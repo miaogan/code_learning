@@ -26,6 +26,8 @@ backend/pytest-cache-files-*/
 backend/.test-scaffold.db
 *.db
 *.sqlite3
+# 后端 pytest 临时目录（backend/tests/conftest.py 的 SCRATCH_DIR，运行后自建）
+backend/tests/.tmp/
 
 # 密钥（示例文件保留）
 .env

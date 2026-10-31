@@ -595,6 +595,52 @@ a {
   margin-top: var(--sp-2);
 }
 
+/* ---------- Toast（复制成功等轻量反馈，DESIGN §0.5 / §0.6 / §4） ---------- */
+.sc-toast {
+  position: fixed;
+  right: var(--sp-6); /* 右下 24 */
+  bottom: var(--sp-6);
+  z-index: 20; /* 高于 .sc-topbar 的 10；tokens.css 无 z 轴 token，沿用既有裸值约定 */
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4); /* 12 16 */
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-8);
+  background: var(--bg-raised);
+  color: var(--text-primary);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body); /* 14 / 22 */
+  box-shadow: var(--elev-2);
+  animation: sc-toast-in var(--base) var(--ease); /* 淡入 180ms + translateY(8px) */
+}
+
+.sc-toast.is-closing {
+  animation: sc-toast-out var(--fast) var(--ease) forwards; /* 淡出 120ms */
+}
+
+@keyframes sc-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--sp-2));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes sc-toast-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(var(--sp-2));
+  }
+}
+
 /* ---------- 上传拖放区（220 高 / 圆角 16 / 虚线 2px） ---------- */
 .sc-dropzone {
   display: flex;

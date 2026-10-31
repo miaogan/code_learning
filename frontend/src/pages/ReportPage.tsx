@@ -10,6 +10,7 @@ import { EmptyState } from '../components/ui/EmptyState'
 import { InlineError } from '../components/ui/InlineError'
 import { PhaseLoader } from '../components/ui/PhaseLoader'
 import { RingProgress } from '../components/ui/RingProgress'
+import { Toast } from '../components/ui/Toast'
 import { formatScore } from '../lib/format'
 import { useAsync } from '../lib/useAsync'
 
@@ -17,6 +18,8 @@ import { useAsync } from '../lib/useAsync'
 const GENERATE_PHASES = ['汇总作答记录', '定位短板', '匹配课程']
 /** 阶段步进秒数：<4s 第 1 段、<9s 第 2 段、之后第 3 段。 */
 const PHASE_STEP_S = [4, 9]
+/** 复制成功提示（AC-3 原文，全仓唯一字面量；文案只在此处出现，检查器断言 3 依赖它）。 */
+const COPY_TOAST_MESSAGE = '已复制到剪贴板，可直接粘进笔记'
 
 function formatPoints(value: number): string {
   if (!Number.isFinite(value)) return '—'
@@ -42,6 +45,16 @@ function errorMessage(error: unknown, fallback: string): string {
   return error instanceof ApiError && error.message ? error.message : fallback
 }
 
+/** 复制失败的中文原因：浏览器拒绝/不支持剪贴板时引导用户走「导出 .md」。 */
+function clipboardErrorMessage(error: unknown): string {
+  if (error instanceof ApiError) return error.message || '复制失败，请改用「导出 .md」手动保存'
+  const name = typeof error === 'object' && error !== null ? (error as { name?: unknown }).name : null
+  if (name === 'NotAllowedError' || name === 'SecurityError') {
+    return '浏览器拒绝访问剪贴板，请改用「导出 .md」手动保存'
+  }
+  return '复制失败，请改用「导出 .md」手动保存'
+}
+
 /**
  * 诊断报告页（AC-5 / AC-6 / AC-9）。
  *
@@ -59,6 +72,9 @@ export default function ReportPage() {
   const [exporting, setExporting] = useState(false)
   const [generateError, setGenerateError] = useState<string | null>(null)
   const [exportError, setExportError] = useState<string | null>(null)
+  const [copying, setCopying] = useState(false)
+  const [copyError, setCopyError] = useState<string | null>(null)
+  const [toast, setToast] = useState<{ message: string; seq: number } | null>(null)
   const [elapsed, setElapsed] = useState(0)
 
   const mountedRef = useRef(true)
@@ -90,6 +106,8 @@ export default function ReportPage() {
     setGenerating(true)
     setGenerateError(null)
     setExportError(null)
+    setCopyError(null)
+    setToast(null)
     setElapsed(0)
     try {
       // 不传 run_ids：服务端默认合并最近一批测评记录（前端不猜哪些记录该进报告）
@@ -129,6 +147,29 @@ export default function ReportPage() {
     }
   }
 
+  const copyMarkdown = async () => {
+    if (!report || copying) return
+    setCopying(true)
+    setCopyError(null)
+    try {
+      // 前置能力判断（非安全上下文 / 旧浏览器）：不进 try 之外抛错，直接走失败分支
+      if (typeof navigator.clipboard?.writeText !== 'function') {
+        throw new ApiError('CLIPBOARD_UNAVAILABLE', '当前浏览器不支持剪贴板复制，请改用「导出 .md」手动保存', 0, true)
+      }
+      // 文本只有一个来源：后端唯一渲染（services/markdown.py）；此处全程零变换（AC-2）
+      const text = await api.reportMarkdown(report.id)
+      await navigator.clipboard.writeText(text)
+      if (!mountedRef.current) return
+      setToast((prev) => ({ message: COPY_TOAST_MESSAGE, seq: (prev?.seq ?? 0) + 1 }))
+    } catch (error) {
+      if (!mountedRef.current) return
+      // 失败只报错不清空页面：报告仍在，用户可重试复制或用「导出 .md」手动兜底
+      setCopyError(clipboardErrorMessage(error))
+    } finally {
+      if (mountedRef.current) setCopying(false)
+    }
+  }
+
   const interviewAvg = report ? report.interview_avg : null
   const examTotal = report ? report.exam_total : null
 
@@ -162,6 +203,9 @@ export default function ReportPage() {
             ) : null}
             {exportError ? (
               <InlineError message={exportError} onRetry={exportMarkdown} retryLabel="重新导出" />
+            ) : null}
+            {copyError ? (
+              <InlineError message={copyError} onRetry={copyMarkdown} retryLabel="重新复制" />
             ) : null}
 
             <Card>
@@ -203,6 +247,9 @@ export default function ReportPage() {
               </div>
 
               <div className="sc-btn-row">
+                <Button variant="secondary" onClick={copyMarkdown} loading={copying}>
+                  复制 Markdown
+                </Button>
                 <Button variant="primary" onClick={exportMarkdown} loading={exporting}>
                   导出 .md
                 </Button>
@@ -277,6 +324,10 @@ export default function ReportPage() {
           <InlineError message={reportAsync.error.message} onRetry={reportAsync.reload} />
         ) : null}
       </div>
+
+      {toast ? (
+        <Toast message={toast.message} seq={toast.seq} onClose={() => setToast(null)} />
+      ) : null}
     </section>
   )
 }
