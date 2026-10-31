@@ -3,7 +3,7 @@
 不新建表：历史只是既有 `runs` / `reports` 的一层投影（TECHNICAL §6·T5）。因此这里只做
 「读 → 换算 → 组装」，SQL 一律走 `repository`（唯一 SQL 出口），本文件不碰 sqlite3。
 
-分数口径（与报告、页面同源，下游不得二次换算）：
+分数口径（与报告、页面同源，下游不得二次换算；实现见公开函数 `score_of`）：
 - 面试 = 均分：`payload.questions[].score` 去掉尚未评分的 `null` 后取均值（保留 1 位小数）；
   这样「答到一半的卷子」不会被按 0 分拉低均分。
 - 笔试 = 总分：优先取服务端判分时写入的 `payload.total`（即 `ExamResult.total` 同名字段，
@@ -72,7 +72,12 @@ def _exam_score(payload: dict[str, Any]) -> float | None:
     return _round1(correct / len(objective) * 100)
 
 
-def _score_of(kind: str, payload: dict[str, Any]) -> float | None:
+def score_of(kind: str, payload: dict[str, Any]) -> float | None:
+    """分数口径的**唯一实现**：`interview` → 均分，`exam` → 总分，未知 kind → `None`。
+
+    公开（原私有 `_score_of`，函数体零改动）：r3 时间线要写同一口径的分数快照，
+    复制一份算式就会变成两套口径（AC-2 要求与历史页差 ≤0.05）。
+    """
     if kind == INTERVIEW_KIND:
         return _interview_score(payload)
     if kind == EXAM_KIND:
@@ -110,7 +115,7 @@ def list_history(limit: int = DEFAULT_LIMIT) -> list[RunSummary]:
             RunSummary(
                 id=row["id"],
                 kind=kind,
-                score=_score_of(kind, row["payload"] or {}),
+                score=score_of(kind, row["payload"] or {}),
                 shortfall_count=_shortfall_count(row["id"], report),
                 created_at=row["created_at"],
             )

@@ -257,6 +257,14 @@ export default function ReportPage() {
                   重新生成
                 </Button>
               </div>
+
+              {/* 润色入口：只在既有按钮行之后追加，复制/导出/重生成的顺序与文案零改动（AC-14 不回归） */}
+              <div className="sc-btn-row sc-report-polish">
+                <p className="sc-meta-line">让简历更贴近这个目标岗位</p>
+                <Link className="sc-btn sc-btn--secondary is-sm" to="/polish">
+                  润色简历
+                </Link>
+              </div>
             </Card>
 
             <div className="sc-profile-dim">

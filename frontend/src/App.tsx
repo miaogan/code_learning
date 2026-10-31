@@ -1,8 +1,10 @@
 import { Route, Routes, useLocation } from 'react-router-dom'
 import { Stepper, type StepItem, type StepState } from './components/ui/Stepper'
+import { ToolNav } from './components/ui/ToolNav'
 import ExamPage from './pages/ExamPage'
 import HistoryPage from './pages/HistoryPage'
 import InterviewPage from './pages/InterviewPage'
+import PolishPage from './pages/PolishPage'
 import ProfilePage from './pages/ProfilePage'
 import ReportPage from './pages/ReportPage'
 import UploadPage from './pages/UploadPage'
@@ -15,6 +17,12 @@ const STEP_BASE = [
   { key: 'exam', label: '模拟笔试', to: '/exam' },
   { key: 'report', label: '诊断报告', to: '/report' },
 ] as const
+
+/** 侧栏「工具」组：非线性的能力出口，不混进步骤（DESIGN §1.1）。 */
+const TOOL_ITEMS = [
+  { key: 'history', label: '成绩趋势', to: '/history' },
+  { key: 'polish', label: '简历润色', to: '/polish' },
+]
 
 /** 全局壳：顶栏 56 + 侧栏 240（<1024 收为顶部横向步骤条），主区 max 1080。 */
 export default function App() {
@@ -48,6 +56,7 @@ export default function App() {
       <div className="sc-shell">
         <aside className="sc-sidebar">
           <Stepper steps={steps} orientation="vertical" />
+          <ToolNav items={TOOL_ITEMS} />
         </aside>
         <main className="sc-main">
           <div className="sc-topstepper">
@@ -61,6 +70,7 @@ export default function App() {
               <Route path="/exam" element={<ExamPage />} />
               <Route path="/report" element={<ReportPage />} />
               <Route path="/history" element={<HistoryPage />} />
+              <Route path="/polish" element={<PolishPage />} />
             </Routes>
           </div>
         </main>

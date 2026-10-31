@@ -21,7 +21,7 @@ from fastapi.testclient import TestClient
 from app.config import get_settings
 from app.db import init_db
 from app.main import app
-from app.schemas import Profile, ProfileProject, ProfileSkill
+from app.schemas import Evidence, Profile, ProfileProject, ProfileSkill, SkillStatus
 from app.services.ai import AIClient
 
 SEED_PATH = Path(__file__).resolve().parent.parent / "app" / "seed" / "questions.json"
@@ -37,6 +37,48 @@ RESUME_TEXT = (
     "项目经历\n数据看板项目：主导表格虚拟滚动与缓存策略\n"
     "技能\nReact TypeScript Python SQLite"
 )
+
+#: 第二份**差异化**简历（r3 增量合并用）：保留 React（小写变体，考归一判同），
+#: 去掉 SQLite（考「消失项转历史」），新增 Go / Kubernetes（考「新增项」）。
+SECOND_RESUME_TEXT = """
+教育经历
+2019-2023 计算机科学与技术 本科
+工作经历
+2023-2026 前端开发工程师，负责组件库与构建提速
+项目经历
+数据看板项目：主导表格虚拟滚动与缓存策略
+服务端项目：用 Go 实现导出服务
+技能
+react TypeScript Python Go Kubernetes
+""".strip()
+
+#: 与 `SECOND_RESUME_TEXT` 逐条对应、可逐字溯源的画像草稿（第二次上传用）。
+SECOND_DRAFT_PAYLOAD: dict[str, Any] = {
+    "skills": [
+        {"name": "React", "source_quote": "react TypeScript Python Go Kubernetes"},
+        {"name": "Go", "source_quote": "react TypeScript Python Go Kubernetes"},
+        {"name": "Kubernetes", "source_quote": "react TypeScript Python Go Kubernetes"},
+    ],
+    "tech_stack": ["React", "TypeScript", "Go", "Kubernetes"],
+    "years_experience": 3.5,
+    "projects": [
+        {
+            "name": "数据看板",
+            "role": "前端主力",
+            "period": "2025-2026",
+            "bullets": ["表格虚拟滚动", "查询结果缓存"],
+            "source_quote": "数据看板项目：主导表格虚拟滚动与缓存策略",
+        },
+        {
+            "name": "导出服务",
+            "role": "服务端开发",
+            "period": "2026",
+            "bullets": ["批量导出"],
+            "source_quote": "服务端项目：用 Go 实现导出服务",
+        },
+    ],
+    "target_role": "后端开发工程师",
+}
 
 #: 与 `RESUME_TEXT` 逐条对应的画像草稿（模型原始产出的 5 维度）。
 DRAFT_PAYLOAD: dict[str, Any] = {
@@ -59,6 +101,73 @@ DRAFT_PAYLOAD: dict[str, Any] = {
 }
 
 Responder = Callable[[type[Any], str], dict[str, Any]]
+
+#: 润色建议模板：`original_text` 逐字取自 `RESUME_TEXT`（反幻觉校验的真实输入口径）。
+#: 五条覆盖 4 个 section；第 3 条与第 2 条区间重叠，是 `compose_full` 去重的天然用例。
+POLISH_CASES: tuple[dict[str, Any], ...] = (
+    {
+        "section": "experience",
+        "original_text": "2023-2026 前端开发工程师，负责组件库与构建提速",
+        "suggested_text": "2023-2026 前端开发工程师，主导组件库建设与构建流程提速",
+        "reason": "把「负责」改成「主导」，让职责与影响力可读",
+    },
+    {
+        "section": "project",
+        "original_text": "数据看板项目：主导表格虚拟滚动与缓存策略",
+        "suggested_text": "数据看板项目：主导大表格虚拟滚动与查询结果缓存，降低渲染开销",
+        "reason": "补充技术场景与收益，避免只有名词堆叠",
+    },
+    {
+        "section": "project",
+        "original_text": "表格虚拟滚动",
+        "suggested_text": "大表格虚拟滚动",
+        "reason": "同一区间的更短表述（与上一条重叠，成稿只取一条）",
+    },
+    {
+        "section": "education",
+        "original_text": "2019-2023 计算机科学与技术 本科",
+        "suggested_text": "2019-2023 计算机科学与技术 本科，专业课程与工程实践并重",
+        "reason": "教育背景补一句侧重，信息量更足",
+    },
+    {
+        "section": "summary",
+        "original_text": "React TypeScript Python SQLite",
+        "suggested_text": "React TypeScript Python SQLite（按目标岗位顺序排列）",
+        "reason": "技能清单按岗位优先级排序，便于快速匹配",
+    },
+)
+
+#: 反幻觉用例的「伪输出」：新增数字（8000 万）与新增专名（GMV）都必须被拦下。
+HALLUCINATED_CASE: dict[str, Any] = {
+    "section": "project",
+    "original_text": "数据看板项目：主导表格虚拟滚动与缓存策略",
+    "suggested_text": "数据看板项目：2023 年 GMV 8000 万，主导表格虚拟滚动与缓存策略",
+    "reason": "补充业务结果（这条应当被降级为〈待补充〉或整条丢弃）",
+}
+
+
+def polish_payload(*, hallucinated: bool = False) -> dict[str, Any]:
+    """润色草稿响应的模板（服务层 `_SuggestDraft` 的**超集**：多余的键被 pydantic
+    默认的 `extra="ignore"` 忽略，因此**不绑定**模型的确切字段名）。
+
+    用法：`patch_ai(lambda *_: polish_payload())` 或 `FakeAI(responder=...)`，零网络。
+    `hallucinated=True` 时追加 `HALLUCINATED_CASE`，覆盖 AC-9 的降级 / 丢弃路径。
+    """
+    cases = [*POLISH_CASES, *([HALLUCINATED_CASE] if hallucinated else [])]
+    return {
+        "suggestions": [
+            {
+                **case,
+                "id": f"ps-{index}",
+                "target_role": None,
+                "flags": [],
+                "start": 0,
+                "end": 0,
+            }
+            for index, case in enumerate(cases, start=1)
+        ],
+        "dropped_count": 0,
+    }
 
 
 @pytest.fixture()
@@ -90,6 +199,17 @@ def resume_text() -> str:
 
 
 @pytest.fixture()
+def second_resume_text() -> str:
+    """第二份差异化简历正文（与 `resume_text` 形成「同技能 / 消失项 / 新增项」对照）。"""
+    return SECOND_RESUME_TEXT
+
+
+@pytest.fixture()
+def second_draft_payload() -> dict[str, Any]:
+    return json.loads(json.dumps(SECOND_DRAFT_PAYLOAD, ensure_ascii=False))
+
+
+@pytest.fixture()
 def draft_payload() -> dict[str, Any]:
     """画像草稿的深拷贝：用例改写它不影响其他用例。"""
     return json.loads(json.dumps(DRAFT_PAYLOAD, ensure_ascii=False))
@@ -97,7 +217,13 @@ def draft_payload() -> dict[str, Any]:
 
 @pytest.fixture()
 def profile_factory(resume_text: str) -> Callable[..., Profile]:
-    """造一份可溯源的 Profile（可直接走 repository 落库）。"""
+    """造一份可溯源的 Profile（可直接走 repository 落库）。
+
+    默认 `with_evidence=True`：r3 起每个能力项天生带一条 `Evidence`（`resume_id` /
+    `file_name` / `captured_at` 指向本画像的来源），这是「证据链熬过 DB 往返」的基座。
+    要造**存量（r1）画像**——只有 `source_quote`、没有证据链——显式传 `with_evidence=False`；
+    `status="historical"` 可直接造「已消失的能力项」。
+    """
 
     def _make(
         profile_id: str = "prof-1",
@@ -105,14 +231,40 @@ def profile_factory(resume_text: str) -> Callable[..., Profile]:
         *,
         tech_stack: list[str] | None = None,
         target_role: str = "前端开发工程师",
+        status: SkillStatus = "active",
+        with_evidence: bool = True,
+        file_name: str = "简历.txt",
+        captured_at: str = "2026-10-31T05:00:00+00:00",
     ) -> Profile:
+        def _evidence(quote: str) -> list[Evidence]:
+            if not with_evidence:
+                return []
+            return [
+                Evidence(
+                    quote=quote,
+                    resume_id=resume_id,
+                    file_name=file_name,
+                    captured_at=captured_at,
+                )
+            ]
+
         return Profile(
             id=profile_id,
             resume_id=resume_id,
             updated_at="2026-10-31T05:00:00+00:00",
             skills=[
-                ProfileSkill(name="React", source_quote="React TypeScript Python SQLite"),
-                ProfileSkill(name="Python", source_quote="React TypeScript Python SQLite"),
+                ProfileSkill(
+                    name="React",
+                    source_quote="React TypeScript Python SQLite",
+                    source_quotes=_evidence("React TypeScript Python SQLite"),
+                    status=status,
+                ),
+                ProfileSkill(
+                    name="Python",
+                    source_quote="React TypeScript Python SQLite",
+                    source_quotes=_evidence("React TypeScript Python SQLite"),
+                    status=status,
+                ),
             ],
             tech_stack=tech_stack or ["React", "TypeScript", "Python", "SQLite"],
             years_experience=3.0,
@@ -123,6 +275,8 @@ def profile_factory(resume_text: str) -> Callable[..., Profile]:
                     period="2025-2026",
                     bullets=["表格虚拟滚动"],
                     source_quote="数据看板项目：主导表格虚拟滚动与缓存策略",
+                    source_quotes=_evidence("数据看板项目：主导表格虚拟滚动与缓存策略"),
+                    status=status,
                 )
             ],
             target_role=target_role,
@@ -167,6 +321,20 @@ class FakeAI:
 @pytest.fixture()
 def fake_ai() -> FakeAI:
     return FakeAI()
+
+
+@pytest.fixture()
+def polish_responder() -> Responder:
+    """润色链路的零网络 responder 模板（现成的 `Responder`，可直接给 `FakeAI` / `patch_ai`）。
+
+    断言口径：五条建议的 `original_text` 都能在 `RESUME_TEXT` 里逐字命中；
+    需要反幻觉用例时改用自己的 responder 并复用 `polish_payload(hallucinated=True)`。
+    """
+
+    def _responder(_model_cls: type[Any], _user: str) -> dict[str, Any]:
+        return polish_payload()
+
+    return _responder
 
 
 @pytest.fixture()

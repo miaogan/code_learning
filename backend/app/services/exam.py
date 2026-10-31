@@ -37,7 +37,7 @@ from ..schemas import (
     PerQuestionResult,
     Profile,
 )
-from . import rules
+from . import rules, timeline
 
 SEED_PATH = Path(__file__).resolve().parent.parent / "seed" / "questions.json"
 EXAM_KIND = "exam"
@@ -362,6 +362,10 @@ def submit_run(run_id: str, answers: dict[str, list[str] | str]) -> ExamResult:
         }
     )
     repository.save_run(run_id, payload, repository.RUN_COMPLETED)
+    # 时间线是旁路：写失败自行返回 None，绝不打断提交判分（r3 AC-1/AC-3）。
+    timeline.record_run_event(
+        {"id": run_id, "kind": EXAM_KIND, "payload": payload, "status": repository.RUN_COMPLETED}
+    )
 
     return ExamResult(
         total=total,

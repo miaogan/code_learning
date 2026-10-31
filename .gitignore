@@ -26,6 +26,12 @@ backend/pytest-cache-files-*/
 backend/.test-scaffold.db
 *.db
 *.sqlite3
+# SQLite 旁路文件：`*.db` 匹配不到 `app.db-wal` / `app.db-shm`（WAL 模式或崩溃残留会留在库里）
+*.db-wal
+*.db-shm
+*.db-journal
+*.sqlite3-wal
+*.sqlite3-shm
 # 后端 pytest 临时目录（backend/tests/conftest.py 的 SCRATCH_DIR，运行后自建）
 backend/tests/.tmp/
 

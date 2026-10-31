@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { api } from '../api/client'
+import { TimelineSection } from '../components/history/TimelineSection'
 import { TrendTable } from '../components/history/TrendTable'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
@@ -79,6 +80,9 @@ export default function HistoryPage() {
           </div>
         </>
       ) : null}
+
+      {/* 成长时间线（AC-4/5）：内嵌在趋势表下方，自带三态 —— 它失败时趋势表照常显示。 */}
+      <TimelineSection runRows={rows} />
     </section>
   )
 }

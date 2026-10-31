@@ -14,7 +14,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from .db import connection
-from .schemas import Profile, Report, ResumeMeta
+from .schemas import Profile, Report, ResumeMeta, TimelineEvent
 
 RUN_RUNNING = "running"
 RUN_COMPLETED = "completed"
@@ -66,10 +66,28 @@ def insert_document(meta: ResumeMeta, text: str, *, mime: str = "application/oct
         )
 
 
-def get_document_text(document_id: str) -> str | None:
+def get_document(document_id: str) -> dict[str, Any] | None:
+    """文档元信息 + 正文：`{text, file_name, created_at}`，查不到 `None`。
+
+    画像合并要「来源文件名 / 抓取时间」写进证据链，润色要正文与文件名 —— 三者同一行，
+    故一次读出；`get_document_text` 复用它，读路径因此只有一份 SQL。
+    """
     with connection() as conn:
-        row = conn.execute("SELECT text FROM documents WHERE id = ?", (document_id,)).fetchone()
-    return None if row is None else str(row["text"])
+        row = conn.execute(
+            "SELECT text, file_name, created_at FROM documents WHERE id = ?", (document_id,)
+        ).fetchone()
+    if row is None:
+        return None
+    return {
+        "text": str(row["text"]),
+        "file_name": row["file_name"],
+        "created_at": row["created_at"],
+    }
+
+
+def get_document_text(document_id: str) -> str | None:
+    document = get_document(document_id)
+    return None if document is None else str(document["text"])
 
 
 # --- profiles ------------------------------------------------------------
@@ -197,3 +215,78 @@ def latest_report() -> Report | None:
             "SELECT payload FROM reports ORDER BY created_at DESC LIMIT 1"
         ).fetchone()
     return None if row is None else _report_of(row)
+
+
+# --- timeline ------------------------------------------------------------
+
+_TIMELINE_INSERT = (
+    "INSERT INTO timeline_events (id, type, ref_id, occurred_at, payload, created_at) "
+    "VALUES (?, ?, ?, ?, ?, ?) "
+    "ON CONFLICT(type, ref_id) DO NOTHING"
+)
+
+
+def insert_timeline_event(event: TimelineEvent) -> bool:
+    """幂等写入时间线事件：插入成功 `True`，同 `(type, ref_id)` 已存在 `False`。
+
+    幂等的最终真值是 `db.py` 的 `UNIQUE(type, ref_id)` 索引，`ON CONFLICT DO NOTHING`
+    只负责「撞了也不抛」——写入钩子因此不会因为重复调用把业务流打断（AC-3）。
+    """
+    with connection() as conn:
+        cursor = conn.execute(
+            _TIMELINE_INSERT,
+            (
+                event.id,
+                event.type,
+                event.ref_id,
+                event.occurred_at,
+                event.model_dump_json(),
+                _now(),
+            ),
+        )
+        return cursor.rowcount > 0
+
+
+def _timeline_of(row: sqlite3.Row) -> TimelineEvent:
+    return TimelineEvent.model_validate_json(row["payload"])
+
+
+def get_timeline_event(event_type: str, ref_id: str) -> TimelineEvent | None:
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT payload FROM timeline_events WHERE type = ? AND ref_id = ?",
+            (event_type, ref_id),
+        ).fetchone()
+    return None if row is None else _timeline_of(row)
+
+
+def list_timeline_events(limit: int = 20, event_type: str | None = None) -> list[TimelineEvent]:
+    """时间线**唯一排序点**（`occurred_at DESC, created_at DESC`）：服务层与前端不得二次排序。"""
+    sql = "SELECT payload FROM timeline_events"
+    params: tuple[Any, ...]
+    if event_type is None:
+        sql += " ORDER BY occurred_at DESC, created_at DESC LIMIT ?"
+        params = (limit,)
+    else:
+        sql += " WHERE type = ? ORDER BY occurred_at DESC, created_at DESC LIMIT ?"
+        params = (event_type, limit)
+    with connection() as conn:
+        rows = conn.execute(sql, params).fetchall()
+    return [_timeline_of(row) for row in rows]
+
+
+def previous_timeline_event(
+    event_type: str, before: str, exclude_id: str = ""
+) -> TimelineEvent | None:
+    """同类型里严格早于 `before` 的上一条事件（`exclude_id` 排除本次事件，重试时不自比较）。
+
+    严格 `<` 而非 `<=`：同一时刻的事件不构成「上一次」，避免自身/并列事件被当成对比基准。
+    """
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT payload FROM timeline_events "
+            "WHERE type = ? AND occurred_at < ? AND id != ? "
+            "ORDER BY occurred_at DESC, created_at DESC LIMIT 1",
+            (event_type, before, exclude_id),
+        ).fetchone()
+    return None if row is None else _timeline_of(row)

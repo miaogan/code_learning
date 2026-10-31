@@ -1,21 +1,34 @@
-"""画像生成（AC-2 / anti-goal 1）：AI 读正文 → ProfileDraft → 原文溯源校验 → 落库。
+"""画像生成（AC-2 / anti-goal 1）：AI 读正文 → ProfileDraft → 原文溯源校验 → 增量合并 → 落库。
 
-契约：
-- `generate_profile` 返回**已入库**的 `Profile`（含 id / resume_id / updated_at）。
+契约（r3 起）：
+- `generate_profile` 返回**已入库**的 `ProfileWithMerge`：`Profile` 部分是合并后的
+  唯一画像（**同一个 `profile_id`**，多次上传只累积不新增行），`merge_summary` 是
+  本次合并的一次性事件摘要（不写库，不进 `GET /api/profiles/latest` 的持久契约）。
+- 合并语义全部在 `services/profile_merge.py`：本文件只负责 AI 编排与「写一次」，
+  不重复任何判同 / 历史项 / 证据累积规则。
 - 任何一条 skills / projects 的 `source_quote` 若不能在简历正文里逐字命中，一律在
   入库前抛 `AI_SCHEMA_INVALID`（502）—— 宁可让用户重试，也不落一份「无源之词」的画像。
+- 时间线事件写在落库成功之后，且**写入失败不阻断主流程**（AC-3）。
 - 注入 `client=` 即可零网络测试（TECHNICAL §6.1）。
 """
 
 from __future__ import annotations
 
-import uuid
-from datetime import UTC, datetime
+from collections.abc import Callable
+from dataclasses import asdict
+from typing import Any
 
+from .. import repository
 from ..errors import AI_SCHEMA_INVALID, VALIDATION_ERROR, AppError
-from ..repository import insert_profile
 from ..schemas import Profile, ProfileDraft
 from .ai import AIClient
+from .profile_merge import (
+    STATUS_HISTORICAL,
+    ProfileMergeSummary,
+    ProfileWithMerge,
+    merge_profile,
+    normalize_name,
+)
 
 #: 送进模型的简历正文上限：超出即截断（长简历既撑上下文，也会拖慢首屏）。
 MAX_PROFILE_CHARS = 12000
@@ -92,10 +105,117 @@ def verify_quotes(draft: ProfileDraft, text: str) -> None:
             )
 
 
+def _is_duplicate(old: Profile | None, body: str) -> bool:
+    """同一份简历判定（Q4）：新旧正文去空白后完全一致即视为重复上传。
+
+    正文取自**旧画像来源简历**；读不到正文时保守判「不重复」—— 误报重复比漏报更糟
+    （漏报只多记一条事件，误报会让用户以为画像没更新）。
+    """
+    if old is None or not old.resume_id:
+        return False
+    previous = repository.get_document_text(old.resume_id)
+    if previous is None:
+        return False
+    return _squash(_clip(previous)) == _squash(body)
+
+
+def _merge_once(
+    old: Profile | None,
+    draft: ProfileDraft,
+    *,
+    resume_id: str,
+    file_name: str,
+    captured_at: str,
+    duplicate: bool,
+) -> tuple[Profile, ProfileMergeSummary]:
+    """一次合并：判同 / 证据累积 / 历史项全部在 `profile_merge`，这里只透传 duplicate。"""
+    return merge_profile(
+        old,
+        draft,
+        resume_id=resume_id,
+        file_name=file_name,
+        captured_at=captured_at,
+        duplicate=duplicate,
+    )
+
+
+def _summary_payload(summary: ProfileMergeSummary) -> dict[str, Any]:
+    dumper = getattr(summary, "model_dump", None)
+    return dumper() if callable(dumper) else asdict(summary)
+
+
+def _with_summary(profile: Profile, summary: ProfileMergeSummary) -> ProfileWithMerge:
+    """组装响应：画像本体 + 一次性 `merge_summary`（不落库、不进 GET 契约）。"""
+    payload = profile.model_dump()
+    if "merge_summary" in getattr(ProfileWithMerge, "model_fields", {}):
+        payload["merge_summary"] = _summary_payload(summary)
+    return ProfileWithMerge.model_validate(payload)
+
+
+def _changed_skill_names(
+    old: Profile | None, merged: Profile
+) -> tuple[list[str], list[str]]:
+    """合并前后的能力项差异（时间线 resume 事件要的是「名字」而不是计数）。
+
+    - added：本次简历新增的 active 能力项；
+    - removed：曾经存在、本次没写而转 historical 的能力项（不是删除）。
+    """
+    previous = {normalize_name(skill.name) for skill in (old.skills if old else [])}
+    added = [
+        skill.name
+        for skill in merged.skills
+        if normalize_name(skill.name) not in previous
+    ]
+    removed = [
+        skill.name
+        for skill in merged.skills
+        if normalize_name(skill.name) in previous
+        and getattr(skill, "status", "") == STATUS_HISTORICAL
+    ]
+    return added, removed
+
+
+def _record_resume_event(
+    *,
+    resume_id: str,
+    skill_added: list[str],
+    skill_removed: list[str],
+    duplicate: bool,
+) -> None:
+    """写简历时间线事件：时间线是**旁路**，任何失败都不阻断画像主流程（AC-3）。"""
+    recorder = _timeline_recorder("record_resume_event")
+    if recorder is None:
+        return
+    try:
+        recorder(
+            resume_id=resume_id,
+            skill_added=skill_added,
+            skill_removed=skill_removed,
+            duplicate=duplicate,
+        )
+    except Exception:  # noqa: BLE001 - 旁路写入失败不得影响画像落库结果
+        return
+
+
+def _timeline_recorder(name: str) -> Callable[..., Any] | None:
+    """惰性取时间线钩子（`services/timeline.py`）；未落地时返回 None（时间线非阻断）。"""
+    try:
+        from . import timeline
+    except Exception:  # noqa: BLE001 - 并行开发窗口内时间线模块可能尚未落地
+        return None
+    recorder = getattr(timeline, name, None)
+    return recorder if callable(recorder) else None
+
+
 async def generate_profile(
-    resume_id: str, text: str, *, client: AIClient | None = None
-) -> Profile:
-    """读简历正文 → 模型抽 5 维度 → 校验溯源 → 入库并返回。"""
+    resume_id: str,
+    text: str,
+    *,
+    file_name: str = "",
+    captured_at: str = "",
+    client: AIClient | None = None,
+) -> ProfileWithMerge:
+    """读简历正文 → 模型抽 5 维度 → 校验溯源 → 合并进当前画像 → 落库 → 写 resume 事件。"""
     body = _clip(text)
     if not body:
         raise AppError(
@@ -118,13 +238,37 @@ async def generate_profile(
             retryable=True,
         )
 
-    profile = Profile.model_validate(
-        {
-            **draft.model_dump(),
-            "id": uuid.uuid4().hex,
-            "resume_id": resume_id,
-            "updated_at": datetime.now(UTC).isoformat(),
-        }
+    # 读—合并—写：先取当前画像做合并基底，写入前再读一次；窗口内被别人改过就
+    # 以最新基底重合并一次（PRD R7 乐观校验，单用户本地场景足够）。
+    old = repository.latest_profile()
+    duplicate = _is_duplicate(old, body)
+    merged, summary = _merge_once(
+        old,
+        draft,
+        resume_id=resume_id,
+        file_name=file_name,
+        captured_at=captured_at,
+        duplicate=duplicate,
     )
-    insert_profile(profile)
-    return profile
+    guard = repository.latest_profile()
+    if guard is not None and (old is None or guard.id != old.id or guard.updated_at != old.updated_at):
+        merged, summary = _merge_once(
+            guard,
+            draft,
+            resume_id=resume_id,
+            file_name=file_name,
+            captured_at=captured_at,
+            duplicate=_is_duplicate(guard, body),
+        )
+        old = guard  # 事件差异必须相对最终合并基底计算
+
+    repository.insert_profile(merged)
+    # 事件必须在落库成功之后写（画像失败时不留半条时间线，AC-3）。
+    added, removed = _changed_skill_names(old, merged)
+    _record_resume_event(
+        resume_id=resume_id,
+        skill_added=added,
+        skill_removed=removed,
+        duplicate=summary.duplicate,
+    )
+    return _with_summary(merged, summary)

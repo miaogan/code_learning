@@ -23,7 +23,7 @@ from .. import repository
 from ..errors import AI_SCHEMA_INVALID, NOT_FOUND, VALIDATION_ERROR, AppError
 from ..repository import RUN_COMPLETED, RUN_RUNNING
 from ..schemas import InterviewQuestion, InterviewRun, Profile, ScoreResult
-from . import rules
+from . import rules, timeline
 from .ai import AIClient
 
 #: 单题评分超时：AC-3 要求 15s 内出分，留 1s 给网络与落库（默认 20s 太宽，见 TECHNICAL §5）。
@@ -267,4 +267,9 @@ async def score_answer(
     payload["total"] = len(entries)
     status = RUN_COMPLETED if answered_count >= len(entries) and entries else RUN_RUNNING
     repository.save_run(run_id, payload, status)
+    if status == RUN_COMPLETED:
+        # 时间线是旁路：写失败自行返回 None，绝不打断「答完最后一题」（r3 AC-1/AC-3）。
+        timeline.record_run_event(
+            {"id": run_id, "kind": INTERVIEW_KIND, "payload": payload, "status": status}
+        )
     return ScoreResult(score=float(draft.score), comment=comment)

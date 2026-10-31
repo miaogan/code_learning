@@ -12,7 +12,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from .config import get_settings
 from .db import init_db
 from .errors import HTTP_ERROR, NOT_FOUND, VALIDATION_ERROR, AppError
-from .routers import courses, exam, history, interview, profile, report, resume
+from .routers import courses, exam, history, interview, profile, report, resume, timeline
 from .schemas import HealthResponse
 
 APP_VERSION = "0.1.0"
@@ -81,6 +81,7 @@ def create_app() -> FastAPI:
     app.include_router(report.router)
     app.include_router(courses.router)
     app.include_router(history.router)
+    app.include_router(timeline.router)
 
     @app.get("/health", response_model=HealthResponse, tags=["ops"], summary="探活（AC-8）")
     def health() -> HealthResponse:

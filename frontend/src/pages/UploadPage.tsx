@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import type { ChangeEvent, DragEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ApiError, api } from '../api/client'
-import type { ResumeMeta } from '../api/types'
+import type { ProfileMergeSummary, ResumeMeta } from '../api/types'
+import { mergeSummaryText } from '../components/profile/MergeSummaryBar'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { Chip } from '../components/ui/Chip'
@@ -15,7 +16,16 @@ import { setFlow } from '../state/flow'
 const MAX_BYTES = 10 * 1024 * 1024
 const ACCEPTED = ['.pdf', '.docx', '.txt']
 
-type Phase = 'idle' | 'uploading' | 'done' | 'error'
+/** idle →（上传）→（生成/合并画像）→ done；任一步失败进 error 并记住失败在哪一步（重试只重跑那一步）。 */
+type Phase = 'idle' | 'uploading' | 'profiling' | 'done' | 'error'
+
+interface Failure {
+  message: string
+  /** 失败发生在哪一步：上传解析 / 画像生成合并（决定「重试」重跑哪一段）。 */
+  stage: 'upload' | 'profile'
+  /** 本地校验失败（格式/大小/空文件）重跑同一文件毫无意义，直接不给重试入口。 */
+  retryable: boolean
+}
 
 /** 与后端一致的中文错误文案（AC-1：空文件 / 加密 PDF / 超限都要给出具体原因）。 */
 function validateLocally(file: File): string | null {
@@ -32,6 +42,11 @@ function validateLocally(file: File): string | null {
   return null
 }
 
+/**
+ * 上传页（r3 行为变更，TECHNICAL §10-1）：上传成功后**立即**生成/合并画像。
+ * 既有实现上传完直接跳 `/profile` 读 `latestProfile`，首份画像永远生成不出来（死链）；
+ * r3 的 AC-6 以「上传 → 生成/合并」为入口，合并摘要随 `location.state` 一次性带给画像页。
+ */
 export default function UploadPage() {
   const navigate = useNavigate()
   const inputRef = useRef<HTMLInputElement>(null)
@@ -40,26 +55,53 @@ export default function UploadPage() {
   const [dragOver, setDragOver] = useState(false)
   const [picked, setPicked] = useState<File | null>(null)
   const [meta, setMeta] = useState<ResumeMeta | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [elapsedSec, setElapsedSec] = useState(0)
+  const [merge, setMerge] = useState<ProfileMergeSummary | null>(null)
+  const [failure, setFailure] = useState<Failure | null>(null)
+  const [uploadSec, setUploadSec] = useState(0)
+  const [profileSec, setProfileSec] = useState(0)
 
   useEffect(() => {
-    if (phase !== 'uploading') return
-    const timer = window.setInterval(() => setElapsedSec((value) => value + 1), 1000)
+    if (phase !== 'uploading' && phase !== 'profiling') return
+    const bump = phase === 'uploading' ? setUploadSec : setProfileSec
+    const timer = window.setInterval(() => bump((value) => value + 1), 1000)
     return () => window.clearInterval(timer)
   }, [phase])
+
+  /** 上传之后的第二步：生成/合并画像；失败只影响本步（简历已在服务端，重试不必重传）。 */
+  const buildProfile = async (resumeId: string, controller: AbortController): Promise<void> => {
+    setPhase('profiling')
+    try {
+      const generated = await api.generateProfile(resumeId, controller.signal)
+      setMerge(generated.merge_summary ?? null)
+      setFlow({ hasResume: true, hasProfile: true })
+      setPhase('done')
+    } catch (err) {
+      if (controller.signal.aborted) {
+        setPhase('idle')
+        return
+      }
+      setFailure({
+        message: err instanceof ApiError ? err.message : '画像生成失败，请稍后重试',
+        stage: 'profile',
+        retryable: true,
+      })
+      setPhase('error')
+    }
+  }
 
   const upload = async (file: File) => {
     const localError = validateLocally(file)
     if (localError) {
-      setError(localError)
+      setFailure({ message: localError, stage: 'upload', retryable: false })
       setPhase('error')
       return
     }
     setPicked(file)
-    setError(null)
+    setFailure(null)
     setMeta(null)
-    setElapsedSec(0)
+    setMerge(null)
+    setUploadSec(0)
+    setProfileSec(0)
     setPhase('uploading')
 
     const controller = new AbortController()
@@ -68,17 +110,51 @@ export default function UploadPage() {
       const result = await api.uploadResume(file, controller.signal)
       setMeta(result)
       setFlow({ hasResume: true })
-      setPhase('done')
+      // 第二步的失败由 buildProfile 内部处理，不会落到这里的 catch（只有上传解析失败才进这里）。
+      await buildProfile(result.resume_id, controller)
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : '解析失败，请稍后重试')
+      if (controller.signal.aborted) {
+        setPhase('idle')
+        return
+      }
+      setFailure({
+        message: err instanceof ApiError ? err.message : '解析失败，请稍后重试',
+        stage: 'upload',
+        retryable: true,
+      })
       setPhase('error')
     }
+  }
+
+  const retry = () => {
+    if (failure === null) return
+    if (failure.stage === 'upload') {
+      if (picked) void upload(picked)
+      return
+    }
+    if (meta === null) {
+      setPhase('idle')
+      return
+    }
+    const controller = new AbortController()
+    abortRef.current = controller
+    void buildProfile(meta.resume_id, controller)
   }
 
   const cancel = () => {
     abortRef.current?.abort()
     setPhase('idle')
-    setElapsedSec(0)
+    setUploadSec(0)
+    setProfileSec(0)
+  }
+
+  const reset = () => {
+    abortRef.current?.abort()
+    setPicked(null)
+    setMeta(null)
+    setMerge(null)
+    setFailure(null)
+    setPhase('idle')
   }
 
   const handleFiles = (files: FileList | null) => {
@@ -97,6 +173,13 @@ export default function UploadPage() {
     event.target.value = ''
   }
 
+  /** 进画像页时只在真的合并过时带 state（「本次合并」语义，刷新即消失）。 */
+  const toProfile = () => {
+    navigate('/profile', merge === null ? undefined : { state: { merge } })
+  }
+
+  const busy = phase === 'uploading' || phase === 'profiling'
+
   return (
     <section>
       <header className="sc-page-header">
@@ -114,6 +197,7 @@ export default function UploadPage() {
         }}
         onDragLeave={() => setDragOver(false)}
         onDrop={onDrop}
+        disabled={busy}
       >
         <span className="sc-dropzone-inner">
           <span className="sc-dropzone-text">拖入或点击选择文件</span>
@@ -136,12 +220,19 @@ export default function UploadPage() {
         <Chip label="解析约 30 秒" />
       </div>
 
-      {error ? (
+      {failure !== null && phase === 'error' ? (
         <div className="sc-actions">
           <InlineError
-            message={error}
-            onRetry={picked ? () => void upload(picked) : undefined}
+            message={failure.message}
+            onRetry={failure.retryable ? retry : undefined}
           />
+          {failure.stage === 'profile' && meta !== null ? (
+            <div className="sc-btn-row">
+              <Button variant="secondary" onClick={toProfile}>
+                先去画像页
+              </Button>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -151,10 +242,31 @@ export default function UploadPage() {
             <div className="sc-upload-summary">
               <RingProgress size={56} state="indeterminate" ariaLabel="解析中" />
               <PhaseLoader
-                phases={['上传简历', '解析简历 → 提取正文']}
+                phases={['上传简历', '解析简历 → 提取正文', 'AI 生成并合并画像']}
                 active={1}
-                elapsedSec={elapsedSec}
+                elapsedSec={uploadSec}
                 title={picked ? picked.name : undefined}
+              />
+              <div className="sc-actions">
+                <Button variant="ghost" size="sm" onClick={cancel}>
+                  取消
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </div>
+      ) : null}
+
+      {phase === 'profiling' ? (
+        <div className="sc-actions">
+          <Card>
+            <div className="sc-upload-summary">
+              <RingProgress size={56} state="indeterminate" ariaLabel="生成画像" />
+              <PhaseLoader
+                phases={['上传简历', '解析简历 → 提取正文', 'AI 生成并合并画像']}
+                active={2}
+                elapsedSec={profileSec}
+                title={meta ? `${meta.file_name} · 正在生成可溯源画像` : undefined}
               />
               <div className="sc-actions">
                 <Button variant="ghost" size="sm" onClick={cancel}>
@@ -174,8 +286,26 @@ export default function UploadPage() {
               <p className="sc-summary-meta">
                 抽取 {formatChars(meta.chars)} · {meta.sections} 章节
               </p>
+
+              {merge !== null ? (
+                <>
+                  <p className={merge.duplicate ? 'sc-meta-line' : 'sc-summary-meta'}>
+                    {`本次合并 · ${mergeSummaryText(merge)}`}
+                  </p>
+                  <p className="sc-meta-line">原有能力与证据不会被覆盖，可在画像页逐条核溯源</p>
+                  {merge.duplicate ? (
+                    <div className="sc-chips">
+                      <Chip label="同一份简历 · 仍记为一次成长事件" />
+                    </div>
+                  ) : null}
+                </>
+              ) : null}
+
               <div className="sc-actions">
-                <Button onClick={() => navigate('/profile')}>开始分析画像</Button>
+                <Button onClick={toProfile}>查看画像</Button>
+                <Button variant="secondary" onClick={reset}>
+                  重新上传
+                </Button>
               </div>
             </div>
           </Card>

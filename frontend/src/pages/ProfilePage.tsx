@@ -1,15 +1,26 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { ApiError, api } from '../api/client'
-import type { Profile, ProfilePatch } from '../api/types'
+import type {
+  Evidence,
+  Profile,
+  ProfileMergeSummary,
+  ProfilePatch,
+  ProfileProject,
+  ProfileSkill,
+} from '../api/types'
+import { EvidenceList } from '../components/profile/EvidenceList'
+import { MergeSummaryBar } from '../components/profile/MergeSummaryBar'
 import { ProfileDimension } from '../components/profile/ProfileDimension'
 import type { DimensionEntry, ProfileDimensionKey } from '../components/profile/ProfileDimension'
 import { ProfileEditor } from '../components/profile/ProfileEditor'
 import type { EditorField } from '../components/profile/ProfileEditor'
+import { Chip } from '../components/ui/Chip'
 import { EmptyState } from '../components/ui/EmptyState'
 import { InlineError } from '../components/ui/InlineError'
 import { PhaseLoader } from '../components/ui/PhaseLoader'
 import { useAsync } from '../lib/useAsync'
+
 
 /* #region t8-logic */
 /** 5 维度的展示顺序与文案（DESIGN §2.2）；顺序即页面自上而下的卡序。 */
@@ -45,25 +56,88 @@ export function parseEntryKey(entryKey: string): { dimension: ProfileDimensionKe
   return { dimension, index }
 }
 
+/** 带累积证据的条目（技能与项目共用同一判定口径；`source_quotes`/`status` 为 r3 新增字段）。 */
+type TrackedEntry = {
+  name: string
+  source_quote: string
+  source_quotes?: Evidence[]
+  status?: string
+}
+
+/** 兼容回填口径（PRD R1）：`source_quotes` 为空 ⇒ 用兼容字段 `source_quote` 组成首条证据。 */
+export function evidenceOf(entry: TrackedEntry): Evidence[] {
+  const quotes = entry.source_quotes
+  if (Array.isArray(quotes) && quotes.length > 0) return quotes
+  const compat = typeof entry.source_quote === 'string' ? entry.source_quote.trim() : ''
+  return compat === '' ? [] : [{ quote: entry.source_quote, resume_id: '', file_name: '', captured_at: '' }]
+}
+
+/** 消失项（本次简历未出现）由服务端标 `historical`：证据保留，但不进主卡片、不进策划素材。 */
+export function isHistorical(entry: TrackedEntry): boolean {
+  return entry.status === 'historical'
+}
+
+/** 历史能力 / 历史项目（折叠分组的数据源：页面只分组，不重算合并结果）。 */
+export function historicalSkills(profile: Profile): ProfileSkill[] {
+  return profile.skills.filter((item) => isHistorical(item))
+}
+
+export function historicalProjects(profile: Profile): ProfileProject[] {
+  return profile.projects.filter((item) => isHistorical(item))
+}
+
+/** 一次性合并摘要的入参校验：`location.state` 属不可信外部输入，字段不合法就整条不渲染。 */
+export function normalizeMergeSummary(raw: unknown): ProfileMergeSummary | null {
+  if (typeof raw !== 'object' || raw === null) return null
+  const record = raw as Record<string, unknown>
+  const added = record.added
+  const historical = record.historical
+  const evidenceAdded = record.evidence_added
+  if (typeof added !== 'number' || !Number.isFinite(added) || added < 0) return null
+  if (typeof historical !== 'number' || !Number.isFinite(historical) || historical < 0) return null
+  if (typeof evidenceAdded !== 'number' || !Number.isFinite(evidenceAdded) || evidenceAdded < 0) return null
+  return { added, historical, evidence_added: evidenceAdded, duplicate: record.duplicate === true }
+}
+
+/** 从 `navigate('/profile', { state: { merge } })` 的 state 取出摘要（缺失/脏 payload ⇒ null）。 */
+export function readMergeSummary(state: unknown): ProfileMergeSummary | null {
+  if (typeof state !== 'object' || state === null) return null
+  return normalizeMergeSummary((state as { merge?: unknown }).merge)
+}
+
 /** 画像 → 5 维度条目（纯函数，无副作用；页面与检查脚本共用同一份映射）。 */
 export function dimensionEntries(profile: Profile): Record<ProfileDimensionKey, DimensionEntry[]> {
   return {
-    skills: profile.skills.map((item, index) => ({
-      key: entryKeyOf('skills', index),
-      title: item.name,
-      sourceQuote: item.source_quote,
-    })),
+    skills: profile.skills.flatMap((item, index) =>
+      isHistorical(item)
+        ? []
+        : [
+            {
+              key: entryKeyOf('skills', index),
+              title: item.name,
+              // 兼容字段为空但已有累积证据时回落到首条证据，避免误报「缺失来源」。
+              sourceQuote: evidenceOf(item)[0]?.quote ?? item.source_quote,
+            },
+          ],
+    ),
     tech_stack: profile.tech_stack.map((item, index) => ({
       key: entryKeyOf('tech_stack', index),
       title: item,
     })),
-    projects: profile.projects.map((item, index) => ({
-      key: entryKeyOf('projects', index),
-      title: item.name,
-      meta: [item.role, item.period].filter((part) => part.trim() !== '').join(' · '),
-      bullets: item.bullets,
-      sourceQuote: item.source_quote,
-    })),
+    projects: profile.projects.flatMap((item, index) =>
+      isHistorical(item)
+        ? []
+        : [
+            {
+              key: entryKeyOf('projects', index),
+              title: item.name,
+              meta: [item.role, item.period].filter((part) => part.trim() !== '').join(' · '),
+              bullets: item.bullets,
+              // 同上：累积证据优先，兼容字段兜底。
+              sourceQuote: evidenceOf(item)[0]?.quote ?? item.source_quote,
+            },
+          ],
+    ),
     years_experience: [],
     target_role: [],
   }
@@ -91,12 +165,10 @@ export function confirmedDimensions(profile: Profile): number {
   }).length
 }
 
-/** 带溯源片段的条目数（页头摘要行 + 侧栏）。 */
+/** 带溯源片段的条目数（页头摘要行 + 侧栏）：按**证据条数**统计（旧→新累积后一条能力可有多条来源）。 */
 export function sourceCount(profile: Profile): number {
-  const entries = dimensionEntries(profile)
-  return [...entries.skills, ...entries.projects].filter(
-    (entry) => typeof entry.sourceQuote === 'string' && entry.sourceQuote.trim() !== '',
-  ).length
+  const active = [...profile.skills, ...profile.projects].filter((item) => !isHistorical(item))
+  return active.reduce((total, item) => total + evidenceOf(item).length, 0)
 }
 
 /** 逗号 / 顿号 / 分号 / 换行都当分隔符（技术栈这类自由输入用）。 */
@@ -144,6 +216,23 @@ export function buildDeletePatch(
   return null
 }
 
+/**
+ * 编辑兼容字段 `source_quote` 时**同步首条证据**，保持 `source_quote == source_quotes[0].quote`（单源口径）；
+ * 其余证据（更早的来源）原样保留、`status` 也不动 —— PATCH 必须「展开原条目」，否则一次编辑就会把
+ * `source_quotes`/`status`（AC-6/AC-7 的累积与历史语义）整段丢掉。
+ */
+function quoteFields(entry: TrackedEntry, values: Record<string, string>): {
+  source_quote: string
+  source_quotes?: Evidence[]
+} {
+  const quote = (values.source_quote ?? entry.source_quote).trim()
+  const quotes = entry.source_quotes
+  if (!Array.isArray(quotes) || quotes.length === 0) {
+    return { source_quote: quote }
+  }
+  return { source_quote: quote, source_quotes: [{ ...quotes[0], quote }, ...quotes.slice(1)] }
+}
+
 /** 编辑一条条目：只回传被改的那一维，其余维度不动（避免整画像覆盖）。 */
 export function buildEntryPatch(
   profile: Profile,
@@ -157,8 +246,8 @@ export function buildEntryPatch(
     const items = profile.skills.slice()
     items[index] = {
       ...target,
+      ...quoteFields(target, values),
       name: (values.name ?? target.name).trim(),
-      source_quote: (values.source_quote ?? target.source_quote).trim(),
     }
     return { skills: items }
   }
@@ -168,11 +257,11 @@ export function buildEntryPatch(
     const items = profile.projects.slice()
     items[index] = {
       ...target,
+      ...quoteFields(target, values),
       name: (values.name ?? target.name).trim(),
       role: (values.role ?? target.role).trim(),
       period: (values.period ?? target.period).trim(),
       bullets: values.bullets === undefined ? target.bullets : splitList(values.bullets),
-      source_quote: (values.source_quote ?? target.source_quote).trim(),
     }
     return { projects: items }
   }
@@ -297,6 +386,17 @@ type EditTarget = { dimension: ProfileDimensionKey; index: number | null }
  */
 export default function ProfilePage() {
   const profileAsync = useAsync((signal) => api.latestProfile(signal), [])
+  const location = useLocation()
+
+  /**
+   * 一次性合并摘要（DESIGN §2.2 / §7-1）：只由「上传 → 生成/合并」那一趟的 `location.state` 带入，
+   * 刷新即消失，不落 localStorage、不扩 `GET /api/profiles/latest` 的持久契约。useState 初始化函数只跑一次。
+   */
+  const [mergeSummary] = useState<ProfileMergeSummary | null>(() => readMergeSummary(location.state))
+  const [historyOpen, setHistoryOpen] = useState<{ skills: boolean; projects: boolean }>({
+    skills: false,
+    projects: false,
+  })
 
   /** 已保存的画像：base 记下「保存时服务端那一版」的 updated_at，服务端刷新出新版就让位给它。 */
   const [patched, setPatched] = useState<{ base: string | null; profile: Profile } | null>(null)
@@ -378,6 +478,69 @@ export default function ProfilePage() {
         : entryEditorFields(profile, edit.dimension, edit.index)
       : []
 
+  /**
+   * 技能 / 项目卡下方的增量可视区（AC-6 + AC-7）：
+   * ①多证据折叠（旧→新、带来源文件名与日期），只在 ≥2 条时出现（单条已由卡片内的溯源按钮展示）；
+   * ②历史分组（本次简历未出现的能力/项目）——用徽章区分、**不降对比度**（禁 opacity，DESIGN anti-pattern）。
+   */
+  const evidenceExtras = (dimension: 'skills' | 'projects') => {
+    if (profile === null) return null
+    const source: TrackedEntry[] = dimension === 'skills' ? profile.skills : profile.projects
+    const foldable = source.filter((item) => !isHistorical(item) && evidenceOf(item).length >= 2)
+    const historical = source.filter((item) => isHistorical(item))
+    if (foldable.length === 0 && historical.length === 0) return null
+
+    const open = historyOpen[dimension]
+
+    return (
+      <div className="sc-actions">
+        {foldable.length > 0 ? (
+          <div className="sc-evidence-list" aria-label="能力证据">
+            {foldable.map((item) => (
+              <EvidenceList
+                key={`${dimension}-evidence-${item.name}`}
+                evidence={evidenceOf(item)}
+                label={`${item.name} · 证据 ${evidenceOf(item).length} 条 · 旧→新`}
+              />
+            ))}
+          </div>
+        ) : null}
+
+        {historical.length > 0 ? (
+          <div>
+            <button
+              type="button"
+              className={open ? 'sc-evidence-chip is-expanded' : 'sc-evidence-chip'}
+              aria-expanded={open}
+              onClick={() =>
+                setHistoryOpen((current) => ({ ...current, [dimension]: !current[dimension] }))
+              }
+            >
+              <span>
+                {`${open ? '▾' : '▸'} ${dimension === 'skills' ? '历史能力' : '历史项目'} ${historical.length} 项（本次简历未出现 · 不参与出题与诊断）`}
+              </span>
+            </button>
+
+            {open ? (
+              <div className="sc-evidence-list" aria-label="历史条目">
+                {historical.map((item) => (
+                  <div key={`${dimension}-historical-${item.name}`} className="sc-evidence-item">
+                    <div className="sc-chips">
+                      <Chip label={item.name} />
+                      <Chip label="历史" />
+                      <Chip label={`证据 ${evidenceOf(item).length} 条`} />
+                    </div>
+                    <EvidenceList evidence={evidenceOf(item)} />
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+    )
+  }
+
   return (
     <section>
       <header className="sc-page-header">
@@ -388,6 +551,8 @@ export default function ProfilePage() {
             : `${sourceCount(profile)} 条溯源 · ${profile.skills.length} 个技能 · ${profile.projects.length} 段项目 · 可选编辑后开始测评`}
         </p>
       </header>
+
+      {mergeSummary !== null ? <MergeSummaryBar summary={mergeSummary} /> : null}
 
       {view === 'gate' ? (
         <PhaseLoader title="正在读取你的最新画像" phases={['读取最新画像']} active={0} />
@@ -425,39 +590,41 @@ export default function ProfilePage() {
           <div className="sc-grid-2">
             <div>
               {DIMENSIONS.map((item) => (
-                <ProfileDimension
-                  key={item.key}
-                  dimension={item.key}
-                  title={item.title}
-                  entries={entries[item.key]}
-                  value={singleValueOf(profile, item.key)}
-                  emptyHint={item.hint}
-                  editable={item.editable}
-                  editing={edit !== null && edit.dimension === item.key}
-                  saving={saving}
-                  onEdit={() => startEdit(item.key, null)}
-                  onEditEntry={(entryKey) => {
-                    const parsed = parseEntryKey(entryKey)
-                    if (parsed !== null) startEdit(parsed.dimension, parsed.index)
-                  }}
-                  onDeleteEntry={(entryKey) => {
-                    void deleteEntry(entryKey)
-                  }}
-                  editor={
-                    edit !== null && edit.dimension === item.key ? (
-                      <ProfileEditor
-                        key={`${item.key}#${edit.index === null ? 'dimension' : edit.index}`}
-                        fields={editorFields}
-                        saving={saving}
-                        error={editError}
-                        onSave={(values) => {
-                          void saveEdit(values)
-                        }}
-                        onCancel={cancelEdit}
-                      />
-                    ) : null
-                  }
-                />
+                <div key={item.key}>
+                  <ProfileDimension
+                    dimension={item.key}
+                    title={item.title}
+                    entries={entries[item.key]}
+                    value={singleValueOf(profile, item.key)}
+                    emptyHint={item.hint}
+                    editable={item.editable}
+                    editing={edit !== null && edit.dimension === item.key}
+                    saving={saving}
+                    onEdit={() => startEdit(item.key, null)}
+                    onEditEntry={(entryKey) => {
+                      const parsed = parseEntryKey(entryKey)
+                      if (parsed !== null) startEdit(parsed.dimension, parsed.index)
+                    }}
+                    onDeleteEntry={(entryKey) => {
+                      void deleteEntry(entryKey)
+                    }}
+                    editor={
+                      edit !== null && edit.dimension === item.key ? (
+                        <ProfileEditor
+                          key={`${item.key}#${edit.index === null ? 'dimension' : edit.index}`}
+                          fields={editorFields}
+                          saving={saving}
+                          error={editError}
+                          onSave={(values) => {
+                            void saveEdit(values)
+                          }}
+                          onCancel={cancelEdit}
+                        />
+                      ) : null
+                    }
+                  />
+                  {item.key === 'skills' || item.key === 'projects' ? evidenceExtras(item.key) : null}
+                </div>
               ))}
             </div>
 

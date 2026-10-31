@@ -1226,6 +1226,1154 @@ input:not([type='radio']):not([type='checkbox']):not([type='file']):disabled {
   cursor: not-allowed;
 }
 
+/* ==========================================================================================
+   r3 基座（DESIGN r3 §0 / §2 / §3）：成长时间线 .sc-tl-* / 对比块 .sc-cmp-* / 合并摘要条 .sc-merge-bar* /
+   证据列表 .sc-evidence-* / 历史分组 .sc-hist-* / 建议卡 .sc-sugg-* / 分段 Tab .sc-seg-* / 成稿 .sc-compose-* /
+   目标岗位条 .sc-target-role* / 润色页两栏 .sc-polish-* / 侧栏工具组 .sc-toolnav* / 确认 Modal .sc-modal*。
+   约束：只用 tokens.css 变量。无对应 token 的微值（1px 边框、图标 8、输入框 240 宽、z 轴 40）沿用既有
+   裸值约定并在行内注明推导（AGENTS §4 / DESIGN r3 §0.2 只新增 12 个尺寸 token）。
+   ========================================================================================== */
+
+/* ---------- 成长时间线（/history 下半区，DESIGN r3 §2.1） ---------- */
+.sc-tl {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin-top: var(--sp-7);
+}
+
+.sc-tl-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+.sc-tl-title {
+  margin: 0;
+  font-size: var(--fs-section);
+  line-height: var(--lh-section);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.sc-tl-meta {
+  margin: 0;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+}
+
+/* 「有 N 次测评未能记入成长记忆」：派生提示（时间线事件数 < 趋势表行数），不新增契约字段 */
+.sc-tl-note {
+  margin: 0;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--warn);
+}
+
+/* 滚动区 528 = 上下 padding 20×2 + 5 条 × 88 + 4 × gap 12（§0.5-2）；
+   overscroll-behavior: contain 保证列表滚到底不劫持页面主滚动（DESIGN §4-1） */
+.sc-tl-scroll,
+.sc-tl-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  max-height: var(--tl-scroll-h);
+  padding: var(--sp-5) 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+/* 事件卡：网格 = 时间列 120 / 内容 1fr / 展开按钮 auto；88 = 16×2 + 24 + 8 + 24（§0.5-1）
+   整卡可点展开；左 2px 透明条只在展开态着色（DESIGN §0.3 时间线事件卡） */
+.sc-tl-event {
+  display: grid;
+  grid-template-columns: var(--tl-time-w) minmax(0, 1fr) auto;
+  grid-template-areas: 'time main toggle';
+  gap: var(--sp-3);
+  align-items: start;
+  min-height: var(--tl-row-h);
+  padding: var(--sp-4);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-left: 2px solid transparent;
+  border-radius: var(--radius-12);
+  box-shadow: var(--elev-1);
+  animation: sc-tl-in var(--base) var(--ease) both;
+  transition: border-color var(--fast) var(--ease), background-color var(--fast) var(--ease);
+}
+
+.sc-tl-event:hover {
+  border-color: var(--border-strong);
+}
+
+.sc-tl-event:active {
+  border-color: var(--border-strong);
+  background: var(--overlay-02);
+}
+
+.sc-tl-event.is-expanded {
+  border-left-color: var(--accent);
+}
+
+/* 最新一条：每屏仅此 1 处强调（accent 30% 边框） */
+.sc-tl-event.is-latest {
+  border-color: var(--accent-line-30);
+}
+
+.sc-tl-event.is-expanded.is-latest {
+  border-color: var(--accent-line-30);
+  border-left-color: var(--accent);
+}
+
+/* 时间列 120：12/16 mono 16 字符 115.2 ≤ 120（§0.5-5，不折行不省略） */
+.sc-tl-time {
+  grid-area: time;
+  padding-top: var(--sp-1);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.sc-tl-main {
+  grid-area: main;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+/* 行内元素全部 24 高；200% 文本放大时换行不裁切（DESIGN §5） */
+.sc-tl-row,
+.sc-tl-row1 {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  min-height: var(--badge-h);
+  min-width: 0;
+}
+
+/* 类型徽章（面试 / 笔试 / 简历）：文字承载语义，不靠颜色（DESIGN §5 冗余编码） */
+.sc-tl-badge {
+  display: inline-flex;
+  align-items: center;
+  height: var(--badge-h);
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--overlay-06);
+  color: var(--text-secondary);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* 重复上传：弱化为 chip 文案，不隐藏、不弹错（AC / DESIGN §4-7） */
+.sc-tl-duplicate {
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.sc-tl-metrics {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+
+.sc-tl-metric {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--sp-1);
+  white-space: nowrap;
+}
+
+.sc-tl-metric-label {
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+}
+
+.sc-tl-metric-value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-value-sm);
+  line-height: var(--lh-value-sm);
+  color: var(--text-primary);
+}
+
+/* Δ chip：↑/↓/＝ + 数字（双通道编码）；非交互 */
+.sc-tl-delta,
+.sc-cmp-delta,
+.sc-delta-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--delta-w-sm);
+  height: var(--badge-h);
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-4);
+  background: var(--overlay-06);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.sc-tl-delta.is-up,
+.sc-cmp-delta.is-up,
+.sc-delta-chip.is-up {
+  border-color: var(--success-line-55);
+  background: var(--success-tint-10);
+  color: var(--success);
+}
+
+.sc-tl-delta.is-down,
+.sc-cmp-delta.is-down,
+.sc-delta-chip.is-down {
+  border-color: var(--danger-line-55);
+  background: var(--danger-tint-10);
+  color: var(--danger);
+}
+
+.sc-tl-delta.is-equal,
+.sc-cmp-delta.is-equal,
+.sc-delta-chip.is-equal {
+  border-color: var(--border-strong);
+  background: var(--overlay-06);
+  color: var(--text-secondary);
+}
+
+/* 短板 chip 行（新增 / 消失各最多 3 项 + 「+N」，不做红黄满屏） */
+.sc-tl-chips {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  min-height: var(--chip-h);
+  min-width: 0;
+}
+
+.sc-tl-chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  height: var(--chip-h);
+  padding: 0 var(--sp-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-4);
+  background: var(--overlay-06);
+  color: var(--text-secondary);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sc-tl-chip.is-added {
+  border-color: var(--warn-line-35);
+  background: var(--warn-tint-12);
+  color: var(--warn);
+}
+
+.sc-tl-chip.is-removed {
+  border-color: var(--success-line-55);
+  background: var(--success-tint-10);
+  color: var(--success);
+}
+
+.sc-tl-chip.is-more {
+  cursor: pointer;
+  transition: background-color var(--fast) var(--ease);
+}
+
+.sc-tl-chip.is-more:hover {
+  background: var(--overlay-10);
+}
+
+/* 展开按钮：32×32 热区 + 文字态「展开对比 / 收起对比」 */
+.sc-tl-expand,
+.sc-tl-toggle {
+  grid-area: toggle;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  height: var(--btn-h-sm);
+  min-width: var(--btn-h-sm);
+  padding: 0 var(--sp-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-6);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color var(--fast) var(--ease), color var(--fast) var(--ease),
+    border-color var(--fast) var(--ease);
+}
+
+.sc-tl-expand:hover,
+.sc-tl-toggle:hover {
+  background: var(--overlay-06);
+  color: var(--text-primary);
+}
+
+.sc-tl-expand:active,
+.sc-tl-toggle:active {
+  background: var(--overlay-10);
+}
+
+/* 对比块：常规 112（§0.5-3）；首态 70 = 24（padding 12×2）+ 16 标题 + 8 gap + 22 单行 */
+.sc-cmp {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-height: var(--cmp-panel-h);
+  padding: var(--sp-3);
+  background: var(--bg-inset);
+  border: 1px solid var(--border-hair);
+  border-radius: var(--radius-8);
+  animation: sc-cmp-in var(--fast) var(--ease);
+}
+
+.sc-cmp.is-first {
+  min-height: calc(var(--cmp-panel-h) - 42px);
+  justify-content: center;
+}
+
+/* 展开后焦点落标题（tabindex="-1"），标题本身不显示焦点环 */
+.sc-cmp-title {
+  margin: 0;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+  outline: none;
+}
+
+/* Δ 行 = 指标名 / 数值（列宽 76，右对齐防跳动）/ 「上次 7.1」 */
+.sc-cmp-row {
+  display: grid;
+  grid-template-columns: auto var(--delta-w) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.sc-cmp-name {
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.sc-cmp-value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-value-md);
+  line-height: var(--lh-value-md);
+  color: var(--text-primary);
+  text-align: right;
+}
+
+.sc-cmp-prev {
+  margin: 0;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+}
+
+.sc-cmp-chips {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  min-height: var(--chip-h);
+}
+
+/* 首次测评：只显示「首次<类型>测评，暂无对比」，不得出现 0.0 / NaN（TECHNICAL §7-5） */
+.sc-cmp-first {
+  margin: 0;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--text-secondary);
+}
+
+/* ---------- 合并摘要条（/profile 页头下，一次性会话态） ---------- */
+/* 48 = 边框 1×2 + padding 12×2 + 正文 22（§0.5-4）；纯信息条，无点击行为 */
+.sc-merge-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  min-height: var(--merge-bar-h);
+  padding: var(--sp-3) var(--sp-4);
+  margin-bottom: var(--sp-5);
+  background: var(--accent-wash-06);
+  border: 1px solid var(--border-subtle);
+  border-left: 2px solid var(--accent);
+  border-radius: var(--radius-8);
+}
+
+.sc-merge-bar-label {
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.sc-merge-bar-text {
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--text-primary);
+}
+
+/* ---------- 能力证据累积（旧→新；来源文件名 + 日期） ---------- */
+/* 视觉由既有 .sc-source-quote 提供（bg-inset + 左 2px accent + 13/20），此处只管块间 gap 8 */
+.sc-evidence-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+}
+
+.sc-evidence-item {
+  display: block;
+}
+
+/* ---------- 历史能力分组（禁止用 opacity 表达历史，DESIGN r3 §0.6） ---------- */
+.sc-hist {
+  margin-top: var(--sp-3);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--border-hair);
+}
+
+.sc-hist-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: var(--lh-small);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  cursor: pointer;
+  transition: color var(--fast) var(--ease);
+}
+
+.sc-hist-toggle:hover {
+  color: var(--text-primary);
+}
+
+.sc-hist-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+}
+
+.sc-hist-item {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--text-secondary);
+}
+
+.sc-hist-name {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+/* ---------- 建议卡（/polish 左栏，三段式 + 采纳/忽略） ---------- */
+/* min-h 320（§0.5-6）：正文区可伸缩、按钮行常驻卡底；整卡不可点（DESIGN §0.6 anti-pattern） */
+.sc-sugg-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  min-height: var(--sugg-min-h);
+  padding: var(--sp-5);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-left: 2px solid var(--border-strong);
+  border-radius: var(--radius-12);
+  box-shadow: var(--elev-1);
+  transition: border-color var(--fast) var(--ease);
+}
+
+.sc-sugg-card:hover {
+  border-color: var(--border-strong);
+}
+
+.sc-sugg-card.is-adopted {
+  border-left-color: var(--success);
+}
+
+.sc-sugg-card.is-ignored {
+  border-left-color: var(--border-hair);
+}
+
+.sc-sugg-card.is-busy {
+  cursor: progress;
+}
+
+.sc-sugg-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  min-height: var(--badge-h);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+}
+
+/* 降级徽章「仅措辞建议」：24 pill，非交互 */
+.sc-sugg-flag {
+  display: inline-flex;
+  align-items: center;
+  height: var(--badge-h);
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--warn-line-35);
+  border-radius: var(--radius-pill);
+  background: var(--warn-tint-12);
+  color: var(--warn);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.sc-sugg-section,
+.sc-sugg-role {
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+}
+
+.sc-sugg-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  min-width: 0;
+}
+
+.sc-sugg-label {
+  margin: 0;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+}
+
+/* 原句：13/20 secondary，≤3 行截断（展开只增高本卡） */
+.sc-sugg-origin {
+  margin: 0;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+/* 建议句：14/22 primary（正文用 sans，仅数字走 mono） */
+.sc-sugg-suggested {
+  margin: 0;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.sc-sugg-origin.is-clamped,
+.sc-sugg-suggested.is-clamped {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+
+/* 已忽略：建议句折叠为一行 13/20 tertiary */
+.sc-sugg-ignored {
+  margin: 0;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--text-tertiary);
+}
+
+.sc-sugg-reason {
+  margin: 0;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--text-tertiary);
+}
+
+/* 降级占位「〈待补充〉」：22 高虚线，与周围正文基线对齐（--chip-flag-h） */
+.sc-sugg-placeholder {
+  display: inline-block;
+  height: var(--chip-flag-h);
+  padding: 0 var(--sp-1);
+  border: 1px dashed var(--warn-line-35);
+  border-radius: var(--radius-4);
+  color: var(--warn);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  vertical-align: baseline;
+}
+
+.sc-sugg-toggle {
+  align-self: flex-start;
+  height: var(--btn-h-sm);
+  padding: 0 var(--sp-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-6);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  cursor: pointer;
+  transition: background-color var(--fast) var(--ease), color var(--fast) var(--ease);
+}
+
+.sc-sugg-toggle:hover {
+  background: var(--overlay-06);
+  color: var(--text-primary);
+}
+
+/* 按钮行常驻卡底（flex 列 + margin-top auto），永不因文本长出卡外（§0.5-6） */
+.sc-sugg-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin-top: auto;
+  padding-top: var(--sp-2);
+  min-height: var(--btn-h);
+}
+
+.sc-sugg-status {
+  margin-left: auto;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+}
+
+/* ---------- 分段 Tab（原版 / 润色版，40 高） ---------- */
+.sc-seg-tabs {
+  display: flex;
+  height: var(--sev-tab-h);
+  padding: 0;
+  background: var(--bg-inset);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-8);
+  overflow: hidden;
+}
+
+.sc-seg-tab {
+  flex: 1 1 0;
+  height: 100%;
+  padding: 0 var(--sp-3);
+  border: 1px solid transparent;
+  border-radius: var(--radius-6);
+  background: transparent;
+  color: var(--text-tertiary);
+  font-family: var(--font-sans);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color var(--fast) var(--ease), color var(--fast) var(--ease),
+    border-color var(--fast) var(--ease);
+}
+
+.sc-seg-tab:hover {
+  color: var(--text-secondary);
+}
+
+.sc-seg-tab:active {
+  background: var(--bg-surface);
+}
+
+.sc-seg-tab.is-active {
+  background: var(--bg-raised);
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+
+/* 滚动区内元素用内偏移焦点环（DESIGN §5） */
+.sc-seg-tab:focus-visible {
+  outline-offset: -2px;
+}
+
+/* ---------- 成稿预览 / 生成态 ---------- */
+.sc-compose {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+
+.sc-compose-meta {
+  margin: 0;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+}
+
+/* 正文预览区：可视高 428（可滚动，只读），正文 sans，标题 16/24 600（§0.5-8） */
+.sc-compose-body {
+  height: var(--polish-prev-h);
+  padding: var(--sp-4);
+  background: var(--bg-inset);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-8);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+.sc-compose-state {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  justify-content: center;
+  align-items: flex-start;
+  min-height: var(--polish-prev-h);
+  padding: var(--sp-4);
+  background: var(--bg-inset);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-8);
+}
+
+.sc-compose-line {
+  margin: 0;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.sc-compose-heading {
+  margin-top: var(--sp-3);
+  font-size: var(--fs-card);
+  line-height: var(--lh-card);
+  font-weight: 600;
+}
+
+.sc-compose-bullet {
+  position: relative;
+  padding-left: var(--sp-4);
+}
+
+.sc-compose-bullet::before {
+  content: '•';
+  position: absolute;
+  left: var(--sp-1);
+  color: var(--text-tertiary);
+}
+
+.sc-compose-blank {
+  height: var(--lh-body);
+}
+
+.sc-compose-empty {
+  margin: 0;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--text-tertiary);
+}
+
+.sc-compose-slow {
+  margin: 0;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+}
+
+/* ---------- 目标岗位条（临时重跑不落库） ---------- */
+.sc-target-role {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.sc-target-role-main {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  min-height: var(--btn-h);
+}
+
+.sc-target-role-label {
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  font-weight: 500;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* 输入框宽 240（DESIGN r3 §0.3 目标岗位条；无对应 token，沿用既有裸值约定） */
+.sc-target-role-input {
+  width: 240px;
+  max-width: 100%;
+}
+
+.sc-target-role-chip.is-temp {
+  border-color: var(--accent-line-30);
+  background: var(--accent-tint);
+  color: var(--accent-soft);
+}
+
+.sc-target-role-hint {
+  margin: 0;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+}
+
+/* ---------- 润色页两栏（左建议 628 / 右成稿 380，§0.5-7） ---------- */
+/* 页面壳：页头 → 目标岗位条 → 两栏，统一纵向节奏（Guide / 列表 / aside 之间的间距只由这里给） */
+.sc-polish-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+/* 页头间距交给 .sc-polish-page 的 gap（避免 24 + 16 的双份留白） */
+.sc-polish-page .sc-page-header {
+  margin-bottom: 0;
+}
+
+.sc-polish {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--polish-pane-w);
+  gap: var(--sp-6);
+  align-items: start;
+}
+
+.sc-polish-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  min-width: 0;
+}
+
+.sc-polish-aside {
+  position: sticky;
+  top: var(--sp-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+
+/* 视口 < 1320（1080 + 侧栏 240 + padding 48）→ 单栏，成稿区折叠为按钮（DESIGN r3 §2.4） */
+@media (max-width: 1319px) {
+  .sc-polish {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sc-polish-aside {
+    position: static;
+  }
+}
+
+/* 顶部引导卡（进页不自动烧 AI，显式「开始分析」） */
+.sc-polish-guide {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-5);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-12);
+  box-shadow: var(--elev-1);
+}
+
+.sc-polish-guide-text {
+  margin: 0;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--text-secondary);
+}
+
+.sc-polish-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.sc-polish-listhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+.sc-polish-listtitle {
+  margin: 0;
+  font-size: var(--fs-card);
+  line-height: var(--lh-card);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.sc-polish-filters {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+.sc-polish-adopted-count {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* 聚合说明：丢弃 N 条（不展示被丢弃的句子） */
+.sc-polish-warn {
+  margin: 0;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--warn);
+}
+
+.sc-polish-note {
+  margin: 0;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+}
+
+.sc-polish-cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.sc-polish-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.sc-polish-hint {
+  margin: 0;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+}
+
+/* 窄屏折叠态：「成稿预览（N 条建议已采纳 M）」按钮区 */
+.sc-polish-toggle {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: var(--sp-3);
+}
+
+/* ---------- 侧栏「工具」组（DESIGN r3 §1.1；当前项复用步骤 current 态） ---------- */
+.sc-toolnav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  margin-top: var(--sp-5);
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--border-hair);
+}
+
+.sc-toolnav-label {
+  padding: 0 var(--sp-3);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+}
+
+.sc-toolnav-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  height: var(--btn-h);
+  padding: 0 var(--sp-3);
+  border-left: 2px solid transparent;
+  border-radius: var(--radius-6);
+  color: var(--text-secondary);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  font-weight: 500;
+  text-decoration: none;
+  transition: background-color var(--fast) var(--ease), color var(--fast) var(--ease),
+    border-color var(--fast) var(--ease);
+}
+
+.sc-toolnav-item:hover {
+  background: var(--overlay-04);
+  color: var(--text-primary);
+}
+
+.sc-toolnav-item.is-active {
+  background: var(--accent-tint);
+  border-left-color: var(--accent);
+  color: var(--accent);
+}
+
+/* <1024 收起侧栏后的顶部 40 高工具条（同一份 items，分隔线换成左竖线） */
+.sc-toolnav.is-horizontal {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: 0;
+  padding: 0 var(--sp-6);
+  padding-top: 0;
+  border-top: none;
+  border-bottom: 1px solid var(--border-hair);
+}
+
+.sc-toolnav.is-horizontal .sc-toolnav-label {
+  padding: 0;
+}
+
+.sc-toolnav.is-horizontal .sc-toolnav-item {
+  height: var(--btn-h);
+  padding: 0 var(--sp-3);
+  border-left: none;
+  border-radius: var(--radius-6);
+}
+
+.sc-toolnav.is-horizontal .sc-toolnav-item.is-active {
+  border-left: none;
+  background: var(--accent-tint);
+}
+
+/* ---------- 确认 Modal（生成中离开保护；DESIGN r3 §0.3 最后一行） ---------- */
+/* 遮罩用 token 表达：--bg-canvas 72% 透明 ≈ DESIGN 的深底 72% 不透明度，不加新色、不做模糊 */
+.sc-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40; /* 高于 .sc-toast 的 20；沿用既有裸值约定 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-6);
+  background: color-mix(in srgb, var(--bg-canvas) 72%, transparent);
+}
+
+.sc-modal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  width: 100%;
+  max-width: 480px; /* 单段中文说明的舒适行长；无对应 token */
+  padding: var(--sp-6);
+  background: var(--bg-surface);
+  border-radius: var(--radius-12);
+  box-shadow: var(--elev-2);
+}
+
+.sc-modal-title {
+  margin: 0;
+  font-size: var(--fs-card);
+  line-height: var(--lh-card);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.sc-modal-message {
+  margin: 0;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--text-secondary);
+}
+
+.sc-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+}
+
+/* ---------- r3 动效（stagger 40ms/条，最多 6 条；§0.4） ---------- */
+@keyframes sc-tl-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.sc-tl-event:nth-child(2) {
+  animation-delay: 40ms;
+}
+
+.sc-tl-event:nth-child(3) {
+  animation-delay: 80ms;
+}
+
+.sc-tl-event:nth-child(4) {
+  animation-delay: 120ms;
+}
+
+.sc-tl-event:nth-child(5) {
+  animation-delay: 160ms;
+}
+
+.sc-tl-event:nth-child(6) {
+  animation-delay: 200ms;
+}
+
+@keyframes sc-cmp-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+/* 减少动效：只保留最终态（§0.4 末行；本段放末尾以覆盖上面的延迟） */
+@media (prefers-reduced-motion: reduce) {
+  .sc-tl-event,
+  .sc-cmp {
+    animation: none;
+  }
+}
+
 /* ---------- 减少动效 ---------- */
 @media (prefers-reduced-motion: reduce) {
   * {

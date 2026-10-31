@@ -11,11 +11,17 @@ import type {
   InterviewRun,
   Profile,
   ProfilePatch,
+  ProfileWithMerge,
+  PolishFullRequest,
+  PolishFullResponse,
+  PolishRequest,
+  PolishResponse,
   Report,
   ReportGenerateRequest,
   ResumeMeta,
   RunSummary,
   ScoreResult,
+  TimelineEvent,
 } from './types'
 
 /** 前端唯一 HTTP 出口：页面不得直接 fetch。 */
@@ -97,11 +103,30 @@ export const api = {
     return request<ResumeMeta>('/api/resumes', { method: 'POST', body: form, signal })
   },
 
-  generateProfile: (resumeId: string, signal?: AbortSignal): Promise<Profile> =>
-    request<Profile>(`/api/resumes/${encodeURIComponent(resumeId)}/profile`, {
+  /** 生成 / 增量合并画像（r3 行为变更：同一 profile_id 累积证据，返回带 `merge_summary`）。 */
+  generateProfile: (resumeId: string, signal?: AbortSignal): Promise<ProfileWithMerge> =>
+    request<ProfileWithMerge>(`/api/resumes/${encodeURIComponent(resumeId)}/profile`, {
       method: 'POST',
       signal,
     }),
+
+  /** 成长时间线（r3）：服务端已按 `occurred_at` 倒序 + 已算好 `comparison`。 */
+  timeline: (limit = 20, signal?: AbortSignal): Promise<TimelineEvent[]> =>
+    request<TimelineEvent[]>(`/api/timeline?limit=${encodeURIComponent(String(limit))}`, { signal }),
+
+  /** 简历逐条润色建议（r3）：单入口 service 产出，页面零提示词。 */
+  polishSuggestions: (resumeId: string, payload: PolishRequest): Promise<PolishResponse> =>
+    request<PolishResponse>(
+      `/api/resumes/${encodeURIComponent(resumeId)}/polish`,
+      jsonInit('POST', payload),
+    ),
+
+  /** 一键成稿（r3）：`markdown` 是唯一成稿真源（导出/复制只取它）。 */
+  polishFull: (resumeId: string, payload: PolishFullRequest): Promise<PolishFullResponse> =>
+    request<PolishFullResponse>(
+      `/api/resumes/${encodeURIComponent(resumeId)}/polish/full`,
+      jsonInit('POST', payload),
+    ),
 
   latestProfile: (signal?: AbortSignal): Promise<Profile> =>
     request<Profile>('/api/profiles/latest', { signal }),
