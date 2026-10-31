@@ -1,0 +1,202 @@
+[
+  {
+    "id": "fe-js-mdn",
+    "title": "MDN · JavaScript 指南",
+    "direction": "前端",
+    "level": "入门",
+    "url": "https://developer.mozilla.org/zh-CN/docs/Web/JavaScript",
+    "why": "语言基础是前端所有题的地基，官方中文文档最稳"
+  },
+  {
+    "id": "fe-react",
+    "title": "React 官方文档 · 学习 React",
+    "direction": "前端",
+    "level": "入门",
+    "url": "https://zh-hans.react.dev/learn",
+    "why": "以组件与状态为主线，与本产品的页面结构同构"
+  },
+  {
+    "id": "fe-ts",
+    "title": "TypeScript 手册",
+    "direction": "前端",
+    "level": "进阶",
+    "url": "https://www.typescriptlang.org/docs/handbook/intro.html",
+    "why": "类型系统是前端工程化的分水岭，笔试常考类型推导"
+  },
+  {
+    "id": "fe-jsinfo",
+    "title": "现代 JavaScript 教程",
+    "direction": "前端",
+    "level": "入门",
+    "url": "https://zh.javascript.info/",
+    "why": "按主题渐进，适合作为 JS 薄弱项的补课主线"
+  },
+  {
+    "id": "fe-css-mdn",
+    "title": "MDN · CSS 网格布局",
+    "direction": "前端",
+    "level": "入门",
+    "url": "https://developer.mozilla.org/zh-CN/docs/Web/CSS/CSS_grid_layout",
+    "why": "布局题常错在 flex / grid 选择，官方示例可直接验证"
+  },
+  {
+    "id": "fe-webdev",
+    "title": "web.dev · Learn",
+    "direction": "前端",
+    "level": "进阶",
+    "url": "https://web.dev/learn",
+    "why": "浏览器渲染与性能是面试深挖的高频区"
+  },
+  {
+    "id": "be-py-tutorial",
+    "title": "Python 官方教程",
+    "direction": "后端",
+    "level": "入门",
+    "url": "https://docs.python.org/zh-cn/3/tutorial/",
+    "why": "语言与标准库基础，服务端题的地基"
+  },
+  {
+    "id": "be-fastapi",
+    "title": "FastAPI 官方教程",
+    "direction": "后端",
+    "level": "入门",
+    "url": "https://fastapi.tiangolo.com/zh/tutorial/",
+    "why": "本产品后端同栈，可边读边对照本仓库代码"
+  },
+  {
+    "id": "be-sqlite",
+    "title": "SQLite 官方文档",
+    "direction": "后端",
+    "level": "入门",
+    "url": "https://www.sqlite.org/docs.html",
+    "why": "本地持久化与 SQL 基础，是刷新不丢数据的实现依据"
+  },
+  {
+    "id": "be-mdn-http",
+    "title": "MDN · HTTP 指南",
+    "direction": "后端",
+    "level": "入门",
+    "url": "https://developer.mozilla.org/zh-CN/docs/Web/HTTP",
+    "why": "状态码、缓存与幂等是接口题高频失分点"
+  },
+  {
+    "id": "be-pg",
+    "title": "PostgreSQL 官方教程",
+    "direction": "后端",
+    "level": "进阶",
+    "url": "https://www.postgresql.org/docs/current/tutorial.html",
+    "why": "索引与事务在真实数据库里更容易理解"
+  },
+  {
+    "id": "be-docker",
+    "title": "Docker · Get started",
+    "direction": "后端",
+    "level": "进阶",
+    "url": "https://docs.docker.com/get-started/",
+    "why": "部署与隔离，是进入生产环境前的必备概念"
+  },
+  {
+    "id": "al-hello",
+    "title": "Hello 算法（中文）",
+    "direction": "算法与数据结构",
+    "level": "入门",
+    "url": "https://www.hello-algo.com/",
+    "why": "图文动画讲数据结构，零基础也能读进去"
+  },
+  {
+    "id": "al-leetcode",
+    "title": "LeetCode 中国站题库",
+    "direction": "算法与数据结构",
+    "level": "进阶",
+    "url": "https://leetcode.cn/problemset/",
+    "why": "题库与题解是校验掌握度最直接的手段"
+  },
+  {
+    "id": "al-visualgo",
+    "title": "VisuAlgo 可视化",
+    "direction": "算法与数据结构",
+    "level": "入门",
+    "url": "https://visualgo.net/zh",
+    "why": "把排序与图算法跑起来看，比背结论有效"
+  },
+  {
+    "id": "al-mit6006",
+    "title": "MIT 6.006 算法导论",
+    "direction": "算法与数据结构",
+    "level": "进阶",
+    "url": "https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/",
+    "why": "系统课，适合补齐复杂度分析与证明能力"
+  },
+  {
+    "id": "al-cs61b",
+    "title": "CS 61B 数据结构（Berkeley）",
+    "direction": "算法与数据结构",
+    "level": "进阶",
+    "url": "https://sp21.datastructur.es/",
+    "why": "项目驱动，从实现层理解每种结构"
+  },
+  {
+    "id": "cs-cs50",
+    "title": "CS50 · 哈佛计算机导论",
+    "direction": "计算机基础",
+    "level": "入门",
+    "url": "https://cs50.harvard.edu/x/",
+    "why": "从零建立计算机体系认知，含 C 与内存"
+  },
+  {
+    "id": "cs-ostep",
+    "title": "OSTEP 操作系统导论（中文）",
+    "direction": "计算机基础",
+    "level": "进阶",
+    "url": "https://pages.cs.wisc.edu/~remzi/OSTEP/",
+    "why": "进程、内存与并发是后端面试深挖题"
+  },
+  {
+    "id": "cs-git",
+    "title": "Pro Git（中文）",
+    "direction": "计算机基础",
+    "level": "入门",
+    "url": "https://git-scm.com/book/zh/v2",
+    "why": "版本控制是团队协作的最低门槛"
+  },
+  {
+    "id": "cs-linux",
+    "title": "Linux Journey",
+    "direction": "计算机基础",
+    "level": "入门",
+    "url": "https://linuxjourney.com/",
+    "why": "命令行与文件系统，常以口述题出现"
+  },
+  {
+    "id": "cs-15445",
+    "title": "CMU 15-445 数据库系统",
+    "direction": "计算机基础",
+    "level": "进阶",
+    "url": "https://15445.courses.cs.cmu.edu/fall2023/",
+    "why": "索引、B+ 树与事务的系统课"
+  },
+  {
+    "id": "cs-mdn-regex",
+    "title": "MDN · 正则表达式指南",
+    "direction": "计算机基础",
+    "level": "入门",
+    "url": "https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Guide/Regular_expressions",
+    "why": "文本处理高频考点，且常被低估"
+  },
+  {
+    "id": "cs-csapp",
+    "title": "CS:APP 官方网站",
+    "direction": "计算机基础",
+    "level": "进阶",
+    "url": "https://csapp.cs.cmu.edu/",
+    "why": "内存、链接与并发，面试深挖可量化"
+  },
+  {
+    "id": "cs-tech-writing",
+    "title": "Google 技术写作课程",
+    "direction": "计算机基础",
+    "level": "进阶",
+    "url": "https://developers.google.com/tech-writing",
+    "why": "文档与表达是简历项目深挖的加分项"
+  }
+]

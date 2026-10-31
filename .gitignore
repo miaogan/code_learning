@@ -1,2 +1,39 @@
 # TeamFlow 运行日志（插件自有产物，非交付物；host 提交时另有 pathspec 强制排除）
 logs/teamflow/
+
+# 前端：依赖、构建产物、缓存
+# .pnpm-store/ 必须忽略：其 v11/projects/*/node_modules 与项目目录存在链接关系，
+# 曾被 rm -rf 遍历导致 frontend/ 源码被误删（2026-10-31 事故）
+.pnpm-store/
+node_modules/
+# 本机沙箱禁止 symlink，pnpm 的 isolated 布局退化成残缺副本（删不掉时改名以 node_modules 开头）
+node_modules-*/
+dist/
+frontend/.vite/
+frontend/.npm-cache/
+*.tsbuildinfo
+coverage/
+
+# 后端：虚拟环境、缓存、本地库
+__pycache__/
+*.py[cod]
+backend/.venv/
+venv/
+.venv/
+backend/.pytest_cache/
+backend/.ruff_cache/
+backend/pytest-cache-files-*/
+backend/.test-scaffold.db
+*.db
+*.sqlite3
+
+# 密钥（示例文件保留）
+.env
+.env.*
+!.env.example
+
+# 编辑器与系统
+.vscode/
+.idea/
+*.log
+.DS_Store

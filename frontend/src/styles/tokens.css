@@ -1,0 +1,119 @@
+/* DESIGN §0.2–0.4 全量 token。禁止组件内写裸色值 / 裸尺寸。 */
+:root {
+  /* 色彩 */
+  --bg-canvas: #0d1117;
+  --bg-surface: #141a23;
+  --bg-raised: #1b2330;
+  --bg-inset: #0a0e14;
+  --border-subtle: #232c3a;
+  --border-strong: #364152;
+  --border-hair: #1e2733;
+
+  --text-primary: #e6edf5;
+  --text-secondary: #9fb0c3;
+  --text-tertiary: #7c8da1;
+
+  --accent: #4da3ff;
+  --accent-hover: #6fb6ff;
+  --accent-press: #3b8ae0;
+  --accent-tint: rgba(77, 163, 255, 0.12);
+  --accent-ink: #06121f;
+
+  --success: #46c08a;
+  --warn: #e3b341;
+  --danger: #f2686b;
+
+  /* 叠色（hover 底 / 边框 / 褪色底）：组件内一律走这些变量，不得写裸色值（AGENTS §4） */
+  --overlay-02: rgba(255, 255, 255, 0.02);
+  --overlay-03: rgba(255, 255, 255, 0.03);
+  --overlay-04: rgba(255, 255, 255, 0.04);
+  --overlay-06: rgba(255, 255, 255, 0.06);
+  --overlay-10: rgba(255, 255, 255, 0.1);
+  --accent-soft: #a8cfff;
+  --accent-wash-06: rgba(77, 163, 255, 0.06);
+  --accent-line-30: rgba(77, 163, 255, 0.3);
+  --success-tint-10: rgba(70, 192, 138, 0.1);
+  --success-line-55: rgba(70, 192, 138, 0.55);
+  --warn-tint-12: rgba(227, 179, 65, 0.12);
+  --warn-line-35: rgba(227, 179, 65, 0.35);
+  --danger-tint-08: rgba(242, 104, 107, 0.08);
+  --danger-tint-10: rgba(242, 104, 107, 0.1);
+  --danger-tint-12: rgba(242, 104, 107, 0.12);
+  --danger-line-35: rgba(242, 104, 107, 0.35);
+  --danger-line-55: rgba(242, 104, 107, 0.55);
+
+  /* 高度（深色不用大投影） */
+  --elev-1: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.35);
+  --elev-2: 0 16px 40px rgba(0, 0, 0, 0.55), 0 0 0 1px var(--border-strong);
+  --elev-accent: 0 0 0 1px var(--accent), 0 0 16px rgba(77, 163, 255, 0.22);
+
+  /* 字体 */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', monospace;
+
+  /* 字号 / 行高（成对使用，见 DESIGN §0.3） */
+  --fs-display: 32px;
+  --lh-display: 40px;
+  --fs-page: 24px;
+  --lh-page: 32px;
+  --fs-section: 20px;
+  --lh-section: 28px;
+  --fs-card: 16px;
+  --lh-card: 24px;
+  --fs-body: 14px;
+  --lh-body: 22px;
+  --fs-small: 13px;
+  --lh-small: 20px;
+  --fs-meta: 12px;
+  --lh-meta: 16px;
+  --fs-value-lg: 40px;
+  --lh-value-lg: 48px;
+  --fs-value-md: 32px;
+  --lh-value-md: 40px;
+  --fs-value-sm: 16px;
+  --lh-value-sm: 19px;
+
+  /* 间距（基数 4） */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-7: 32px;
+  --sp-8: 40px;
+  --sp-9: 56px;
+
+  /* 圆角 */
+  --radius-4: 4px;
+  --radius-6: 6px;
+  --radius-8: 8px;
+  --radius-12: 12px;
+  --radius-16: 16px;
+  --radius-pill: 999px;
+
+  /* 动效 */
+  --fast: 120ms;
+  --base: 180ms;
+  --slow: 240ms;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+
+  /* 布局 */
+  --topbar-h: 56px;
+  --sidebar-w: 240px;
+  --content-max: 1080px;
+
+  /* 组件尺寸（DESIGN §0.7 推导，改值必须重算） */
+  --btn-h: 40px;
+  --btn-h-sm: 32px;
+  --btn-h-hero: 48px;
+  --badge-h: 24px;
+  --chip-h: 24px;
+  --tile-h: 96px;
+  --course-h: 132px;
+  --textarea-min-h: 128px;
+  --ring-lg: 64px;
+  --ring-md: 56px;
+  --dropzone-h: 220px;
+}
