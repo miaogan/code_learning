@@ -13,6 +13,9 @@
 - 契约规则：JSON 字段名一律 snake_case；改字段必须同时改 `backend/app/schemas.py` 与 `frontend/src/api/types.ts`；错误统一为 `{ "error": { "code", "message", "retryable" } }`，message 中文且不含路径/堆栈/端点/Key。
 - 视觉真源：`docs/teamflow/20261031-r1-dev-skill-coach/DESIGN.md` §0 的 token 与几何（40 按钮 / 24 徽章 / 96 磁贴 / 132 课程卡 / 128 textarea / 64 与 56 环）；实现只许引用 `frontend/src/styles/tokens.css`，改尺寸必须重算并回写设计文档。
 - 反馈约定（2026-10-31 · r2 落定）：**成功用 Toast（唯一出口 `frontend/src/components/ui/Toast.tsx`，右下 24、`--elev-2`、2s）**，**失败一律页内 `InlineError`（中文原因 + 重试），禁止只用 Toast 承载失败**；报告类文本（复制/导出）只能取自 `api.reportMarkdown`（后端 `services/markdown.py` 单一渲染源），前端禁止二次拼串或裁剪。
+- 记忆约定（2026-10-31 · r3 落定）：画像恒为**单一当前画像 + 增量合并**（同一能力项（归一后）证据累积、旧证据不删、消失项标 `status=historical` 且不参与出题/诊断）；成长记忆唯一来源是成长时间线表与 `GET /api/timeline`，事件指标必须复用既有 service（`history` / `diagnosis`）计算，前端不得自行做减法或二次拼装。
+- 简历润色约定（2026-10-31 · r3 落定）：润色只在 `backend/app/services/resume_polish.py` 单一入口（路由与页面零提示词），为其被诊断报告复用留出入口；建议文本必须逐字带原句溯源，数字/专名的幻觉由后置校验降级为「仅措辞建议」、缺数值写 `〈待补充〉` 不编造。
+- 一次性升级说明（2026-10-31 · r3 上线须知）：`timeline_events` 由 `backend/app/db.py` 的 `CREATE TABLE IF NOT EXISTS` 随 `init_db()` 自建，**没有迁移脚本、不删旧库、无需手工建表**；`ProfileSkill` / `ProfileProject` 新增 `source_quotes` / `status`，旧画像里只有单条 `source_quote` 的记录由 pydantic validator 自动回填（读旧数据不报错、首次写入后转多证据）；历史 runs / documents **不回填**为时间线事件（时间线只记本版本起的新事件，空态文案「历史数据从本版本起记录」）；润色建议缓存是**进程内**的（重启即失效，`/full` 会重跑并如实标 `regenerated: true`），采纳/临时岗位/成稿一律不入库。
 - 验证命令：前端 `npm run typecheck` / `npm run lint` / `npm test` / `npm run build`；后端 `python -m pytest -q` / `python -m ruff check app tests`；探活 `GET /health`。
 
 ## 已知待办（下一批）
@@ -23,6 +26,8 @@
 - [ ] 真实环境人工补测：浏览器视觉/动效走查（含 Toast 位置与复制后真机粘贴）、`vitest`+`vite build`、`ruff`、真实 PDF/DOCX 解析、配真实 Key 的端到端计时（AC-1 ≤30s / AC-3 单题 ≤15s / AC-4 10s / AC-7 ≤5 分钟）。
 - [ ] QA round-2 三条 P3：上传上限校验收敛到 `services/parser.py` 单源、框架级 405 文案中文化、`.gitignore` 补 `backend/tests/.tmp/`（本轮已随 r2 工程约束补齐）。
 - [ ] 25 门种子课程外链需人工点检一次（当前只校验数量与方向覆盖）。
+- [x] **r3 长期记忆 + 简历润色已交付并验收**（2026-10-31 · 任务夹 `docs/teamflow/20261031-r3-memory-resume-polish/` · 判定「⚠️ 有条件通过」）：15 条 AC 全部由验收人亲自复跑的执行证据支撑（pytest 113 全绿、typecheck/lint 0 error、functional 18/18、parity 14/14、copy 6/6、memory_polish 28/28、T7 25/25）。**必须闭合**：R-1 润色页「原版」Tab 要显示整篇简历正文（现为被改写句原文拼接，与 DESIGN §240 不符，二选一：补只读正文接口并双侧同步契约，或降级设计并改 meta 文案）；R-2 删除仓库根误产物 `nul`（0 字节，`git add -A` 会带进提交）。**可随下轮清理**：导出文件名取原文件名（DESIGN §284，需 `file_name` 来源）、删除 `profile_merge.py` 的 `CONTRACT_READY` 死分支（双模型定义双源风险）、补合并摘要条「查看历史能力项」入口。
+- [x] r3 的两处取舍已由验收定稿（2026-10-31）：①AC-7「能力项不足」只落 payload `tech_fallback`、暂不加 InterviewPage/ExamPage 页面提示（接受，页面提示留后续需求）；②润色建议缓存保持**进程内**（接受，`/full` 如实标 `regenerated: true`，满足 AC-10「采纳/临时岗位不入库」边界；跨重启复用需另立需求并先评估该边界）。
 
 ## 说明
 
