@@ -344,18 +344,24 @@ def _assert_payload_structure(payload_questions: list[dict[str, Any]]) -> None:
 
 
 def test_whole_direction_proficient_still_creates_paper(client: Any, profile_factory: Any) -> None:
-    """极端场景①：某方向**全部**题熟练 → 仍 HTTP 200、结构达标、净过滤数=该方向题数。"""
+    """极端场景①：某方向**全部**题熟练 → 仍 HTTP 200、结构达标、净过滤数=该方向题数。
+
+    r11 起题库扩容到 260 题，某方向题量可能远超 20（AC-3 明确允许「回填后某语言总数可 >20」），
+    因此这里的题量断言收敛为「≥ 存量 20 道」，行为断言（200 / L1 / 结构 / 不含熟练题）不变。
+    """
     profile = profile_factory()
     repository.insert_profile(profile)
     questions = repository.list_questions()
     victims = [q["id"] for q in questions if q["direction"] == rules.DIRECTIONS[0]]
-    assert len(victims) == 20, f"种子题库每方向应 20 题，实际 {len(victims)}"
+    assert len(victims) >= 20, f"种子题库每方向应至少 20 题，实际 {len(victims)}"
     repository.insert_attempts(_attempt_rows(victims, days_ago=2))
 
     response = client.post("/api/exams", json={"profile_id": profile.id})
     assert response.status_code == 200, f"整方向熟练不得 400：{response.text[:200]}"
     body = response.json()
-    assert body["filtered_count"] == 20, f"净过滤数应为 20，实际 {body['filtered_count']}"
+    assert body["filtered_count"] == len(victims), (
+        f"净过滤数应为该方向题数 {len(victims)}，实际 {body['filtered_count']}"
+    )
     payload = repository.get_run(body["run_id"])["payload"]
     assert payload["stage"] == "L1"
     _assert_payload_structure(payload["questions"])
@@ -365,22 +371,22 @@ def test_whole_direction_proficient_still_creates_paper(client: Any, profile_fac
 def test_recent_papers_covering_most_of_bank_still_creates_paper(
     client: Any, profile_factory: Any
 ) -> None:
-    """极端场景②：近 3 卷覆盖池子大半 → 逐卷退回历史题（L4）后仍 200，绝不 400。"""
+    """极端场景②：近 3 卷覆盖池子大半 → 逐卷退回历史题（L4）后仍 200，绝不 400。
+
+    卷面大小按「题库总量 − 8」三等分推导（r11 起题库固定 260 题，不能再用 72 这样的字面量），
+    留下的 8 道小于 `MIN_EXAM_QUESTIONS`，因此 L1 必然凑不出卷、只能靠 L4 放回历史题。
+    """
     profile = profile_factory()
     repository.insert_profile(profile)
     questions = repository.list_questions()
-    grouped = {
-        direction: [q["id"] for q in questions if q["direction"] == direction]
-        for direction in rules.DIRECTIONS
-    }
-    chunks: list[list[str]] = []
-    for offset in range(3):
-        chunk: list[str] = []
-        for direction in rules.DIRECTIONS:
-            chunk.extend(grouped[direction][offset * 6 : (offset + 1) * 6])
-        chunks.append(chunk)
+    spare = rules.MIN_EXAM_QUESTIONS - 2  # 预留 8 道不覆盖：L1 凑不出 10 题
+    per_paper = (len(questions) - spare) // 3
+    assert per_paper >= rules.MIN_OBJECTIVE_QUESTIONS, f"题库过小，无法构造历史覆盖：{len(questions)}"
+    pool = [str(q["id"]) for q in questions]
+    chunks: list[list[str]] = [pool[index * per_paper : (index + 1) * per_paper] for index in range(3)]
     covered = {qid for chunk in chunks for qid in chunk}
-    assert len(covered) == 72, f"3 卷应覆盖 72 道，实际 {len(covered)}"
+    assert len(covered) == per_paper * 3, f"3 卷应覆盖 {per_paper * 3} 道，实际 {len(covered)}"
+    assert len(questions) - len(covered) < rules.MIN_EXAM_QUESTIONS, "剩题足以在 L1 出卷，前提不成立"
     # 最旧一卷必须自足（≥8 客观 + ≥2 方向），否则 L4 首个子步骤就该继续往后放松。
     oldest = [q for q in questions if q["id"] in chunks[0]]
     objective_oldest = sum(1 for q in oldest if rules.is_objective_kind(q["kind"]))
@@ -395,7 +401,9 @@ def test_recent_papers_covering_most_of_bank_still_creates_paper(
     assert response.status_code == 200, f"近卷覆盖大半不得 400：{response.text[:200]}"
     payload = repository.get_run(response.json()["run_id"])["payload"]
     assert payload["stage"] == "L4", f"应在 L4 退回历史卷，实际 {payload['stage']}"
-    assert payload["backfill"]["history"] == 24, f"应退回最旧一卷 24 道，实际 {payload['backfill']}"
+    assert payload["backfill"]["history"] == len(chunks[0]), (
+        f"应退回最旧一卷 {len(chunks[0])} 道，实际 {payload['backfill']}"
+    )
     _assert_payload_structure(payload["questions"])
 
 

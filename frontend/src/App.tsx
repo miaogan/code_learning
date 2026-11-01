@@ -5,6 +5,7 @@ import ExamPage from './pages/ExamPage'
 import HistoryPage from './pages/HistoryPage'
 import InterviewPage from './pages/InterviewPage'
 import PolishPage from './pages/PolishPage'
+import PracticePage from './pages/PracticePage'
 import ProfilePage from './pages/ProfilePage'
 import ReportPage from './pages/ReportPage'
 import UploadPage from './pages/UploadPage'
@@ -20,6 +21,7 @@ const STEP_BASE = [
 
 /** 侧栏「工具」组：非线性的能力出口，不混进步骤（DESIGN §1.1）。 */
 const TOOL_ITEMS = [
+  { key: 'practice', label: '练习', to: '/practice' },
   { key: 'history', label: '成绩趋势', to: '/history' },
   { key: 'polish', label: '简历润色', to: '/polish' },
 ]
@@ -71,6 +73,7 @@ export default function App() {
               <Route path="/report" element={<ReportPage />} />
               <Route path="/history" element={<HistoryPage />} />
               <Route path="/polish" element={<PolishPage />} />
+              <Route path="/practice" element={<PracticePage />} />
             </Routes>
           </div>
         </main>

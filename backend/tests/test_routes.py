@@ -14,7 +14,7 @@ from app.schemas import Course, Report, ResumeMeta, Shortfall
 from app.services import exam as exam_service
 from app.services import rules
 
-OBJECTIVE_KINDS = {"single", "multiple"}
+OBJECTIVE_KINDS = frozenset(rules.OBJECTIVE_KINDS)  # 闭集只在 rules.py（r11：含 judge）
 VALID_KINDS = ["technical"] * rules.MIN_TECHNICAL_QUESTIONS + ["project"] * (
     rules.MIN_INTERVIEW_QUESTIONS - rules.MIN_TECHNICAL_QUESTIONS
 )

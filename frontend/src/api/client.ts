@@ -18,12 +18,25 @@ import type {
   PolishFullResponse,
   PolishRequest,
   PolishResponse,
+  PracticeAnswerRequest,
+  PracticeAnswerResult,
+  PracticeLanguageFilter,
+  PracticePaper,
+  PracticePaperRequest,
+  PracticeStats,
+  PracticeWrongBook,
   Report,
   ReportGenerateRequest,
   ResumeMeta,
   RunSummary,
   TimelineEvent,
 } from './types'
+
+/** 练习统计查询参数（r11）：与题单同口径，但**不带 limit**（命中数不受题量截断）。 */
+export type PracticeStatsParams = Pick<
+  PracticePaperRequest,
+  'language' | 'direction' | 'difficulty' | 'essentiality' | 'scope'
+>
 
 /** 前端唯一 HTTP 出口：页面不得直接 fetch。 */
 const BASE = (import.meta.env.VITE_API_BASE ?? '').replace(/\/$/, '')
@@ -93,6 +106,15 @@ function jsonInit(method: string, body: unknown, signal?: AbortSignal): RequestI
     body: JSON.stringify(body),
     signal,
   }
+}
+
+/** 查询串：只拼有值的键（中文筛选值如「后端」由 URLSearchParams 负责编码，页面不手拼）。 */
+function queryString(params: Record<string, string | number | undefined>): string {
+  const search = new URLSearchParams()
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined) search.set(key, String(value))
+  })
+  return search.toString()
 }
 
 export const api = {
@@ -167,4 +189,25 @@ export const api = {
     request<RunSummary[]>(`/api/history?limit=${encodeURIComponent(String(limit))}`),
 
   listCourses: (): Promise<Course[]> => request<Course[]>('/api/courses'),
+
+  /* ---------- r11 练习四端点（纯本地、零 AI；空结果是 200 + 空列表，不是错误） ---------- */
+
+  /** 题单：`hit_count` 是全部筛选后的命中总数（不受 `limit` 截断），题单内**不含** answer。 */
+  practicePaper: (body: PracticePaperRequest): Promise<PracticePaper> =>
+    request<PracticePaper>('/api/practice/paper', jsonInit('POST', body)),
+
+  /** 单题判分：服务端复用 `exam.grade_objective` 并写 `question_attempts`，前端不做任何判分。 */
+  practiceAnswer: (body: PracticeAnswerRequest): Promise<PracticeAnswerResult> =>
+    request<PracticeAnswerResult>('/api/practice/answer', jsonInit('POST', body)),
+
+  /** 统计：`hit` 与题单 `hit_count` 同源同值。 */
+  practiceStats: (params: PracticeStatsParams, signal?: AbortSignal): Promise<PracticeStats> =>
+    request<PracticeStats>(`/api/practice/stats?${queryString(params)}`, { signal }),
+
+  /** 错题本：服务端已按最近答错时间倒序，前端不二次排序。 */
+  practiceWrongBook: (
+    language: PracticeLanguageFilter,
+    signal?: AbortSignal,
+  ): Promise<PracticeWrongBook> =>
+    request<PracticeWrongBook>(`/api/practice/wrong-book?${queryString({ language })}`, { signal }),
 }

@@ -1,12 +1,19 @@
+import type { ReactNode } from 'react'
 import type { ExamQuestion, PerQuestionResult } from '../../api/types'
 import { Card } from '../ui/Card'
 import { Chip } from '../ui/Chip'
+import { PromptBody } from './PromptBody'
 
 /**
- * 笔试题目卡：单选 / 多选 / 简答三型共用一张卡（DESIGN §2.4）。
+ * 笔试 / 练习题卡：单选 / 多选 / 判断 / 简答共用一张卡（DESIGN §2.4）。
  * 选项行用原生 radio / checkbox（`base.css` 已对 `.sc-opt input` 定过 1em 尺寸），因此键盘与读屏天然可用。
  * 传 `review` 即切复核态：`.sc-opt.is-correct/.is-wrong` 着色 + 头部 ✔/✗ 文字；传 `locked` 为提交中锁定。
  * 组件不发请求、不 import api（TECHNICAL §3.2 硬规则 1）。
+ *
+ * r11 三处改动（**零新 kind 分支**）：
+ * 1. `KIND_LABEL` 增 `judge`（纯文案，判断题天然落 `kind !== 'multiple'` 的 radio 分支）；
+ * 2. 可选 `footer` 插槽（选项组之后、`Card` 之内），练习页在里放判分反馈与解析；
+ * 3. 题面改走 `PromptBody`：含围栏时渲染 `.sc-qa-code` 代码块，**无围栏题面输出与改前逐字相同**。
  */
 export interface ExamQuestionCardProps {
   /** 题目序号，从 0 开始，渲染为 Q1 */
@@ -19,11 +26,14 @@ export interface ExamQuestionCardProps {
   review?: PerQuestionResult | null
   /** 提交中：只读但仍展示已选内容（不清空作答） */
   locked?: boolean
+  /** 卡片底部插槽（r11）：练习页放「判分反馈 + 解析」；不传时卡片结构与改前一致 */
+  footer?: ReactNode
 }
 
 const KIND_LABEL: Record<ExamQuestion['kind'], string> = {
   single: '单选',
   multiple: '多选',
+  judge: '判断',
   text: '简答',
 }
 
@@ -52,6 +62,7 @@ export function ExamQuestionCard({
   onChange,
   review = null,
   locked = false,
+  footer = null,
 }: ExamQuestionCardProps) {
   const disabled = locked || review !== null
   const mine = keysOf(value)
@@ -88,7 +99,7 @@ export function ExamQuestionCard({
         ) : null}
       </div>
 
-      <p className="sc-qcard-prompt">{question.prompt}</p>
+      <PromptBody prompt={question.prompt} />
 
       {question.kind === 'text' ? (
         review !== null ? (
@@ -136,6 +147,8 @@ export function ExamQuestionCard({
           })}
         </div>
       )}
+
+      {footer}
     </Card>
   )
 }

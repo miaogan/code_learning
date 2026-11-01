@@ -183,6 +183,27 @@ export interface InterviewSession {
 export type ExamDifficulty = 'basic' | 'intermediate' | 'challenge'
 /** 必备度三档：必备 / 进阶 / 加分项。 */
 export type QuestionEssentiality = 'must_know' | 'advanced' | 'nice_to_know'
+/**
+ * 题型闭集（r11 扩 `judge` 判断题）：与 `backend/app/schemas.py:ExamKind` 逐字一致，
+ * 单一出处在 `backend/app/services/rules.py:OBJECTIVE_KINDS`。`text` 是简答题（不判分）。
+ */
+export type ExamKind = 'single' | 'multiple' | 'judge' | 'text'
+
+/**
+ * 题干语言闭集（r11）。**`''` 是闭集成员**（通用 / 算法题），不是「全部」——
+ * 筛选里的「全部」是 `'all'`（`rules.FILTER_ANY`），两条语义不得混用。
+ */
+export type QuestionLanguage =
+  | ''
+  | 'python'
+  | 'java'
+  | 'go'
+  | 'html'
+  | 'css'
+  | 'js'
+  | 'ts'
+  | 'vue3'
+  | 'react'
 
 export interface ExamOption {
   key: string
@@ -195,7 +216,7 @@ export interface ExamCreateRequest {
 
 export interface ExamQuestion {
   id: string
-  kind: 'single' | 'multiple' | 'text'
+  kind: ExamKind
   direction: string
   prompt: string
   options: ExamOption[]
@@ -498,4 +519,92 @@ export interface PolishFullResponse {
   dropped_count: number
   /** true = 进程内缓存失效后重跑了一套建议。 */
   regenerated: boolean
+}
+
+/* ------------------------------------------------------------------
+ * r11 练习四端点（/api/practice/paper|answer|stats|wrong-book）
+ * 与 `backend/app/schemas.py` 的 `Practice*` 逐字镜像（字段名 snake_case，零转换），
+ * 闭集单一出处在 `backend/app/services/rules.py`。改字段必须两侧同时改。
+ * ------------------------------------------------------------------ */
+
+/** 语言筛选 = 闭集 + 「全部」（`'all'` 与通用题的 `''` 并存，两条语义不同）。 */
+export type PracticeLanguageFilter = 'all' | QuestionLanguage
+/** 方向筛选 = 四方向 + 「全部」。 */
+export type PracticeDirectionFilter = 'all' | '前端' | '后端' | '算法与数据结构' | '计算机基础'
+/** 难度筛选 = 三档 + 「全部」。 */
+export type PracticeDifficultyFilter = 'all' | ExamDifficulty
+/** 必备度筛选 = 三档 + 「全部」。 */
+export type PracticeEssentialityFilter = 'all' | QuestionEssentiality
+/** 练习范围：全部 / 未做过（含笔试）/ 最近一次答错。 */
+export type PracticeScope = 'all' | 'unseen' | 'wrong'
+/** 练习题量：`0` = 本次全部命中。 */
+export type PracticeLimit = 10 | 20 | 0
+
+/** 组卷请求体。六项都有服务端默认值，故前端可只传改动项。 */
+export interface PracticePaperRequest {
+  language?: PracticeLanguageFilter
+  direction?: PracticeDirectionFilter
+  difficulty?: PracticeDifficultyFilter
+  essentiality?: PracticeEssentialityFilter
+  scope?: PracticeScope
+  limit?: PracticeLimit
+}
+
+/** 题单里的一道题：**不含** `answer`（答案只在判分响应里回显）。 */
+export interface PracticeQuestion {
+  id: string
+  kind: ExamKind
+  language: QuestionLanguage
+  direction: string
+  difficulty: ExamDifficulty
+  essentiality: QuestionEssentiality
+  prompt: string
+  options: ExamOption[]
+}
+
+export interface PracticePaper {
+  session_id: string
+  questions: PracticeQuestion[]
+  /** 全部筛选后的命中总数（不受 `limit` 截断），与 `PracticeStats.hit` 同源同值。 */
+  hit_count: number
+  /** 空结果 / 截断 / 题库未就绪的中文提示；正常满额时为空串。 */
+  notice: string
+}
+
+export interface PracticeAnswerRequest {
+  session_id: string
+  question_id: string
+  answer?: string[] | string | null
+}
+
+export interface PracticeAnswerResult {
+  question_id: string
+  correct: boolean
+  correct_answer: string[] | string | null
+  /** 解析恒为字符串；空串时页面显示「本题暂无解析」。 */
+  explanation: string
+}
+
+export interface PracticeStats {
+  total: number
+  practiced: number
+  wrong_total: number
+  hit: number
+}
+
+/** 错题本一行：该题**最近一次作答为错误**。 */
+export interface PracticeWrongItem {
+  question_id: string
+  prompt: string
+  language: QuestionLanguage
+  direction: string
+  difficulty: ExamDifficulty
+  /** 最近一次答错时间（UTC ISO8601），展示时格式化为 `MM-dd HH:mm`。 */
+  last_wrong_at: string
+  wrong_count: number
+}
+
+export interface PracticeWrongBook {
+  items: PracticeWrongItem[]
+  total: number
 }

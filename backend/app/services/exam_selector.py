@@ -7,8 +7,9 @@
    不会把结构随机掉：题量 / 客观题数 / 挑战题占比 / 方向覆盖由 `build_paper()` 这一个校验点兜住
    （AC-9 的「随机限同相关度同难度档」与「结构约束恒定成立」同时成立）。
 2. `build_paper()` —— 结构闸门（原 `exam.py` 的 `_compose` + `_respect_challenge_cap` 合并搬迁，
-   `exam.py` 不再保留第二份）。10–12 题 / 客观 ≥8 / 挑战 ≤20% / 方向 ≥ `require_directions`，
-   任一条不满足返回 `None`（换池重试，**不是异常**，因此任何一层都不会因过滤 400）。
+   `exam.py` 不再保留第二份）。10–12 题 / 客观 ≥8 / 挑战 ≤20% / 方向 ≥ `require_directions` /
+   **每种可用客观题型各 ≥1**（r11：判断题必须真的能在卷面上被取到），任一条不满足返回 `None`
+   （换池重试，**不是异常**，因此任何一层都不会因过滤 400）。
 3. `select_paper()` —— L1→L6 唯一阶梯，顺序不可重排：先滤「熟练 + 近 N 卷」，逐层把过滤掉的题
    放回池子（L2 熟练 `must_know` → L3 熟练其余 → L4 历史卷逐卷 → L5 全库放宽方向 ≥1 →
    L6 全库不要求方向）。只有 L6 仍凑不出结构达标的卷，调用方才 400（AC-8 的唯一 400 出口）。
@@ -168,8 +169,13 @@ def _challenge_count(questions: Sequence[dict[str, Any]]) -> int:
 
 
 def _objective_count(questions: Sequence[dict[str, Any]]) -> int:
+    """组卷侧客观题计数口径 = `rules.is_exam_objective_kind()`（客观题闭集 − 降级开关）。
+
+    与取池口径必须同一份，否则 `EXAM_EXCLUDED_KINDS=("judge",)` 只把题挪出池子、却仍按
+    「含 judge」的分母校验：开关拨了一半（D2 的教训）。
+    """
     return sum(
-        1 for question in questions if rules.is_objective_kind(str(question.get("kind") or ""))
+        1 for question in questions if rules.is_exam_objective_kind(str(question.get("kind") or ""))
     )
 
 
@@ -209,6 +215,36 @@ def _spread_by_direction(
             if index < len(bucket):
                 spread.append(bucket[index])
     return spread
+
+
+def _prefer_kind_diversity(questions: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
+    """把**每种可用客观题型各提一道到队首**，其余保持原序（题型可达性的唯一出口）。
+
+    为什么必须有这一步：`_spread_by_direction()` 只做方向轮转，而轮转出来的队首全是
+    各方向相关度最高、难度最低的题 —— r11 的判断题全落在 intermediate/challenge 档，
+    8 个客观题额度在 basic 档就被用尽，于是「判断题进制」在卷面上**结构不可达**（QA D1：
+    30 卷 300 题 0 道 judge）。题型覆盖必须显式写在取题顺序里，而不是指望难度分布恰好帮忙。
+
+    代表题优先取**非挑战题**（挑战额度由 `_fit_structure()` 裁决，代表题不该去挤它）；
+    某题型只有挑战题时仍补一道代表 —— 否则该题型在新数据下会静默消失。
+    """
+    remaining = list(questions)
+    head: list[dict[str, Any]] = []
+    covered: set[str] = set()
+    for question in remaining:
+        kind = str(question.get("kind") or "")
+        if not kind or kind in covered or _is_challenge(question):
+            continue
+        covered.add(kind)
+        head.append(question)
+    for question in remaining:
+        kind = str(question.get("kind") or "")
+        if not kind or kind in covered:
+            continue
+        covered.add(kind)
+        head.append(question)
+    head_ids = {id(question) for question in head}
+    return head + [question for question in remaining if id(question) not in head_ids]
 
 
 def _fit_structure(
@@ -263,17 +299,22 @@ def build_paper(
     组卷口径与 r1/r5 逐字一致：先取 `MIN_OBJECTIVE_QUESTIONS`(8) 道客观题 → 用 `text` 补到
     `MIN_EXAM_QUESTIONS`(10) → 仍不足再用客观题补（题量优先于题型配比，但保住客观 ≥8 的分母）
     → 挑战题压回 `ceil(题数 × 20%)`。所有阈值来自 `rules.py`，本文件不写魔数。
+    客观题取池走 `rules.is_exam_objective_kind()`（含 r11 的 judge，可被 `EXAM_EXCLUDED_KINDS`
+    一键降级），取题顺序在方向轮转之上再叠加 `_prefer_kind_diversity()`（题型可达性）。
     去重键是题目 `id`（`seen`），因此**卷内不重复在任何一层都恒成立**。
     """
     objective = [
         question
         for question in ranked
-        if rules.is_objective_kind(str(question.get("kind") or ""))
+        if rules.is_exam_objective_kind(str(question.get("kind") or ""))
     ]
     texts = [question for question in ranked if str(question.get("kind") or "") == rules.TEXT_KIND]
     # 客观题按方向轮转取（池子允许时），否则相关度排序会把卷子压成单一方向 —— 见
     # `_spread_by_direction()` 的说明；方向不足时原序，由阶梯换池重试。
     objective_order = _spread_by_direction(objective, require_directions)
+    # 方向轮转之上再做一次题型覆盖（每种可用客观题型各一道进队首）：judge 属客观题闭集
+    # （PRD §11 决策 1「进」），但它的难度档恒 ≥ intermediate，纯方向轮转结构上取不到它。
+    objective_order = _prefer_kind_diversity(objective_order)
 
     picked: list[dict[str, Any]] = []
     seen: set[str] = set()

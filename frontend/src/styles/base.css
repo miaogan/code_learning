@@ -3241,3 +3241,542 @@ input:not([type='radio']):not([type='checkbox']):not([type='file']):disabled {
   .sc-role-table td:nth-child(3) { width: auto; }
   .sc-hint-head .sc-btn { margin-left: 0; }
 }
+
+/* ============================================================
+   r11 · 在线练习页（append-only，DESIGN r11 §4 逐条落地）
+   全部颜色 / 尺寸取自 tokens.css；本段不修改任何既有声明。
+   ============================================================ */
+
+/* ---------- 页面列（宽 880 + 左对齐；页头自带下边距归零，改由列 gap 统一） ---------- */
+.sc-qa-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  width: 100%;
+  max-width: var(--qa-col-w);
+  margin-right: auto;
+}
+
+.sc-qa-col > .sc-page-header {
+  margin-bottom: 0;
+}
+
+.sc-qa-tabs .sc-seg-tabs {
+  width: 100%;
+}
+
+/* ---------- 筛选卡：5 组单选 chip（高 32 / pill / 选中 accent + 「✓」双通道） ---------- */
+.sc-qa-filter-row {
+  display: flex;
+  gap: var(--sp-4);
+  align-items: flex-start;
+  padding: var(--sp-3) 0;
+  border-top: 1px solid var(--border-hair);
+}
+
+.sc-qa-filter-row:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.sc-qa-filter-label {
+  flex: 0 0 var(--qa-label-w);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--text-secondary);
+}
+
+.sc-qa-filter-body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.sc-qa-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.sc-qa-chip {
+  cursor: pointer;
+  transition: background-color var(--fast) var(--ease), border-color var(--fast) var(--ease);
+}
+
+.sc-qa-chip:hover {
+  border-color: var(--border-strong);
+  background: var(--overlay-06);
+}
+
+.sc-qa-chip:active {
+  background: var(--overlay-10);
+}
+
+.sc-qa-chip[aria-pressed='true'],
+.sc-qa-chip[aria-pressed='true']:hover {
+  border-color: var(--accent);
+  background: var(--accent-tint);
+  color: var(--text-primary);
+}
+
+.sc-qa-chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.sc-qa-hint {
+  margin: 0;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+}
+
+/* 段落分隔线（1px hair） */
+.sc-qa-split {
+  height: 1px;
+  margin: var(--sp-3) 0;
+  background: var(--border-hair);
+}
+
+/* 命中行：常驻 20 行高，请求中不塌陷（防跳动） */
+.sc-qa-hit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: var(--lh-small);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--text-secondary);
+}
+
+.sc-qa-hit-count {
+  font-size: var(--fs-value-sm);
+  line-height: var(--lh-value-sm);
+  color: var(--text-primary);
+}
+
+.sc-qa-practiced {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-1);
+  margin: var(--sp-1) 0 0;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--text-secondary);
+}
+
+.sc-qa-footer-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+  padding-top: var(--sp-3);
+}
+
+/* ---------- 作答态：进度行 + 6px 轨道（轨内零文字） ---------- */
+.sc-qa-running-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.sc-qa-running-tools {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.sc-qa-progress-block {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.sc-qa-progress {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--text-secondary);
+}
+
+.sc-qa-pos {
+  font-size: var(--fs-value-sm);
+  line-height: var(--lh-value-sm);
+  color: var(--text-primary);
+}
+
+.sc-qa-score {
+  color: var(--text-secondary);
+}
+
+.sc-qa-track {
+  height: var(--qa-track-h);
+  border-radius: var(--radius-pill);
+  background: var(--overlay-06);
+  overflow: hidden;
+}
+
+.sc-qa-track-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width var(--base) var(--ease);
+}
+
+/* ---------- 题卡容器与题面代码块 ---------- */
+.sc-qa-cardwrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.sc-qa-cardwrap:focus-visible,
+.sc-qa-feedback:focus-visible,
+.sc-qa-need:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.sc-qa-question-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0;
+}
+
+.sc-qa-prompt {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin: 0;
+}
+
+.sc-qa-code {
+  max-height: var(--qa-code-max-h);
+  margin: 0;
+  padding: var(--sp-3);
+  border: 1px solid var(--border-hair);
+  border-radius: var(--radius-8);
+  background: var(--bg-inset);
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--text-primary);
+  overflow: auto;
+}
+
+.sc-qa-code-inline {
+  padding: 0 var(--sp-1);
+  border-radius: var(--radius-4);
+  background: var(--overlay-06);
+  font-family: var(--font-mono);
+  font-size: var(--fs-meta);
+}
+
+/* ---------- 判分反馈块（网格：徽标/答案 ←→ 折叠按钮，解析通栏） ---------- */
+.sc-qa-feedback {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  border: 1px solid var(--border-hair);
+  border-radius: var(--radius-8);
+  background: var(--bg-inset);
+}
+
+.sc-qa-feedback-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  grid-column: 1;
+}
+
+.sc-qa-mark {
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  font-weight: 600;
+}
+
+.sc-qa-mark.is-correct {
+  color: var(--success);
+}
+
+.sc-qa-mark.is-wrong {
+  color: var(--danger);
+}
+
+.sc-qa-answer-label {
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-secondary);
+}
+
+.sc-qa-answer {
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--text-primary);
+}
+
+/* 折叠块：display: contents 让按钮与正文直接成为反馈块的网格项 */
+.sc-qa-exp-block {
+  display: contents;
+}
+
+.sc-qa-exp-toggle {
+  grid-column: 2;
+  justify-self: end;
+}
+
+.sc-qa-caret {
+  display: inline-block;
+  margin-left: var(--sp-1);
+  transition: transform var(--fast) var(--ease);
+}
+
+.sc-qa-caret.is-open {
+  transform: rotate(180deg);
+}
+
+.sc-qa-exp {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding-left: var(--sp-3);
+  border-left: 2px solid var(--accent);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+}
+
+/* 未选答案就提交：红字提示（不禁用按钮，避免死按钮） */
+.sc-qa-need {
+  margin: 0;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--danger);
+}
+
+/* ---------- 作答按钮行 ---------- */
+.sc-qa-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+}
+
+/* ---------- 完成态 ---------- */
+.sc-qa-summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.sc-qa-summary-title {
+  margin: 0;
+  font-size: var(--fs-card);
+  line-height: var(--lh-card);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.sc-qa-rate {
+  display: flex;
+  align-items: baseline;
+  margin: 0;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-value-md);
+  line-height: var(--lh-value-md);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.sc-qa-rate-unit {
+  font-size: var(--fs-section);
+  line-height: var(--lh-section);
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.sc-qa-summary-line {
+  margin: 0;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--text-secondary);
+}
+
+.sc-qa-summary-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+}
+
+/* ---------- 错题本 ---------- */
+.sc-qa-wrongbook {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.sc-qa-wrong-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.sc-qa-wrong-total {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-1);
+  margin: 0;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--text-secondary);
+}
+
+.sc-qa-wrong-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sc-qa-wrong-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-height: var(--qa-row-min-h);
+  padding: var(--sp-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-8);
+  background: var(--bg-surface);
+}
+
+.sc-qa-wrong-prompt {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--text-primary);
+}
+
+.sc-qa-wrong-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sc-qa-wrong-full {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.sc-qa-wrong-full-text {
+  margin: 0;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--text-primary);
+  white-space: pre-wrap;
+}
+
+.sc-qa-wrong-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+}
+
+.sc-qa-wrong-time,
+.sc-qa-wrong-count {
+  color: var(--text-tertiary);
+}
+
+.sc-qa-wrong-empty {
+  margin: 0;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--text-secondary);
+}
+
+/* 只保留两处动效（进度轨宽度 / 折叠箭头）；减少动效时一并取消 */
+@media (prefers-reduced-motion: reduce) {
+  .sc-qa-track-fill,
+  .sc-qa-caret {
+    transition: none;
+  }
+}
+
+/* ---------- 390px：纵向堆叠、按钮满宽、按钮行不挤压（页面无横滚） ---------- */
+@media (max-width: 640px) {
+  .sc-qa-filter-row {
+    flex-direction: column;
+    gap: var(--sp-2);
+  }
+
+  .sc-qa-filter-label {
+    flex: 0 0 auto;
+  }
+
+  .sc-qa-running-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .sc-qa-running-tools {
+    justify-content: flex-end;
+  }
+
+  .sc-qa-actions,
+  .sc-qa-footer-row,
+  .sc-qa-summary-actions {
+    justify-content: stretch;
+  }
+
+  .sc-qa-actions .sc-btn,
+  .sc-qa-footer-row .sc-btn,
+  .sc-qa-summary-actions .sc-btn {
+    width: 100%;
+  }
+
+  .sc-qa-feedback {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sc-qa-exp-toggle {
+    grid-column: 1;
+    justify-self: end;
+  }
+
+  .sc-qa-wrong-prompt {
+    align-items: flex-start;
+  }
+
+  .sc-qa-wrong-text {
+    white-space: normal;
+  }
+}
+

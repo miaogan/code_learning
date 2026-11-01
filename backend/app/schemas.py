@@ -1,8 +1,15 @@
 """API 契约模型（pydantic v2）。前端镜像见 frontend/src/api/types.ts，改字段必须两侧同步。"""
 
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 Severity = Literal["high", "medium", "low"]
 CourseLevel = Literal["入门", "进阶"]
@@ -11,7 +18,9 @@ QuestionKind = Literal["technical", "project", "challenge"]
 ExperienceBand = Literal["应届", "1-3年", "3-5年", "5-10年", "10年以上"]
 InterviewMarket = Literal["国内", "北美", "欧洲", "其他"]
 CompanySize = Literal["大厂", "中型", "初创"]
-ExamKind = Literal["single", "multiple", "text"]
+#: 题型闭集（r11 扩 `judge` 判断题）：单一出处是 `services/rules.py:OBJECTIVE_KINDS` →
+#: `QUESTION_KINDS`（由本 Literal 派生），改一处必须改两处。
+ExamKind = Literal["single", "multiple", "judge", "text"]
 #: 题目难度三档（r6：`basic` / `intermediate` / `challenge`）。闭集单一出处在
 #: `services/rules.py:DIFFICULTIES` —— 那份元组与本 Literal 逐字对齐，改一处必须改两处。
 ExamDifficulty = Literal["basic", "intermediate", "challenge"]
@@ -24,6 +33,41 @@ SkillStatus = Literal["active", "historical"]
 TimelineType = Literal["interview", "exam", "resume"]
 #: 润色建议所属段落（与简历正文的自然段落一一对应）。
 PolishSection = Literal["project", "experience", "education", "summary"]
+
+# --- r11 题库语言维度与练习闭集（镜像 `services/rules.py`，逐字对齐）--------
+#: 题干语言闭集。**`""` 是闭集成员**（通用 / 算法题），不是「全部」——
+#: 筛选里的「全部」是 `rules.FILTER_ANY`（字面量 `"all"`），两条语义不得混用。
+QuestionLanguage = Literal["", "python", "java", "go", "html", "css", "js", "ts", "vue3", "react"]
+#: 练习语言筛选 = 闭集成员 + 「全部」（`"all"` 与 `""` 并列，故类型上必须并存）。
+PracticeLanguageFilter = Literal[
+    "all", "", "python", "java", "go", "html", "css", "js", "ts", "vue3", "react"
+]
+#: 练习方向筛选：闭集只此一份（`rules.DIRECTIONS`），**刻意不在 schemas.py 复写方向字面量** ——
+#: 既有门禁 `test_direction_literals_not_duplicated` 把 `schemas.py` 算在 r6 改动面内，
+#: 再写一份方向字面量就是第二份闭集。这里用 `Annotated` 校验器，越界值在模型层被拒，
+#: FastAPI 仍统一映射 422 `VALIDATION_ERROR`（错误矩阵不变）。
+def _check_direction_filter(value: str) -> str:
+    """方向筛选闭集校验（`rules.DIRECTIONS` + `rules.FILTER_ANY`）。
+
+    延迟导入是刻意的：`rules` 反向上依赖本模块（`ExamKind` / `InterviewSettings`），
+    模块级导入会成环；校验器在请求到达时才执行，那时两个模块都已就绪。
+    """
+    from .services import rules
+
+    if value != rules.FILTER_ANY and value not in rules.DIRECTIONS:
+        raise ValueError("direction 越出闭集")
+    return value
+
+
+PracticeDirectionFilter = Annotated[str, AfterValidator(_check_direction_filter)]
+#: 练习难度筛选 = 三档（`rules.DIFFICULTIES`）+ 「全部」。
+PracticeDifficultyFilter = Literal["all", "basic", "intermediate", "challenge"]
+#: 练习必备度筛选 = 三档（`rules.ESSENTIALITIES`）+ 「全部」。
+PracticeEssentialityFilter = Literal["all", "must_know", "advanced", "nice_to_know"]
+#: 练习范围闭集（`rules.PRACTICE_SCOPES`）：全部 / 未做过 / 最近一次答错。
+PracticeScope = Literal["all", "unseen", "wrong"]
+#: 练习题量闭集（`rules.PRACTICE_LIMITS`，`0` = 全部命中）。
+PracticeLimit = Literal[10, 20, 0]
 
 
 class HealthResponse(BaseModel):
@@ -301,6 +345,93 @@ class ExamResult(BaseModel):
     objective_total: int
     elapsed_s: float
     per_question: list[PerQuestionResult]
+
+
+# --- r11 练习四端点契约（/api/practice/paper|answer|stats|wrong-book）--------
+# 与 `frontend/src/api/types.ts` 逐字镜像（字段名 snake_case，零转换）：任一侧改名即
+# `tests/test_r11_contract.py` 转红。判分/事件表复用笔试那一份（`question_attempts`）。
+
+
+class PracticePaperRequest(BaseModel):
+    """练习组卷请求体（`POST /api/practice/paper`，闭集越界由 FastAPI 统一映射 422）。"""
+
+    language: PracticeLanguageFilter = "all"
+    direction: PracticeDirectionFilter = "all"
+    difficulty: PracticeDifficultyFilter = "all"
+    essentiality: PracticeEssentialityFilter = "all"
+    scope: PracticeScope = "all"
+    limit: PracticeLimit = 10
+
+
+class PracticeQuestion(BaseModel):
+    """练习题单里的一道题：**不含** `answer`（答案只在判分响应里回显）。"""
+
+    id: str
+    kind: ExamKind
+    language: str
+    direction: str
+    difficulty: str
+    essentiality: str
+    prompt: str
+    options: list[ExamOption]
+
+
+class PracticePaper(BaseModel):
+    """练习题单（`POST /api/practice/paper`）：空结果也 200，靠 `notice` 说中文原因。"""
+
+    session_id: str
+    questions: list[PracticeQuestion]
+    #: 全部筛选后的命中总数（不受 `limit` 截断），与 `/stats` 的 `hit` 同源同值。
+    hit_count: int
+    #: 空 / 截断 / 题库未就绪的中文提示（正常满额时为空串）。
+    notice: str = ""
+
+
+class PracticeAnswerRequest(BaseModel):
+    """单题判定请求（`POST /api/practice/answer`）；`answer` 空由服务端 400 兜底。"""
+
+    session_id: str
+    question_id: str
+    answer: list[str] | str | None = None
+
+
+class PracticeAnswerResult(BaseModel):
+    """单题判定结果：判分只走 `exam.grade_objective()`，这里只做数据搬运。"""
+
+    question_id: str
+    correct: bool
+    correct_answer: list[str] | str | None = None
+    #: 解析恒 `str`（库内为空时也返回空串，前端显示「本题暂无解析」降级文案）。
+    explanation: str = ""
+
+
+class PracticeStats(BaseModel):
+    """练习统计（`GET /api/practice/stats`）：`hit` 是当前筛选命中数。"""
+
+    total: int
+    practiced: int
+    wrong_total: int
+    hit: int
+
+
+class PracticeWrongItem(BaseModel):
+    """错题本一行：最近一次作答为错误的题。"""
+
+    question_id: str
+    prompt: str
+    language: str
+    direction: str
+    difficulty: str
+    #: 最近一次答错时间（UTC ISO8601），前端格式化为 `MM-dd HH:mm`。
+    last_wrong_at: str
+    wrong_count: int
+
+
+class PracticeWrongBook(BaseModel):
+    """错题本（`GET /api/practice/wrong-book`）：空列表也是 200。"""
+
+    items: list[PracticeWrongItem]
+    total: int
 
 
 class Course(BaseModel):

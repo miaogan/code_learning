@@ -5,6 +5,7 @@
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "must_know",
+    "language": "react",
     "prompt": "以下哪个 Hook 用于在组件挂载后执行副作用并支持清理函数？",
     "options": [
       { "key": "A", "text": "useMemo" },
@@ -12,7 +13,8 @@
       { "key": "C", "text": "useRef" },
       { "key": "D", "text": "useContext" }
     ],
-    "answer": ["B"]
+    "answer": ["B"],
+    "explanation": "useEffect 在渲染提交后执行副作用，其返回值是清理函数，会在依赖变化或卸载时调用；useMemo 只缓存计算结果，useRef 只保存可变引用。"
   },
   {
     "id": "fe-q2",
@@ -20,6 +22,7 @@
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "must_know",
+    "language": "react",
     "prompt": "React 列表渲染时 key 的主要作用是什么？",
     "options": [
       { "key": "A", "text": "标识元素身份，帮助 Diff 复用节点" },
@@ -27,7 +30,8 @@
       { "key": "C", "text": "决定组件挂载顺序" },
       { "key": "D", "text": "控制重渲染频率" }
     ],
-    "answer": ["A"]
+    "answer": ["A"],
+    "explanation": "key 是 React 协调阶段判断元素身份的依据，稳定唯一的 key 让节点被复用而不是重建；它不影响 CSS、挂载顺序或渲染频率。"
   },
   {
     "id": "fe-q3",
@@ -35,6 +39,7 @@
     "kind": "multiple",
     "difficulty": "challenge",
     "essentiality": "advanced",
+    "language": "js",
     "prompt": "关于浏览器事件循环，下列说法正确的有？",
     "options": [
       { "key": "A", "text": "微任务在本轮宏任务结束后、下一轮渲染前清空" },
@@ -42,7 +47,8 @@
       { "key": "C", "text": "Promise 回调属于宏任务" },
       { "key": "D", "text": "多次微任务可能造成渲染阻塞" }
     ],
-    "answer": ["A", "B", "D"]
+    "answer": ["A", "B", "D"],
+    "explanation": "Promise 回调属于微任务而非宏任务；微任务队列会在本轮宏任务结束后、渲染前被清空，堆积过多微任务会推迟渲染。"
   },
   {
     "id": "fe-q4",
@@ -50,6 +56,7 @@
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "nice_to_know",
+    "language": "js",
     "prompt": "在 JavaScript 中执行 typeof null 的返回值是？",
     "options": [
       { "key": "A", "text": "\"null\"" },
@@ -57,7 +64,8 @@
       { "key": "C", "text": "\"undefined\"" },
       { "key": "D", "text": "\"number\"" }
     ],
-    "answer": ["B"]
+    "answer": ["B"],
+    "explanation": "typeof null 返回 \"object\"，这是 JS 早期的历史遗留缺陷：null 的类型标签与对象相同，为兼容一直保留至今。判断 null 应直接用 === null。"
   },
   {
     "id": "fe-q5",
@@ -65,6 +73,7 @@
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "nice_to_know",
+    "language": "",
     "prompt": "用 let 在 for 循环块内声明的变量，在循环块之外直接访问会怎样？",
     "options": [
       { "key": "A", "text": "正常访问到循环结束时的值" },
@@ -72,7 +81,8 @@
       { "key": "C", "text": "得到 undefined" },
       { "key": "D", "text": "自动升级为全局变量" }
     ],
-    "answer": ["B"]
+    "answer": ["B"],
+    "explanation": "let 声明是块级作用域，离开 for 循环块后变量不存在，访问会抛 ReferenceError；它不会被提升为全局变量，也不是 undefined。"
   },
   {
     "id": "fe-q6",
@@ -80,6 +90,7 @@
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "nice_to_know",
+    "language": "ts",
     "prompt": "TypeScript 中表示「这个值可能是字符串也可能是 null」的联合类型写法是？",
     "options": [
       { "key": "A", "text": "string & null" },
@@ -87,7 +98,8 @@
       { "key": "C", "text": "string ?? null" },
       { "key": "D", "text": "string => null" }
     ],
-    "answer": ["B"]
+    "answer": ["B"],
+    "explanation": "联合类型用 | 连接候选类型，string | null 表示可能是字符串也可能是 null；& 是交叉类型，?? 是空值合并运算符而不是类型语法。"
   },
   {
     "id": "fe-q7",
@@ -95,6 +107,7 @@
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "nice_to_know",
+    "language": "css",
     "prompt": "用 CSS Grid 定义三列等宽布局，下列写法正确的是？",
     "options": [
       { "key": "A", "text": "grid-template-columns: repeat(3, 1fr)" },
@@ -102,7 +115,8 @@
       { "key": "C", "text": "grid-template-rows: 3fr" },
       { "key": "D", "text": "flex: 1 1 0" }
     ],
-    "answer": ["A"]
+    "answer": ["A"],
+    "explanation": "repeat(3, 1fr) 表示三列且每列占一份剩余空间；grid-auto-flow 控制自动放置方向，grid-template-rows 定义行高，flex 属于弹性布局。"
   },
   {
     "id": "fe-q8",
@@ -110,6 +124,7 @@
     "kind": "multiple",
     "difficulty": "basic",
     "essentiality": "advanced",
+    "language": "",
     "prompt": "关于 HTTP 缓存，下列说法正确的有？",
     "options": [
       { "key": "A", "text": "Cache-Control: max-age 表示资源可被缓存的最长新鲜期" },
@@ -117,7 +132,8 @@
       { "key": "C", "text": "no-store 表示允许缓存，只是每次都要回源验证" },
       { "key": "D", "text": "命中新鲜缓存时可直接复用，不再向服务器发起请求" }
     ],
-    "answer": ["A", "B", "D"]
+    "answer": ["A", "B", "D"],
+    "explanation": "no-store 是完全禁止缓存，不是「每次回源验证」（那是 no-cache）；强缓存命中时不发请求，协商缓存才用 ETag/If-None-Match 校验。"
   },
   {
     "id": "fe-q9",
@@ -125,6 +141,7 @@
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "must_know",
+    "language": "js",
     "prompt": "关于 Promise 的状态变化，下列说法正确的是？",
     "options": [
       { "key": "A", "text": "pending / fulfilled / rejected 三种状态可以任意来回切换" },
@@ -132,7 +149,8 @@
       { "key": "C", "text": "只有 then 的回调里能修改状态" },
       { "key": "D", "text": "外部可以随时重新给 Promise 赋状态" }
     ],
-    "answer": ["B"]
+    "answer": ["B"],
+    "explanation": "Promise 状态只能由 pending 单向迁移到 fulfilled 或 rejected 一次，之后永久固定；then 的回调也不会再改变状态。"
   },
   {
     "id": "fe-q10",
@@ -140,6 +158,7 @@
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "advanced",
+    "language": "react",
     "prompt": "React 中把更新写成 setCount((c) => c + 1) 这种函数式更新，主要好处是？",
     "options": [
       { "key": "A", "text": "减少组件渲染次数" },
@@ -147,7 +166,8 @@
       { "key": "C", "text": "自动对 state 做深比较" },
       { "key": "D", "text": "让 setState 变成同步执行" }
     ],
-    "answer": ["B"]
+    "answer": ["B"],
+    "explanation": "函数式更新的参数由 React 提供，是队列里的最新状态，连续多次调用不会读到同一个旧值；它不改变渲染次数，也不做深比较，更不会让更新同步。"
   },
   {
     "id": "fe-q11",
@@ -155,6 +175,7 @@
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "must_know",
+    "language": "js",
     "prompt": "JavaScript 中 == 与 === 的核心区别是？",
     "options": [
       { "key": "A", "text": "两者完全等价" },
@@ -162,7 +183,8 @@
       { "key": "C", "text": "== 会把操作数都转成布尔值再比较" },
       { "key": "D", "text": "=== 只能比较引用类型" }
     ],
-    "answer": ["B"]
+    "answer": ["B"],
+    "explanation": "=== 是严格相等，类型不同直接返回 false；== 会先做隐式类型转换，所以 null == undefined 为 true 而 null === undefined 为 false。"
   },
   {
     "id": "fe-q12",
@@ -170,6 +192,7 @@
     "kind": "multiple",
     "difficulty": "basic",
     "essentiality": "nice_to_know",
+    "language": "css",
     "prompt": "关于 CSS 盒模型，下列说法正确的有？",
     "options": [
       { "key": "A", "text": "box-sizing: border-box 时设置的 width 已包含 padding 与 border" },
@@ -177,7 +200,8 @@
       { "key": "C", "text": "margin 会被计入 border-box 计算出的 width" },
       { "key": "D", "text": "相邻块级元素的垂直外边距可能发生合并（margin collapse）" }
     ],
-    "answer": ["A", "B", "D"]
+    "answer": ["A", "B", "D"],
+    "explanation": "border-box 让 width 覆盖内容区加 padding 加 border，但 margin 始终不计入；相邻块级元素的垂直 margin 会合并，取较大值。"
   },
   {
     "id": "fe-q13",
@@ -185,6 +209,7 @@
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "advanced",
+    "language": "ts",
     "prompt": "TypeScript 中 unknown 与 any 的区别是？",
     "options": [
       { "key": "A", "text": "两者完全等价" },
@@ -192,7 +217,8 @@
       { "key": "C", "text": "unknown 只能用于函数返回值" },
       { "key": "D", "text": "any 比 unknown 更安全" }
     ],
-    "answer": ["B"]
+    "answer": ["B"],
+    "explanation": "unknown 是安全的未知类型，必须先收窄才能访问成员；any 关闭类型检查，可以随意读写，因此更容易埋下运行时错误。"
   },
   {
     "id": "fe-q14",
@@ -200,6 +226,7 @@
     "kind": "multiple",
     "difficulty": "challenge",
     "essentiality": "advanced",
+    "language": "react",
     "prompt": "关于 React 常见性能优化手段，下列说法正确的有？",
     "options": [
       { "key": "A", "text": "React.memo 对 props 做浅比较，可避免不必要的重渲染" },
@@ -207,7 +234,8 @@
       { "key": "C", "text": "useCallback 缓存函数引用，配合 memo 才能让浅比较生效" },
       { "key": "D", "text": "只要用了 memo，组件内部状态更新也不会再触发重渲染" }
     ],
-    "answer": ["A", "B", "C"]
+    "answer": ["A", "B", "C"],
+    "explanation": "memo 只拦截由父组件传入 props 引起的重渲染，组件自身 state 更新仍然重渲染；useMemo 缓存值、useCallback 缓存函数引用，三者的分工不能混用。"
   },
   {
     "id": "fe-q15",
@@ -215,6 +243,7 @@
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "nice_to_know",
+    "language": "js",
     "prompt": "关于箭头函数的 this，下列说法正确的是？",
     "options": [
       { "key": "A", "text": "指向运行时的调用者" },
@@ -222,7 +251,8 @@
       { "key": "C", "text": "始终指向 window" },
       { "key": "D", "text": "指向 new 出来的实例" }
     ],
-    "answer": ["B"]
+    "answer": ["B"],
+    "explanation": "箭头函数没有自己的 this，取定义时外层词法作用域的 this，且 call/apply/bind 无法改变；普通函数的 this 才由调用方式决定。"
   },
   {
     "id": "fe-q16",
@@ -230,6 +260,7 @@
     "kind": "multiple",
     "difficulty": "basic",
     "essentiality": "nice_to_know",
+    "language": "js",
     "prompt": "关于浏览器 localStorage，下列说法正确的有？",
     "options": [
       { "key": "A", "text": "同源共享，关闭浏览器后数据仍保留" },
@@ -237,7 +268,8 @@
       { "key": "C", "text": "写入的内容会自动附加到之后的每个 HTTP 请求里" },
       { "key": "D", "text": "只能存字符串，存对象需要 JSON 序列化" }
     ],
-    "answer": ["A", "B", "D"]
+    "answer": ["A", "B", "D"],
+    "explanation": "localStorage 同源共享且持久，API 同步会阻塞主线程，只能存字符串；自动附带请求头的是 Cookie，不是 localStorage。"
   },
   {
     "id": "fe-q17",
@@ -245,6 +277,7 @@
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "nice_to_know",
+    "language": "css",
     "prompt": "下列哪条 CSS 选择器优先级关系是正确的？",
     "options": [
       { "key": "A", "text": "内联样式 > id 选择器 > 类选择器 > 元素选择器" },
@@ -252,7 +285,8 @@
       { "key": "C", "text": "元素选择器优先级最高" },
       { "key": "D", "text": "!important 优先级最低" }
     ],
-    "answer": ["A"]
+    "answer": ["A"],
+    "explanation": "优先级从高到低为内联样式 > id > 类/属性/伪类 > 元素/伪元素；!important 会覆盖同层及以下的声明，是最高的例外而不是最低。"
   },
   {
     "id": "fe-q18",
@@ -260,9 +294,11 @@
     "kind": "text",
     "difficulty": "basic",
     "essentiality": "must_know",
+    "language": "js",
     "prompt": "请简述浏览器事件传播的三个阶段，以及各阶段中监听器的触发顺序。",
     "options": [],
-    "answer": []
+    "answer": [],
+    "explanation": "事件传播分捕获、目标、冒泡三阶段：捕获由外向内、目标阶段在目标元素触发、冒泡由内向外；addEventListener 第三个参数为 true 时在捕获阶段触发。"
   },
   {
     "id": "fe-q19",
@@ -270,9 +306,11 @@
     "kind": "text",
     "difficulty": "basic",
     "essentiality": "nice_to_know",
+    "language": "react",
     "prompt": "为什么 React 列表渲染需要稳定唯一的 key？使用随机 key 或以数组下标作 key 分别会带来什么问题？",
     "options": [],
-    "answer": []
+    "answer": [],
+    "explanation": "稳定唯一的 key 让 Diff 正确复用与移动节点；随机 key 每次渲染都变，导致节点被反复卸载重建、状态丢失；用下标作 key 在插入或排序后身份错位，同样导致错误复用。"
   },
   {
     "id": "fe-q20",
@@ -280,9 +318,11 @@
     "kind": "text",
     "difficulty": "basic",
     "essentiality": "nice_to_know",
+    "language": "",
     "prompt": "简述 var、let、const 三种声明的区别：作用域、重复声明、是否允许重新赋值。",
     "options": [],
-    "answer": []
+    "answer": [],
+    "explanation": "var 是函数作用域、可重复声明；let 与 const 是块级作用域、不能重复声明；let 可重新赋值，const 绑定不可重新赋值（但对象内部属性仍可修改）。"
   },
   {
     "id": "be-q1",
@@ -290,6 +330,7 @@
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "must_know",
+    "language": "",
     "prompt": "HTTP 状态码 401 与 403 的核心区别是？",
     "options": [
       { "key": "A", "text": "401 未认证，403 已认证但无权限" },
@@ -297,7 +338,8 @@
       { "key": "C", "text": "两个完全等价" },
       { "key": "D", "text": "401 用于缓存，403 用于重定向" }
     ],
-    "answer": ["A"]
+    "answer": ["A"],
+    "explanation": "401 表示未认证或凭证无效，403 表示已认证但没有访问权限；两者都不是服务端错误，也不能互换使用。"
   },
   {
     "id": "be-q2",
@@ -305,6 +347,7 @@
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "must_know",
+    "language": "",
     "prompt": "数据库中索引最主要的作用是？",
     "options": [
       { "key": "A", "text": "减少写入的数据量" },
@@ -312,7 +355,8 @@
       { "key": "C", "text": "自动进行事务隔离" },
       { "key": "D", "text": "压缩表存储空间" }
     ],
-    "answer": ["B"]
+    "answer": ["B"],
+    "explanation": "索引是额外的有序数据结构，用存储与写入代价换取按索引列快速定位；它不减少写入量，也不负责隔离与压缩。"
   },
   {
     "id": "be-q3",
@@ -320,6 +364,7 @@
     "kind": "multiple",
     "difficulty": "challenge",
     "essentiality": "advanced",
+    "language": "",
     "prompt": "关于 REST 接口的幂等性，下列说法正确的有？",
     "options": [
       { "key": "A", "text": "GET 应当是幂等的" },
@@ -327,7 +372,8 @@
       { "key": "C", "text": "POST 天然幂等" },
       { "key": "D", "text": "幂等性有助于失败重试的安全" }
     ],
-    "answer": ["A", "B", "D"]
+    "answer": ["A", "B", "D"],
+    "explanation": "GET 与 PUT 语义幂等，重复执行结果一致，因此可安全重试；POST 通常每次创建新资源，不幂等，重试前需要幂等键。"
   },
   {
     "id": "be-q4",
@@ -335,6 +381,7 @@
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "nice_to_know",
+    "language": "",
     "prompt": "HTTP 状态码 201 表示？",
     "options": [
       { "key": "A", "text": "请求成功且已创建了新资源" },
@@ -342,7 +389,8 @@
       { "key": "C", "text": "资源已被永久重定向" },
       { "key": "D", "text": "服务端发生未预期错误" }
     ],
-    "answer": ["A"]
+    "answer": ["A"],
+    "explanation": "201 Created 表示请求成功且服务端已创建新资源，常配合 POST；200 是有响应体，204 是无内容，301 是永久重定向。"
   },
   {
     "id": "be-q5",
@@ -350,6 +398,7 @@
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "must_know",
+    "language": "",
     "prompt": "数据库事务的「原子性（Atomicity）」含义是？",
     "options": [
       { "key": "A", "text": "事务内的操作要么全部生效，要么全部不生效" },
@@ -357,7 +406,8 @@
       { "key": "C", "text": "事务提交后结果永久保存" },
       { "key": "D", "text": "事务必须严格按提交顺序执行" }
     ],
-    "answer": ["A"]
+    "answer": ["A"],
+    "explanation": "原子性指事务内的操作要么全部提交要么全部回滚；选项 B 是隔离性，C 是持久性，D 不是 ACID 的要求。"
   },
   {
     "id": "be-q6",
@@ -365,6 +415,7 @@
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "advanced",
+    "language": "python",
     "prompt": "Python 中把可变对象（如 list）用作函数默认参数，最典型的问题是？",
     "options": [
       { "key": "A", "text": "会直接报语法错误" },
@@ -372,7 +423,8 @@
       { "key": "C", "text": "每次调用都会自动新建一份副本" },
       { "key": "D", "text": "实参会被强制转换成元组" }
     ],
-    "answer": ["B"]
+    "answer": ["B"],
+    "explanation": "默认参数在函数定义时求值一次，可变对象会被所有调用共享；正确写法是默认 None，在函数体内再新建列表。"
   },
   {
     "id": "be-q7",
@@ -380,6 +432,7 @@
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "nice_to_know",
+    "language": "",
     "prompt": "FastAPI 中给 POST 接口声明 JSON 请求体，最推荐的做法是？",
     "options": [
       { "key": "A", "text": "用 Pydantic 模型作为参数类型标注，由框架解析与校验" },
@@ -387,7 +440,8 @@
       { "key": "C", "text": "把每个字段写成普通函数参数" },
       { "key": "D", "text": "用单个字符串参数接收整个 JSON" }
     ],
-    "answer": ["A"]
+    "answer": ["A"],
+    "explanation": "用 Pydantic 模型做类型标注后，FastAPI 会自动解析请求体、校验字段并生成文档；手动解析会丢掉校验与错误提示。"
   },
   {
     "id": "be-q8",
@@ -395,6 +449,7 @@
     "kind": "multiple",
     "difficulty": "basic",
     "essentiality": "nice_to_know",
+    "language": "",
     "prompt": "关于 SQL 的表连接（JOIN），下列说法正确的有？",
     "options": [
       { "key": "A", "text": "INNER JOIN 只返回两表中匹配上的行" },
@@ -402,7 +457,8 @@
       { "key": "C", "text": "CROSS JOIN 会自动去重重复行" },
       { "key": "D", "text": "连接条件应写在 ON 子句而不是 WHERE 里，语义更清晰" }
     ],
-    "answer": ["A", "B", "D"]
+    "answer": ["A", "B", "D"],
+    "explanation": "INNER JOIN 取交集，LEFT JOIN 保留左表并以 NULL 补齐，连接条件写 ON 更清晰；CROSS JOIN 是笛卡尔积，不自动去重。"
   },
   {
     "id": "be-q9",
@@ -410,6 +466,7 @@
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "nice_to_know",
+    "language": "",
     "prompt": "关于 SQLite，下列说法最准确的是？",
     "options": [
       { "key": "A", "text": "无独立服务进程、单文件存储，适合单机读多写少的场景" },
@@ -417,7 +474,8 @@
       { "key": "C", "text": "采用多版本并发控制，支持海量并发写入" },
       { "key": "D", "text": "只能用于移动端，不能用于服务端" }
     ],
-    "answer": ["A"]
+    "answer": ["A"],
+    "explanation": "SQLite 以库形式嵌进进程，单文件存储、无需服务端，适合单机与嵌入式场景；它不是分布式集群，写入并发能力有限。"
   },
   {
     "id": "be-q10",
@@ -425,6 +483,7 @@
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "must_know",
+    "language": "",
     "prompt": "关于 HTTP GET 与 POST，下列说法正确的是？",
     "options": [
       { "key": "A", "text": "GET 语义是读取资源、通常可缓存且不应产生副作用" },
@@ -432,7 +491,8 @@
       { "key": "C", "text": "POST 天然幂等，重复提交结果一致" },
       { "key": "D", "text": "GET 不能使用查询参数" }
     ],
-    "answer": ["A"]
+    "answer": ["A"],
+    "explanation": "GET 用于读取、可缓存、不应有副作用，查询参数放在 URL 上；POST 通常不幂等，重复提交可能创建多条数据。"
   },
   {
     "id": "be-q11",
@@ -440,6 +500,7 @@
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "advanced",
+    "language": "",
     "prompt": "ORM 中一次查出 N 条主记录后逐条再查关联表的做法（N+1 查询问题），最常见的治理方式是？",
     "options": [
       { "key": "A", "text": "改为 JOIN 或按主键集合批量 IN 查询，一次拿回关联数据" },
@@ -447,7 +508,8 @@
       { "key": "C", "text": "把数据库整体换成 NoSQL" },
       { "key": "D", "text": "在前端加内存缓存" }
     ],
-    "answer": ["A"]
+    "answer": ["A"],
+    "explanation": "N+1 的根因是逐条查询，用 JOIN 或按主键集合批量 IN 一次取回即可把 1+N 次降到 2 次；加事务、换库、前端缓存都不解决访问次数。"
   },
   {
     "id": "be-q12",
@@ -455,6 +517,7 @@
     "kind": "multiple",
     "difficulty": "challenge",
     "essentiality": "advanced",
+    "language": "",
     "prompt": "关于数据库索引与事务隔离，下列说法正确的有？",
     "options": [
       { "key": "A", "text": "联合索引通常遵循最左前缀匹配原则" },
@@ -462,7 +525,8 @@
       { "key": "C", "text": "可重复读隔离级别下不会出现任何并发异常" },
       { "key": "D", "text": "对频繁更新的列建索引会带来写放大与维护成本" }
     ],
-    "answer": ["A", "B", "D"]
+    "answer": ["A", "B", "D"],
+    "explanation": "联合索引遵循最左前缀，索引列上做函数运算或隐式转换会失效，频繁更新的列建索引会增加写放大；可重复读仍可能出现幻读等异常。"
   },
   {
     "id": "be-q13",
@@ -470,6 +534,7 @@
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "nice_to_know",
+    "language": "",
     "prompt": "HTTP 状态码 500 表示？",
     "options": [
       { "key": "A", "text": "客户端请求格式错误" },
@@ -477,7 +542,8 @@
       { "key": "C", "text": "请求的资源不存在" },
       { "key": "D", "text": "已认证但权限不足" }
     ],
-    "answer": ["B"]
+    "answer": ["B"],
+    "explanation": "500 表示服务端在处理请求时发生未预期错误；400 是请求格式错误，404 是资源不存在，403 是无权限。"
   },
   {
     "id": "be-q14",
@@ -485,6 +551,7 @@
     "kind": "multiple",
     "difficulty": "basic",
     "essentiality": "nice_to_know",
+    "language": "",
     "prompt": "关于 Docker 镜像与容器，下列说法正确的有？",
     "options": [
       { "key": "A", "text": "镜像是只读的分层模板，容器是镜像的运行实例" },
@@ -492,7 +559,8 @@
       { "key": "C", "text": "容器内对文件的修改会直接写回原始镜像层" },
       { "key": "D", "text": "把变动频繁的指令放在 Dockerfile 靠后位置更利于构建缓存命中" }
     ],
-    "answer": ["A", "B", "D"]
+    "answer": ["A", "B", "D"],
+    "explanation": "镜像只读且分层，容器是运行实例，一个镜像可起多个容器；容器内修改写在可写层不会回写镜像；易变指令放后面能复用构建缓存。"
   },
   {
     "id": "be-q15",
@@ -500,6 +568,7 @@
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "advanced",
+    "language": "python",
     "prompt": "Python asyncio 中 await 的实际行为是？",
     "options": [
       { "key": "A", "text": "阻塞当前线程直到该操作完成" },
@@ -507,7 +576,8 @@
       { "key": "C", "text": "自动为操作创建一个新的操作系统线程" },
       { "key": "D", "text": "只能用在同步函数里" }
     ],
-    "answer": ["B"]
+    "answer": ["B"],
+    "explanation": "await 把控制权交回事件循环，让其他协程先跑，等可等待对象完成再继续；它不阻塞线程也不新开线程，且只能用在 async 函数内。"
   },
   {
     "id": "be-q16",
@@ -515,6 +585,7 @@
     "kind": "multiple",
     "difficulty": "basic",
     "essentiality": "nice_to_know",
+    "language": "",
     "prompt": "以下哪些属于常见的 HTTP 请求头？",
     "options": [
       { "key": "A", "text": "Content-Type" },
@@ -522,7 +593,8 @@
       { "key": "C", "text": "Set-Cookie" },
       { "key": "D", "text": "Accept" }
     ],
-    "answer": ["A", "B", "D"]
+    "answer": ["A", "B", "D"],
+    "explanation": "Content-Type、Authorization、Accept 都是请求头；Set-Cookie 是响应头，由服务端下发、浏览器保存。"
   },
   {
     "id": "be-q17",
@@ -530,6 +602,7 @@
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "nice_to_know",
+    "language": "",
     "prompt": "SQL 中 WHERE 与 HAVING 的区别是？",
     "options": [
       { "key": "A", "text": "WHERE 在分组前过滤行，HAVING 在分组后过滤分组" },
@@ -537,7 +610,8 @@
       { "key": "C", "text": "HAVING 只能用于非聚合列" },
       { "key": "D", "text": "WHERE 只能出现在聚合查询里" }
     ],
-    "answer": ["A"]
+    "answer": ["A"],
+    "explanation": "WHERE 在分组前过滤原始行、不能用聚合函数；HAVING 在 GROUP BY 之后过滤分组结果，可以引用聚合值。"
   },
   {
     "id": "be-q18",
@@ -545,9 +619,11 @@
     "kind": "text",
     "difficulty": "basic",
     "essentiality": "must_know",
+    "language": "",
     "prompt": "请简述数据库事务的 ACID 四个特性分别指什么。",
     "options": [],
-    "answer": []
+    "answer": [],
+    "explanation": "原子性（全做或全不做）、一致性（约束与业务不变量不被破坏）、隔离性（并发事务互不干扰）、持久性（提交后即使崩溃也不丢失）。"
   },
   {
     "id": "be-q19",
@@ -555,9 +631,11 @@
     "kind": "text",
     "difficulty": "basic",
     "essentiality": "nice_to_know",
+    "language": "",
     "prompt": "为什么给列建索引能加快查询？索引又会带来哪些代价？",
     "options": [],
-    "answer": []
+    "answer": [],
+    "explanation": "索引让数据库用 B+ 树等结构快速定位少量目标行、避免全表扫描；代价是额外存储、写入与更新维护成本，以及优化器误选索引的风险。"
   },
   {
     "id": "be-q20",
@@ -565,9 +643,11 @@
     "kind": "text",
     "difficulty": "basic",
     "essentiality": "nice_to_know",
+    "language": "",
     "prompt": "简述 REST 风格中资源命名与 HTTP 状态码的常见选择，并举 2 到 3 个状态码示例说明其适用场景。",
     "options": [],
-    "answer": []
+    "answer": [],
+    "explanation": "REST 用名词复数表示资源（如 /orders），用 HTTP 方法表达动作，用状态码表达结果：201 创建成功、204 无内容成功、404 资源不存在、409 冲突。"
   },
   {
     "id": "al-q1",
@@ -575,6 +655,7 @@
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "must_know",
+    "language": "",
     "prompt": "在一个已排序数组中二分查找的时间复杂度是？",
     "options": [
       { "key": "A", "text": "O(1)" },
@@ -582,7 +663,8 @@
       { "key": "C", "text": "O(n)" },
       { "key": "D", "text": "O(n log n)" }
     ],
-    "answer": ["B"]
+    "answer": ["B"],
+    "explanation": "二分查找每次折半排除一半区间，比较次数与 log2(n) 成正比，因此时间复杂度是 O(log n)；前提是数组已经有序。"
   },
   {
     "id": "al-q2",
@@ -590,6 +672,7 @@
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "must_know",
+    "language": "",
     "prompt": "栈这种数据结构的特点是？",
     "options": [
       { "key": "A", "text": "先进先出" },
@@ -597,7 +680,8 @@
       { "key": "C", "text": "随机访问" },
       { "key": "D", "text": "按优先级出队" }
     ],
-    "answer": ["B"]
+    "answer": ["B"],
+    "explanation": "栈只在一端（栈顶）进出，后进先出（LIFO）；先进先出是队列，按优先级出队是优先队列。"
   },
   {
     "id": "al-q3",
@@ -605,6 +689,7 @@
     "kind": "multiple",
     "difficulty": "challenge",
     "essentiality": "advanced",
+    "language": "",
     "prompt": "下列关于哈希表的说法正确的有？",
     "options": [
       { "key": "A", "text": "平均查找接近 O(1)" },
@@ -612,7 +697,8 @@
       { "key": "C", "text": "哈希表保证元素有序" },
       { "key": "D", "text": "负载因子过高会显著增加冲突" }
     ],
-    "answer": ["A", "B", "D"]
+    "answer": ["A", "B", "D"],
+    "explanation": "哈希表平均查找 O(1)，冲突用链地址法或开放寻址处理，负载因子过高冲突会明显增多；哈希表本身不保证元素有序。"
   },
   {
     "id": "al-q4",
@@ -620,6 +706,7 @@
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "nice_to_know",
+    "language": "",
     "prompt": "队列（Queue）的核心操作特点是？",
     "options": [
       { "key": "A", "text": "先进先出（FIFO）" },
@@ -627,7 +714,8 @@
       { "key": "C", "text": "总是按优先级最高者出队" },
       { "key": "D", "text": "支持按下标随机访问" }
     ],
-    "answer": ["A"]
+    "answer": ["A"],
+    "explanation": "队列一端入队、另一端出队，先进先出；后进先出是栈，按优先级出队是优先队列或堆。"
   },
   {
     "id": "al-q5",
@@ -635,6 +723,7 @@
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "must_know",
+    "language": "",
     "prompt": "快速排序在平均情况下的时间复杂度是？",
     "options": [
       { "key": "A", "text": "O(n)" },
@@ -642,7 +731,8 @@
       { "key": "C", "text": "O(log n)" },
       { "key": "D", "text": "O(n^2) 且无法避免" }
     ],
-    "answer": ["B"]
+    "answer": ["B"],
+    "explanation": "快排平均每层划分 O(n)、共 log n 层，平均 O(n log n)；最坏情况（每次划分极不均衡）会退化到 O(n^2)。"
   },
   {
     "id": "al-q6",
@@ -650,6 +740,7 @@
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "must_know",
+    "language": "",
     "prompt": "写递归函数时缺少基线条件（base case）会导致？",
     "options": [
       { "key": "A", "text": "编译期直接报错" },
@@ -657,7 +748,8 @@
       { "key": "C", "text": "运行时自动转换为循环" },
       { "key": "D", "text": "函数返回 null" }
     ],
-    "answer": ["B"]
+    "answer": ["B"],
+    "explanation": "缺少基线条件时递归永不终止，调用栈不断加深，最终栈溢出（Python 抛 RecursionError，其他语言是 StackOverflow）。"
   },
   {
     "id": "al-q7",
@@ -665,6 +757,7 @@
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "advanced",
+    "language": "",
     "prompt": "与数组相比，链表的主要优势与代价是？",
     "options": [
       { "key": "A", "text": "随机访问更快，但插入删除更慢" },
@@ -672,7 +765,8 @@
       { "key": "C", "text": "内存连续，缓存命中率更高" },
       { "key": "D", "text": "不需要存储指针，因此更省内存" }
     ],
-    "answer": ["B"]
+    "answer": ["B"],
+    "explanation": "链表在已知节点位置时插入删除是 O(1)，但按下标随机访问要 O(n) 遍历；数组内存连续、缓存友好，随机访问 O(1)。"
   },
   {
     "id": "al-q8",
@@ -680,6 +774,7 @@
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "nice_to_know",
+    "language": "",
     "prompt": "对二叉搜索树（BST）做中序遍历，得到的键序列是？",
     "options": [
       { "key": "A", "text": "随机顺序" },
@@ -687,7 +782,8 @@
       { "key": "C", "text": "降序序列" },
       { "key": "D", "text": "按层顺序" }
     ],
-    "answer": ["B"]
+    "answer": ["B"],
+    "explanation": "BST 满足左子树键小于根、右子树键大于根，中序遍历按「左-根-右」访问，因此输出升序序列。"
   },
   {
     "id": "al-q9",
@@ -695,6 +791,7 @@
     "kind": "multiple",
     "difficulty": "basic",
     "essentiality": "nice_to_know",
+    "language": "",
     "prompt": "关于排序算法的稳定性，下列说法正确的有？",
     "options": [
       { "key": "A", "text": "稳定指排序后相等的元素仍保持原来的相对顺序" },
@@ -702,7 +799,8 @@
       { "key": "C", "text": "快速排序通常是稳定排序" },
       { "key": "D", "text": "稳定性衡量的是相对顺序，与渐进复杂度无关" }
     ],
-    "answer": ["A", "B", "D"]
+    "answer": ["A", "B", "D"],
+    "explanation": "稳定性指相等元素相对顺序不变：归并排序稳定（合并时优先取左侧），快排与堆排通常不稳定；稳定性与时间复杂度是两件独立的事。"
   },
   {
     "id": "al-q10",
@@ -710,6 +808,7 @@
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "advanced",
+    "language": "",
     "prompt": "动态规划与普通分治法的关键区别在于？",
     "options": [
       { "key": "A", "text": "动态规划的子问题存在重叠，可缓存结果避免重复计算" },
@@ -717,7 +816,8 @@
       { "key": "C", "text": "动态规划不需要定义状态" },
       { "key": "D", "text": "动态规划只能求最短路径" }
     ],
-    "answer": ["A"]
+    "answer": ["A"],
+    "explanation": "动态规划要求子问题重叠并可用状态缓存（记忆化或递推表），分治的子问题通常互相独立、不必缓存。"
   },
   {
     "id": "al-q11",
@@ -725,6 +825,7 @@
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "nice_to_know",
+    "language": "",
     "prompt": "在边上权值均为 1 的无权图中求最短路径，最合适的算法是？",
     "options": [
       { "key": "A", "text": "深度优先搜索（DFS）" },
@@ -732,7 +833,8 @@
       { "key": "C", "text": "必须使用 Dijkstra" },
       { "key": "D", "text": "必须使用 Floyd" }
     ],
-    "answer": ["B"]
+    "answer": ["B"],
+    "explanation": "无权图的最短路径就是最少边数，BFS 按层扩展天然保证第一次到达即最短；DFS 不保证最短，Dijkstra 与 Floyd 是杀鸡用牛刀。"
   },
   {
     "id": "al-q12",
@@ -740,6 +842,7 @@
     "kind": "multiple",
     "difficulty": "challenge",
     "essentiality": "advanced",
+    "language": "",
     "prompt": "关于算法复杂度分析，下列说法正确的有？",
     "options": [
       { "key": "A", "text": "大 O 记号描述的是渐进上界" },
@@ -747,7 +850,8 @@
       { "key": "C", "text": "空间复杂度可以不统计递归调用栈占用的空间" },
       { "key": "D", "text": "常数因子与低阶项在大 O 中通常被忽略" }
     ],
-    "answer": ["A", "B", "D"]
+    "answer": ["A", "B", "D"],
+    "explanation": "大 O 描述渐进上界、忽略常数与低阶项，均摊分析把偶发高开销摊到每次操作；递归调用栈的空间必须计入空间复杂度。"
   },
   {
     "id": "al-q13",
@@ -755,6 +859,7 @@
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "advanced",
+    "language": "",
     "prompt": "从含 n 个元素的大顶堆中取出并删除堆顶最大值的复杂度是？",
     "options": [
       { "key": "A", "text": "O(1)" },
@@ -762,7 +867,8 @@
       { "key": "C", "text": "O(n)" },
       { "key": "D", "text": "O(n log n)" }
     ],
-    "answer": ["B"]
+    "answer": ["B"],
+    "explanation": "取堆顶只需读一次是 O(1)，但删除后要把末尾元素放到堆顶并下沉调整，调整路径长度是树高 O(log n)，所以删除整体是 O(log n)。"
   },
   {
     "id": "al-q14",
@@ -770,6 +876,7 @@
     "kind": "multiple",
     "difficulty": "basic",
     "essentiality": "nice_to_know",
+    "language": "",
     "prompt": "关于图算法，下列说法正确的有？",
     "options": [
       { "key": "A", "text": "Dijkstra 不能正确处理带负权边的图" },
@@ -777,7 +884,8 @@
       { "key": "C", "text": "Floyd 能求任意两点间最短路径，但复杂度高，适合稠密小图" },
       { "key": "D", "text": "深度优先搜索一定能找到无权图的最短路径" }
     ],
-    "answer": ["A", "B", "C"]
+    "answer": ["A", "B", "C"],
+    "explanation": "Dijkstra 要求非负权边，拓扑排序只适用于 DAG，Floyd 是 O(n^3) 的全源最短路适合稠密小图；DFS 找到的路径只是可达，不保证最短。"
   },
   {
     "id": "al-q15",
@@ -785,6 +893,7 @@
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "nice_to_know",
+    "language": "",
     "prompt": "递归算法的空间复杂度主要取决于？",
     "options": [
       { "key": "A", "text": "全局变量的个数" },
@@ -792,7 +901,8 @@
       { "key": "C", "text": "输入与输出规模之比" },
       { "key": "D", "text": "循环语句的嵌套层数" }
     ],
-    "answer": ["B"]
+    "answer": ["B"],
+    "explanation": "递归每调用一层压入一个栈帧，空间复杂度取决于最大递归深度，与全局变量数量或循环层数无关。"
   },
   {
     "id": "al-q16",
@@ -800,6 +910,7 @@
     "kind": "multiple",
     "difficulty": "basic",
     "essentiality": "nice_to_know",
+    "language": "",
     "prompt": "关于二叉树的遍历，下列说法正确的有？",
     "options": [
       { "key": "A", "text": "前序遍历顺序是根、左、右" },
@@ -807,7 +918,8 @@
       { "key": "C", "text": "中序遍历顺序是左、根、右" },
       { "key": "D", "text": "后序遍历顺序是根、右、左" }
     ],
-    "answer": ["A", "B", "C"]
+    "answer": ["A", "B", "C"],
+    "explanation": "前序根左右、中序左根右、后序左右根；层序遍历借助队列按层访问。D 描述的既不是后序也不是任何标准遍历的优先顺序。"
   },
   {
     "id": "al-q17",
@@ -815,6 +927,7 @@
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "nice_to_know",
+    "language": "",
     "prompt": "数据规模很大且要求排序结果稳定时，下列哪种算法更合适？",
     "options": [
       { "key": "A", "text": "归并排序" },
@@ -822,7 +935,8 @@
       { "key": "C", "text": "堆排序" },
       { "key": "D", "text": "选择排序" }
     ],
-    "answer": ["A"]
+    "answer": ["A"],
+    "explanation": "归并排序稳定且最坏也是 O(n log n)，适合大数据量；快排与堆排不稳定，选择排序虽然稳定但复杂度 O(n^2)，规模大时不可用。"
   },
   {
     "id": "al-q18",
@@ -830,9 +944,11 @@
     "kind": "text",
     "difficulty": "basic",
     "essentiality": "must_know",
+    "language": "",
     "prompt": "请简述 O(n log n) 与 O(n^2) 在数据规模增大时的差距，并说明工程上为什么要在意复杂度。",
     "options": [],
-    "answer": []
+    "answer": [],
+    "explanation": "规模翻十倍时 n log n 只增至十倍出头，而 n^2 增至百倍；复杂度决定程序在大数据量下是否还能跑完，因此是选型与优化的第一依据。"
   },
   {
     "id": "al-q19",
@@ -840,9 +956,11 @@
     "kind": "text",
     "difficulty": "basic",
     "essentiality": "nice_to_know",
+    "language": "",
     "prompt": "对比哈希表与平衡二叉搜索树：分别说明适合的使用场景以及各自的局限。",
     "options": [],
-    "answer": []
+    "answer": [],
+    "explanation": "哈希表查找平均 O(1)、无序、不支持范围查询；平衡 BST 有序、支持范围查询与前驱后继、最坏 O(log n)，但常数与内存开销更大。"
   },
   {
     "id": "al-q20",
@@ -850,9 +968,11 @@
     "kind": "text",
     "difficulty": "basic",
     "essentiality": "nice_to_know",
+    "language": "",
     "prompt": "简述使用动态规划需要满足的两个前提条件，并举一个你熟悉的例子说明状态与转移。",
     "options": [],
-    "answer": []
+    "answer": [],
+    "explanation": "需要最优子结构（大问题最优解由子问题最优解构成）与重叠子问题（同一状态被反复求解）；例如 0-1 背包以「前 i 件物品、容量 j」为状态，转移取选或不选的较大值。"
   },
   {
     "id": "cs-q1",
@@ -860,6 +980,7 @@
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "nice_to_know",
+    "language": "",
     "prompt": "git 中用于创建并切换到新分支的命令是？",
     "options": [
       { "key": "A", "text": "git branch" },
@@ -867,7 +988,8 @@
       { "key": "C", "text": "git merge" },
       { "key": "D", "text": "git rebase" }
     ],
-    "answer": ["B"]
+    "answer": ["B"],
+    "explanation": "git checkout -b <name> 创建并立即切换分支；git branch 只创建或列出分支，git merge 与 git rebase 是合并历史。"
   },
   {
     "id": "cs-q2",
@@ -875,6 +997,7 @@
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "must_know",
+    "language": "",
     "prompt": "操作系统中的进程与线程，最准确的描述是？",
     "options": [
       { "key": "A", "text": "进程是资源分配单位，线程是调度单位" },
@@ -882,7 +1005,8 @@
       { "key": "C", "text": "进程之间天然共享内存" },
       { "key": "D", "text": "线程切换成本高于进程切换" }
     ],
-    "answer": ["A"]
+    "answer": ["A"],
+    "explanation": "进程是资源分配单位、拥有独立地址空间，线程是 CPU 调度单位并与同进程内其他线程共享地址空间，因此线程切换成本低于进程切换。"
   },
   {
     "id": "cs-q3",
@@ -890,6 +1014,7 @@
     "kind": "multiple",
     "difficulty": "challenge",
     "essentiality": "advanced",
+    "language": "",
     "prompt": "关于 TCP 与 UDP，下列说法正确的有？",
     "options": [
       { "key": "A", "text": "TCP 提供可靠传输" },
@@ -897,7 +1022,8 @@
       { "key": "C", "text": "TCP 有握手与挥手过程" },
       { "key": "D", "text": "UDP 一定比 TCP 慢" }
     ],
-    "answer": ["A", "B", "C"]
+    "answer": ["A", "B", "C"],
+    "explanation": "TCP 面向连接、可靠有序，有三次握手四次挥手；UDP 无连接、无拥塞控制，头部开销小通常更快，但可能丢包乱序。"
   },
   {
     "id": "cs-q4",
@@ -905,6 +1031,7 @@
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "nice_to_know",
+    "language": "",
     "prompt": "8 位无符号整数能表示的最大值是？",
     "options": [
       { "key": "A", "text": "127" },
@@ -912,7 +1039,8 @@
       { "key": "C", "text": "256" },
       { "key": "D", "text": "65535" }
     ],
-    "answer": ["B"]
+    "answer": ["B"],
+    "explanation": "8 位无符号整数取值 0~255，最大值是 2^8-1=255；127 是有符号 8 位整数的最大值，65535 是 16 位无符号的最大值。"
   },
   {
     "id": "cs-q5",
@@ -920,6 +1048,7 @@
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "must_know",
+    "language": "",
     "prompt": "虚拟内存的主要作用是？",
     "options": [
       { "key": "A", "text": "让每个进程拥有独立地址空间，并可用磁盘扩展可用内存" },
@@ -927,7 +1056,8 @@
       { "key": "C", "text": "减少磁盘容量的占用" },
       { "key": "D", "text": "彻底消除内存碎片" }
     ],
-    "answer": ["A"]
+    "answer": ["A"],
+    "explanation": "虚拟内存为每个进程提供独立地址空间，并按页在物理内存与磁盘之间换入换出，从而突破物理内存限制；它不提高主频，也不能消除碎片。"
   },
   {
     "id": "cs-q6",
@@ -935,6 +1065,7 @@
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "must_know",
+    "language": "",
     "prompt": "HTTPS 相比 HTTP 的核心安全增强是？",
     "options": [
       { "key": "A", "text": "对传输内容做压缩" },
@@ -942,7 +1073,8 @@
       { "key": "C", "text": "让请求速度更快" },
       { "key": "D", "text": "彻底禁止浏览器缓存" }
     ],
-    "answer": ["B"]
+    "answer": ["B"],
+    "explanation": "HTTPS 在传输层用 TLS 加密数据并通过证书校验服务端身份，防窃听与中间人攻击；加密带来的握手开销会让它略慢于 HTTP。"
   },
   {
     "id": "cs-q7",
@@ -950,6 +1082,7 @@
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "must_know",
+    "language": "",
     "prompt": "DNS 的主要作用是？",
     "options": [
       { "key": "A", "text": "把域名解析成 IP 地址" },
@@ -957,7 +1090,8 @@
       { "key": "C", "text": "为设备分配 MAC 地址" },
       { "key": "D", "text": "缓存 HTTP 响应体" }
     ],
-    "answer": ["A"]
+    "answer": ["A"],
+    "explanation": "DNS 负责域名到 IP 的解析，让用户用域名访问服务；加密由 TLS 负责，MAC 地址由网卡与 ARP 决定。"
   },
   {
     "id": "cs-q8",
@@ -965,6 +1099,7 @@
     "kind": "multiple",
     "difficulty": "basic",
     "essentiality": "nice_to_know",
+    "language": "",
     "prompt": "关于 git 常用操作，下列说法正确的有？",
     "options": [
       { "key": "A", "text": "git status 用于查看工作区与暂存区的状态" },
@@ -972,7 +1107,8 @@
       { "key": "C", "text": "git log --oneline 以简洁形式查看提交历史" },
       { "key": "D", "text": "git clone 只能用于克隆空仓库" }
     ],
-    "answer": ["A", "B", "C"]
+    "answer": ["A", "B", "C"],
+    "explanation": "git status 看状态、git diff --staged 看暂存区与 HEAD 的差异、git log --oneline 看简洁历史；git clone 可以克隆任意非空仓库。"
   },
   {
     "id": "cs-q9",
@@ -980,6 +1116,7 @@
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "nice_to_know",
+    "language": "",
     "prompt": "Linux shell 中竖线 | 的作用是？",
     "options": [
       { "key": "A", "text": "把前一个命令的标准输出作为后一个命令的标准输入" },
@@ -987,7 +1124,8 @@
       { "key": "C", "text": "把输出重定向写入文件" },
       { "key": "D", "text": "表示逻辑与，两命令都要成功" }
     ],
-    "answer": ["A"]
+    "answer": ["A"],
+    "explanation": "管道把前一个命令的 stdout 接到后一个命令的 stdin；重定向是 > 或 >>，逻辑与是 &&，并行执行用 &。"
   },
   {
     "id": "cs-q10",
@@ -995,6 +1133,7 @@
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "nice_to_know",
+    "language": "",
     "prompt": "正则表达式中 * 与 + 的区别是？",
     "options": [
       { "key": "A", "text": "* 匹配 0 次或多次，+ 匹配 1 次或多次" },
@@ -1002,7 +1141,8 @@
       { "key": "C", "text": "两者完全相同" },
       { "key": "D", "text": "* 匹配任意字符，+ 只匹配数字" }
     ],
-    "answer": ["A"]
+    "answer": ["A"],
+    "explanation": "* 允许出现 0 次，+ 至少出现 1 次，二者都是量词、作用于前一个元素；匹配任意字符是 .，不是 *。"
   },
   {
     "id": "cs-q11",
@@ -1010,6 +1150,7 @@
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "advanced",
+    "language": "",
     "prompt": "下列哪一项是死锁产生的必要条件之一？",
     "options": [
       { "key": "A", "text": "请求并保持（持有资源的同时等待新资源）" },
@@ -1017,7 +1158,8 @@
       { "key": "C", "text": "页面置换算法" },
       { "key": "D", "text": "内存分页" }
     ],
-    "answer": ["A"]
+    "answer": ["A"],
+    "explanation": "死锁的四个必要条件是互斥、请求并保持、不可剥夺、循环等待；调度算法、页面置换与分页都不是死锁的必要条件。"
   },
   {
     "id": "cs-q12",
@@ -1025,6 +1167,7 @@
     "kind": "multiple",
     "difficulty": "challenge",
     "essentiality": "advanced",
+    "language": "",
     "prompt": "关于 TCP 的流量控制与拥塞控制，下列说法正确的有？",
     "options": [
       { "key": "A", "text": "滑动窗口用于流量控制，避免发送方压垮接收方" },
@@ -1032,7 +1175,8 @@
       { "key": "C", "text": "流量控制与拥塞控制是同一件事的两种叫法" },
       { "key": "D", "text": "丢包通常被视作拥塞信号，会触发窗口收缩" }
     ],
-    "answer": ["A", "B", "D"]
+    "answer": ["A", "B", "D"],
+    "explanation": "流量控制面向接收方缓冲（滑动窗口），拥塞控制面向网络承载（慢启动、拥塞避免、快重传），丢包被视为拥塞信号会收缩窗口；两者目的不同。"
   },
   {
     "id": "cs-q13",
@@ -1040,6 +1184,7 @@
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "advanced",
+    "language": "",
     "prompt": "进程上下文切换时需要保存并恢复的主要是？",
     "options": [
       { "key": "A", "text": "CPU 寄存器、程序计数器等执行现场，以及进程地址空间相关状态" },
@@ -1047,7 +1192,8 @@
       { "key": "C", "text": "只保存当前屏幕画面" },
       { "key": "D", "text": "只需要保存文件路径字符串" }
     ],
-    "answer": ["A"]
+    "answer": ["A"],
+    "explanation": "上下文切换要保存 CPU 寄存器、程序计数器等执行现场以及页表等地址空间相关状态，恢复时再载入，否则进程无法从中断点继续执行。"
   },
   {
     "id": "cs-q14",
@@ -1055,6 +1201,7 @@
     "kind": "multiple",
     "difficulty": "basic",
     "essentiality": "nice_to_know",
+    "language": "",
     "prompt": "关于数据库事务隔离级别，下列说法正确的有？",
     "options": [
       { "key": "A", "text": "读未提交（Read Uncommitted）可能读到其他事务尚未提交的数据" },
@@ -1062,7 +1209,8 @@
       { "key": "C", "text": "串行化一致性强，但并发性能通常最差" },
       { "key": "D", "text": "隔离级别越高，对性能越没有影响" }
     ],
-    "answer": ["A", "B", "C"]
+    "answer": ["A", "B", "C"],
+    "explanation": "读未提交会产生脏读，可重复读在部分实现仍有幻读，串行化最强但并发最差；隔离级别越高通常锁与开销越大，性能会下降。"
   },
   {
     "id": "cs-q15",
@@ -1070,6 +1218,7 @@
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "advanced",
+    "language": "",
     "prompt": "引用计数式垃圾回收的典型缺陷是？",
     "options": [
       { "key": "A", "text": "循环引用导致对象无法被回收" },
@@ -1077,7 +1226,8 @@
       { "key": "C", "text": "必须停止整个程序才能扫描" },
       { "key": "D", "text": "只能回收栈上的内存" }
     ],
-    "answer": ["A"]
+    "answer": ["A"],
+    "explanation": "引用计数无法回收互指的环（循环引用），所以常需配合标记清除或弱引用；它能及时回收临时对象，也不需要全程序停顿扫描。"
   },
   {
     "id": "cs-q16",
@@ -1085,6 +1235,7 @@
     "kind": "multiple",
     "difficulty": "basic",
     "essentiality": "nice_to_know",
+    "language": "",
     "prompt": "关于 git 的 reset 与 revert，下列说法正确的有？",
     "options": [
       { "key": "A", "text": "git revert 通过新增一次反向提交来撤销某次改动" },
@@ -1092,7 +1243,8 @@
       { "key": "C", "text": "已推送并被他人使用的历史，更适合用 revert 撤销" },
       { "key": "D", "text": "revert 会把原提交记录从历史中删除" }
     ],
-    "answer": ["A", "B", "C"]
+    "answer": ["A", "B", "C"],
+    "explanation": "revert 追加一次反向提交来撤销改动，适合已推送的历史；reset --hard 直接移动分支指针会丢弃未提交内容；revert 不删除原提交记录。"
   },
   {
     "id": "cs-q17",
@@ -1100,6 +1252,7 @@
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "nice_to_know",
+    "language": "",
     "prompt": "C 程序从源码到可执行文件的典型流程是？",
     "options": [
       { "key": "A", "text": "预处理 → 编译 → 汇编 → 链接" },
@@ -1107,7 +1260,8 @@
       { "key": "C", "text": "汇编 → 解释执行 → 运行" },
       { "key": "D", "text": "编译 → 反编译 → 链接" }
     ],
-    "answer": ["A"]
+    "answer": ["A"],
+    "explanation": "C 的构建流程依次是预处理（宏展开、包含头文件）、编译（生成汇编）、汇编（生成目标文件）、链接（合并目标文件与库）。"
   },
   {
     "id": "cs-q18",
@@ -1115,9 +1269,11 @@
     "kind": "text",
     "difficulty": "basic",
     "essentiality": "nice_to_know",
+    "language": "",
     "prompt": "简述进程与线程的区别，并各自举例说明适用场景。",
     "options": [],
-    "answer": []
+    "answer": [],
+    "explanation": "进程有独立地址空间、隔离性好但创建与切换开销大，适合需要稳定隔离的服务；线程共享地址空间、通信方便开销小，适合高并发与 IO 密集场景，但需处理数据竞争。"
   },
   {
     "id": "cs-q19",
@@ -1125,9 +1281,11 @@
     "kind": "text",
     "difficulty": "basic",
     "essentiality": "must_know",
+    "language": "",
     "prompt": "解释 TCP 三次握手的目的，并说明为什么两次握手不够。",
     "options": [],
-    "answer": []
+    "answer": [],
+    "explanation": "三次握手确认双方收发能力正常并同步初始序列号；两次握手时服务端无法确认客户端收到了自己的 SYN-ACK，也确认不了客户端可达，历史滞留的连接请求还会让服务端白白建立连接。"
   },
   {
     "id": "cs-q20",
@@ -1135,8 +1293,2998 @@
     "kind": "text",
     "difficulty": "basic",
     "essentiality": "nice_to_know",
+    "language": "",
     "prompt": "简述什么是虚拟内存，以及它解决了哪些具体问题。",
     "options": [],
-    "answer": []
+    "answer": [],
+    "explanation": "虚拟内存为每个进程提供独立的连续地址空间，按页映射到物理内存或磁盘，解决物理内存不足、进程地址隔离与地址冲突问题，也支撑共享库与按需加载。"
+  },
+  {
+    "id": "py-q1",
+    "direction": "后端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "python",
+    "prompt": "下面这段代码的输出是？\n```python\ndef f(a, b=[]):\n    b.append(a)\n    return b\nprint(f(1), f(2))\n```",
+    "options": [
+      { "key": "A", "text": "[1] [2]" },
+      { "key": "B", "text": "[1] [1, 2]" },
+      { "key": "C", "text": "[1, 2] [1, 2]" },
+      { "key": "D", "text": "抛出 TypeError" }
+    ],
+    "answer": ["B"],
+    "explanation": "默认参数 b=[] 只在函数定义时求值一次，两次调用共享同一个列表：第一次返回 [1]，第二次在其上追加得到 [1, 2]。正确写法是默认 None 并在函数体内新建列表。"
+  },
+  {
+    "id": "py-q2",
+    "direction": "后端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "python",
+    "prompt": "列表推导式 [x * 2 for x in range(3)] 的结果是？",
+    "options": [
+      { "key": "A", "text": "[0, 2, 4]" },
+      { "key": "B", "text": "[2, 4, 6]" },
+      { "key": "C", "text": "[0, 1, 2]" },
+      { "key": "D", "text": "[1, 2, 3]" }
+    ],
+    "answer": ["A"],
+    "explanation": "range(3) 产出 0、1、2，逐个乘以 2 得到 0、2、4；推导式返回的是新列表，不会修改被迭代对象。"
+  },
+  {
+    "id": "py-q3",
+    "direction": "后端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "python",
+    "prompt": "下面这段代码的输出是？\n```python\nfuncs = [lambda: i for i in range(3)]\nprint([f() for f in funcs])\n```",
+    "options": [
+      { "key": "A", "text": "[0, 1, 2]" },
+      { "key": "B", "text": "[2, 2, 2]" },
+      { "key": "C", "text": "[3, 3, 3]" },
+      { "key": "D", "text": "抛出 NameError" }
+    ],
+    "answer": ["B"],
+    "explanation": "lambda 中的 i 是闭包引用、在调用时才取值，循环结束后 i 已是 2，三个函数都返回 2。要固化当时的值应写 lambda i=i: i。"
+  },
+  {
+    "id": "py-q4",
+    "direction": "后端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "python",
+    "prompt": "Python 中 is 与 == 的区别是？",
+    "options": [
+      { "key": "A", "text": "is 比较对象身份，== 比较值是否相等" },
+      { "key": "B", "text": "两者完全等价" },
+      { "key": "C", "text": "is 比较值，== 比较类型" },
+      { "key": "D", "text": "== 只能用于数字比较" }
+    ],
+    "answer": ["A"],
+    "explanation": "is 判断两个名字是否指向同一个对象（身份/地址），== 调用 __eq__ 比较值；例如两个内容相同的列表 == 为 True，is 为 False。"
+  },
+  {
+    "id": "py-q5",
+    "direction": "后端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "python",
+    "prompt": "关于 CPython 的 GIL，下列说法正确的是？",
+    "options": [
+      { "key": "A", "text": "同一进程内多线程无法并行执行 Python 字节码，计算密集型任务应用多进程" },
+      { "key": "B", "text": "GIL 让多线程完全不可用" },
+      { "key": "C", "text": "GIL 会阻止所有 IO 操作并发" },
+      { "key": "D", "text": "开启多线程即可获得多核并行加速" }
+    ],
+    "answer": ["A"],
+    "explanation": "GIL 保证同一时刻只有一个线程执行字节码，因此计算密集任务用多进程才能吃满多核；IO 操作会释放 GIL，所以 IO 密集场景多线程依然有效。"
+  },
+  {
+    "id": "py-q6",
+    "direction": "后端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "python",
+    "prompt": "Python 中 dict 按 key 查找的平均时间复杂度是？",
+    "options": [
+      { "key": "A", "text": "O(1)" },
+      { "key": "B", "text": "O(log n)" },
+      { "key": "C", "text": "O(n)" },
+      { "key": "D", "text": "O(n log n)" }
+    ],
+    "answer": ["A"],
+    "explanation": "dict 基于哈希表实现，平均 O(1) 完成查找、插入与删除；极端哈希冲突下最坏可退化到 O(n)，但平均代价保持常数级。"
+  },
+  {
+    "id": "py-q7",
+    "direction": "后端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "python",
+    "prompt": "下列哪种 Python 类型是不可变（immutable）的？",
+    "options": [
+      { "key": "A", "text": "list" },
+      { "key": "B", "text": "dict" },
+      { "key": "C", "text": "tuple" },
+      { "key": "D", "text": "set" }
+    ],
+    "answer": ["C"],
+    "explanation": "tuple 创建后不能增删改元素，因此可作为 dict 的 key 或 set 的成员；list、dict、set 都是可变对象，不可哈希。"
+  },
+  {
+    "id": "py-q8",
+    "direction": "后端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "advanced",
+    "language": "python",
+    "prompt": "函数签名中的 *args 与 **kwargs 分别表示？",
+    "options": [
+      { "key": "A", "text": "收集多余的位置参数为元组、收集关键字参数为字典" },
+      { "key": "B", "text": "两者都收集为列表" },
+      { "key": "C", "text": "*args 收集关键字参数，**kwargs 收集位置参数" },
+      { "key": "D", "text": "只是文档约定，不影响调用" }
+    ],
+    "answer": ["A"],
+    "explanation": "*args 把多余的位置参数打包成 tuple，**kwargs 把多余的关键字参数打包成 dict；调用时反过来用 * 和 ** 可以把序列与字典解包成实参。"
+  },
+  {
+    "id": "py-q9",
+    "direction": "后端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "advanced",
+    "language": "python",
+    "prompt": "给函数 f 加上 @decorator 之后，等价于下面哪一步？",
+    "options": [
+      { "key": "A", "text": "f = decorator(f)" },
+      { "key": "B", "text": "f 保持不变，装饰器只在调用时执行一次" },
+      { "key": "C", "text": "decorator(f) 的返回值被丢弃" },
+      { "key": "D", "text": "只影响文档字符串" }
+    ],
+    "answer": ["A"],
+    "explanation": "@decorator 是语法糖，等价于定义后立即执行 f = decorator(f)，把新函数绑定回原名字；装饰器在定义阶段执行一次，调用时执行的是被包装后的函数。"
+  },
+  {
+    "id": "py-q10",
+    "direction": "后端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "advanced",
+    "language": "python",
+    "prompt": "with 语句使用上下文管理器时，无论是否发生异常都一定会调用的是？",
+    "options": [
+      { "key": "A", "text": "__enter__" },
+      { "key": "B", "text": "__exit__" },
+      { "key": "C", "text": "__init__" },
+      { "key": "D", "text": "__del__" }
+    ],
+    "answer": ["B"],
+    "explanation": "with 进入时调用 __enter__，退出时无条件调用 __exit__（即使块内抛异常），这正是文件自动关闭、锁自动释放的实现基础。"
+  },
+  {
+    "id": "py-q11",
+    "direction": "后端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "advanced",
+    "language": "python",
+    "prompt": "try/except/finally 中 finally 块的特点是？",
+    "options": [
+      { "key": "A", "text": "只有发生异常时才执行" },
+      { "key": "B", "text": "无论是否发生异常都会执行" },
+      { "key": "C", "text": "只有没有异常时才执行" },
+      { "key": "D", "text": "其中的 return 语句会被忽略" }
+    ],
+    "answer": ["B"],
+    "explanation": "finally 用于释放资源，无论正常结束、抛异常还是被 return 都执行；但 finally 里若写 return 会覆盖前面的返回值，应避免。"
+  },
+  {
+    "id": "py-q12",
+    "direction": "后端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "advanced",
+    "language": "python",
+    "prompt": "copy.copy() 与 copy.deepcopy() 的区别是？",
+    "options": [
+      { "key": "A", "text": "浅拷贝只复制外层容器，内层可变对象仍与原对象共享" },
+      { "key": "B", "text": "两者完全等价" },
+      { "key": "C", "text": "深拷贝比浅拷贝更快" },
+      { "key": "D", "text": "浅拷贝会递归复制所有嵌套对象" }
+    ],
+    "answer": ["A"],
+    "explanation": "浅拷贝新建外层容器但元素仍是同一批对象引用，修改嵌套列表会同时反映到两边；deepcopy 递归复制整棵对象图，代价更高但互不影响。"
+  },
+  {
+    "id": "py-q13",
+    "direction": "后端",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "language": "python",
+    "prompt": "关于生成器（generator），下列说法正确的有？",
+    "options": [
+      { "key": "A", "text": "用 yield 实现，按需惰性产出元素" },
+      { "key": "B", "text": "相比列表更省内存，适合处理大数据流" },
+      { "key": "C", "text": "生成器被耗尽后需要重新创建才能再次遍历" },
+      { "key": "D", "text": "可以用 len() 直接获取生成器元素个数" }
+    ],
+    "answer": ["A", "B", "C"],
+    "explanation": "生成器惰性求值、内存占用小，但只能遍历一次，耗尽后需重建；它没有长度，len() 会抛 TypeError，需要计数就只能逐个消费。"
+  },
+  {
+    "id": "py-q14",
+    "direction": "后端",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "language": "python",
+    "prompt": "关于 CPython 的内存管理与垃圾回收，下列说法正确的有？",
+    "options": [
+      { "key": "A", "text": "以引用计数为主，计数归零立即回收" },
+      { "key": "B", "text": "循环引用由分代垃圾回收器补扫" },
+      { "key": "C", "text": "可以用 sys.getrefcount() 观察对象引用数量" },
+      { "key": "D", "text": "必须手动调用 free() 才能释放对象内存" }
+    ],
+    "answer": ["A", "B", "C"],
+    "explanation": "CPython 主要靠引用计数即时回收，并用分代循环 GC 处理互相引用的环；sys.getrefcount 可查看引用数。Python 没有手动 free，del 只是减少一个引用。"
+  },
+  {
+    "id": "py-q15",
+    "direction": "后端",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "language": "python",
+    "prompt": "关于 Python 的作用域与闭包，下列说法正确的有？",
+    "options": [
+      { "key": "A", "text": "函数内对名字赋值默认创建局部变量" },
+      { "key": "B", "text": "nonlocal 可修改外层函数的变量" },
+      { "key": "C", "text": "global 声明后可修改模块级变量" },
+      { "key": "D", "text": "局部变量在赋值语句之前就能被读取到值" }
+    ],
+    "answer": ["A", "B", "C"],
+    "explanation": "函数内赋值产生局部绑定，要改外层用 nonlocal、要改模块级用 global；局部变量在赋值前读取会抛 UnboundLocalError，而不是读到旧值。"
+  },
+  {
+    "id": "py-q16",
+    "direction": "后端",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "language": "python",
+    "prompt": "关于虚拟环境与依赖管理，下列说法正确的有？",
+    "options": [
+      { "key": "A", "text": "venv 为项目隔离出自己的 site-packages，避免版本互相污染" },
+      { "key": "B", "text": "pip freeze 输出当前环境已安装包的精确版本清单" },
+      { "key": "C", "text": "requirements.txt 可以用 == 固定版本以保证可复现" },
+      { "key": "D", "text": "在虚拟环境里安装的包会同时装进系统全局 Python" }
+    ],
+    "answer": ["A", "B", "C"],
+    "explanation": "venv 隔离依赖，pip freeze 与 requirements.txt 固定版本以保证可复现；虚拟环境里的安装不会写进系统全局解释器，这正是隔离的意义。"
+  },
+  {
+    "id": "py-q17",
+    "direction": "后端",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "language": "python",
+    "prompt": "在 Python 中，字符串是不可变对象，因此对字符串执行 += 拼接会就地修改原字符串对象。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": ["B"],
+    "explanation": "字符串不可变，+= 会创建新字符串并让变量重新绑定，原对象不会被修改；因此大量拼接应改用列表 join 以避免重复复制。"
+  },
+  {
+    "id": "py-q18",
+    "direction": "后端",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "language": "python",
+    "prompt": "Python 的 list 与 tuple 都可以容纳不同类型的元素，tuple 创建后其元素引用不能再被替换。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": ["A"],
+    "explanation": "两种容器都允许异构元素；tuple 不可变指不能替换或增删元素引用，但如果元素本身是可变对象（如 tuple 里放 list），该对象内容仍可修改。"
+  },
+  {
+    "id": "py-q19",
+    "direction": "后端",
+    "kind": "judge",
+    "difficulty": "challenge",
+    "essentiality": "nice_to_know",
+    "language": "python",
+    "prompt": "调用一个 async def 定义的函数时，函数体会立即开始执行，直到遇到第一个 await 才让出控制权。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": ["B"],
+    "explanation": "调用 async def 函数只返回协程对象，函数体一行都不执行；必须 await 它、用 asyncio.run 或把它注册进事件循环（如 create_task）才开始运行。"
+  },
+  {
+    "id": "py-q20",
+    "direction": "后端",
+    "kind": "judge",
+    "difficulty": "challenge",
+    "essentiality": "nice_to_know",
+    "language": "python",
+    "prompt": "在 CPython 中，由于小整数缓存（-5 到 256），相同数值的两个变量用 is 比较可能返回 True。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": ["A"],
+    "explanation": "CPython 会复用 -5 到 256 的小整数对象，所以该区间内 a is b 可能为 True；这属于实现细节，判断值相等始终应使用 ==。"
+  },
+  {
+    "id": "java-q1",
+    "direction": "后端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "java",
+    "prompt": "下面这段代码输出的 b 是？\n```java\nint a = 5;\nint b = a++ + ++a;\nSystem.out.println(b);\n```",
+    "options": [
+      { "key": "A", "text": "11" },
+      { "key": "B", "text": "12" },
+      { "key": "C", "text": "13" },
+      { "key": "D", "text": "10" }
+    ],
+    "answer": ["B"],
+    "explanation": "a++ 先取值 5 再自增为 6，随后 ++a 先自增为 7 再取值，因此 5 + 7 = 12；自增运算符的位置决定取值与自增的先后。"
+  },
+  {
+    "id": "java-q2",
+    "direction": "后端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "java",
+    "prompt": "Java 中 String 与 StringBuilder 的主要区别是？",
+    "options": [
+      { "key": "A", "text": "String 不可变，每次拼接都产生新对象；StringBuilder 可变，适合频繁拼接" },
+      { "key": "B", "text": "两者完全等价" },
+      { "key": "C", "text": "StringBuilder 不可变，String 可变" },
+      { "key": "D", "text": "String 只能存 ASCII 字符" }
+    ],
+    "answer": ["A"],
+    "explanation": "String 对象创建后内容不可改，+ 拼接会不断产生新对象；StringBuilder 维护可变字符数组，追加是原地修改，循环拼接场景性能差别明显。"
+  },
+  {
+    "id": "java-q3",
+    "direction": "后端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "java",
+    "prompt": "下面这段代码的输出是？\n```java\nList<Integer> list = new ArrayList<>();\nlist.add(1);\nlist.add(2);\nlist.remove(1);\nSystem.out.println(list);\n```",
+    "options": [
+      { "key": "A", "text": "[1, 2]" },
+      { "key": "B", "text": "[1]" },
+      { "key": "C", "text": "[2]" },
+      { "key": "D", "text": "抛出 IndexOutOfBoundsException" }
+    ],
+    "answer": ["B"],
+    "explanation": "list.remove(1) 的参数是 int，匹配 remove(int index) 重载，删除下标 1 的元素 2，剩下 [1]；要按值删除需传 Integer 对象或 removeIf。"
+  },
+  {
+    "id": "java-q4",
+    "direction": "后端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "java",
+    "prompt": "Java 中 == 与 equals 的区别是？",
+    "options": [
+      { "key": "A", "text": "== 比较引用（基本类型比较值），equals 默认比较引用，可被重写为比较内容" },
+      { "key": "B", "text": "两者完全等价" },
+      { "key": "C", "text": "== 比较内容，equals 比较引用" },
+      { "key": "D", "text": "equals 只能用于字符串" }
+    ],
+    "answer": ["A"],
+    "explanation": "== 对引用类型比较是否指向同一对象；equals 是 Object 的方法，String、Integer 等重写后比较内容。自定义类重写 equals 时还应同时重写 hashCode。"
+  },
+  {
+    "id": "java-q5",
+    "direction": "后端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "java",
+    "prompt": "关于 Java 的接口与抽象类，下列说法正确的是？",
+    "options": [
+      { "key": "A", "text": "一个类可以实现多个接口，但只能继承一个抽象类" },
+      { "key": "B", "text": "一个类只能实现一个接口" },
+      { "key": "C", "text": "抽象类不能被继承" },
+      { "key": "D", "text": "接口里不能有任何方法" }
+    ],
+    "answer": ["A"],
+    "explanation": "Java 是单继承多实现：类只能 extends 一个父类（抽象或具体），但可以 implements 多个接口；接口自 Java 8 起可含 default 与 static 方法。"
+  },
+  {
+    "id": "java-q6",
+    "direction": "后端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "java",
+    "prompt": "Java 中 final 修饰类、方法、变量时分别表示？",
+    "options": [
+      { "key": "A", "text": "类不可被继承、方法不可被重写、变量不可再赋值" },
+      { "key": "B", "text": "三者都表示可以随意修改" },
+      { "key": "C", "text": "类不可实例化、方法不可调用、变量不可读取" },
+      { "key": "D", "text": "只对基本类型有效" }
+    ],
+    "answer": ["A"],
+    "explanation": "final 类不能被继承（如 String），final 方法不能被重写，final 变量只能赋值一次；final 引用不可重新指向，但对象内部状态仍可修改。"
+  },
+  {
+    "id": "java-q7",
+    "direction": "后端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "java",
+    "prompt": "Java 中 int 与 Integer 的区别是？",
+    "options": [
+      { "key": "A", "text": "int 是基本类型、不能为 null；Integer 是包装类、可为 null 并可放进集合" },
+      { "key": "B", "text": "两者完全等价" },
+      { "key": "C", "text": "Integer 是基本类型，int 是包装类" },
+      { "key": "D", "text": "int 只能存负数" }
+    ],
+    "answer": ["A"],
+    "explanation": "int 是 32 位基本类型，默认 0；Integer 是对象，默认 null，可放集合与泛型，自动装箱拆箱。注意 Integer 用 == 比较时会受缓存区间与对象身份影响。"
+  },
+  {
+    "id": "java-q8",
+    "direction": "后端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "advanced",
+    "language": "java",
+    "prompt": "JDK 8 的 HashMap 中，同一个桶上的链表长度超过阈值后会发生什么？",
+    "options": [
+      { "key": "A", "text": "链表转换为红黑树，把极端查找从 O(n) 降到 O(log n)" },
+      { "key": "B", "text": "直接扩容并丢弃该桶的数据" },
+      { "key": "C", "text": "抛出异常" },
+      { "key": "D", "text": "改为顺序表存储" }
+    ],
+    "answer": ["A"],
+    "explanation": "桶内链表长度达到 8 且容量不小于 64 时转为红黑树，避免哈希冲突集中时查找退化成 O(n)；节点减少到 6 时会退化回链表。"
+  },
+  {
+    "id": "java-q9",
+    "direction": "后端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "advanced",
+    "language": "java",
+    "prompt": "Java 异常体系中 Error 与 Exception 的区别是？",
+    "options": [
+      { "key": "A", "text": "Error 表示 JVM 层面的严重问题，通常不应捕获；Exception 是应用可处理的异常" },
+      { "key": "B", "text": "两者完全等价" },
+      { "key": "C", "text": "Error 必须被 catch 才能编译通过" },
+      { "key": "D", "text": "Exception 不能被捕获" }
+    ],
+    "answer": ["A"],
+    "explanation": "Error（如 OutOfMemoryError、StackOverflowError）表示程序已无法正常恢复；Exception 分受检与非受检，是业务代码应处理的异常。"
+  },
+  {
+    "id": "java-q10",
+    "direction": "后端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "advanced",
+    "language": "java",
+    "prompt": "Java 中 static 成员的特点是？",
+    "options": [
+      { "key": "A", "text": "属于类而非实例，所有实例共享，类加载时初始化" },
+      { "key": "B", "text": "每个实例各有一份" },
+      { "key": "C", "text": "只能在 main 方法里访问" },
+      { "key": "D", "text": "不能被继承" }
+    ],
+    "answer": ["A"],
+    "explanation": "static 成员在类加载的初始化阶段创建，属于类本身，所有实例共享同一份；static 方法不能直接访问实例成员，也没有 this。"
+  },
+  {
+    "id": "java-q11",
+    "direction": "后端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "advanced",
+    "language": "java",
+    "prompt": "Java 泛型在编译后会发生什么？",
+    "options": [
+      { "key": "A", "text": "类型擦除，运行时不再保留具体类型参数信息" },
+      { "key": "B", "text": "为每个类型参数生成独立的类" },
+      { "key": "C", "text": "自动生成运行期类型检查代码" },
+      { "key": "D", "text": "只能用于基本类型" }
+    ],
+    "answer": ["A"],
+    "explanation": "Java 泛型是编译期特性，编译后擦除为原始类型并插入必要的强转与桥接方法，因此不能 new T()、不能判断 List<String> 的运行时类型。"
+  },
+  {
+    "id": "java-q12",
+    "direction": "后端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "advanced",
+    "language": "java",
+    "prompt": "try-with-resources 语法要求被管理的资源实现哪个接口？",
+    "options": [
+      { "key": "A", "text": "AutoCloseable" },
+      { "key": "B", "text": "Serializable" },
+      { "key": "C", "text": "Runnable" },
+      { "key": "D", "text": "Comparable" }
+    ],
+    "answer": ["A"],
+    "explanation": "try-with-resources 在代码块结束时自动调用 close()，要求资源实现 AutoCloseable（Closeable 是它的子接口）；多个资源按声明逆序关闭。"
+  },
+  {
+    "id": "java-q13",
+    "direction": "后端",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "language": "java",
+    "prompt": "关于 Java 的线程池 ThreadPoolExecutor，下列说法正确的有？",
+    "options": [
+      { "key": "A", "text": "核心线程都在忙时，新任务先进入工作队列" },
+      { "key": "B", "text": "队列已满且线程数达到 maximumPoolSize 时触发拒绝策略" },
+      { "key": "C", "text": "线程池使用后应显式关闭，否则可能阻止 JVM 退出" },
+      { "key": "D", "text": "只要提交任务，线程数就可以无限增长" }
+    ],
+    "answer": ["A", "B", "C"],
+    "explanation": "执行顺序是核心线程 → 队列 → 非核心线程 → 拒绝策略，线程总数受 maximumPoolSize 限制；线程池持有工作线程，不关闭会阻止 JVM 正常退出。"
+  },
+  {
+    "id": "java-q14",
+    "direction": "后端",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "language": "java",
+    "prompt": "关于 Java 的垃圾回收，下列说法正确的有？",
+    "options": [
+      { "key": "A", "text": "对象在 GC Roots 不可达后才可能被回收" },
+      { "key": "B", "text": "分代收集把堆划分为新生代与老年代，采用不同回收策略" },
+      { "key": "C", "text": "调用 System.gc() 只是建议 JVM 回收，并不保证立即执行" },
+      { "key": "D", "text": "finalize() 的执行时机是确定的，适合用来释放关键资源" }
+    ],
+    "answer": ["A", "B", "C"],
+    "explanation": "可达性分析以 GC Roots 为起点标记存活对象；分代收集按对象年龄采用不同算法；System.gc() 仅是建议。finalize 已废弃且时机不确定，资源应显式关闭。"
+  },
+  {
+    "id": "java-q15",
+    "direction": "后端",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "language": "java",
+    "prompt": "关于 Java 集合类，下列说法正确的有？",
+    "options": [
+      { "key": "A", "text": "ArrayList 随机访问是 O(1)，中间插入删除要搬移元素约 O(n)" },
+      { "key": "B", "text": "LinkedList 头尾增删快，但按下标访问需要 O(n) 遍历" },
+      { "key": "C", "text": "HashMap 允许一个 null key，值也可以为 null" },
+      { "key": "D", "text": "TreeMap 底层是哈希表，元素无序" }
+    ],
+    "answer": ["A", "B", "C"],
+    "explanation": "ArrayList 基于数组，随机访问快而中间增删慢；LinkedList 是双向链表；HashMap 允许一个 null key。TreeMap 基于红黑树且按 key 有序。"
+  },
+  {
+    "id": "java-q16",
+    "direction": "后端",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "language": "java",
+    "prompt": "关于 Java 的字符串，下列说法正确的有？",
+    "options": [
+      { "key": "A", "text": "String 不可变，因此可以安全地在多线程间共享" },
+      { "key": "B", "text": "字符串字面量存放在字符串常量池，相同字面量会复用同一对象" },
+      { "key": "C", "text": "在循环里用 + 大量拼接时，建议改用 StringBuilder" },
+      { "key": "D", "text": "两个字符串用 == 比较即可安全判断内容是否相同" }
+    ],
+    "answer": ["A", "B", "C"],
+    "explanation": "不可变带来线程安全与常量池复用，循环拼接应改用 StringBuilder；判断内容相等必须用 equals，== 比较的是引用，常量池之外通常是 false。"
+  },
+  {
+    "id": "java-q17",
+    "direction": "后端",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "language": "java",
+    "prompt": "Java 中 int 是基本类型、Integer 是包装类，Integer 类型的变量可以为 null。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": ["A"],
+    "explanation": "int 是基本类型，默认值 0，不能为 null；Integer 是引用类型，默认 null，可放入集合，但自动拆箱时对 null 会抛 NullPointerException。"
+  },
+  {
+    "id": "java-q18",
+    "direction": "后端",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "language": "java",
+    "prompt": "Java 子类重写父类方法时，可以把访问权限从 public 收窄为 private。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": ["B"],
+    "explanation": "重写方法不能缩小访问权限，也不能抛出更宽的受检异常；public 只能保持 public 或放宽，否则编译失败并破坏多态契约。"
+  },
+  {
+    "id": "java-q19",
+    "direction": "后端",
+    "kind": "judge",
+    "difficulty": "challenge",
+    "essentiality": "nice_to_know",
+    "language": "java",
+    "prompt": "Java 的 finally 块中出现 return 语句时，会覆盖 try 块中已经计算出的返回值。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": ["A"],
+    "explanation": "finally 在返回值真正返回前执行，其中的 return 会直接结束方法并覆盖 try 的返回值；在 finally 中写 return 也会吞掉异常，属于应避免的写法。"
+  },
+  {
+    "id": "java-q20",
+    "direction": "后端",
+    "kind": "judge",
+    "difficulty": "challenge",
+    "essentiality": "nice_to_know",
+    "language": "java",
+    "prompt": "在 Java 中，String 的 == 比较的是内容是否相同，而 equals 比较的是引用是否相同。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": ["B"],
+    "explanation": "恰好说反了：== 比较引用（是否为同一对象），String 重写后的 equals 比较字符内容；常量池复用会让字面量的 == 偶然为 true，但不该依赖。"
+  },
+  {
+    "id": "go-q1",
+    "direction": "后端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "go",
+    "prompt": "下面这段代码在函数返回时的输出顺序是？\n```go\ndefer fmt.Println(\"a\")\ndefer fmt.Println(\"b\")\n```",
+    "options": [
+      { "key": "A", "text": "先 a 后 b" },
+      { "key": "B", "text": "先 b 后 a" },
+      { "key": "C", "text": "两条都不会执行" },
+      { "key": "D", "text": "随机顺序" }
+    ],
+    "answer": ["B"],
+    "explanation": "defer 注册的调用按后进先出（LIFO）执行，后注册的 b 先执行，因此输出 b 再 a；这常用于按相反顺序释放资源。"
+  },
+  {
+    "id": "go-q2",
+    "direction": "后端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "go",
+    "prompt": "Go 中 goroutine 的特点是？",
+    "options": [
+      { "key": "A", "text": "由 Go 运行时调度的轻量协程，初始栈很小、按需增长" },
+      { "key": "B", "text": "等同于操作系统线程，一对一占用内核栈" },
+      { "key": "C", "text": "必须配合异步回调使用" },
+      { "key": "D", "text": "只能在 main 函数中启动" }
+    ],
+    "answer": ["A"],
+    "explanation": "goroutine 由 Go 运行时做 M:N 调度，初始栈只有几 KB 并按需增长，创建与切换成本远低于线程；用 go 关键字可以在任何函数中启动。"
+  },
+  {
+    "id": "go-q3",
+    "direction": "后端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "go",
+    "prompt": "声明 var m map[string]int 后直接执行 m[\"a\"] = 1 会发生什么？\n```go\nvar m map[string]int\nm[\"a\"] = 1\n```",
+    "options": [
+      { "key": "A", "text": "正常运行，等价于自动初始化" },
+      { "key": "B", "text": "运行时 panic：向 nil map 写入" },
+      { "key": "C", "text": "编译期报错" },
+      { "key": "D", "text": "写入被静默丢弃" }
+    ],
+    "answer": ["B"],
+    "explanation": "map 的零值是 nil，读 nil map 返回零值，但写入会 panic（assignment to entry in nil map）；必须先 make(map[string]int) 或字面量初始化。"
+  },
+  {
+    "id": "go-q4",
+    "direction": "后端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "go",
+    "prompt": "Go 中 slice 与数组的区别是？",
+    "options": [
+      { "key": "A", "text": "数组长度是类型的一部分且值传递会整体复制；slice 是含指针、长度、容量的描述符" },
+      { "key": "B", "text": "两者完全等价" },
+      { "key": "C", "text": "slice 长度固定，数组长度可变" },
+      { "key": "D", "text": "数组可以 append，slice 不行" }
+    ],
+    "answer": ["A"],
+    "explanation": "数组是值类型，[3]int 与 [4]int 是不同类型，传参复制整份数据；slice 只是指向底层数组的描述符，可以 append 扩容，函数间传递共享底层数组。"
+  },
+  {
+    "id": "go-q5",
+    "direction": "后端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "go",
+    "prompt": "Go 中 interface{}（any）的含义是？",
+    "options": [
+      { "key": "A", "text": "空接口，任何类型都满足它，可用来接收任意值" },
+      { "key": "B", "text": "只接受结构体的接口" },
+      { "key": "C", "text": "表示该值一定为 null" },
+      { "key": "D", "text": "编译期泛型的语法" }
+    ],
+    "answer": ["A"],
+    "explanation": "空接口不含任何方法，因此所有类型都实现了它，可用作任意值的容器（Go 1.18 起 any 是其别名）；取值时通常需要类型断言或 switch。"
+  },
+  {
+    "id": "go-q6",
+    "direction": "后端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "go",
+    "prompt": "Go 中值接收者与指针接收者方法的区别是？",
+    "options": [
+      { "key": "A", "text": "指针接收者可以修改接收者的字段；值接收者拿到的是副本" },
+      { "key": "B", "text": "两者完全等价" },
+      { "key": "C", "text": "值接收者可以修改原对象的字段" },
+      { "key": "D", "text": "指针接收者只能用于指针类型变量，无法通过变量名调用" }
+    ],
+    "answer": ["A"],
+    "explanation": "值接收者收到结构体副本，方法内的修改不影响调用方；指针接收者操作原对象。方法集决定了值类型与指针类型各自能实现哪些接口。"
+  },
+  {
+    "id": "go-q7",
+    "direction": "后端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "go",
+    "prompt": "Go 中 := 与 var 的用法区别是？",
+    "options": [
+      { "key": "A", "text": ":= 只能在函数内使用并做类型推断；var 可用于包级并显式指定类型" },
+      { "key": "B", "text": ":= 只能用于包级变量" },
+      { "key": "C", "text": "两者完全等价，位置随意" },
+      { "key": "D", "text": "var 不能用于局部变量" }
+    ],
+    "answer": ["A"],
+    "explanation": ":= 是短变量声明的语法糖，至少声明一个新变量、由右值推断类型，只能出现在函数体内；var 既可用于包级也可用于局部，并可显式写类型。"
+  },
+  {
+    "id": "go-q8",
+    "direction": "后端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "advanced",
+    "language": "go",
+    "prompt": "Go 中无缓冲 channel 的发送与接收是什么关系？",
+    "options": [
+      { "key": "A", "text": "发送与接收必须同时就绪，否则阻塞（相当于同步交接）" },
+      { "key": "B", "text": "发送方会立刻返回，数据自动排队" },
+      { "key": "C", "text": "接收方永远拿不到数据" },
+      { "key": "D", "text": "无缓冲 channel 不能发送数据" }
+    ],
+    "answer": ["A"],
+    "explanation": "无缓冲 channel 没有暂存空间，发送操作会阻塞到有接收方就绪（反之亦然），因此天然是同步点；需要缓冲时用 make(chan T, n) 指定容量。"
+  },
+  {
+    "id": "go-q9",
+    "direction": "后端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "advanced",
+    "language": "go",
+    "prompt": "Go 中错误处理的惯用做法是？",
+    "options": [
+      { "key": "A", "text": "函数把 error 作为最后一个返回值，调用方显式判断并处理" },
+      { "key": "B", "text": "统一用 panic 表达所有失败" },
+      { "key": "C", "text": "用全局变量记录最后一次错误" },
+      { "key": "D", "text": "异常会自动向上冒泡到 main" }
+    ],
+    "answer": ["A"],
+    "explanation": "Go 没有异常机制，错误是普通返回值（通常是最后一个），调用方用 if err != nil 处理或包装后用 errors.Is/As 判断；panic 只用于不可恢复的编程错误。"
+  },
+  {
+    "id": "go-q10",
+    "direction": "后端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "advanced",
+    "language": "go",
+    "prompt": "Go 中结构体嵌入（embedding）实现的是？",
+    "options": [
+      { "key": "A", "text": "组合：外层类型获得内层类型的字段与方法提升，不是继承" },
+      { "key": "B", "text": "与 Java 继承完全相同的语义" },
+      { "key": "C", "text": "只能嵌入接口，不能嵌入结构体" },
+      { "key": "D", "text": "嵌入后无法重写内层方法" }
+    ],
+    "answer": ["A"],
+    "explanation": "Go 用组合代替继承：嵌入类型的字段与方法会被提升到外层，外层可以定义同名方法遮蔽它们，但不存在父子类多态关系。"
+  },
+  {
+    "id": "go-q11",
+    "direction": "后端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "advanced",
+    "language": "go",
+    "prompt": "Go 中用 for range 遍历字符串时，每次迭代拿到的是？",
+    "options": [
+      { "key": "A", "text": "字节下标与一个 rune（按 UTF-8 解码的字符）" },
+      { "key": "B", "text": "两个字节" },
+      { "key": "C", "text": "固定长度的四个字节切片" },
+      { "key": "D", "text": "只有一个字节值，没有下标" }
+    ],
+    "answer": ["A"],
+    "explanation": "range 遍历字符串按 UTF-8 逐字符解码，返回字节偏移与 rune；非 ASCII 字符占多个字节，因此下标不连续递增。要按字节遍历应用下标或 []byte。"
+  },
+  {
+    "id": "go-q12",
+    "direction": "后端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "advanced",
+    "language": "go",
+    "prompt": "Go 运行时 GC 的主要特点是？",
+    "options": [
+      { "key": "A", "text": "并发三色标记清除，停顿时间短，不做分代" },
+      { "key": "B", "text": "引用计数，循环引用无法回收" },
+      { "key": "C", "text": "每次回收都停止全程序，停顿可达秒级" },
+      { "key": "D", "text": "需要开发者手动 free" }
+    ],
+    "answer": ["A"],
+    "explanation": "Go 的 GC 是并发的标记-清除（三色标记 + 写屏障），大部分标记与用户代码并发执行以压低 STW 时间；它不采用分代策略，也不需要手动释放内存。"
+  },
+  {
+    "id": "go-q13",
+    "direction": "后端",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "language": "go",
+    "prompt": "关于 Go 的并发编程，下列说法正确的有？",
+    "options": [
+      { "key": "A", "text": "sync.Mutex 的 Lock 与 Unlock 应成对出现，通常配合 defer 使用" },
+      { "key": "B", "text": "go 启动的函数无法直接返回结果，需通过 channel 或共享变量加锁传递" },
+      { "key": "C", "text": "从没有关闭、也没有发送方的 channel 接收会永久阻塞" },
+      { "key": "D", "text": "多个 goroutine 并发写同一个 map 是安全的" }
+    ],
+    "answer": ["A", "B", "C"],
+    "explanation": "互斥锁要成对使用，goroutine 的结果需经 channel 或同步机制传递，无人关闭且无发送的 channel 接收会死锁；map 不是并发安全的，并发写会直接被运行时检测到并 panic。"
+  },
+  {
+    "id": "go-q14",
+    "direction": "后端",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "language": "go",
+    "prompt": "关于 Go 的切片，下列说法正确的有？",
+    "options": [
+      { "key": "A", "text": "append 在容量不足时会分配新的底层数组并复制元素" },
+      { "key": "B", "text": "切片按引用语义传递，函数内修改元素对调用方可见" },
+      { "key": "C", "text": "len 是当前元素个数，cap 是底层数组从切片起点开始的可用容量" },
+      { "key": "D", "text": "任何 append 之后都一定能看到原切片长度发生变化" }
+    ],
+    "answer": ["A", "B", "C"],
+    "explanation": "append 可能扩容到新数组，此时与原切片脱钩；传递切片是复制描述符但共享底层数组，元素修改可见；但 append 只改变接收者变量的长度，原切片长度不变。"
+  },
+  {
+    "id": "go-q15",
+    "direction": "后端",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "language": "go",
+    "prompt": "关于 Go 的接口，下列说法正确的有？",
+    "options": [
+      { "key": "A", "text": "接口是隐式实现：类型只要具备方法集就自动满足接口，无需 implements 声明" },
+      { "key": "B", "text": "空接口可以容纳任意类型的值" },
+      { "key": "C", "text": "类型断言 v, ok := i.(T) 用两返回值形式时不会 panic" },
+      { "key": "D", "text": "接口值不能与 nil 比较" }
+    ],
+    "answer": ["A", "B", "C"],
+    "explanation": "Go 接口隐式实现，空接口容纳任意值，带 ok 的类型断言失败只返回零值与 false；接口值可以与 nil 比较，但要小心「含 nil 指针的非 nil 接口」这一陷阱。"
+  },
+  {
+    "id": "go-q16",
+    "direction": "后端",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "language": "go",
+    "prompt": "关于 Go 的 defer，下列说法正确的有？",
+    "options": [
+      { "key": "A", "text": "defer 的调用在函数返回前执行，多个 defer 按后进先出顺序" },
+      { "key": "B", "text": "defer 语句中的实参在注册 defer 时就已经求值" },
+      { "key": "C", "text": "在循环里 defer 关闭资源会一直推迟到函数返回才执行" },
+      { "key": "D", "text": "defer 无法修改具名返回值" }
+    ],
+    "answer": ["A", "B", "C"],
+    "explanation": "defer 后进先出、实参立即求值、在函数返回前统一执行，因此循环内 defer 容易堆积；闭包形式的 defer 可以修改具名返回值（常用于 recover 与错误包装）。"
+  },
+  {
+    "id": "go-q17",
+    "direction": "后端",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "language": "go",
+    "prompt": "Go 语言中，一个 goroutine 与一个操作系统线程是一一对应的。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": ["B"],
+    "explanation": "goroutine 与 OS 线程是 M:N 关系：多个 goroutine 复用少量线程（GOMAXPROCS 控制并行度），阻塞的系统调用会触发线程调度切换，而不是每协程一线程。"
+  },
+  {
+    "id": "go-q18",
+    "direction": "后端",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "language": "go",
+    "prompt": "Go 的 map 是引用语义，把 map 传给函数后，函数内新增的键在调用方可见。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": ["A"],
+    "explanation": "map 变量内部是指向运行时哈希表的指针，按值传递复制的是这个指针，因此函数内增删键对调用方可见；但函数内重新 make 赋值不会影响调用方。"
+  },
+  {
+    "id": "go-q19",
+    "direction": "后端",
+    "kind": "judge",
+    "difficulty": "challenge",
+    "essentiality": "nice_to_know",
+    "language": "go",
+    "prompt": "在 Go 中，向已关闭的 channel 发送数据会触发 panic，而从已关闭的 channel 接收会立即返回零值。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": ["A"],
+    "explanation": "close 之后发送会 panic（send on closed channel），接收则立即返回剩余缓冲数据或零值，第二返回值 ok 为 false；因此关闭动作只能由唯一发送方执行。"
+  },
+  {
+    "id": "go-q20",
+    "direction": "后端",
+    "kind": "judge",
+    "difficulty": "challenge",
+    "essentiality": "nice_to_know",
+    "language": "go",
+    "prompt": "Go 的接口是显式实现方式，类型必须写明 implements 才能赋值给接口变量。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": ["B"],
+    "explanation": "Go 没有 implements 关键字，接口是隐式满足的：只要类型的方法集覆盖接口方法即可赋值；这种设计让接口可以由使用方定义，实现方无需感知。"
+  },
+  {
+    "id": "html-q1",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "html",
+    "prompt": "下列哪个 HTML 标签用于表示页面的主导航区域？",
+    "options": [
+      { "key": "A", "text": "<nav>" },
+      { "key": "B", "text": "<menu>" },
+      { "key": "C", "text": "<aside>" },
+      { "key": "D", "text": "<footer>" }
+    ],
+    "answer": ["A"],
+    "explanation": "<nav> 表示导航链接区域，读屏软件可据此定位；<aside> 是侧边补充内容，<footer> 是页脚，<menu> 是命令或选项列表。"
+  },
+  {
+    "id": "html-q2",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "html",
+    "prompt": "meta 标签 name=\"viewport\" content=\"width=device-width, initial-scale=1\" 的作用是？",
+    "options": [
+      { "key": "A", "text": "让视口宽度等于设备宽度并按 1:1 缩放，移动端按响应式布局渲染" },
+      { "key": "B", "text": "禁止页面滚动" },
+      { "key": "C", "text": "设置网页标题" },
+      { "key": "D", "text": "强制启用暗色模式" }
+    ],
+    "answer": ["A"],
+    "explanation": "没有 viewport 声明时移动浏览器会用约 980px 的虚拟视口缩放着显示；声明 width=device-width 后媒体查询才按真实设备宽度生效。"
+  },
+  {
+    "id": "html-q3",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "html",
+    "prompt": "下面这行链接中 target=\"_blank\" 的作用是？\n```html\n<a href=\"/about\" target=\"_blank\" rel=\"noopener\">关于我们</a>\n```",
+    "options": [
+      { "key": "A", "text": "在新标签页（或新窗口）中打开链接" },
+      { "key": "B", "text": "在当前页面内锚点跳转" },
+      { "key": "C", "text": "禁止跳转" },
+      { "key": "D", "text": "下载文件而不打开" }
+    ],
+    "answer": ["A"],
+    "explanation": "target=\"_blank\" 让浏览器在新标签页打开；rel=\"noopener\" 切断新页面通过 window.opener 访问原页面的能力，避免反向跳转劫持。"
+  },
+  {
+    "id": "html-q4",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "html",
+    "prompt": "使用 <header>、<main>、<footer> 这类语义化标签的意义是？",
+    "options": [
+      { "key": "A", "text": "表达页面结构语义，便于无障碍工具、搜索引擎与团队阅读" },
+      { "key": "B", "text": "自动给元素加上好看的默认样式" },
+      { "key": "C", "text": "提升页面渲染性能" },
+      { "key": "D", "text": "替代所有 class 命名" }
+    ],
+    "answer": ["A"],
+    "explanation": "语义化标签描述结构含义，读屏软件可生成地标导航（landmark），搜索引擎能更好理解内容；它们的默认样式很弱，样式仍要自己写。"
+  },
+  {
+    "id": "html-q5",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "html",
+    "prompt": "为图片提供替代文本、在图片无法显示时展示内容的属性是？",
+    "options": [
+      { "key": "A", "text": "alt" },
+      { "key": "B", "text": "title" },
+      { "key": "C", "text": "srcset" },
+      { "key": "D", "text": "loading" }
+    ],
+    "answer": ["A"],
+    "explanation": "alt 是图片的替代文本，图片加载失败时显示、读屏软件朗读、也被搜索引擎利用；纯装饰图应写空 alt 让读屏跳过。"
+  },
+  {
+    "id": "html-q6",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "html",
+    "prompt": "让 label 与表单控件正确关联的做法是？",
+    "options": [
+      { "key": "A", "text": "label 的 for 属性等于控件的 id，或把控件嵌套在 label 内" },
+      { "key": "B", "text": "给 label 和控件都加上相同的 name" },
+      { "key": "C", "text": "使用 title 属性替代 label" },
+      { "key": "D", "text": "label 必须放在控件之后才能生效" }
+    ],
+    "answer": ["A"],
+    "explanation": "for/id 关联或嵌套包裹都能让点击 label 聚焦控件、让读屏软件读出控件名称；name 用于提交字段名，与标签关联无关。"
+  },
+  {
+    "id": "html-q7",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "html",
+    "prompt": "需要用户输入邮箱地址、并在移动端弹出邮箱键盘，应使用哪种 input 类型？",
+    "options": [
+      { "key": "A", "text": "type=\"email\"" },
+      { "key": "B", "text": "type=\"text\"" },
+      { "key": "C", "text": "type=\"mail\"" },
+      { "key": "D", "text": "type=\"email-input\"" }
+    ],
+    "answer": ["A"],
+    "explanation": "type=\"email\" 会启用浏览器原生格式校验并让移动端显示邮箱键盘；不存在 type=\"mail\" 或 type=\"email-input\" 这类取值。"
+  },
+  {
+    "id": "html-q8",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "advanced",
+    "language": "html",
+    "prompt": "HTML 中用于绘制矢量图形、可无损缩放的标签是？",
+    "options": [
+      { "key": "A", "text": "<svg>" },
+      { "key": "B", "text": "<canvas>" },
+      { "key": "C", "text": "<picture>" },
+      { "key": "D", "text": "<figure>" }
+    ],
+    "answer": ["A"],
+    "explanation": "<svg> 是基于矢量的 XML 图形，缩放不模糊，节点可被样式与脚本操作；<canvas> 是位图绘制平面，缩放会失真。"
+  },
+  {
+    "id": "html-q9",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "advanced",
+    "language": "html",
+    "prompt": "关于 script 的 defer 与 async，下列说法正确的是？",
+    "options": [
+      { "key": "A", "text": "defer 按文档顺序在解析完成后执行；async 下载完立即执行，顺序不确定" },
+      { "key": "B", "text": "两者都会阻塞 HTML 解析直到脚本下载并执行完成" },
+      { "key": "C", "text": "async 保证按文档顺序执行" },
+      { "key": "D", "text": "defer 会让脚本提前到解析之前执行" }
+    ],
+    "answer": ["A"],
+    "explanation": "普通 script 会阻塞解析；async 并行下载、下载完立即执行（适合独立统计脚本）；defer 并行下载并按定义顺序在 DOMContentLoaded 前执行（适合依赖 DOM 的脚本）。"
+  },
+  {
+    "id": "html-q10",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "advanced",
+    "language": "html",
+    "prompt": "表格中表示表头单元格的标签是？",
+    "options": [
+      { "key": "A", "text": "<th>" },
+      { "key": "B", "text": "<td>" },
+      { "key": "C", "text": "<caption>" },
+      { "key": "D", "text": "<thead>" }
+    ],
+    "answer": ["A"],
+    "explanation": "<th> 是表头单元格，默认加粗居中并可配合 scope 声明作用范围，读屏软件能正确关联表头与数据；<td> 是普通数据格。"
+  },
+  {
+    "id": "html-q11",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "advanced",
+    "language": "html",
+    "prompt": "块级元素与行内元素的主要区别是？",
+    "options": [
+      { "key": "A", "text": "块级元素独占一行且可设置宽高，行内元素随文本流排列、宽高不直接生效" },
+      { "key": "B", "text": "行内元素不能包含文字" },
+      { "key": "C", "text": "块级元素不能被 CSS 影响" },
+      { "key": "D", "text": "两者完全等价" }
+    ],
+    "answer": ["A"],
+    "explanation": "块级元素（div、p、section）独占一行、默认宽度撑满父容器；行内元素（span、a、strong）随文字流排版，宽高与垂直 margin 不按块级方式生效，可用 display 改变。"
+  },
+  {
+    "id": "html-q12",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "advanced",
+    "language": "html",
+    "prompt": "让输入框在表单提交前必须填写（浏览器原生校验），应使用哪个属性？",
+    "options": [
+      { "key": "A", "text": "required" },
+      { "key": "B", "text": "readonly" },
+      { "key": "C", "text": "disabled" },
+      { "key": "D", "text": "placeholder" }
+    ],
+    "answer": ["A"],
+    "explanation": "required 让浏览器在提交时做必填校验并弹出提示；readonly 只读但仍会提交，disabled 禁用且不提交，placeholder 只是占位提示。"
+  },
+  {
+    "id": "html-q13",
+    "direction": "前端",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "language": "html",
+    "prompt": "关于 HTML 无障碍（a11y），下列说法正确的有？",
+    "options": [
+      { "key": "A", "text": "有信息含义的图片应提供 alt 文本" },
+      { "key": "B", "text": "表单控件应有关联的 label，让读屏软件能读出名称" },
+      { "key": "C", "text": "用 tabindex 大范围改写焦点顺序总是推荐做法" },
+      { "key": "D", "text": "语义化标签（nav/main/button）比一堆 div 更利于辅助技术理解结构" }
+    ],
+    "answer": ["A", "B", "D"],
+    "explanation": "alt、label 与语义化标签是无障碍的基础；tabindex 改写焦点顺序会与浏览器默认顺序冲突，正数 tabindex 尤其容易造成混乱，应优先用合理的 DOM 顺序。"
+  },
+  {
+    "id": "html-q14",
+    "direction": "前端",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "language": "html",
+    "prompt": "关于 HTML 表单提交，下列说法正确的有？",
+    "options": [
+      { "key": "A", "text": "method=\"get\" 时参数会拼接到 URL 的查询串上" },
+      { "key": "B", "text": "method=\"post\" 时参数放在请求体里，不出现在 URL 中" },
+      { "key": "C", "text": "enctype=\"multipart/form-data\" 是文件上传表单必需的编码方式" },
+      { "key": "D", "text": "required 属性生效后，服务端就可以完全不做校验" }
+    ],
+    "answer": ["A", "B", "C"],
+    "explanation": "GET 把字段拼进查询串、POST 放在请求体，文件上传必须用 multipart/form-data；前端校验只是体验优化，服务端必须重新校验，因为请求可以绕过页面直接发出。"
+  },
+  {
+    "id": "html-q15",
+    "direction": "前端",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "language": "html",
+    "prompt": "关于 <a> 链接，下列说法正确的有？",
+    "options": [
+      { "key": "A", "text": "缺少 href 的 a 标签不是可跳转链接，也无法获得键盘聚焦" },
+      { "key": "B", "text": "rel=\"noopener\" 可阻止新页面通过 window.opener 操作原页面" },
+      { "key": "C", "text": "target=\"_blank\" 而不加 rel 时，新页面可能拿到原页面的 window.opener" },
+      { "key": "D", "text": "href 只能填写绝对 URL，不能写相对路径" }
+    ],
+    "answer": ["A", "B", "C"],
+    "explanation": "没有 href 的 a 只是普通行内容器；_blank 会暴露 window.opener 需配合 noopener/noreferrer；href 支持相对路径、绝对路径、锚点与协议链接。"
+  },
+  {
+    "id": "html-q16",
+    "direction": "前端",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "language": "html",
+    "prompt": "关于浏览器解析与渲染下面这段 HTML，下列说法正确的有？\n```html\n<div>\n  <script src=\"/a.js\"></script>\n  <img src=\"/b.png\" width=\"300\" height=\"200\" alt=\"示意图\" />\n</div>\n```",
+    "options": [
+      { "key": "A", "text": "普通 script 默认阻塞 HTML 解析，直到下载并执行完成" },
+      { "key": "B", "text": "CSS 不阻塞 DOM 解析，但会阻塞渲染，因此首屏样式应尽早加载" },
+      { "key": "C", "text": "给 img 写明 width 与 height 可减少图片加载时的布局偏移" },
+      { "key": "D", "text": "HTML 是严格 XML，任何一个标签未闭合都会直接报错" }
+    ],
+    "answer": ["A", "B", "C"],
+    "explanation": "同步 script 阻塞解析；CSS 阻塞渲染但不阻塞 DOM 构建；宽高能预留占位避免 CLS。HTML5 是宽容的标记语言，解析器会自动修复未闭合标签而不是报错。"
+  },
+  {
+    "id": "html-q17",
+    "direction": "前端",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "language": "html",
+    "prompt": "在同一个 HTML 页面中，id 属性可以重复出现多次，用来给同类元素分组。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": ["B"],
+    "explanation": "id 必须全页唯一：label 的 for、锚点跳转、document.getElementById 都依赖唯一性；需要分组复用样式应使用 class。"
+  },
+  {
+    "id": "html-q18",
+    "direction": "前端",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "language": "html",
+    "prompt": "<input type=\"button\"> 与 <button> 都能生成可点击按钮，但 <button> 内部可以包含图标等 HTML 元素。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": ["A"],
+    "explanation": "input 是空元素，value 只能是纯文本；button 是容器元素，可以嵌套文本与图标。注意 button 默认 type 是 submit，在表单里需显式写 type=\"button\"。"
+  },
+  {
+    "id": "html-q19",
+    "direction": "前端",
+    "kind": "judge",
+    "difficulty": "challenge",
+    "essentiality": "nice_to_know",
+    "language": "html",
+    "prompt": "img 是空元素（void element），没有结束标签，因此不需要写 </img>。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": ["A"],
+    "explanation": "img、br、hr、input、meta、link 等都是空元素，不能有子内容，因此没有结束标签；在 JSX 等 XML 风格语法中会写成自闭合的 <img />。"
+  },
+  {
+    "id": "html-q20",
+    "direction": "前端",
+    "kind": "judge",
+    "difficulty": "challenge",
+    "essentiality": "nice_to_know",
+    "language": "html",
+    "prompt": "把重要提示放在 <marquee> 标签里滚动展示是 HTML5 推荐的强调方式，读屏软件也能正确朗读滚动内容。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": ["B"],
+    "explanation": "marquee 已从标准中废弃，滚动内容会干扰阅读且不利于无障碍与性能；重要提示应使用静态高对比文本并配合 aria-live 播报。"
+  },
+  {
+    "id": "css-q1",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "css",
+    "prompt": "默认 content-box 下，下面的元素实际占用的宽度（不含 margin）是多少？\n```css\n.box {\n  width: 200px;\n  padding: 10px;\n  border: 1px solid #333;\n}\n```",
+    "options": [
+      { "key": "A", "text": "200px" },
+      { "key": "B", "text": "222px" },
+      { "key": "C", "text": "220px" },
+      { "key": "D", "text": "202px" }
+    ],
+    "answer": ["B"],
+    "explanation": "content-box 下 width 只算内容区，左右 padding 各 10px、左右 border 各 1px 都要加上：200 + 20 + 2 = 222px；改用 border-box 则 width 已包含这些。"
+  },
+  {
+    "id": "css-q2",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "css",
+    "prompt": "position: absolute 的元素相对于什么进行定位？",
+    "options": [
+      { "key": "A", "text": "最近的非 static 定位祖先元素，没有则相对初始包含块" },
+      { "key": "B", "text": "永远是浏览器视口" },
+      { "key": "C", "text": "永远是直接父元素" },
+      { "key": "D", "text": "永远是 body" }
+    ],
+    "answer": ["A"],
+    "explanation": "absolute 脱离文档流，向上寻找最近的 position 不为 static 的祖先作为包含块；fixed 才是相对视口（有 transform 祖先时例外）。"
+  },
+  {
+    "id": "css-q3",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "css",
+    "prompt": "对 <div id=\"b\" class=\"a\"> 应用下面的样式后，文字颜色是？\n```css\n.a { color: red !important; }\n#b { color: blue; }\n```",
+    "options": [
+      { "key": "A", "text": "red" },
+      { "key": "B", "text": "blue" },
+      { "key": "C", "text": "浏览器默认黑色" },
+      { "key": "D", "text": "两者混合后的紫色" }
+    ],
+    "answer": ["A"],
+    "explanation": "!important 提升声明到最高优先级层级，普通声明里即使 id 选择器权重更高也压不过它；因此 red 生效。这也是应少用 !important 的原因。"
+  },
+  {
+    "id": "css-q4",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "css",
+    "prompt": "在 flex 容器中让子元素水平垂直居中，正确的写法是？",
+    "options": [
+      { "key": "A", "text": "display: flex; justify-content: center; align-items: center;" },
+      { "key": "B", "text": "display: flex; text-align: center; vertical-align: middle;" },
+      { "key": "C", "text": "display: block; margin: auto;" },
+      { "key": "D", "text": "display: flex; position: center;" }
+    ],
+    "answer": ["A"],
+    "explanation": "justify-content 控制主轴对齐、align-items 控制交叉轴对齐，两者都设 center 即可双向居中；vertical-align 只对行内/表格单元格有意义。"
+  },
+  {
+    "id": "css-q5",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "css",
+    "prompt": "CSS 中 rem 与 em 的区别是？",
+    "options": [
+      { "key": "A", "text": "rem 相对根元素 html 的 font-size；em 相对当前元素（或父元素）计算出的 font-size" },
+      { "key": "B", "text": "两者完全等价" },
+      { "key": "C", "text": "em 相对视口宽度" },
+      { "key": "D", "text": "rem 只用于字体大小" }
+    ],
+    "answer": ["A"],
+    "explanation": "rem 只锚定 html 的字号，适合做整体缩放；em 会随所在元素字号层层叠加，嵌套时容易失控。相对视口的是 vw/vh。"
+  },
+  {
+    "id": "css-q6",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "css",
+    "prompt": "关于 z-index，下列说法正确的是？",
+    "options": [
+      { "key": "A", "text": "它只在非 static 定位（或 flex/grid 子项）上生效，且只在与同一层叠上下文内的元素比较" },
+      { "key": "B", "text": "任何元素写了 z-index 都会生效" },
+      { "key": "C", "text": "z-index 越大一定能压过所有元素，包括其他层叠上下文里更大的值" },
+      { "key": "D", "text": "z-index 只能取 0 到 10" }
+    ],
+    "answer": ["A"],
+    "explanation": "z-index 对 static 元素无效；层叠上下文是独立的比较层级，子元素再大的 z-index 也压不过父上下文之外的兄弟。opacity、transform、filter 等都会创建新的层叠上下文。"
+  },
+  {
+    "id": "css-q7",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "css",
+    "prompt": "伪类与伪元素的主要区别是？",
+    "options": [
+      { "key": "A", "text": "伪类选择元素的某个状态（如 :hover），伪元素创建元素的特定部分（如 ::before）" },
+      { "key": "B", "text": "两者完全等价" },
+      { "key": "C", "text": "伪类只能用于链接" },
+      { "key": "D", "text": "伪元素会插入真实 HTML 节点" }
+    ],
+    "answer": ["A"],
+    "explanation": "伪类（:hover、:focus、:nth-child）描述状态或位置，伪元素（::before、::after、::first-line）生成不存在的样式化部分；伪元素内容来自 content，不进入 DOM 结构。"
+  },
+  {
+    "id": "css-q8",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "advanced",
+    "language": "css",
+    "prompt": "哪个声明会让元素完全从布局中移除、不再占据任何空间？",
+    "options": [
+      { "key": "A", "text": "display: none" },
+      { "key": "B", "text": "visibility: hidden" },
+      { "key": "C", "text": "opacity: 0" },
+      { "key": "D", "text": "position: relative" }
+    ],
+    "answer": ["A"],
+    "explanation": "display: none 让元素不生成盒子、完全退出布局；visibility: hidden 与 opacity: 0 仍占位，只是不可见（后者仍可交互）。"
+  },
+  {
+    "id": "css-q9",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "advanced",
+    "language": "css",
+    "prompt": "CSS 自定义属性（变量）的声明与使用写法是？",
+    "options": [
+      { "key": "A", "text": "声明 --brand: #f60; 使用 var(--brand)" },
+      { "key": "B", "text": "声明 $brand: #f60; 使用 $brand" },
+      { "key": "C", "text": "声明 @brand: #f60; 使用 @brand" },
+      { "key": "D", "text": "声明 brand: #f60; 使用 brand" }
+    ],
+    "answer": ["A"],
+    "explanation": "自定义属性以 -- 开头并继承，通过 var(--name) 引用，可带默认值：var(--brand, #333)；$ 是 Sass 变量、@ 是 Less 变量，都需预处理器。"
+  },
+  {
+    "id": "css-q10",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "advanced",
+    "language": "css",
+    "prompt": "媒体查询 @media (max-width: 600px) 表示什么条件成立？",
+    "options": [
+      { "key": "A", "text": "视口宽度小于等于 600px 时" },
+      { "key": "B", "text": "元素宽度大于 600px 时" },
+      { "key": "C", "text": "屏幕像素密度为 600 时" },
+      { "key": "D", "text": "页面高度小于 600px 时" }
+    ],
+    "answer": ["A"],
+    "explanation": "max-width 是「至多」上界，匹配视口宽度不超过 600px 的场景；min-width 是下界，移动优先常用 min-width 逐步增强。"
+  },
+  {
+    "id": "css-q11",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "advanced",
+    "language": "css",
+    "prompt": "关于 BFC（块级格式化上下文），下列说法正确的是？",
+    "options": [
+      { "key": "A", "text": "它能包含浮动子元素、阻止与外部元素的外边距合并" },
+      { "key": "B", "text": "它是浏览器自动为每个元素创建的" },
+      { "key": "C", "text": "它只能通过 float 触发" },
+      { "key": "D", "text": "它会让元素脱离文档流" }
+    ],
+    "answer": ["A"],
+    "explanation": "BFC 是独立布局区域：内部浮动不会外溢、不与外部 margin 合并、可避免高度塌陷。可用 display: flow-root、overflow 非 visible、float、flex/grid 子项等触发。"
+  },
+  {
+    "id": "css-q12",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "advanced",
+    "language": "css",
+    "prompt": "选择器 .a.b 的含义是？",
+    "options": [
+      { "key": "A", "text": "同时带有 a 和 b 两个 class 的元素" },
+      { "key": "B", "text": "class 为 a 的元素的后代中 class 为 b 的元素" },
+      { "key": "C", "text": "class 为 a 或 class 为 b 的元素" },
+      { "key": "D", "text": "class 名为 \"a.b\" 的元素" }
+    ],
+    "answer": ["A"],
+    "explanation": ".a.b 是复合选择器，要求元素同时具备两个类名；后代是 .a .b（空格），并集用 .a, .b，含点的类名需要转义。"
+  },
+  {
+    "id": "css-q13",
+    "direction": "前端",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "language": "css",
+    "prompt": "关于 CSS 层叠与优先级，下列说法正确的有？",
+    "options": [
+      { "key": "A", "text": "内联样式通常高于 id 选择器" },
+      { "key": "B", "text": "!important 声明高于同等层级的普通声明" },
+      { "key": "C", "text": "优先级相同时，后出现的声明覆盖先出现的声明" },
+      { "key": "D", "text": "选择器权重会随元素数量无限累加，没有上限" }
+    ],
+    "answer": ["A", "B", "C"],
+    "explanation": "层叠顺序由来源与重要性、内联、选择器权重、出现顺序依次决定；权重是 (id, class, 元素) 三元组的比较，不存在无限累加。"
+  },
+  {
+    "id": "css-q14",
+    "direction": "前端",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "language": "css",
+    "prompt": "关于 Flexbox，下列说法正确的有？",
+    "options": [
+      { "key": "A", "text": "flex-direction 决定主轴方向，row 时主轴是水平方向" },
+      { "key": "B", "text": "justify-content 沿主轴对齐，align-items 沿交叉轴对齐" },
+      { "key": "C", "text": "flex: 1 等价于 flex-grow: 1、flex-shrink: 1、flex-basis: 0%" },
+      { "key": "D", "text": "flex 容器的子元素必须设置固定宽度才能布局" }
+    ],
+    "answer": ["A", "B", "C"],
+    "explanation": "flex-direction 定义主轴，justify-content 与 align-items 分别在主轴/交叉轴对齐，flex: 1 是三个子属性的简写；子元素宽度可自适应，不需要固定宽。"
+  },
+  {
+    "id": "css-q15",
+    "direction": "前端",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "language": "css",
+    "prompt": "关于响应式布局，下列说法正确的有？",
+    "options": [
+      { "key": "A", "text": "媒体查询可以按视口宽度切换不同的样式规则" },
+      { "key": "B", "text": "使用 %、rem、vw 等相对单位更利于适配不同屏幕" },
+      { "key": "C", "text": "移动优先指先写小屏样式，再用 min-width 逐级增强" },
+      { "key": "D", "text": "只用固定 px 宽度就能完美适配所有屏幕尺寸" }
+    ],
+    "answer": ["A", "B", "C"],
+    "explanation": "响应式的三件套是流式布局、相对单位与媒体查询；固定 px 宽度在窄屏会溢出，必须配合 max-width: 100% 等约束。"
+  },
+  {
+    "id": "css-q16",
+    "direction": "前端",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "language": "css",
+    "prompt": "关于 CSS 过渡与动画，下列说法正确的有？",
+    "options": [
+      { "key": "A", "text": "transition 需要属性值发生变化才会触发过渡" },
+      { "key": "B", "text": "@keyframes 配合 animation 可以实现自动循环动画" },
+      { "key": "C", "text": "优先动画 transform 与 opacity 更容易获得合成层加速" },
+      { "key": "D", "text": "所有属性做动画的性能开销完全一样" }
+    ],
+    "answer": ["A", "B", "C"],
+    "explanation": "transition 由状态变化触发、animation 可自播放并循环；transform、opacity 通常只触发合成而不重排重绘，开销最小，width、top 等则容易触发布局。"
+  },
+  {
+    "id": "css-q17",
+    "direction": "前端",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "language": "css",
+    "prompt": "CSS 中 margin 与 padding 都可以设置为负值。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": ["B"],
+    "explanation": "margin 可以为负（用于拉近或让元素外溢），padding 必须非负，负值会被忽略；这一点在写偏移技巧时必须区分。"
+  },
+  {
+    "id": "css-q18",
+    "direction": "前端",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "language": "css",
+    "prompt": "box-sizing: border-box 会让 width 包含 padding 与 border，但不包含 margin。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": ["A"],
+    "explanation": "border-box 把 padding 与 border 计入 width，margin 始终在盒子之外（不影响 width）。这也是全局设 border-box 后布局更好算的原因。"
+  },
+  {
+    "id": "css-q19",
+    "direction": "前端",
+    "kind": "judge",
+    "difficulty": "challenge",
+    "essentiality": "nice_to_know",
+    "language": "css",
+    "prompt": "只要给元素写了 z-index 数值，它就一定生效，与该元素的 position 是否为 static 无关。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": ["B"],
+    "explanation": "z-index 对 static 定位元素不生效（flex/grid 子项例外）；要让 z-index 参与层叠，元素需 position 为 relative、absolute、fixed、sticky 之一。"
+  },
+  {
+    "id": "css-q20",
+    "direction": "前端",
+    "kind": "judge",
+    "difficulty": "challenge",
+    "essentiality": "nice_to_know",
+    "language": "css",
+    "prompt": "在 CSS 层叠计算中，两条规则优先级相同时，后出现的声明会覆盖先出现的声明。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": ["A"],
+    "explanation": "层叠的最后一道判定是顺序：权重与来源都相同时，书写位置靠后的声明胜出；因此第三方库样式应放在自己的样式之前。"
+  },
+  {
+    "id": "js-q1",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "js",
+    "prompt": "下面这段代码输出的结果是？\n```js\nconsole.log(1 + \"2\" - 1);\n```",
+    "options": [
+      { "key": "A", "text": "11" },
+      { "key": "B", "text": "2" },
+      { "key": "C", "text": "NaN" },
+      { "key": "D", "text": "\"12\"" }
+    ],
+    "answer": ["A"],
+    "explanation": "+ 遇到字符串做拼接得到 \"12\"，随后 - 把字符串隐式转成数字 12 再减 1，结果是数字 11。混用 + 与 - 时的隐式转换正是 JS 的经典坑。"
+  },
+  {
+    "id": "js-q2",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "js",
+    "prompt": "JavaScript 中 let、const 与 var 在作用域上的区别是？",
+    "options": [
+      { "key": "A", "text": "let 与 const 是块级作用域，var 是函数作用域" },
+      { "key": "B", "text": "三者都是块级作用域" },
+      { "key": "C", "text": "var 是块级作用域，let 是函数作用域" },
+      { "key": "D", "text": "const 声明的作用域取决于是否在循环里" }
+    ],
+    "answer": ["A"],
+    "explanation": "let 与 const 绑定在最近的代码块（if、for、{}）内，var 只受函数边界约束并会提升；const 额外要求声明时初始化且不能重新赋值。"
+  },
+  {
+    "id": "js-q3",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "js",
+    "prompt": "下面这段代码输出的是？\n```js\nconst a = [1, 2, 3];\nconst b = a;\nb.push(4);\nconsole.log(a.length);\n```",
+    "options": [
+      { "key": "A", "text": "3" },
+      { "key": "B", "text": "4" },
+      { "key": "C", "text": "undefined" },
+      { "key": "D", "text": "抛出异常" }
+    ],
+    "answer": ["B"],
+    "explanation": "把数组赋给另一个变量只复制引用，a 与 b 指向同一个数组，push 之后 a 也变成 4 个元素；需要独立副本应使用 slice、扩展运算符或 structuredClone。"
+  },
+  {
+    "id": "js-q4",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "js",
+    "prompt": "关于 JavaScript 中的 NaN，下列说法正确的是？",
+    "options": [
+      { "key": "A", "text": "NaN 不等于自身，判断应使用 Number.isNaN()" },
+      { "key": "B", "text": "NaN === NaN 返回 true" },
+      { "key": "C", "text": "typeof NaN 返回 \"nan\"" },
+      { "key": "D", "text": "NaN 可以用作 Map 的键之外的所有场景" }
+    ],
+    "answer": ["A"],
+    "explanation": "按 IEEE 754 规范 NaN 与任何值都不相等（包括自身），因此 NaN === NaN 为 false；typeof NaN 是 \"number\"，判断用 Number.isNaN。"
+  },
+  {
+    "id": "js-q5",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "js",
+    "prompt": "document.querySelectorAll() 返回的是？",
+    "options": [
+      { "key": "A", "text": "静态的 NodeList，之后 DOM 变化不会自动更新它" },
+      { "key": "B", "text": "动态的 HTMLCollection，会随 DOM 变化实时更新" },
+      { "key": "C", "text": "普通数组，可以直接调用 push" },
+      { "key": "D", "text": "单个元素，取不到集合" }
+    ],
+    "answer": ["A"],
+    "explanation": "querySelectorAll 返回静态 NodeList，快照式；getElementsByClassName/TagName 返回动态 HTMLCollection。两者都不是真数组，需要 Array.from 转换。"
+  },
+  {
+    "id": "js-q6",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "js",
+    "prompt": "事件委托（事件代理）的实现原理是？",
+    "options": [
+      { "key": "A", "text": "利用事件冒泡在父元素统一监听，再通过 event.target 判断来源元素" },
+      { "key": "B", "text": "给每个子元素都绑定一次监听器" },
+      { "key": "C", "text": "使用 capture 阶段拦截所有事件" },
+      { "key": "D", "text": "依赖 setInterval 轮询 DOM 变化" }
+    ],
+    "answer": ["A"],
+    "explanation": "子元素的事件会冒泡到父级，父级只需一个监听器即可处理动态增删的子元素，减少绑定数量、天然支持后插入的节点。"
+  },
+  {
+    "id": "js-q7",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "js",
+    "prompt": "用 JSON.parse(JSON.stringify(obj)) 做深拷贝的典型局限是？",
+    "options": [
+      { "key": "A", "text": "会丢失函数与 undefined、Date 变成字符串、遇到循环引用直接抛错" },
+      { "key": "B", "text": "无法复制字符串" },
+      { "key": "C", "text": "会把数字转成字符串" },
+      { "key": "D", "text": "只能复制第一层对象" }
+    ],
+    "answer": ["A"],
+    "explanation": "JSON 序列化只保留可 JSON 化的数据：函数、undefined、Symbol 会丢，Date 变字符串，Map/Set 变空对象，循环引用报 TypeError；更稳妥的是 structuredClone。"
+  },
+  {
+    "id": "js-q8",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "advanced",
+    "language": "js",
+    "prompt": "关于 JavaScript 中 this 的指向，下列说法正确的是？",
+    "options": [
+      { "key": "A", "text": "普通函数的 this 由调用方式决定，箭头函数取定义时外层作用域的 this" },
+      { "key": "B", "text": "所有函数的 this 都在定义时确定" },
+      { "key": "C", "text": "this 永远指向 window" },
+      { "key": "D", "text": "箭头函数的 this 可以被 call 修改" }
+    ],
+    "answer": ["A"],
+    "explanation": "普通函数的 this 取决于调用形式（方法调用、直接调用、call/apply、new）；箭头函数没有自己的 this，取词法作用域，call/apply 无法改变。"
+  },
+  {
+    "id": "js-q9",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "advanced",
+    "language": "js",
+    "prompt": "在 JavaScript 中，表达式 0.1 + 0.2 === 0.3 的结果是？",
+    "options": [
+      { "key": "A", "text": "false，因为二进制浮点存在精度误差" },
+      { "key": "B", "text": "true，数值完全相等" },
+      { "key": "C", "text": "抛出异常" },
+      { "key": "D", "text": "结果为 NaN" }
+    ],
+    "answer": ["A"],
+    "explanation": "0.1 与 0.2 无法用二进制浮点精确表示，相加得到 0.30000000000000004，因此严格相等为 false；比较小数应引入误差阈值。"
+  },
+  {
+    "id": "js-q10",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "advanced",
+    "language": "js",
+    "prompt": "防抖（debounce）与节流（throttle）的区别是？",
+    "options": [
+      { "key": "A", "text": "防抖在停止触发一段时间后才执行一次；节流按固定时间间隔最多执行一次" },
+      { "key": "B", "text": "两者完全等价" },
+      { "key": "C", "text": "防抖每次触发都立即执行" },
+      { "key": "D", "text": "节流只适用于滚动事件" }
+    ],
+    "answer": ["A"],
+    "explanation": "防抖关注「稳定下来」，适合搜索输入联想；节流关注「频率上限」，适合滚动、拖拽等持续事件。二者都可以带首次立即执行选项。"
+  },
+  {
+    "id": "js-q11",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "advanced",
+    "language": "js",
+    "prompt": "Promise.all 的行为是？",
+    "options": [
+      { "key": "A", "text": "全部成功才成功并按顺序返回结果；任一失败立即以该原因失败" },
+      { "key": "B", "text": "返回最先完成的那个 Promise 的结果" },
+      { "key": "C", "text": "忽略失败，只返回成功的那些" },
+      { "key": "D", "text": "串行依次执行所有 Promise" }
+    ],
+    "answer": ["A"],
+    "explanation": "Promise.all 并行等待全部完成，结果顺序与输入一致；任何一个 reject 会让整体立即 reject。需要全部结果时用 Promise.allSettled。"
+  },
+  {
+    "id": "js-q12",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "advanced",
+    "language": "js",
+    "prompt": "Array.prototype.forEach 与 map 的区别是？",
+    "options": [
+      { "key": "A", "text": "forEach 只为副作用遍历、返回 undefined；map 返回同长度的新数组" },
+      { "key": "B", "text": "两者都返回新数组" },
+      { "key": "C", "text": "map 会修改原数组" },
+      { "key": "D", "text": "forEach 可以提前 return 跳出循环" }
+    ],
+    "answer": ["A"],
+    "explanation": "map 按回调返回值构造新数组（不修改原数组），forEach 没有返回值也不改变数组；两者都无法通过 return 提前跳出，需要中断应使用 for 或 some/every。"
+  },
+  {
+    "id": "js-q13",
+    "direction": "前端",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "language": "js",
+    "prompt": "关于 JavaScript 闭包，下列说法正确的有？",
+    "options": [
+      { "key": "A", "text": "内层函数可以访问外层函数作用域中的变量" },
+      { "key": "B", "text": "被闭包引用的变量会常驻内存，直到闭包本身不可达" },
+      { "key": "C", "text": "用 var 在循环里创建闭包常因共享同一变量而读到最后一次的值" },
+      { "key": "D", "text": "闭包只能捕获基本类型，不能捕获对象" }
+    ],
+    "answer": ["A", "B", "C"],
+    "explanation": "闭包是函数与其词法环境的组合，能访问外层变量并延长其生命周期；var 没有块级作用域导致共享变量，改用 let 或在循环体内再包一层即可。闭包可以捕获任意类型。"
+  },
+  {
+    "id": "js-q14",
+    "direction": "前端",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "language": "js",
+    "prompt": "关于 JavaScript 的原型与继承，下列说法正确的有？",
+    "options": [
+      { "key": "A", "text": "每个函数都有 prototype 属性，作为其实例的原型对象" },
+      { "key": "B", "text": "实例的 __proto__ 指向构造函数的 prototype" },
+      { "key": "C", "text": "class 语法本质仍是基于原型的继承" },
+      { "key": "D", "text": "修改原型对象不会影响已经创建出来的实例" }
+    ],
+    "answer": ["A", "B", "C"],
+    "explanation": "属性查找沿原型链进行：实例 → 构造函数 prototype → Object.prototype；class 是原型继承的语法糖。修改原型会影响所有尚未被自有属性遮蔽的实例。"
+  },
+  {
+    "id": "js-q15",
+    "direction": "前端",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "language": "js",
+    "prompt": "关于 JavaScript 模块化，下列说法正确的有？",
+    "options": [
+      { "key": "A", "text": "ES Module 是静态结构，利于 tree-shaking 与编译期分析" },
+      { "key": "B", "text": "CommonJS 的 require 是同步加载，适合服务端" },
+      { "key": "C", "text": "ES Module 顶层的 this 是 undefined，且 import 会被提升" },
+      { "key": "D", "text": "ESM 与 CommonJS 可以在同一文件里随意混用而不需要构建工具" }
+    ],
+    "answer": ["A", "B", "C"],
+    "explanation": "ESM 静态可分析、支持 tree-shaking，顶层 this 是 undefined；CommonJS 运行时同步 require。两者规范不同，混用需要打包器或 Node 的互操作支持。"
+  },
+  {
+    "id": "js-q16",
+    "direction": "前端",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "language": "js",
+    "prompt": "关于 JavaScript 的内存与垃圾回收，下列说法正确的有？",
+    "options": [
+      { "key": "A", "text": "引擎基于可达性分析回收不可达对象" },
+      { "key": "B", "text": "挂在全局对象上的引用会一直存活，容易造成泄漏" },
+      { "key": "C", "text": "未移除的事件监听或未清理的定时器可能持有引用造成泄漏" },
+      { "key": "D", "text": "delete 运算符会立即释放对象占用的内存" }
+    ],
+    "answer": ["A", "B", "C"],
+    "explanation": "JS 用标记清除式的可达性回收，全局引用、闭包、未解绑的监听器与定时器都可能延长对象寿命；delete 只删除属性，真正的释放由 GC 在不可达后进行。"
+  },
+  {
+    "id": "js-q17",
+    "direction": "前端",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "language": "js",
+    "prompt": "在 JavaScript 中，用 const 声明的对象，其内部属性仍然可以被修改。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": ["A"],
+    "explanation": "const 只保证绑定不可重新赋值，对象本身的属性仍可增删改；需要不可变可配合 Object.freeze（浅冻结）或改用不可变数据结构。"
+  },
+  {
+    "id": "js-q18",
+    "direction": "前端",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "language": "js",
+    "prompt": "setTimeout(fn, 0) 注册的回调会在当前同步代码执行完之前就运行。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": ["B"],
+    "explanation": "setTimeout 回调是宏任务，必须等当前同步代码与微任务队列清空后才执行，所以它一定晚于后续同步语句。"
+  },
+  {
+    "id": "js-q19",
+    "direction": "前端",
+    "kind": "judge",
+    "difficulty": "challenge",
+    "essentiality": "nice_to_know",
+    "language": "js",
+    "prompt": "在 for 循环中用 var 声明的循环变量被闭包捕获时，所有回调读到的都是循环结束后的最终值。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": ["A"],
+    "explanation": "var 是函数作用域，整个循环只有一个变量，回调执行时它已被更新为最终值；改用 let 会为每次迭代创建新的绑定，从而得到期望的 0、1、2。"
+  },
+  {
+    "id": "js-q20",
+    "direction": "前端",
+    "kind": "judge",
+    "difficulty": "challenge",
+    "essentiality": "nice_to_know",
+    "language": "js",
+    "prompt": "Object.freeze() 会递归冻结对象的全部嵌套属性，使对象彻底不可变。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": ["B"],
+    "explanation": "Object.freeze 是浅冻结，只冻结对象自身的直接属性；嵌套对象仍可修改，需要递归冻结或使用不可变库/深冻结工具。"
+  },
+  {
+    "id": "ts-q1",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "ts",
+    "prompt": "下面这段 TypeScript 代码会有什么结果？\n```ts\nconst value: unknown = \"hello\";\nconsole.log(value.length);\n```",
+    "options": [
+      { "key": "A", "text": "编译报错：unknown 类型上不能直接访问属性" },
+      { "key": "B", "text": "正常输出 5" },
+      { "key": "C", "text": "运行时抛 TypeError" },
+      { "key": "D", "text": "输出 undefined" }
+    ],
+    "answer": ["A"],
+    "explanation": "unknown 是安全的未知类型，访问成员前必须先收窄：typeof value === 'string' 之后再取 length。若声明为 any 则能编译通过，但会失去类型保护。"
+  },
+  {
+    "id": "ts-q2",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "ts",
+    "prompt": "TypeScript 中 interface 与 type 的主要区别是？",
+    "options": [
+      { "key": "A", "text": "interface 支持同名声明合并；type 可表示联合、元组等更灵活的组合类型" },
+      { "key": "B", "text": "两者完全等价，没有任何区别" },
+      { "key": "C", "text": "type 只能描述类，不能描述对象" },
+      { "key": "D", "text": "interface 会在运行时生成代码" }
+    ],
+    "answer": ["A"],
+    "explanation": "interface 可被多次声明自动合并，适合描述可扩展的对象结构；type 支持联合、交叉、映射、条件类型等，但不能重复声明合并。两者都在编译期抹除。"
+  },
+  {
+    "id": "ts-q3",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "ts",
+    "prompt": "开启 strictNullChecks 后，下面的代码有什么问题？\n```ts\nfunction fixed(x?: number) {\n  return x.toFixed(2);\n}\n```",
+    "options": [
+      { "key": "A", "text": "x 的类型是 number | undefined，直接调用 toFixed 会编译报错" },
+      { "key": "B", "text": "没有任何问题" },
+      { "key": "C", "text": "x 会自动被赋值为 0" },
+      { "key": "D", "text": "返回类型必须显式标注否则报错" }
+    ],
+    "answer": ["A"],
+    "explanation": "可选参数意味着可能传入 undefined，strictNullChecks 会要求先判空（x ?? 0）或用可选链（x?.toFixed(2)），否则编译器直接报错。"
+  },
+  {
+    "id": "ts-q4",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "ts",
+    "prompt": "TypeScript 中 unknown 与 any 相比，哪个更安全？",
+    "options": [
+      { "key": "A", "text": "unknown 更安全，因为使用前必须先做类型收窄" },
+      { "key": "B", "text": "any 更安全，因为它可以随意赋值" },
+      { "key": "C", "text": "两者安全性完全一样" },
+      { "key": "D", "text": "unknown 在运行时才会报错" }
+    ],
+    "answer": ["A"],
+    "explanation": "any 会关闭类型检查、让错误延迟到运行时；unknown 只允许赋值与比较，任何成员访问都要先收窄，因此把不可信输入标注为 unknown 更安全。"
+  },
+  {
+    "id": "ts-q5",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "ts",
+    "prompt": "tsconfig 中把 strict 设为 true 会带来什么？",
+    "options": [
+      { "key": "A", "text": "一次性启用 noImplicitAny、strictNullChecks 等一组严格检查" },
+      { "key": "B", "text": "只检查语法错误，不做类型检查" },
+      { "key": "C", "text": "让代码在运行时做类型校验" },
+      { "key": "D", "text": "禁止使用 interface" }
+    ],
+    "answer": ["A"],
+    "explanation": "strict 是严格模式总开关，包含 strictNullChecks、noImplicitAny、strictFunctionTypes、strictPropertyInitialization 等；新项目建议直接开启。"
+  },
+  {
+    "id": "ts-q6",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "ts",
+    "prompt": "泛型约束 <T extends object> 的含义是？",
+    "options": [
+      { "key": "A", "text": "类型参数 T 必须满足 object 约束，不能传入基本类型" },
+      { "key": "B", "text": "T 只能是 Object 类的实例，不能是普通对象字面量" },
+      { "key": "C", "text": "T 会被强制转换为 object 类型" },
+      { "key": "D", "text": "T 只能是函数类型" }
+    ],
+    "answer": ["A"],
+    "explanation": "extends 在泛型里表示约束（上界），不是继承：T 必须是 object 的子类型，因此 string、number 会被拒绝，对象字面量与接口都符合。"
+  },
+  {
+    "id": "ts-q7",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "advanced",
+    "language": "ts",
+    "prompt": "TypeScript 的 never 类型表示？",
+    "options": [
+      { "key": "A", "text": "永远不会正常返回的值，例如总是抛异常或死循环的函数返回类型" },
+      { "key": "B", "text": "等同于 null" },
+      { "key": "C", "text": "可以是任意值" },
+      { "key": "D", "text": "等同于 undefined" }
+    ],
+    "answer": ["A"],
+    "explanation": "never 是空类型，表示不可能出现的值；常用于抛错函数与穷尽性检查（switch 的 default 里赋给 never 变量，若漏了分支就编译报错）。"
+  },
+  {
+    "id": "ts-q8",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "advanced",
+    "language": "ts",
+    "prompt": "TypeScript 的数字枚举编译成 JavaScript 后会变成？",
+    "options": [
+      { "key": "A", "text": "一个包含正向与反向映射的普通对象" },
+      { "key": "B", "text": "被完全删除，运行时不存在" },
+      { "key": "C", "text": "一个 Map 实例" },
+      { "key": "D", "text": "一个 Symbol" }
+    ],
+    "answer": ["A"],
+    "explanation": "数字枚举会生成双向映射对象（Color.Red = 1 与 Color[1] = 'Red'），因此有运行时代码；字符串枚举只生成正向映射，const enum 才会被内联消除。"
+  },
+  {
+    "id": "ts-q9",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "advanced",
+    "language": "ts",
+    "prompt": "as const 断言的作用是？",
+    "options": [
+      { "key": "A", "text": "把字面量推断为最窄的字面量类型，并使对象/数组成为只读" },
+      { "key": "B", "text": "在运行时冻结对象" },
+      { "key": "C", "text": "把类型断言为 any" },
+      { "key": "D", "text": "让变量可以重新赋值" }
+    ],
+    "answer": ["A"],
+    "explanation": "as const 让 const obj = { a: 1 } 的属性类型是 1 而不是 number，并把数组变为 readonly 元组；它只在编译期生效，不冻结运行时对象。"
+  },
+  {
+    "id": "ts-q10",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "advanced",
+    "language": "ts",
+    "prompt": "类型断言 value as string 的含义是？",
+    "options": [
+      { "key": "A", "text": "告诉编译器按 string 处理，运行时不做任何检查或转换" },
+      { "key": "B", "text": "运行时把值转成字符串" },
+      { "key": "C", "text": "先做类型校验，失败则抛异常" },
+      { "key": "D", "text": "等同于声明一个新变量" }
+    ],
+    "answer": ["A"],
+    "explanation": "as 是编译期断言，编译后完全消失，值本身不会改变；真实数据来源不可信时应先用 typeof、typeof 守卫或运行时校验库做检查。"
+  },
+  {
+    "id": "ts-q11",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "advanced",
+    "language": "ts",
+    "prompt": "keyof T 得到的是什么类型？",
+    "options": [
+      { "key": "A", "text": "T 所有属性名组成的联合类型" },
+      { "key": "B", "text": "T 所有属性值组成的联合类型" },
+      { "key": "C", "text": "T 自身" },
+      { "key": "D", "text": "总是 string" }
+    ],
+    "answer": ["A"],
+    "explanation": "keyof 取出类型的所有键名联合，例如 type P = { a: number; b: string } 的 keyof P 是 \"a\" | \"b\"；取属性值用 T[keyof T]。"
+  },
+  {
+    "id": "ts-q12",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "advanced",
+    "language": "ts",
+    "prompt": "内置工具类型 Partial<T> 的作用是？",
+    "options": [
+      { "key": "A", "text": "把 T 的所有属性变成可选" },
+      { "key": "B", "text": "把 T 的所有属性变成必填" },
+      { "key": "C", "text": "把 T 的所有属性变成只读" },
+      { "key": "D", "text": "只保留 T 的一部分属性" }
+    ],
+    "answer": ["A"],
+    "explanation": "Partial 通过映射类型把每个属性加上 ?，常用于更新接口的部分字段；必填用 Required，只读用 Readonly，挑选字段用 Pick。"
+  },
+  {
+    "id": "ts-q13",
+    "direction": "前端",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "language": "ts",
+    "prompt": "关于 TypeScript 的类型收窄，下列说法正确的有？",
+    "options": [
+      { "key": "A", "text": "用 typeof 判断基本类型可以让后续分支获得更窄的类型" },
+      { "key": "B", "text": "用 in 运算符判断属性存在可以收窄联合类型" },
+      { "key": "C", "text": "自定义类型守卫 value is T 会把判定结果告诉编译器" },
+      { "key": "D", "text": "类型断言 as 会在运行时执行真实校验并抛错" }
+    ],
+    "answer": ["A", "B", "C"],
+    "explanation": "typeof、in、instanceof、类型守卫与可辨识联合都能收窄控制流中的类型；as 是纯编译期断言，不会做任何运行时检查，所以不能当成校验手段。"
+  },
+  {
+    "id": "ts-q14",
+    "direction": "前端",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "language": "ts",
+    "prompt": "关于 tsconfig 与编译流程，下列说法正确的有？",
+    "options": [
+      { "key": "A", "text": "noEmit 为 true 时只做类型检查、不产出 JS 文件" },
+      { "key": "B", "text": "target 决定编译输出的 JavaScript 语法级别" },
+      { "key": "C", "text": "开启 strict 后，未标注类型的变量就不会再报 noImplicitAny 错误" },
+      { "key": "D", "text": "skipLibCheck 可以跳过依赖声明文件的类型检查以加快编译" }
+    ],
+    "answer": ["A", "B", "D"],
+    "explanation": "noEmit 用于纯类型检查（如 CI 的 tsc --noEmit），target 决定降级到哪个 ES 版本，skipLibCheck 跳过 node_modules 声明检查；strict 恰恰会启用 noImplicitAny，让隐式 any 直接报错。"
+  },
+  {
+    "id": "ts-q15",
+    "direction": "前端",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "language": "ts",
+    "prompt": "关于 TypeScript 的泛型，下列说法正确的有？",
+    "options": [
+      { "key": "A", "text": "泛型能让入参与返回值的类型保持关联，避免退化成 any" },
+      { "key": "B", "text": "可以为类型参数指定默认值，如 <T = string>" },
+      { "key": "C", "text": "泛型的具体类型信息会保留到运行时并可被反射" },
+      { "key": "D", "text": "extends 可以给类型参数加上约束" }
+    ],
+    "answer": ["A", "B", "D"],
+    "explanation": "泛型是编译期的类型参数化，支持默认值与 extends 约束，能表达「传入什么就返回什么」；编译后泛型被擦除，运行时拿不到具体类型。"
+  },
+  {
+    "id": "ts-q16",
+    "direction": "前端",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "language": "ts",
+    "prompt": "关于 TypeScript 的接口与结构类型系统，下列说法正确的有？",
+    "options": [
+      { "key": "A", "text": "TypeScript 是结构类型：只要形状一致就能赋值，无需显式声明实现" },
+      { "key": "B", "text": "一个接口可以 extends 多个其他接口" },
+      { "key": "C", "text": "类 implements 接口时必须实现接口声明的全部成员" },
+      { "key": "D", "text": "接口可以包含具体方法实现并生成运行时代码" }
+    ],
+    "answer": ["A", "B", "C"],
+    "explanation": "TS 按形状比较类型，接口可多继承，implements 要求成员齐全；接口是纯类型声明，默认被擦除，不会生成运行时代码（抽象类才会）。"
+  },
+  {
+    "id": "ts-q17",
+    "direction": "前端",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "language": "ts",
+    "prompt": "TypeScript 的类型标注会被保留在编译产出的 JavaScript 中，并在运行时对变量做类型校验。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": ["B"],
+    "explanation": "类型标注、接口、泛型在编译后全部擦除，运行时没有任何类型校验；外部数据仍需运行时校验（如 zod、手写守卫）。"
+  },
+  {
+    "id": "ts-q18",
+    "direction": "前端",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "language": "ts",
+    "prompt": "TypeScript 中 interface 与 type 都能描述对象形状，而 interface 支持同名声明合并。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": ["A"],
+    "explanation": "同名 interface 的成员会自动合并，常用于给第三方类型打补丁（声明合并）；type 别名重复声明会直接报错。"
+  },
+  {
+    "id": "ts-q19",
+    "direction": "前端",
+    "kind": "judge",
+    "difficulty": "challenge",
+    "essentiality": "nice_to_know",
+    "language": "ts",
+    "prompt": "在 TypeScript 中 any 与 unknown 都能接收任意值，但只有 any 可以在不做收窄的情况下直接访问其属性或调用。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": ["A"],
+    "explanation": "两者都能被赋任意值，但 any 完全绕过类型检查，可以直接调用；unknown 只能赋值与比较，访问成员前必须先收窄，这正是它更安全的原因。"
+  },
+  {
+    "id": "ts-q20",
+    "direction": "前端",
+    "kind": "judge",
+    "difficulty": "challenge",
+    "essentiality": "nice_to_know",
+    "language": "ts",
+    "prompt": "never 是所有类型的子类型，因此可以把 never 类型的值赋给任意类型的变量。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": ["A"],
+    "explanation": "never 是底类型，可赋值给任何类型；反过来只有 never 能接收 never。它常用于穷尽性检查，让漏掉的分支在编译期暴露。"
+  },
+  {
+    "id": "vue3-q1",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "vue3",
+    "prompt": "下面的组件中，模板里显示 count 的正确写法是？\n```vue\n<template><p>{{ ??? }}</p></template>\n<script setup>\nimport { ref } from 'vue'\nconst count = ref(0)\n</script>\n```",
+    "options": [
+      { "key": "A", "text": "{{ count }}" },
+      { "key": "B", "text": "{{ count.value }}" },
+      { "key": "C", "text": "{{ $count }}" },
+      { "key": "D", "text": "{{ this.count }}" }
+    ],
+    "answer": ["A"],
+    "explanation": "模板会自动解包顶层 ref，直接写 count 即可；在 script 或普通 JS 里才需要 count.value。"
+  },
+  {
+    "id": "vue3-q2",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "vue3",
+    "prompt": "Vue 3 中 ref 与 reactive 的区别是？",
+    "options": [
+      { "key": "A", "text": "ref 可包装任意类型并需 .value 读写；reactive 只对对象/数组生效，直接访问属性" },
+      { "key": "B", "text": "两者完全等价" },
+      { "key": "C", "text": "reactive 只接受基本类型" },
+      { "key": "D", "text": "ref 只能用于 DOM 引用" }
+    ],
+    "answer": ["A"],
+    "explanation": "ref 内部用 value 容器包装，可存基本类型，模板中自动解包；reactive 返回 Proxy，对对象生效，重新赋值（替换整个对象）会丢失响应性。"
+  },
+  {
+    "id": "vue3-q3",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "vue3",
+    "prompt": "下面代码打印出的 a 是？\n```js\nconst state = reactive({ a: 1 })\nconst { a } = state\nstate.a = 2\nconsole.log(a)\n```",
+    "options": [
+      { "key": "A", "text": "1" },
+      { "key": "B", "text": "2" },
+      { "key": "C", "text": "undefined" },
+      { "key": "D", "text": "抛出异常" }
+    ],
+    "answer": ["A"],
+    "explanation": "解构得到的是当时属性值的普通副本，后续修改 state.a 不会回写这个变量，因此仍是 1；要保持响应性应使用 toRefs(state)。"
+  },
+  {
+    "id": "vue3-q4",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "vue3",
+    "prompt": "Vue 3 的响应式系统基于什么实现？",
+    "options": [
+      { "key": "A", "text": "Proxy 拦截对象的读写，配合依赖收集与派发更新" },
+      { "key": "B", "text": "Object.defineProperty 递归定义 getter/setter" },
+      { "key": "C", "text": "定时轮询对比对象差异" },
+      { "key": "D", "text": "MutationObserver 监听 DOM 变化" }
+    ],
+    "answer": ["A"],
+    "explanation": "Vue 3 用 Proxy 代理整个对象，能拦截属性新增、删除与数组索引赋值；Object.defineProperty 是 Vue 2 的方案，无法覆盖这些场景。"
+  },
+  {
+    "id": "vue3-q5",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "vue3",
+    "prompt": "关于 Vue 组件的 props，正确的做法是？",
+    "options": [
+      { "key": "A", "text": "props 是单向数据流，子组件不应直接修改，需通过事件通知父组件" },
+      { "key": "B", "text": "子组件可以直接给 props 赋值" },
+      { "key": "C", "text": "props 只能在模板里使用" },
+      { "key": "D", "text": "父组件可以监听子组件对 props 的修改" }
+    ],
+    "answer": ["A"],
+    "explanation": "props 只读、由父向下传递；改数据必须让子组件 $emit 事件或调用父传入的回调，形成清晰的数据流向。直接改 props 会告警并破坏可预测性。"
+  },
+  {
+    "id": "vue3-q6",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "vue3",
+    "prompt": "v-if 与 v-show 的区别是？",
+    "options": [
+      { "key": "A", "text": "v-if 会销毁/重建元素与组件，v-show 只切换 CSS display" },
+      { "key": "B", "text": "两者完全等价" },
+      { "key": "C", "text": "v-show 会销毁 DOM" },
+      { "key": "D", "text": "v-if 只能用于组件不能用于元素" }
+    ],
+    "answer": ["A"],
+    "explanation": "v-if 是真实的条件渲染，切换有销毁/重建开销但初始为假时不渲染；v-show 始终渲染、只改 display，适合频繁切换的场景。"
+  },
+  {
+    "id": "vue3-q7",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "vue3",
+    "prompt": "Vue 3 中 computed 与 watch 的区别是？",
+    "options": [
+      { "key": "A", "text": "computed 有缓存、返回派生值；watch 监听变化后执行副作用" },
+      { "key": "B", "text": "两者完全等价" },
+      { "key": "C", "text": "watch 只能监听基本类型且没有回调" },
+      { "key": "D", "text": "computed 没有返回值" }
+    ],
+    "answer": ["A"],
+    "explanation": "computed 依赖不变时不重算、返回新值，适合派生状态；watch 用于数据变化后的副作用（请求、写缓存），可配置 immediate 与 deep。"
+  },
+  {
+    "id": "vue3-q8",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "advanced",
+    "language": "vue3",
+    "prompt": "v-for 中给元素绑定 key 的作用是？",
+    "options": [
+      { "key": "A", "text": "帮助 diff 算法识别节点身份，正确复用与移动 DOM" },
+      { "key": "B", "text": "设置元素在页面上的显示顺序" },
+      { "key": "C", "text": "作为 CSS 选择器使用" },
+      { "key": "D", "text": "让元素自动获得唯一 id 属性" }
+    ],
+    "answer": ["A"],
+    "explanation": "key 是虚拟节点身份标识，列表增删排序时让 Vue 精确复用节点；用数组下标作 key 在顺序变化时会导致状态错位。"
+  },
+  {
+    "id": "vue3-q9",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "advanced",
+    "language": "vue3",
+    "prompt": "Vue 3 的 <script setup> 是什么？",
+    "options": [
+      { "key": "A", "text": "编译期语法糖：顶层绑定自动暴露给模板，减少样板代码" },
+      { "key": "B", "text": "运行时注册全局组件的方法" },
+      { "key": "C", "text": "一种替代 npm 的模块加载方式" },
+      { "key": "D", "text": "只在开发环境生效的调试指令" }
+    ],
+    "answer": ["A"],
+    "explanation": "<script setup> 在编译阶段被展开为 setup() 函数，顶层变量与导入可直接在模板使用，无需 return；编译后不存在于运行时代码中。"
+  },
+  {
+    "id": "vue3-q10",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "advanced",
+    "language": "vue3",
+    "prompt": "组合式 API 中 onMounted 回调的触发时机是？",
+    "options": [
+      { "key": "A", "text": "组件的 DOM 挂载完成后" },
+      { "key": "B", "text": "组件实例创建之前" },
+      { "key": "C", "text": "数据变化后" },
+      { "key": "D", "text": "组件卸载时" }
+    ],
+    "answer": ["A"],
+    "explanation": "onMounted 在首次挂载、DOM 已插入后调用，适合初始化第三方库与测量尺寸；挂载前是 setup 本体执行期，此时拿不到真实 DOM。"
+  },
+  {
+    "id": "vue3-q11",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "advanced",
+    "language": "vue3",
+    "prompt": "Pinia 与 Vuex 的关系是？",
+    "options": [
+      { "key": "A", "text": "Pinia 是 Vue 官方推荐的新一代状态管理，作为 Vuex 的继任方案" },
+      { "key": "B", "text": "Pinia 是 Vuex 的插件市场" },
+      { "key": "C", "text": "两者互不兼容且 Pinia 不支持 Vue 3" },
+      { "key": "D", "text": "Pinia 只能存基本类型" }
+    ],
+    "answer": ["A"],
+    "explanation": "Pinia 提供类似组合式的 API、更好的 TS 推导与 devtools 支持，是 Vue 3 的官方推荐；Vuex 已进入维护状态。"
+  },
+  {
+    "id": "vue3-q12",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "advanced",
+    "language": "vue3",
+    "prompt": "provide / inject 的主要用途是？",
+    "options": [
+      { "key": "A", "text": "跨多层组件传递依赖，避免逐层透传 props" },
+      { "key": "B", "text": "替代所有 props 与事件" },
+      { "key": "C", "text": "在组件卸载时清理定时器" },
+      { "key": "D", "text": "注册全局路由" }
+    ],
+    "answer": ["A"],
+    "explanation": "祖先 provide 一个值，任意后代 inject 取用，适合主题、i18n、表单上下文；它是隐式依赖，层级深时便于取用但不利于追踪来源。"
+  },
+  {
+    "id": "vue3-q13",
+    "direction": "前端",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "language": "vue3",
+    "prompt": "关于 Vue 3 的响应式，下列说法正确的有？",
+    "options": [
+      { "key": "A", "text": "ref 在模板中会被自动解包，直接写变量名即可" },
+      { "key": "B", "text": "reactive 对基本类型（数字、字符串）无效" },
+      { "key": "C", "text": "解构 reactive 对象会丢失响应性，应使用 toRefs" },
+      { "key": "D", "text": "把 reactive 代理对象整体替换为新对象后，响应性会自动保持" }
+    ],
+    "answer": ["A", "B", "C"],
+    "explanation": "ref 在模板中自动解包；reactive 只代理对象；解构得到的是普通值副本需 toRefs。整体替换 reactive 变量会让原代理与新对象脱钩，因此应改属性或用 ref。"
+  },
+  {
+    "id": "vue3-q14",
+    "direction": "前端",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "language": "vue3",
+    "prompt": "关于 Vue 组件通信，下列说法正确的有？",
+    "options": [
+      { "key": "A", "text": "props 用于父组件向子组件传递数据" },
+      { "key": "B", "text": "子组件通过 emit 自定义事件把变化通知父组件" },
+      { "key": "C", "text": "provide / inject 适合跨多层级共享依赖" },
+      { "key": "D", "text": "子组件直接修改 props 是官方推荐的做法" }
+    ],
+    "answer": ["A", "B", "C"],
+    "explanation": "props 下行、事件上行、provide/inject 跨层级；props 是只读的单向数据流，直接修改会告警并破坏可预测性，应改为事件或 v-model 约定。"
+  },
+  {
+    "id": "vue3-q15",
+    "direction": "前端",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "language": "vue3",
+    "prompt": "关于 Vue Router，下列说法正确的有？",
+    "options": [
+      { "key": "A", "text": "router-link 提供声明式导航，且不会整页刷新" },
+      { "key": "B", "text": "useRouter() 返回路由实例，可用于编程式导航" },
+      { "key": "C", "text": "路由守卫可用于登录鉴权与重定向" },
+      { "key": "D", "text": "每次路由切换都会触发浏览器的整页刷新" }
+    ],
+    "answer": ["A", "B", "C"],
+    "explanation": "Vue Router 基于 History API 做前端路由，切换不整页刷新；router-link 与 useRouter().push 分别是声明式与编程式导航，守卫负责拦截与鉴权。"
+  },
+  {
+    "id": "vue3-q16",
+    "direction": "前端",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "language": "vue3",
+    "prompt": "关于组合式 API 与组合式函数（composable），下列说法正确的有？",
+    "options": [
+      { "key": "A", "text": "响应式状态应在 setup 调用期间创建，才能绑定到当前组件实例" },
+      { "key": "B", "text": "组合式函数惯例以 use 开头，内部可调用其他组合式函数" },
+      { "key": "C", "text": "watchEffect 会自动收集依赖，依赖变化时重新执行" },
+      { "key": "D", "text": "ref 只能用于模板 DOM 引用，不能保存业务状态" }
+    ],
+    "answer": ["A", "B", "C"],
+    "explanation": "组合式 API 要求在 setup 期间创建响应式状态与副作用以便正确绑定生命周期；composable 以 use 命名复用逻辑；ref 既能存业务状态也能存 DOM 引用。"
+  },
+  {
+    "id": "vue3-q17",
+    "direction": "前端",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "language": "vue3",
+    "prompt": "在 Vue 3 中把 v-if 与 v-for 写在同一个元素上是推荐做法，v-if 可以直接使用 v-for 的循环变量。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": ["B"],
+    "explanation": "Vue 3 中 v-if 的优先级高于 v-for，因此 v-if 拿不到循环变量，容易报未定义；应把 v-if 移到外层 template 或用 computed 先过滤列表。"
+  },
+  {
+    "id": "vue3-q18",
+    "direction": "前端",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "language": "vue3",
+    "prompt": "Vue 3 的 reactive 对字符串、数字这类基本类型无效，保存基本类型状态应使用 ref。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": ["A"],
+    "explanation": "reactive 基于 Proxy 代理对象，基本类型没有可代理的属性读写；基本类型状态用 ref，模板中自动解包。"
+  },
+  {
+    "id": "vue3-q19",
+    "direction": "前端",
+    "kind": "judge",
+    "difficulty": "challenge",
+    "essentiality": "nice_to_know",
+    "language": "vue3",
+    "prompt": "在 Vue 3 中，给 reactive 数组按下标赋值（如 arr[0] = 1）可以触发视图更新。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": ["A"],
+    "explanation": "Vue 3 用 Proxy 能拦截数组索引赋值，因此 arr[0] = 1 会正常触发更新；Vue 2 的 defineProperty 方案则必须用 splice 或 Vue.set。"
+  },
+  {
+    "id": "vue3-q20",
+    "direction": "前端",
+    "kind": "judge",
+    "difficulty": "challenge",
+    "essentiality": "nice_to_know",
+    "language": "vue3",
+    "prompt": "Vue 3 的 computed 每次被访问时都会重新执行计算函数，不做任何缓存。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": ["B"],
+    "explanation": "computed 会缓存计算结果，只有依赖的响应式数据变化时才重新求值；这也意味着计算函数里不应写副作用，副作用应放进 watch。"
+  },
+  {
+    "id": "react-q1",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "react",
+    "prompt": "React 中 useState 返回的数组两个元素分别是？",
+    "options": [
+      { "key": "A", "text": "当前状态值与更新该状态的函数" },
+      { "key": "B", "text": "初始值与上一个值" },
+      { "key": "C", "text": "状态对象与 reducer" },
+      { "key": "D", "text": "组件实例与 DOM 引用" }
+    ],
+    "answer": ["A"],
+    "explanation": "useState(initial) 返回 [state, setState]，setState 可用新值或函数式更新（setState(prev => next)），调用后触发重新渲染。"
+  },
+  {
+    "id": "react-q2",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "react",
+    "prompt": "React 中 props 与 state 的区别是？",
+    "options": [
+      { "key": "A", "text": "props 由父组件传入且只读；state 由组件自身维护，更新会触发重新渲染" },
+      { "key": "B", "text": "两者完全等价" },
+      { "key": "C", "text": "props 可以被组件自己任意修改" },
+      { "key": "D", "text": "state 只能存字符串" }
+    ],
+    "answer": ["A"],
+    "explanation": "props 是外部输入、不可直接修改；state 是内部可变数据，通过 setState 更新并驱动渲染。数据流因此保持自上而下。"
+  },
+  {
+    "id": "react-q3",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "react",
+    "prompt": "下面这段 Effect 缺少了什么？\n```jsx\nuseEffect(() => {\n  const id = setInterval(tick, 1000)\n}, [])\n```",
+    "options": [
+      { "key": "A", "text": "缺少清理函数：应 return () => clearInterval(id)" },
+      { "key": "B", "text": "缺少依赖数组" },
+      { "key": "C", "text": "Effect 里不能调用 setInterval" },
+      { "key": "D", "text": "必须写成 useLayoutEffect" }
+    ],
+    "answer": ["A"],
+    "explanation": "Effect 不返回清理函数时定时器在卸载后继续运行，既泄漏又把状态写进已卸载组件；正确写法是返回 () => clearInterval(id)。"
+  },
+  {
+    "id": "react-q4",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "react",
+    "prompt": "受控组件与非受控组件的区别是？",
+    "options": [
+      { "key": "A", "text": "受控组件的值由 state 驱动；非受控组件由 DOM 自己保存，通过 ref 读取" },
+      { "key": "B", "text": "两者完全等价" },
+      { "key": "C", "text": "非受控组件不能用表单" },
+      { "key": "D", "text": "受控组件必须用 useReducer" }
+    ],
+    "answer": ["A"],
+    "explanation": "受控：value 绑定 state + onChange 写回，数据流单向可预测、便于校验；非受控：用 defaultValue 与 ref 取值，代码少但状态分散在 DOM 里。"
+  },
+  {
+    "id": "react-q5",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "react",
+    "prompt": "下面组件中，点击后 console.log 打印的是什么？\n```jsx\nfunction Counter() {\n  const [count, setCount] = useState(0)\n  const handle = () => {\n    setCount(count + 1)\n    console.log(count)\n  }\n  return <button onClick={handle}>{count}</button>\n}\n```",
+    "options": [
+      { "key": "A", "text": "更新前的旧值，因为状态更新是批处理且异步生效" },
+      { "key": "B", "text": "一定是 1" },
+      { "key": "C", "text": "抛出异常" },
+      { "key": "D", "text": "undefined" }
+    ],
+    "answer": ["A"],
+    "explanation": "setState 不会同步修改当前渲染闭包里的 count，本次执行仍读到旧值，新值在下次渲染生效；需要基于新值计算时用函数式更新或在 Effect 里读取。"
+  },
+  {
+    "id": "react-q6",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "react",
+    "prompt": "useContext 的作用是？",
+    "options": [
+      { "key": "A", "text": "读取最近的 Provider 提供的上下文值，避免逐层传 props" },
+      { "key": "B", "text": "创建一个新的全局变量" },
+      { "key": "C", "text": "替代所有 useState" },
+      { "key": "D", "text": "订阅浏览器事件" }
+    ],
+    "answer": ["A"],
+    "explanation": "createContext 定义上下文，Provider 提供值，useContext(Context) 在任意后代读取最近 Provider 的值；值变化时消费该上下文的组件会重渲染。"
+  },
+  {
+    "id": "react-q7",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "advanced",
+    "language": "react",
+    "prompt": "使用 dangerouslySetInnerHTML 的主要风险是？",
+    "options": [
+      { "key": "A", "text": "把不可信 HTML 直接插入页面可能造成 XSS" },
+      { "key": "B", "text": "会导致组件无法重新渲染" },
+      { "key": "C", "text": "会清空父组件的 state" },
+      { "key": "D", "text": "没有任何风险" }
+    ],
+    "answer": ["A"],
+    "explanation": "它会绕过 React 的文本转义，直接写入 innerHTML；插入用户内容前必须做 HTML 净化（如 DOMPurify），否则脚本会被执行。"
+  },
+  {
+    "id": "react-q8",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "advanced",
+    "language": "react",
+    "prompt": "useRef() 返回值的特点是？",
+    "options": [
+      { "key": "A", "text": "一个带 current 属性的稳定对象，修改它不会触发重新渲染" },
+      { "key": "B", "text": "一个每次渲染都重建的新对象" },
+      { "key": "C", "text": "一个只读的字符串" },
+      { "key": "D", "text": "一个会自动同步到 state 的对象" }
+    ],
+    "answer": ["A"],
+    "explanation": "useRef 在组件整个生命周期返回同一个 { current } 对象，适合保存定时器 id、DOM 引用等不需要参与渲染的数据；改 current 不触发渲染。"
+  },
+  {
+    "id": "react-q9",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "advanced",
+    "language": "react",
+    "prompt": "函数组件中 props.children 表示什么？",
+    "options": [
+      { "key": "A", "text": "父组件在标签之间传入的内容" },
+      { "key": "B", "text": "当前组件的所有 state" },
+      { "key": "C", "text": "组件的 DOM 节点引用" },
+      { "key": "D", "text": "React 的全局配置" }
+    ],
+    "answer": ["A"],
+    "explanation": "children 是组合式的核心：<Card>内容</Card> 中的内容会作为 props.children 传进来，可用于布局容器与插槽式复用。"
+  },
+  {
+    "id": "react-q10",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "advanced",
+    "language": "react",
+    "prompt": "React Fragment（<>...</>）的作用是？",
+    "options": [
+      { "key": "A", "text": "把多个子元素分组返回，但不额外生成 DOM 节点" },
+      { "key": "B", "text": "生成一个 div 容器" },
+      { "key": "C", "text": "创建一个新的 context" },
+      { "key": "D", "text": "把组件变成纯组件" }
+    ],
+    "answer": ["A"],
+    "explanation": "组件必须返回单个根节点，Fragment 允许并列返回多个元素且不插入真实 DOM，避免无意义的 div 影响布局与 CSS 选择器。"
+  },
+  {
+    "id": "react-q11",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "advanced",
+    "language": "react",
+    "prompt": "React 事件处理（如 onClick）底层使用的机制是？",
+    "options": [
+      { "key": "A", "text": "合成事件：在根容器统一委托，屏蔽浏览器差异" },
+      { "key": "B", "text": "给每个元素单独绑定原生 addEventListener 且不做任何处理" },
+      { "key": "C", "text": "通过轮询监听 DOM 变化触发" },
+      { "key": "D", "text": "使用 Web Worker 分发事件" }
+    ],
+    "answer": ["A"],
+    "explanation": "React 用事件委托在根节点统一监听，构造 SyntheticEvent 抹平浏览器差异（React 17 起挂载在根容器而不是 document）。"
+  },
+  {
+    "id": "react-q12",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "advanced",
+    "language": "react",
+    "prompt": "JSX 中条件渲染的常见写法不包括？",
+    "options": [
+      { "key": "A", "text": "三元表达式与 && 短路" },
+      { "key": "B", "text": "提前 return 不同的 JSX" },
+      { "key": "C", "text": "用变量保存算好的 JSX 片段" },
+      { "key": "D", "text": "在 JSX 中写 if 语句块" }
+    ],
+    "answer": ["D"],
+    "explanation": "JSX 花括号里只能是表达式，不能写 if 语句；条件渲染用三元、&&、提前 return，或把 if 写在 return 之前再渲染对应结果。"
+  },
+  {
+    "id": "react-q13",
+    "direction": "前端",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "language": "react",
+    "prompt": "关于 React Hooks 的使用规则，下列说法正确的有？",
+    "options": [
+      { "key": "A", "text": "只能在函数组件或自定义 Hook 的顶层调用" },
+      { "key": "B", "text": "不能在条件、循环或嵌套函数中调用，否则顺序会错乱" },
+      { "key": "C", "text": "自定义 Hook 必须以 use 开头，便于 lint 规则识别" },
+      { "key": "D", "text": "class 组件内部也可以直接调用 useState" }
+    ],
+    "answer": ["A", "B", "C"],
+    "explanation": "Hooks 依赖调用顺序与 fiber 上的链表一一对应，条件与循环中的调用会让顺序错位；命名以 use 开头才能被规则检查。class 组件不能用 Hooks。"
+  },
+  {
+    "id": "react-q14",
+    "direction": "前端",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "language": "react",
+    "prompt": "关于 React 的渲染与性能，下列说法正确的有？",
+    "options": [
+      { "key": "A", "text": "setState 会触发重新渲染，但 React 会对比新旧元素并只更新有变化的 DOM" },
+      { "key": "B", "text": "useMemo 可缓存昂贵计算结果，依赖不变时直接复用" },
+      { "key": "C", "text": "虚拟 DOM diff 的作用是减少直接操作真实 DOM 的次数" },
+      { "key": "D", "text": "在渲染函数体里直接发请求是推荐的数据获取方式" }
+    ],
+    "answer": ["A", "B", "C"],
+    "explanation": "React 通过协调与 diff 最小化真实 DOM 操作，useMemo 缓存计算结果；渲染函数应是纯函数，发请求要放进 Effect 或事件里，否则每次渲染都会重复发起。"
+  },
+  {
+    "id": "react-q15",
+    "direction": "前端",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "language": "react",
+    "prompt": "关于 useEffect，下列说法正确的有？",
+    "options": [
+      { "key": "A", "text": "它在渲染提交、DOM 更新之后执行" },
+      { "key": "B", "text": "依赖数组为空时只在挂载后执行一次" },
+      { "key": "C", "text": "返回的函数会在下次效应执行前或组件卸载时调用，用于清理" },
+      { "key": "D", "text": "依赖数组写不写、写全写漏，对行为没有影响" }
+    ],
+    "answer": ["A", "B", "C"],
+    "explanation": "Effect 在提交阶段之后执行，空数组等价挂载一次，返回函数是清理钩子；依赖数组决定何时重跑，漏写会导致读到旧闭包值等隐蔽 bug。"
+  },
+  {
+    "id": "react-q16",
+    "direction": "前端",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "language": "react",
+    "prompt": "关于 React 状态设计，下列说法正确的有？",
+    "options": [
+      { "key": "A", "text": "状态应尽量提升到需要它的组件的最近公共父级" },
+      { "key": "B", "text": "更新对象或数组状态时应返回新对象，而不是直接修改原对象" },
+      { "key": "C", "text": "多个相互关联的状态可以用 useReducer 合并管理" },
+      { "key": "D", "text": "把组件 state 直接赋给模块级变量长期保存是推荐做法" }
+    ],
+    "answer": ["A", "B", "C"],
+    "explanation": "状态提升保证单一数据源，不可变更新让浅比较生效，useReducer 适合复杂联动；模块级变量会跨组件实例共享且不参与渲染，容易造成脏数据。"
+  },
+  {
+    "id": "react-q17",
+    "direction": "前端",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "language": "react",
+    "prompt": "在 React 中直接修改 state 对象（例如 state.count++）也能可靠触发界面更新。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": ["B"],
+    "explanation": "React 通过引用是否变化判断更新，直接修改同一对象不会触发渲染，还可能被浅比较忽略；必须用 setState 传新对象（展开运算符或不可变更新库）。"
+  },
+  {
+    "id": "react-q18",
+    "direction": "前端",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "language": "react",
+    "prompt": "父组件重新渲染时，其子组件默认也会重新渲染，除非子组件用 React.memo 等手段做了优化。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": ["A"],
+    "explanation": "默认行为是父渲染带动子渲染；React.memo 对 props 做浅比较可跳过，配合 useCallback/useMemo 保持引用稳定才真正有效。"
+  },
+  {
+    "id": "react-q19",
+    "direction": "前端",
+    "kind": "judge",
+    "difficulty": "challenge",
+    "essentiality": "nice_to_know",
+    "language": "react",
+    "prompt": "useEffect 的依赖数组若遗漏了 Effect 内使用的某个变量，可能导致回调一直读到旧的闭包值（stale closure）。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": ["A"],
+    "explanation": "Effect 捕获的是创建时那次渲染的变量快照，依赖漏写就不会重新创建，从而读到过期值；应写全依赖或用函数式更新规避。"
+  },
+  {
+    "id": "react-q20",
+    "direction": "前端",
+    "kind": "judge",
+    "difficulty": "challenge",
+    "essentiality": "nice_to_know",
+    "language": "react",
+    "prompt": "React 18 在同一个事件处理函数中多次调用 setState 会自动批处理，只触发一次重新渲染。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": ["A"],
+    "explanation": "React 18 的自动批处理覆盖事件处理、Promise、setTimeout 等场景，多次更新合并为一次渲染；需要立即读取 DOM 时用 flushSync 显式同步刷新。"
   }
 ]

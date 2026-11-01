@@ -12,7 +12,17 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from .config import get_settings
 from .db import init_db
 from .errors import HTTP_ERROR, NOT_FOUND, VALIDATION_ERROR, AppError
-from .routers import courses, exam, history, interview, profile, report, resume, timeline
+from .routers import (
+    courses,
+    exam,
+    history,
+    interview,
+    practice,
+    profile,
+    report,
+    resume,
+    timeline,
+)
 from .schemas import HealthResponse
 from .services import question_bank
 
@@ -22,7 +32,8 @@ APP_VERSION = "0.1.0"
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     init_db()
-    # 启动即补种子（数据不是 DDL，故不进 db.py）：空库补 80 行、重复启动 0 新增（AC-1）。
+    # 启动即补种子（数据不是 DDL，故不进 db.py）：r11 起**每次都跑**幂等导入 + 只补空列——
+    # `ON CONFLICT DO NOTHING` 保证重复启动 0 新增，存量库（r10 卷）也能拿到新增题与解析。
     question_bank.ensure_seeded()
     yield
 
@@ -81,6 +92,9 @@ def create_app() -> FastAPI:
     app.include_router(profile.router)
     app.include_router(interview.router)
     app.include_router(exam.router)
+    # r11：练习四端点（/api/practice/paper|answer|stats|wrong-book）纯本地、零 AI，
+    # 与笔试共用 `exam.grade_objective()` 与同一张 `question_attempts`。
+    app.include_router(practice.router)
     app.include_router(report.router)
     app.include_router(courses.router)
     app.include_router(history.router)

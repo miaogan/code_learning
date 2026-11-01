@@ -1,16 +1,19 @@
-"""题库导入与读库（r6 · TECHNICAL §2.3）：可用性校验、幂等导入、空库自动种子的唯一出处。
+"""题库导入与读库（r6 · TECHNICAL §2.3；r11 改启动口径）：可用性校验、幂等导入、空库种子的唯一出处。
 
 运行时由 `questions` 表承载题库（DDL 只在 `db.py`，SQL 只在 `repository.py`），
 `app/seed/questions.json` 退为**唯一导入源**：数据与代码分离，题库仍可读文件审阅。
 
-三条写死的口径：
+四条写死的口径：
 - `_usable()` 只有这一份（`exam.py` 不再定义同名副本）：缺 id / kind / prompt、客观题无答案
   或无选项的条目一律不入库、也不出卷。`tests/test_engineering_gates.py::
   test_single_usable_and_structure_gate` 反向钉住「只此一份」。
 - 导入幂等由 `repository.insert_question()` 的 `ON CONFLICT(id) DO NOTHING` 兑现：重复导入
   既不新增也不覆盖既有行（标签回填只在首次导入那一刻生效，AC-1）。
-- **空库自动种子**是既有用例零回归的关键：`tests/conftest.py` 的 `tmp_db` 只 `init_db()`，
-  `load_questions()` 发现库空就 `import_seed()` 再重读，行为等价于 r5 的「现读 JSON」。
+- **r11 起每次启动都导入**（`ensure_seeded()`）：旧实现「仅空库导入」会让存量 `app.db`
+  （含 r10 的 `skillcoach-data` 卷）永远拿不到新增的 180 题。幂等由主键 + `DO NOTHING` 保证，
+  重复启动恒 0 新增 —— 这仍满足 r6 AC-1「重复导入不新增、既有行不被覆盖」。
+- **只补空列**：`ON CONFLICT DO NOTHING` 不会给存量行补 `language` / `explanation`，因此
+  `sync_new_columns()` 把这些列「只填空、不覆盖」地补上（SQL 在 `repository`）。
 """
 
 from __future__ import annotations
@@ -77,7 +80,11 @@ def load_seed(path: Path = SEED_PATH) -> list[dict[str, Any]]:
 
 
 def _row_of(question: dict[str, Any]) -> dict[str, Any]:
-    """种子条目 → `repository.insert_question()` 入参：补默认难度 / 必备度，题干原样不加工。"""
+    """种子条目 → `repository.insert_question()` 入参：补默认难度 / 必备度，题干原样不加工。
+
+    r11 起 `language` / `explanation` 随行写入：`language` 缺省空串（`""` 是「通用/算法题」的
+    合法闭集成员，不是「未填」），`explanation` 缺省空串（由 `sync_new_columns` 兜底补空列）。
+    """
     difficulty = str(question.get("difficulty") or "")
     return {
         "id": str(question["id"]).strip(),
@@ -89,6 +96,8 @@ def _row_of(question: dict[str, Any]) -> dict[str, Any]:
         "options": question.get("options") or [],
         "answer": question.get("answer") or [],
         "source": str(question.get("source") or "seed"),
+        "language": str(question.get("language") or ""),
+        "explanation": str(question.get("explanation") or ""),
     }
 
 
@@ -101,10 +110,24 @@ def import_seed(path: Path = SEED_PATH) -> int:
     return inserted
 
 
+def sync_new_columns(path: Path = SEED_PATH) -> int:
+    """把种子的 `language` / `explanation` 补到库内**空单元格**上，返回被补齐的行数。
+
+    幂等真值：第二次调用返回 `0`（列已非空）；题面 / 选项 / 答案 / 难度 / 必备度一律不碰
+    （r6 AC-1「既有行不被覆盖」不回退）。SQL 只在 `repository.fill_empty_question_columns`。
+    """
+    return repository.fill_empty_question_columns(load_seed(path))
+
+
 def ensure_seeded() -> int:
-    """空库才导入种子（生产首启即 80 行，重复启动 0 新增）；返回表内总行数。"""
-    if repository.count_questions() == 0:
-        import_seed()
+    """启动即幂等导入 + 补空列（r11 改口径），返回表内总行数。
+
+    旧实现「仅在空库导入」会让存量库永远拿不到新增题；现在每次都跑：
+    `import_seed()` 靠 `ON CONFLICT(id) DO NOTHING` 保证重复启动 0 新增，
+    `sync_new_columns()` 只给存量行补空的 `language` / `explanation`。
+    """
+    import_seed()
+    sync_new_columns()
     return repository.count_questions()
 
 
@@ -119,6 +142,26 @@ def load_questions() -> list[dict[str, Any]]:
         ensure_seeded()
         rows = repository.list_questions()
     return [row for row in rows if _usable(row)]
+
+
+def practice_pool() -> list[dict[str, Any]]:
+    """练习池的唯一出口：可用题里**仅客观题**（`rules.is_objective_kind`，r11 含判断题）。
+
+    练习只判客观题，简答题（`text`）没有唯一答案、不进入练习池；与笔试的差别只在
+    `rules.EXAM_EXCLUDED_KINDS`（那只是笔试侧降级开关，练习侧不看它）。
+    """
+    return [row for row in load_questions() if rules.is_objective_kind(str(row.get("kind") or ""))]
+
+
+def find_question(question_id: str) -> dict[str, Any] | None:
+    """按 id 取一道**可用**题（练习提交判分用）；不存在或不可用返回 `None`（由调用方映射 404）。"""
+    target = str(question_id or "").strip()
+    if not target:
+        return None
+    for row in load_questions():
+        if str(row.get("id") or "") == target:
+            return row
+    return None
 
 
 def sync_labels(path: Path = SEED_PATH) -> int:

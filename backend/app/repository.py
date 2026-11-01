@@ -317,14 +317,29 @@ def _json_list(value: Any) -> list[Any]:
 
 _QUESTION_INSERT = (
     "INSERT INTO questions (id, direction, kind, difficulty, essentiality, prompt, "
-    "options, answer, source, created_at, updated_at) "
-    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+    "options, answer, source, language, explanation, created_at, updated_at) "
+    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
     "ON CONFLICT(id) DO NOTHING"
 )
 
 _QUESTION_SELECT = (
-    "SELECT id, direction, kind, difficulty, essentiality, prompt, options, answer, source "
+    "SELECT id, direction, kind, difficulty, essentiality, prompt, options, answer, source, "
+    "language, explanation "
     "FROM questions"
+)
+
+#: 存量行「只补空列」的定向 UPDATE（AC-16 / TECHNICAL §2.3）：
+#: - `SET` 侧两个 `CASE WHEN col = '' AND ? <> ''` 保证**非空值永不被改写**；
+#: - `WHERE` 侧同样要求「该列为空**且**种子给了非空值」，否则 SQLite 会按「匹配到的行」
+#:   计 rowcount —— 语言 `''`（通用/算法题）是合法值，缺了这层守卫第二次运行仍会返回 >0，
+#:   「幂等（第二次 0 变更）」就不成立。
+_QUESTION_FILL = (
+    "UPDATE questions SET "
+    "language = CASE WHEN language = '' AND ? <> '' THEN ? ELSE language END, "
+    "explanation = CASE WHEN explanation = '' AND ? <> '' THEN ? ELSE explanation END, "
+    "updated_at = ? "
+    "WHERE id = ? "
+    "AND ((language = '' AND ? <> '') OR (explanation = '' AND ? <> ''))"
 )
 
 
@@ -332,7 +347,8 @@ def insert_question(question: dict[str, Any]) -> bool:
     """幂等导入单题：新增 `True`，同 `id` 已存在 `False`（**绝不覆盖**既有行，AC-1）。
 
     幂等的最终真值是 `questions.id` 主键 + `ON CONFLICT(id) DO NOTHING`：重复导入既不新增
-    也不改写，标签回填只在首次导入那一刻生效。
+    也不改写，标签回填只在首次导入那一刻生效。r11 起 `language` / `explanation` 随行写入，
+    缺省空串（`language=''` 表示通用/算法题，是闭集里的合法成员而非"未填"）。
     """
     now = _now()
     with connection() as conn:
@@ -348,6 +364,8 @@ def insert_question(question: dict[str, Any]) -> bool:
                 _json_text(question.get("options")),
                 _json_text(question.get("answer")),
                 question.get("source") or "seed",
+                str(question.get("language") or ""),
+                str(question.get("explanation") or ""),
                 now,
                 now,
             ),
@@ -367,7 +385,36 @@ def _question_of(row: sqlite3.Row) -> dict[str, Any]:
         "options": _json_list(row["options"]),
         "answer": _json_list(row["answer"]),
         "source": row["source"],
+        "language": str(row["language"] or ""),
+        "explanation": str(row["explanation"] or ""),
     }
+
+
+def fill_empty_question_columns(rows: list[dict[str, Any]]) -> int:
+    """把种子的 `language` / `explanation` 补到**空单元格**上，返回实际补齐的行数。
+
+    `ON CONFLICT DO NOTHING` 只保证「不新增、不覆盖」，不补列 —— 存量 80 题若不补，
+    筛选与解析会全空。这里题面 / 选项 / 答案 / 难度 / 必备度一律不碰（r6 AC-1 不回退）；
+    种子给空串的字段跳过（`language=''` 是通用题的合法取值）。
+    幂等真值：补齐后该列不再为空，第二次调用返回 0。
+    """
+    if not rows:
+        return 0
+    now = _now()
+    filled = 0
+    with connection() as conn:
+        for row in rows:
+            question_id = row.get("id")
+            language = str(row.get("language") or "")
+            explanation = str(row.get("explanation") or "")
+            if not question_id or not (language or explanation):
+                continue
+            cursor = conn.execute(
+                _QUESTION_FILL,
+                (language, language, explanation, explanation, now, question_id, language, explanation),
+            )
+            filled += max(cursor.rowcount, 0)
+    return filled
 
 
 def list_questions() -> list[dict[str, Any]]:
@@ -385,8 +432,8 @@ def count_questions() -> int:
 
 
 _ATTEMPT_INSERT = (
-    "INSERT INTO question_attempts (id, question_id, run_id, correct, answered_at, created_at) "
-    "VALUES (?, ?, ?, ?, ?, ?) "
+    "INSERT INTO question_attempts (id, question_id, run_id, correct, answered_at, created_at, source) "
+    "VALUES (?, ?, ?, ?, ?, ?, ?) "
     "ON CONFLICT(question_id, run_id) DO NOTHING"
 )
 
@@ -396,6 +443,7 @@ def insert_attempts(rows: list[dict[str, Any]]) -> int:
 
     幂等真值同样是 `db.py` 的 `UNIQUE(question_id, run_id)`：同卷同题重复提交不会写出
     第二条、也不抛异常；空列表直接返回 0（不打扰库）。
+    r11 起每行可带 `source`（'exam' | 'practice'），缺省 `'exam'` —— 读侧一律以列为准。
     """
     if not rows:
         return 0
@@ -411,6 +459,7 @@ def insert_attempts(rows: list[dict[str, Any]]) -> int:
                     int(row.get("correct") or 0),
                     row["answered_at"],
                     row.get("created_at") or row["answered_at"],
+                    str(row.get("source") or "exam"),
                 ),
             )
             written += max(cursor.rowcount, 0)
@@ -421,7 +470,7 @@ def list_attempts() -> list[dict[str, Any]]:
     """全表作答事件，按 `answered_at` 升序（窗口聚合在服务层；同刻用 `created_at`、`id` 定序）。"""
     with connection() as conn:
         rows = conn.execute(
-            "SELECT id, question_id, run_id, correct, answered_at, created_at "
+            "SELECT id, question_id, run_id, correct, answered_at, created_at, source "
             "FROM question_attempts ORDER BY answered_at ASC, created_at ASC, id ASC"
         ).fetchall()
     return [
@@ -432,9 +481,23 @@ def list_attempts() -> list[dict[str, Any]]:
             "correct": int(row["correct"]),
             "answered_at": row["answered_at"],
             "created_at": row["created_at"],
+            "source": str(row["source"] or "exam"),
         }
         for row in rows
     ]
+
+
+def count_practiced_questions() -> int:
+    """有**任何**作答事件的题数（`COUNT(DISTINCT question_id)`，练习 + 笔试都算）。
+
+    `PracticeStats.practiced` 的唯一读取口径（TECHNICAL §5.4 / AC-18 的 m 值）：
+    去重按题而非按事件，「同题重练」不会虚增；空库返回 0。
+    """
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT COUNT(DISTINCT question_id) AS total FROM question_attempts"
+        ).fetchone()
+    return 0 if row is None else int(row["total"])
 
 
 def list_recent_exam_question_ids(limit: int) -> list[set[str]]:

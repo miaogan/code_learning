@@ -11,8 +11,10 @@ docstring 互相点名，`tests/test_engineering_gates.py` 反向钉住。
 字段差异适配（既有 schemas 决定的差异，下游请用下面几个帮助函数，别自己猜字段）：
 - 面试题挑战判定 = `InterviewQuestion.kind == "challenge"` → `is_challenge_kind()`
 - 笔试题挑战判定 = 题库条目的 `difficulty == "challenge"`（不进响应）→ `is_challenge_difficulty()`
-- 笔试客观题判定 = 题库条目的 `kind ∈ {"single","multiple"}` → `is_objective_kind()`
+- 笔试客观题判定 = 题库条目的 `kind ∈ OBJECTIVE_KINDS`（r11 起含 `judge`）→ `is_objective_kind()`
+- 组卷侧客观题判定 = 客观题闭集 − `EXAM_EXCLUDED_KINDS`（降级开关）→ `is_exam_objective_kind()`
 - 笔试必备度读取 = 题库条目的 `essentiality`（脏值兜底）→ `essentiality_of()`
+- 题干语言闭集 / 语言→方向归属 = `LANGUAGES` / `LANGUAGE_DIRECTION` → `direction_of_language()`
 """
 
 import math
@@ -62,7 +64,13 @@ ESSENTIALITIES: tuple[str, ...] = ("must_know", "advanced", "nice_to_know")
 #: 组卷兜底阶梯：L1 最优 → L6 全库兜底，**顺序即优先级**，任何一层都不得因过滤而返回 400。
 PAPER_STAGES: tuple[str, ...] = ("L1", "L2", "L3", "L4", "L5", "L6")
 #: 客观题闭集（`ExamKind` 里 `text` 是简答题）：只有它们判分并写熟练度事件。
-OBJECTIVE_KINDS: tuple[str, ...] = ("single", "multiple")
+#: r11 扩 `judge`（判断题与单选框同形：`options` 恰 2、`answer` 恰 1，判分仍走
+#: `exam.grade_objective()` 的集合相等）—— 全站**不得**再出现第二份客观题闭集。
+OBJECTIVE_KINDS: tuple[str, ...] = ("single", "multiple", "judge")
+#: 组卷侧排除的 kind（降级开关，默认空 = 判断题进笔试卷面）。
+#: 若实施发现 `ExamPage` 必须改 kind 分支，只需把这里置 `("judge",)` —— 数据级一行，
+#: 不改判分、不改页面、不写第二套逻辑；练习池不受它影响（练习只认 `is_objective_kind`）。
+EXAM_EXCLUDED_KINDS: tuple[str, ...] = ()
 #: 可出卷 kind 闭集：直接取 API 契约 `schemas.ExamKind` 的取值，不另立字面量。
 QUESTION_KINDS: tuple[str, ...] = tuple(get_args(ExamKind))
 #: 简答题 kind（不计分、不写熟练度事件）：闭集里不属于客观题的那一档。
@@ -70,6 +78,42 @@ QUESTION_KINDS: tuple[str, ...] = tuple(get_args(ExamKind))
 TEXT_KIND: str = next(kind for kind in QUESTION_KINDS if kind not in OBJECTIVE_KINDS)
 #: 必备度最高档（`ESSENTIALITIES` 首档）：组卷 L2 只回这一档，L3 才放开其余档。
 MUST_KNOW: str = ESSENTIALITIES[0]
+
+# --- 题库语言维度与练习闭集（r11）------------------------------------------
+# 闭集只此一份：`backend/app/schemas.py` 的 `QuestionLanguage` / `Practice*` Literal 与
+# `frontend/src/api/types.ts` 的同名联合类型逐字对齐，双向钉在 `tests/test_r11_contract.py`。
+#: 题干语言闭集。**`""` 是闭集成员**（通用 / 算法题，不属于任何具体语言），
+#: 与筛选里的「全部」（`FILTER_ANY`）是**两条不同语义**：别处不得用 `""` 表示「全部」。
+LANGUAGES: tuple[str, ...] = (
+    "",
+    "python",
+    "java",
+    "go",
+    "html",
+    "css",
+    "js",
+    "ts",
+    "vue3",
+    "react",
+)
+#: 前端方向的六种语言。
+FRONTEND_LANGUAGES: tuple[str, ...] = ("html", "css", "js", "ts", "vue3", "react")
+#: 后端方向的三种语言。
+BACKEND_LANGUAGES: tuple[str, ...] = ("python", "java", "go")
+#: 语言 → 方向归属（只由上面两份语言元组派生，别处不得再写一份映射）。
+#: 空串 / 未收录语言**不在映射里**：通用题不归属任何方向（`direction_of_language` → `None`）。
+LANGUAGE_DIRECTION: dict[str, str] = {
+    **{lang: "前端" for lang in FRONTEND_LANGUAGES},
+    **{lang: "后端" for lang in BACKEND_LANGUAGES},
+}
+#: 筛选「全部」的唯一字面量。`language` 的「全部」也用它（`""` 已被通用题占用）。
+FILTER_ANY: str = "all"
+#: 练习范围闭集：全部 / 未做过 / 最近一次答错。
+PRACTICE_SCOPES: tuple[str, ...] = ("all", "unseen", "wrong")
+#: 练习题量闭集（`0` = 全部命中）。
+PRACTICE_LIMITS: tuple[int, ...] = (10, 20, 0)
+#: 练习默认题量（与 `PracticePaperRequest.limit` 的默认值同一口径）。
+DEFAULT_PRACTICE_LIMIT: int = 10
 
 # --- 报告 ----------------------------------------------------------------
 MIN_SHORTFALLS = 3
@@ -92,8 +136,36 @@ def is_challenge_kind(kind: str) -> bool:
 
 
 def is_objective_kind(kind: str) -> bool:
-    """笔试客观题判定（闭集 `OBJECTIVE_KINDS`）：`text` 简答题不判分、不写熟练度事件。"""
+    """笔试客观题判定（闭集 `OBJECTIVE_KINDS`，r11 起含 `judge`）：`text` 不判分、不写熟练度事件。"""
     return kind in OBJECTIVE_KINDS
+
+
+def is_exam_objective_kind(kind: str) -> bool:
+    """组卷侧客观题口径 = 客观题闭集 − `EXAM_EXCLUDED_KINDS`（默认空，等价 `is_objective_kind`）。
+
+    组卷侧（`exam_selector`）用它、练习侧用 `is_objective_kind`：降级时只把判断题挪出**笔试**
+    卷面，练习照旧能练 —— 两个口径共享同一份闭集，不各自写一份。
+    """
+    return is_objective_kind(kind) and kind not in EXAM_EXCLUDED_KINDS
+
+
+def languages_for_direction(direction: str) -> tuple[str, ...]:
+    """方向 → 该方向下的语言元组（`FILTER_ANY` 或未知方向 → `LANGUAGES`，即不筛）。"""
+    if direction == FILTER_ANY:
+        return LANGUAGES
+    return tuple(lang for lang in LANGUAGES if LANGUAGE_DIRECTION.get(lang) == direction)
+
+
+def direction_of_language(language: str) -> str | None:
+    """语言 → 方向归属（`""` 通用题 / 未收录语言 → `None`：通用题不归属任何方向）。"""
+    return LANGUAGE_DIRECTION.get(language)
+
+
+def is_language_allowed(language: str, direction: str) -> bool:
+    """语言与方向是否自洽：`""` 通用题恒放行，`FILTER_ANY` 方向不筛，其余按归属严格比对。"""
+    if not language or direction == FILTER_ANY:
+        return True
+    return direction_of_language(language) == direction
 
 
 def is_challenge_difficulty(difficulty: str) -> bool:

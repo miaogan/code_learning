@@ -14,14 +14,17 @@ from __future__ import annotations
 import ast
 import inspect
 import json
+import random
 import re
 import subprocess
 from pathlib import Path
 from typing import get_args
 
-from app.schemas import ExamKind
+from app.schemas import ExamKind, Profile
 from app.services.ai import AIClient
+from app.services import exam_selector
 from app.services import interview as interview_service
+from app.services import question_bank
 from app.services import rules
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -819,6 +822,398 @@ def test_r9_env_example_lists_provider_keys() -> None:
         f"lmstudio 档默认超时 {config_timeout}s 低于实测下限 300s"
         "（qwen3.5-9b 单次画像实测 201.25s，旧默认 180s 必 503）"
     )
+
+
+# ---------------------------------------------------------------------------
+# r11 · 在线练习题库与练习页（TECHNICAL §2.5「单一出处」/ §4.3「单一判分」/ §4.4 降级开关）
+#
+# 五个门禁的共同理由：r11 新增的每一条口径（语言闭集、语言→方向归属、练习
+# scope/limit、客观题判分）都**跨侧、跨模块**被消费，且两侧无共享代码。少一处静态
+# 断言，下一轮就会有人就地写第二种实现（第二份判分 / 第二份语言表），而且不会报错。
+# ---------------------------------------------------------------------------
+
+#: r11 改动面（仓库根相对）。蓝图 34 模块里的**产品文件**，逐条必须可解析。
+R11_TOUCHED = (
+    "backend/app/services/rules.py",
+    "backend/app/schemas.py",
+    "backend/app/db.py",
+    "backend/app/repository.py",
+    "backend/app/services/question_backfill.py",
+    "backend/app/services/question_bank.py",
+    "backend/app/services/practice.py",
+    "backend/app/routers/practice.py",
+    "backend/app/main.py",
+    "backend/app/seed/questions.json",
+    "frontend/src/api/types.ts",
+    "frontend/src/api/client.ts",
+    "frontend/src/pages/PracticePage.tsx",
+    "frontend/src/components/practice/PracticeFilters.tsx",
+    "frontend/src/components/practice/PracticeProgress.tsx",
+    "frontend/src/components/practice/Explanation.tsx",
+    "frontend/src/components/practice/PracticeSummary.tsx",
+    "frontend/src/components/practice/WrongBookList.tsx",
+    "frontend/src/lib/practice.ts",
+    "frontend/src/lib/promptCode.ts",
+    "frontend/src/components/exam/ExamQuestionCard.tsx",
+    "frontend/src/components/polish/SegTabs.tsx",
+    "frontend/src/App.tsx",
+    "frontend/src/styles/tokens.css",
+    "frontend/src/styles/base.css",
+    "backend/tests/test_r11_data_layer.py",
+    "backend/tests/test_r11_contract.py",
+    "backend/tests/test_question_backfill.py",
+    "backend/tests/test_question_bank_quality.py",
+    "backend/tests/test_r11_practice_service.py",
+    "backend/tests/test_r11_practice_api.py",
+    "frontend/src/test/practice.test.ts",
+    "frontend/src/test/promptCode.test.ts",
+    "backend/tests/test_engineering_gates.py",
+)
+
+#: r11 闭集的期望值（TECHNICAL §2.6 逐字）。门禁是**唯一断言点**，故此处允许字面量。
+R11_LANGUAGES = ("", "python", "java", "go", "html", "css", "js", "ts", "vue3", "react")
+R11_FRONTEND_LANGUAGES = ("html", "css", "js", "ts", "vue3", "react")
+R11_BACKEND_LANGUAGES = ("python", "java", "go")
+R11_PRACTICE_SCOPES = ("all", "unseen", "wrong")
+R11_PRACTICE_LIMITS = (10, 20, 0)
+
+#: 第二套判分比较的**历史白名单**：exam.py 是唯一判分实现，proficiency.py 只累计次数。
+SET_COMPARE_ALLOWED = {"exam.py", "proficiency.py"}
+
+
+def _int_literal_values(tree: ast.Module, name: str) -> set[int]:
+    """取 `name = Literal[10, 20, 0]` 的**整型**取值集合（`_literal_values` 只管字符串）。"""
+    for node in ast.walk(tree):
+        targets: list[ast.expr] = []
+        value: ast.expr | None = None
+        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+            targets, value = [node.target], node.value
+        elif isinstance(node, ast.Assign) and node.value is not None:
+            targets, value = list(node.targets), node.value
+        if not any(isinstance(t, ast.Name) and t.id == name for t in targets) or value is None:
+            continue
+        if isinstance(value, ast.Subscript):  # Literal[...]
+            value = value.slice
+        elements = getattr(value, "elts", None)
+        if elements is None:
+            continue
+        return {elt.value for elt in elements if isinstance(elt, ast.Constant) and isinstance(elt.value, int)}
+    return set()
+
+
+def _ts_union_terms(source: str, name: str) -> str:
+    """`export type Name = ...` 的右值整段文本（含以 `|` 开头的续行成员）。"""
+    lines = source.split("\n")
+    for index, line in enumerate(lines):
+        match = re.match(rf"export type {name}\s*=\s*(.*)$", line)
+        if match is None:
+            continue
+        terms = match.group(1)
+        cursor = index + 1
+        while cursor < len(lines) and re.match(r"^\s*\|", lines[cursor]):
+            terms += " " + lines[cursor].strip()
+            cursor += 1
+        return terms
+    return ""
+
+
+def _ts_string_union(source: str, name: str) -> set[str]:
+    """`types.ts` 里字符串字面量并集的成员集合（类型别名引用不展开，故只取引号成员）。"""
+    return set(re.findall(r"'([^']*)'", _ts_union_terms(source, name)))
+
+
+def _ts_number_union(source: str, name: str) -> set[int]:
+    return {int(number) for number in re.findall(r"\b(\d+)\b", _ts_union_terms(source, name))}
+
+
+def test_r11_single_grading_function() -> None:
+    """AC-6 / §4.3：全库只有一个客观题判分函数，第二套「比较答案」的写法不得复活。
+
+    练习与笔试共用 `exam.grade_objective()`：任何就地 `set(answer) == set(correct)` 都会
+    让「少选/多选算错」在练习与笔试之间漂移，而且两处都「看起来对」。
+    """
+    graders = {name: files for name, files in _python_defs().items() if name.startswith("grade_")}
+    assert set(graders) == {"grade_objective"}, (
+        f"客观题判分函数必须恰好一个（实际 {sorted(graders)}）：练习与笔试共用 exam.grade_objective"
+    )
+    files = graders["grade_objective"]
+    assert len(files) == 1 and files[0].endswith("services/exam.py"), (
+        f"grade_objective 必须唯一一份且住 services/exam.py，实际 {files}"
+    )
+
+    offenders: list[str] = []
+    for path in sorted(APP_DIR.rglob("*.py")):
+        if path.name in SET_COMPARE_ALLOWED:
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Compare):
+                continue
+            operands = [node.left, *node.comparators]
+            for position, operator in enumerate(node.ops):
+                if not isinstance(operator, ast.Eq):
+                    continue
+                pair = (operands[position], operands[position + 1])
+                if all(
+                    isinstance(side, ast.Call)
+                    and isinstance(side.func, ast.Name)
+                    and side.func.id == "set"
+                    for side in pair
+                ):
+                    offenders.append(f"{path.relative_to(REPO_ROOT)}:{node.lineno}")
+    assert not offenders, f"出现第二套集合相等判分（应调 exam.grade_objective）：{offenders}"
+
+    blanks = [
+        str(path.relative_to(REPO_ROOT))
+        for path in sorted(APP_DIR.rglob("*.py"))
+        if '"blank"' in path.read_text(encoding="utf-8")
+        or "'blank'" in path.read_text(encoding="utf-8")
+    ]
+    assert not blanks, f"题库出现了 blank 题型（本版只有选择/判断，填空不在范围）：{blanks}"
+
+    assert rules.OBJECTIVE_KINDS == ("single", "multiple", "judge"), (
+        f"客观题闭集应为 single/multiple/judge，实际 {rules.OBJECTIVE_KINDS}"
+    )
+    assert rules.is_objective_kind("judge") is True, "judge 必须算客观题（否则判断题不判分、不计熟练度）"
+
+
+def test_r11_language_direction_single_source() -> None:
+    """AC-1 / AC-12：语言闭集与「语言→方向归属」只在 `rules.py`，两侧镜像逐字一致。"""
+    rules_tree = _r6_ast("backend/app/services/rules.py")
+    schemas_tree = _r6_ast("backend/app/schemas.py")
+
+    declared = _literal_values(rules_tree, "LANGUAGES")
+    assert declared == set(R11_LANGUAGES), f"rules.LANGUAGES 与十一成员闭集不一致：{sorted(declared)}"
+    assert rules.LANGUAGES == R11_LANGUAGES, (
+        "rules.LANGUAGES 的顺序即契约（``''`` 在最前）：改顺序等于改前端 chip 顺序与题库分布口径"
+    )
+
+    mirror = _literal_values(schemas_tree, "QuestionLanguage")
+    assert mirror == declared, f"schemas.QuestionLanguage={sorted(mirror)} 与 rules.LANGUAGES 不一致"
+    types_ts = (FRONTEND / "src/api/types.ts").read_text(encoding="utf-8")
+    assert _ts_string_union(types_ts, "QuestionLanguage") == declared, (
+        "types.ts 的 QuestionLanguage 与 rules.LANGUAGES 不同步（改一处忘另一侧）"
+    )
+
+    frontend = set(_literal_values(rules_tree, "FRONTEND_LANGUAGES"))
+    backend = set(_literal_values(rules_tree, "BACKEND_LANGUAGES"))
+    assert frontend == set(R11_FRONTEND_LANGUAGES), f"FRONTEND_LANGUAGES 不一致：{sorted(frontend)}"
+    assert backend == set(R11_BACKEND_LANGUAGES), f"BACKEND_LANGUAGES 不一致：{sorted(backend)}"
+    assert not frontend & backend, f"同一语言同时被登记为前端与后端：{sorted(frontend & backend)}"
+    assert frontend | backend == declared - {""}, (
+        "前端 + 后端必须恰好覆盖具体语言（``''`` 通用题不归属任何方向）"
+    )
+    expected_map = {**{lang: "前端" for lang in frontend}, **{lang: "后端" for lang in backend}}
+    assert rules.LANGUAGE_DIRECTION == expected_map, (
+        f"LANGUAGE_DIRECTION 必须由两份语言元组派生，实际 {rules.LANGUAGE_DIRECTION}"
+    )
+
+    assert rules.languages_for_direction("前端") == rules.FRONTEND_LANGUAGES
+    assert rules.languages_for_direction("后端") == rules.BACKEND_LANGUAGES
+    assert rules.languages_for_direction(rules.FILTER_ANY) == rules.LANGUAGES
+    assert rules.languages_for_direction("不存在的方向") == ()
+    assert rules.direction_of_language("python") == "后端"
+    assert rules.direction_of_language("react") == "前端"
+    assert rules.direction_of_language("") is None, "通用题（``''``）不归属任何方向"
+    assert rules.direction_of_language("cobol") is None
+    assert rules.is_language_allowed("", "前端") is True, "通用题恒放行（不归属方向不等于不合法）"
+    assert rules.is_language_allowed("python", "后端") is True
+    assert rules.is_language_allowed("python", "前端") is False, "语言与方向必须自洽（后端语言不得出现在前端方向）"
+    assert rules.is_language_allowed("js", rules.FILTER_ANY) is True
+
+    # 不得出现第二份语言闭集（元组/列表/集合里全是语言成员，且至少两个）。
+    allowed = {"rules.py", "schemas.py"}
+    offenders: list[str] = []
+    for path in sorted(APP_DIR.rglob("*.py")):
+        if path.name in allowed:
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if not isinstance(node, (ast.Assign, ast.AnnAssign)) or node.value is None:
+                continue
+            elements = getattr(node.value, "elts", None) or []
+            members = {
+                element.value
+                for element in elements
+                if isinstance(element, ast.Constant) and isinstance(element.value, str)
+            }
+            if len(members) >= 2 and members <= set(R11_LANGUAGES):
+                offenders.append(f"{path.relative_to(REPO_ROOT)}:{node.lineno}")
+    assert not offenders, f"语言闭集在 rules.py 之外被重写了一份（应引用 rules.LANGUAGES）：{offenders}"
+
+
+def test_r11_practice_closed_sets() -> None:
+    """AC-9 / §2.5：练习 scope / limit / 语言筛选闭集单一出处，两侧镜像逐字一致。
+
+    特别钉住 r11 的**语义不对称**：`language` 的「全部」是 `"all"`，而 `""` 是「通用题」
+    这个**闭集成员**——任何地方拿 `""` 表示「全部」都会让通用题筛不出来。
+    """
+    rules_tree = _r6_ast("backend/app/services/rules.py")
+    schemas_tree = _r6_ast("backend/app/schemas.py")
+    types_ts = (FRONTEND / "src/api/types.ts").read_text(encoding="utf-8")
+
+    assert _literal_values(rules_tree, "PRACTICE_SCOPES") == set(R11_PRACTICE_SCOPES), (
+        "rules.PRACTICE_SCOPES 应为 all/unseen/wrong"
+    )
+    assert tuple(rules.PRACTICE_LIMITS) == R11_PRACTICE_LIMITS, (
+        f"rules.PRACTICE_LIMITS 应为 (10, 20, 0)（0 = 全部），实际 {rules.PRACTICE_LIMITS}"
+    )
+    assert rules.DEFAULT_PRACTICE_LIMIT == 10, "默认题量必须与 PracticePaperRequest.limit 默认值同口径"
+
+    assert _literal_values(schemas_tree, "PracticeScope") == set(R11_PRACTICE_SCOPES)
+    assert _int_literal_values(schemas_tree, "PracticeLimit") == set(R11_PRACTICE_LIMITS), (
+        "schemas.PracticeLimit 的整型闭集与 rules.PRACTICE_LIMITS 不一致（0 = 全部）"
+    )
+    assert _literal_values(schemas_tree, "PracticeLanguageFilter") == set(R11_LANGUAGES) | {
+        rules.FILTER_ANY
+    }, "schemas.PracticeLanguageFilter 应为 语言闭集 + 「全部」，缺一个就有一类题筛不到"
+    assert _literal_values(schemas_tree, "PracticeDifficultyFilter") == set(rules.DIFFICULTIES) | {
+        rules.FILTER_ANY
+    }
+    assert _literal_values(schemas_tree, "PracticeEssentialityFilter") == set(
+        rules.ESSENTIALITIES
+    ) | {rules.FILTER_ANY}
+
+    assert _ts_string_union(types_ts, "PracticeScope") == set(R11_PRACTICE_SCOPES), (
+        "types.ts PracticeScope 与 schemas.PracticeScope 不同步"
+    )
+    assert _ts_number_union(types_ts, "PracticeLimit") == set(R11_PRACTICE_LIMITS), (
+        "types.ts PracticeLimit 与 schemas.PracticeLimit 不同步"
+    )
+    for name, alias in (
+        ("PracticeLanguageFilter", "QuestionLanguage"),
+        ("PracticeDifficultyFilter", "ExamDifficulty"),
+        ("PracticeEssentialityFilter", "QuestionEssentiality"),
+    ):
+        assert re.search(
+            rf"export type {name}\s*=\s*'{rules.FILTER_ANY}'\s*\|\s*{alias}\b", types_ts
+        ), f"types.ts 的 {name} 应为 「全部」 + {alias}（与 schemas.py 镜像）"
+
+    assert "" in R11_LANGUAGES, "``''`` 是语言闭集成员（通用 / 算法题）"
+    assert rules.FILTER_ANY == "all", "筛选「全部」的唯一字面量必须是 all"
+    assert rules.FILTER_ANY not in rules.LANGUAGES, "all 不是语言成员（否则通用题与全部混为一谈）"
+    assert rules.FILTER_ANY in rules.PRACTICE_SCOPES
+    assert "" not in rules.PRACTICE_SCOPES, "范围闭集不得用空串表示「全部」（与语言语义冲突）"
+
+    empty_holders: set[str] = set()
+    for node in ast.walk(schemas_tree):
+        if not isinstance(node, ast.Assign) or not isinstance(node.value, ast.Subscript):
+            continue
+        elements = getattr(node.value.slice, "elts", [])
+        if not any(isinstance(element, ast.Constant) and element.value == "" for element in elements):
+            continue
+        empty_holders |= {target.id for target in node.targets if isinstance(target, ast.Name)}
+    assert empty_holders == {"QuestionLanguage", "PracticeLanguageFilter"}, (
+        f"``''`` 只允许出现在语言闭集里（实际 {sorted(empty_holders)}）：别处拿空串当「全部」= 语义二义"
+    )
+
+
+def test_r11_exam_excluded_kinds_default_empty() -> None:
+    """§4.4：进笔试卷面的降级开关默认不触发，且「半个开关」不得静默存在。
+
+    `EXAM_EXCLUDED_KINDS` 非空时组卷侧必须真的消费它（`exam_selector` 走
+    `is_exam_objective_kind`），否则是把判断题挪出笔试的开关拨了一半：常量改了、
+    卷面没变，而且看不出来。
+    """
+    assert rules.EXAM_EXCLUDED_KINDS == (), (
+        "EXAM_EXCLUDED_KINDS 默认必须是空元组（判断题进制）；非空意味着本版走了「不进制」降级路径"
+    )
+    assert "judge" not in rules.EXAM_EXCLUDED_KINDS
+    assert rules.is_exam_objective_kind("judge") is True
+    for kind in (*get_args(ExamKind), ""):
+        assert rules.is_exam_objective_kind(kind) is rules.is_objective_kind(kind), (
+            f"默认档下组卷口径必须与客观题口径逐字等价（kind={kind!r}）"
+        )
+
+    if rules.EXAM_EXCLUDED_KINDS:
+        selector = (APP_DIR / "services" / "exam_selector.py").read_text(encoding="utf-8")
+        assert "is_exam_objective_kind" in selector, (
+            "EXAM_EXCLUDED_KINDS 非空但 exam_selector 仍用 is_objective_kind：开关是死的，卷面不会变"
+        )
+
+
+def test_r11_judge_reachable_in_exam_paper(monkeypatch) -> None:
+    """判断题必须**结构可达**地进笔试卷面（QA D1 的常驻回归）。
+
+    修复前的真实缺陷：`build_paper()` 只做方向轮转，取到的 8 道客观题全是 basic 档；
+    r11 的 36 道 judge 恒为 intermediate/challenge，于是「判断题进制」这条 PRD 决策在卷面上
+    结构不可达（30 卷 / 300 题抽样 0 道 judge），而静态看代码一切正常。
+    另外 `EXAM_EXCLUDED_KINDS` 的降级开关此前无消费点（D2），置 `("judge",)` 卷面也不会变。
+    """
+    profile = Profile(
+        id="gate-prof-judge", resume_id="gate-res-judge",
+        updated_at="2026-11-01T00:00:00+00:00",
+        skills=[], tech_stack=["Python", "React"], years_experience=3,
+        projects=[], target_role="后端开发工程师",
+    )
+    questions = question_bank.load_seed()
+    available = {
+        str(question.get("kind"))
+        for question in questions
+        if rules.is_exam_objective_kind(str(question.get("kind") or ""))
+    }
+    assert {"single", "multiple", "judge"} <= available, "种子必须同时含单选/多选/判断（题型覆盖前提）"
+
+    # 1) 单次 L1 组卷即可取到判断题（不依赖随机种子碰运气）
+    for seed in (0, 1, 2, 7, 42):
+        paper = exam_selector.build_paper(
+            exam_selector.rank_pool(questions, profile, rng=random.Random(seed)),
+            require_directions=2,
+        )
+        assert paper is not None, f"seed={seed} 组卷失败（结构闸门过不去）"
+        kinds = [str(question.get("kind")) for question in paper]
+        assert "judge" in kinds, f"seed={seed} 卷面无判断题：题型结构不可达（QA D1 回归）"
+        assert available <= set(kinds), (
+            f"seed={seed} 卷面缺题型 {sorted(available - set(kinds))}：每种可用客观题型必须各 ≥1"
+        )
+        assert sum(kind in ("single", "multiple", "judge") for kind in kinds) >= 8
+
+    # 2) 走完整 6 层阶梯同样取得到（真实出卷路径不是 build_paper 单独调用）
+    ladder = exam_selector.select_paper(questions, profile, proficient=set(), recent=[])
+    assert ladder is not None
+    assert "judge" in [str(question.get("kind")) for question in ladder.questions]
+
+    # 3) 降级开关一键生效：置 ("judge",) 后卷面不得再出现判断题，且结构依旧达标
+    monkeypatch.setattr(rules, "EXAM_EXCLUDED_KINDS", ("judge",))
+    for seed in (0, 3):
+        degraded = exam_selector.build_paper(
+            exam_selector.rank_pool(questions, profile, rng=random.Random(seed)),
+            require_directions=2,
+        )
+        assert degraded is not None, "降级后仍必须能组出结构达标的卷（否则降级路径是死路）"
+        degraded_kinds = [str(question.get("kind")) for question in degraded]
+        assert "judge" not in degraded_kinds, "EXAM_EXCLUDED_KINDS=('judge',) 但卷面仍有判断题"
+        assert sum(k in ("single", "multiple") for k in degraded_kinds) >= 8
+
+    # 4) 组卷侧必须真的消费组卷口径（不是只把常量拨了一半）
+    selector_src = (APP_DIR / "services" / "exam_selector.py").read_text(encoding="utf-8")
+    assert "is_exam_objective_kind" in selector_src
+    assert "is_objective_kind" not in selector_src.replace("is_exam_objective_kind", ""), (
+        "exam_selector 仍残留裸 is_objective_kind：取池与计数会绕开降级开关"
+    )
+
+    # 5) 测试侧不得再抄一份客观题闭集字面量：本地副本 `{"single","multiple"}` 正是 D1 的帮凶
+    #    （judge 进制后同一份卷面被算成「7 道客观题」，于是组卷闸门与判分断言同时失真）。
+    duplicated = [
+        path.name
+        for path in sorted((REPO_ROOT / "backend" / "tests").glob("*.py"))
+        if re.search(r"^OBJECTIVE_KINDS\s*=\s*[\{\[]", path.read_text(encoding="utf-8"), re.M)
+    ]
+    assert not duplicated, (
+        f"测试里重复定义客观题闭集：{duplicated}（必须从 `rules.OBJECTIVE_KINDS` 派生）"
+    )
+
+
+def test_r11_touched_paths_resolve() -> None:
+    """r11 改动面必须按**仓库根相对**解析成功（r6 D-1「漏 `backend/` 前缀」的 r11 版）。
+
+    这条同时是 T3/T4 的交付面探针：backfill / practice 服务与路由、对应的四个测试文件
+    任何一件没落地，这里会直接点名，而不是等到别的用例 FileNotFoundError。
+    """
+    mislabelled = [rel for rel in R11_TOUCHED if not rel.startswith(("backend/", "frontend/"))]
+    assert not mislabelled, f"R11_TOUCHED 路径必须带 backend/ 或 frontend/ 前缀：{mislabelled}"
+    missing = [rel for rel in R11_TOUCHED if not (REPO_ROOT / rel).is_file()]
+    assert not missing, f"r11 改动面未落地（应为仓库根相对且文件存在）：{missing}"
 
 
 
