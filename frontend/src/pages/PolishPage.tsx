@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { ApiError, api } from '../api/client'
-import type { PolishSuggestion } from '../api/types'
+import type { PolishSection, PolishSuggestion } from '../api/types'
 import { ComposePreview } from '../components/polish/ComposePreview'
 import { SegTabs } from '../components/polish/SegTabs'
 import { SuggestionCard, type SuggestionState } from '../components/polish/SuggestionCard'
@@ -14,6 +14,14 @@ import { InlineError } from '../components/ui/InlineError'
 import { PhaseLoader } from '../components/ui/PhaseLoader'
 import { Toast } from '../components/ui/Toast'
 import { exportFileName } from '../lib/exportName'
+import {
+  FOCUS_ELEMENT_ID,
+  FOCUS_PENDING_NOTICE,
+  SECTION_LABEL,
+  findFocusedSuggestion,
+  focusNotice,
+  parseFocusParams,
+} from '../lib/polishFocus'
 import { useAsync } from '../lib/useAsync'
 
 /** 建议生成三段文案（DESIGN §0.6：AI 等待必须有文字步进）。 */
@@ -84,11 +92,13 @@ export default function PolishPage() {
   const profileAsync = useAsync((signal) => api.latestProfile(signal), [])
   const profile = profileAsync.data
   const navigate = useNavigate()
-  const { pathname } = useLocation()
+  const { pathname, search } = useLocation()
 
   const [session, setSession] = useState<PolishSession | null>(null)
   const [states, setStates] = useState<Record<string, SuggestionState>>({})
   const [filter, setFilter] = useState<'all' | 'pending'>('all')
+  const [sectionFilter, setSectionFilter] = useState<PolishSection | null>(null)
+  const [focusDismissed, setFocusDismissed] = useState(false)
   const [roleInput, setRoleInput] = useState('')
   const [analyzing, setAnalyzing] = useState(false)
   const [analyzeElapsed, setAnalyzeElapsed] = useState(0)
@@ -184,10 +194,43 @@ export default function PolishPage() {
   const adoptionKey = adoptedIds.join(',')
   const stale = full !== null && adoptionSnapshot !== null && adoptionKey !== adoptionSnapshot
 
-  const visibleSuggestions =
+  // --- r7 AC-5：报告页「去改这一条」→ 逐字定位 ---------------------------------
+  const focusTarget = useMemo(() => parseFocusParams(new URLSearchParams(search)), [search])
+  const focusedId = useMemo(() => {
+    if (focusTarget === null || session === null) return null
+    return findFocusedSuggestion(suggestions, focusTarget)?.id ?? null
+  }, [focusTarget, session, suggestions])
+  const focusMissed = focusTarget !== null && session !== null && focusedId === null && !focusDismissed
+
+  useEffect(() => {
+    if (focusTarget === null) return
+    // 未命中才降级成按 section 预筛；命中时列表保持原样（用户看得见上下文）。
+    setSectionFilter(focusedId === null ? focusTarget.section : null)
+    setFocusDismissed(false)
+  }, [focusTarget, focusedId])
+
+  useEffect(() => {
+    if (focusedId === null || typeof document === 'undefined') return
+    const element = document.getElementById(FOCUS_ELEMENT_ID)
+    if (element === null) return
+    element.scrollIntoView({ block: 'center' })
+    element.focus({ preventScroll: true })
+  }, [focusedId])
+
+  const dismissFocus = () => {
+    setFocusDismissed(true)
+    setSectionFilter(null)
+    navigate(pathname, { replace: true })
+  }
+
+  const baseSuggestions =
     filter === 'pending'
       ? suggestions.filter((item) => (states[item.id] ?? 'pending') === 'pending')
       : suggestions
+  const visibleSuggestions =
+    sectionFilter === null
+      ? baseSuggestions
+      : baseSuggestions.filter((item) => item.section === sectionFilter)
 
   const analyze = async (roleOverride: string | null) => {
     // 一次请求一个动作：生成中不再发第二次 AI 调用，避免重复扣费（DESIGN §4.8）
@@ -376,8 +419,23 @@ export default function PolishPage() {
               </Card>
             ) : null}
 
+            {session === null && focusTarget !== null && !analyzing ? (
+              <p className="sc-polish-note sc-focus-pending">{FOCUS_PENDING_NOTICE}</p>
+            ) : null}
+
             {session !== null ? (
               <div className="sc-polish-list">
+                {focusMissed ? (
+                  <div className="sc-focus-banner" role="status">
+                    <span className="sc-focus-banner-text">{focusNotice(sectionFilter)}</span>
+                    {sectionFilter !== null ? (
+                      <span className="sc-chip">{SECTION_LABEL[sectionFilter]}</span>
+                    ) : null}
+                    <button type="button" className="sc-focus-clear" onClick={dismissFocus}>
+                      显示全部
+                    </button>
+                  </div>
+                ) : null}
                 <div className="sc-polish-listhead">
                   <h2 className="sc-polish-listtitle">逐条建议（{suggestions.length} 条）</h2>
                   <div className="sc-polish-filters" role="group" aria-label="建议筛选">
@@ -431,6 +489,7 @@ export default function PolishPage() {
                       state={states[item.id] ?? 'pending'}
                       busy={analyzing}
                       roleIsTemporary={roleIsTemporary}
+                      focused={item.id === focusedId}
                       onAdopt={() => setSuggestionState(item.id, 'adopted')}
                       onIgnore={() => setSuggestionState(item.id, 'ignored')}
                     />

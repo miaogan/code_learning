@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -22,8 +23,16 @@ from pydantic import BaseModel, Field
 
 from .. import repository
 from ..errors import NOT_FOUND, VALIDATION_ERROR, AppError
-from ..schemas import InterviewSettings, Report, Severity, Shortfall
-from . import courses, rules
+from ..schemas import (
+    InterviewSettings,
+    Profile,
+    Report,
+    RoleFit,
+    Severity,
+    Shortfall,
+    WeaknessItem,
+)
+from . import coach_copy, courses, resume_hints, role_fit, rules, weakness
 from .ai import AIClient
 from .history import _interviews_settings_of
 from .markdown import SEVERITY_LABEL, format_score
@@ -58,6 +67,30 @@ class _ShortfallCopy(BaseModel):
 
 class _ReportCopyDraft(BaseModel):
     shortfalls: list[_ShortfallCopy]
+
+
+#: r7 教练文案（AC-11）：只允许补「一句话薄弱描述」和「一句岗位结论」，键不可增删。
+COACH_SYSTEM = (
+    "你是编程学习教练。用户会给你「知识薄弱分组」清单（每组含名称、难度、必备级别、错题数/总题数、"
+    "均分、已有模板描述）和目标岗位的差距摘要。请为每组改写一句中文薄弱描述（不超过 60 字，"
+    "点出具体能力缺口，不要空话、不要改数值），并为岗位对标写一句中文结论（不超过 60 字，"
+    "说明先补哪项）。key 必须原样返回，不得增删条目；没有岗位信息时 role_conclusion 返回 null。"
+    '只输出 JSON：{"weaknesses":[{"key":"...","summary":"..."}],"role_conclusion":null}'
+)
+
+
+class _WeaknessCopy(BaseModel):
+    """AI 补的一条薄弱描述（内部模型，不进 HTTP 契约）。"""
+
+    key: str = Field(min_length=1)
+    summary: str = Field(min_length=1)
+
+
+class _CoachCopyDraft(BaseModel):
+    """AI 补文案的响应模型：条目数、顺序、结论都可能缺失，调用方一律按 key 合并。"""
+
+    weaknesses: list[_WeaknessCopy] = Field(default_factory=list)
+    role_conclusion: str | None = None
 
 
 @dataclass(frozen=True)
@@ -321,7 +354,12 @@ def attach_courses(shortfalls: list[Shortfall]) -> list[Shortfall]:
 async def build_report(
     run_ids: list[str] | None = None, *, client: AIClient | None = None
 ) -> Report:
-    """合并指定（或最近一次）面试与笔试 → 诊断报告；AI 文案失败不影响成功。"""
+    """合并指定（或最近一次）面试与笔试 → 诊断报告；AI 文案失败不影响成功。
+
+    r7 结构（anti-goal 5）：先用纯函数把三块算完（零网络），再让**两路 AI 并发**——
+    短板/教练文案串行两小步算一路，简历要点算另一路，用户可见延迟是两者的最大值而不是相加。
+    任一路异常都退回纯函数结果（报告恒 200，只是文案变模板）。
+    """
     runs = _resolve_runs(run_ids)
     shortfalls = attach_courses(build_shortfalls(runs))
     if not shortfalls:
@@ -330,7 +368,32 @@ async def build_report(
             "所选测评里还没有可诊断的作答，请先完成一次模拟面试或笔试",
             status=404,
         )
-    shortfalls = await _enrich_copy(shortfalls, client=client)
+    weak_items = weakness.build_weakness_map(runs)
+    profile = repository.latest_profile()
+    settings = interview_settings_of(runs)
+    resolved = role_fit.resolve_target_role(interview_settings=settings, profile=profile)
+    # 传整个 `TargetRole`（而不是 `resolved.role`）：裸岗位名会让纯函数只能反向推断来源，
+    # 「面试设定恰好与画像同值」这一情形会被误标成「简历画像」（AC-9 / D-1）。
+    role = role_fit.build_role_fit(profile, resolved)
+    ai = client or AIClient()
+
+    async def _copies() -> tuple[list[Shortfall], list[WeaknessItem], RoleFit]:
+        """同一 `AIClient` 上串行两次调用（共享连接更省），整体与简历要点并发。"""
+        enriched = await _enrich_copy(shortfalls, client=ai)
+        weak, role_out = await _enrich_coach(weak_items, role, client=ai)
+        return enriched, weak, role_out
+
+    copies, hints = await asyncio.gather(
+        _copies(),
+        resume_hints.build_resume_pointers(
+            _resume_text_of(profile), profile, resolved.role, client=ai
+        ),
+        return_exceptions=True,
+    )
+    shortfalls, weak_items, role = _degrade_copies(copies, shortfalls, weak_items, role)
+    if not isinstance(hints, resume_hints.ResumeHints):
+        hints = resume_hints.ResumeHints([], coach_copy.RESUME_AI_FALLBACK)
+
     report = Report(
         id=f"rep-{uuid4().hex[:10]}",
         run_ids=[str(run.get("id") or "") for run in runs],
@@ -338,10 +401,95 @@ async def build_report(
         exam_total=_exam_total(runs),
         shortfalls=shortfalls,
         generated_at=datetime.now(UTC).isoformat(),
-        interview_settings=interview_settings_of(runs),
+        interview_settings=settings,
+        weakness_map=weak_items,
+        resume_pointers=hints.pointers,
+        resume_pointers_notice=hints.notice,
+        role_fit=role,
     )
     repository.insert_report(report)
     return report
+
+
+def _degrade_copies(
+    copies: Any,
+    shortfalls: list[Shortfall],
+    weak_items: list[WeaknessItem],
+    role: RoleFit,
+) -> tuple[list[Shortfall], list[WeaknessItem], RoleFit]:
+    """`gather` 的任一异常 → 全部退回纯函数结果（模板文案仍然可用，AC-11 / anti-goal 5）。"""
+    if isinstance(copies, BaseException) or not isinstance(copies, tuple):
+        return shortfalls, weak_items, role
+    enriched, weak_out, role_out = copies
+    return enriched, weak_out, role_out
+
+
+def _resume_text_of(profile: Profile | None) -> str | None:
+    """简历正文（用于逐字定位）：无画像 / 无正文 → `None`，`resume_hints` 据此跳过 AI。"""
+    if profile is None:
+        return None
+    resume_id = str(profile.resume_id or "").strip()
+    if not resume_id:
+        return None
+    return repository.get_document_text(resume_id)
+
+
+async def _enrich_coach(
+    weakness: list[WeaknessItem], role: RoleFit, *, client: AIClient
+) -> tuple[list[WeaknessItem], RoleFit]:
+    """AI 只补薄弱描述与岗位结论；数值、条数、顺序一律不动，失败原样返回。"""
+    has_role = role.model is not None
+    if not weakness and not has_role:
+        # 两块都没内容就不发请求（零额外延迟，也避免为一句空话付一次模型调用）。
+        return weakness, role
+    request = {
+        "weaknesses": [
+            {
+                "key": item.key,
+                "point": item.point,
+                "difficulty": item.difficulty,
+                "essentiality": item.essentiality,
+                "wrong": item.wrong,
+                "total": item.total,
+                "rate": item.rate,
+                "avg": item.avg,
+                "summary": item.summary,
+            }
+            for item in weakness
+        ],
+        "role": None
+        if not has_role
+        else {
+            "target_role": role.target_role,
+            "level": role.model.label if role.model else None,
+            "missing_must": role.missing_must,
+            "first_fix": role.first_fix,
+            "items": [
+                {"name": row.name, "required": row.required, "user_level": row.user_level,
+                 "gap": row.gap}
+                for row in role.items
+            ],
+        },
+    }
+    try:
+        draft = await client.complete_model(
+            COACH_SYSTEM,
+            "薄弱分组：" + json.dumps(request, ensure_ascii=False),
+            _CoachCopyDraft,
+        )
+    except Exception:  # AI 降级是设计行为（anti-goal 5），不是异常路径
+        return weakness, role
+
+    copies = {copy.key.strip(): copy for copy in draft.weaknesses}
+    enriched: list[WeaknessItem] = []
+    for item in weakness:
+        copy = copies.get(item.key.strip())
+        summary = (copy.summary or "").strip() if copy is not None else ""
+        enriched.append(item.model_copy(update={"summary": summary}) if summary else item)
+    conclusion = (draft.role_conclusion or "").strip()
+    if has_role and conclusion:
+        role = role.model_copy(update={"conclusion": conclusion})
+    return enriched, role
 
 
 def interview_settings_of(runs: list[dict[str, Any]]) -> InterviewSettings | None:

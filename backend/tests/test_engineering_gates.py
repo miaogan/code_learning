@@ -402,19 +402,102 @@ def test_frontend_filtered_notice_single_source() -> None:
     assert not re.search(r"filtered_count\s*[<>]=?\s*[\d-]", page), "ExamPage 内自行比较 filtered_count（语义须唯一）"
 
 
-def test_style_baseline_untouched() -> None:
-    """r6 零新增 token / CSS 类：样式基座不得出现在本轮改动里。"""
+def test_style_baseline_append_only() -> None:
+    """r7 AC-16：样式基座只允许 append（新增 token / 新增类），既有声明不得改动或删除。
+
+    取代 r6 的 `test_style_baseline_untouched`（原断言是「这两个文件不得出现在 git status」，
+    与 AC-16 直接互斥）。语义在这里是**更强**而不是更松：新增整段照样通过，但只要出现一行
+    删除/修改就立即失败。TECHNICAL r7 §8.2 的升格理由见任务夹。
+    """
     proc = subprocess.run(
-        ["git", "status", "--porcelain=v1", "-uall"],
+        ["git", "diff", "--unified=0", "--", "frontend/src/styles/tokens.css",
+         "frontend/src/styles/base.css"],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
         encoding="utf-8",
         errors="replace",
     )
-    assert proc.returncode == 0, f"git status 不可用：{proc.stderr[:200]}"
-    changed = proc.stdout
-    for style in ("styles/tokens.css", "styles/base.css"):
-        assert style not in changed, f"本轮改了样式基座 {style}（DESIGN 要求零增量）"
+    assert proc.returncode == 0, f"git diff 不可用：{proc.stderr[:200]}"
+    removed = [
+        line
+        for line in proc.stdout.splitlines()
+        if line.startswith("-") and not line.startswith("---")
+    ]
+    assert not removed, f"样式基座出现删除/修改行：{removed[:5]}"
+
+
+def _string_literals(source: str) -> set[str]:
+    """源文件里的**代码**字符串字面量（注释里的闭集提及不算，避免误伤说明文字）。"""
+    tree = ast.parse(source)
+    return {
+        str(node.value)
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Constant) and isinstance(node.value, str)
+    }
+
+
+def test_r7_contract_mirror() -> None:
+    """AC-13 / 门禁 39：`Report` 的四个 r7 字段名必须逐字出现在 `types.ts`。"""
+    schemas_py = (APP_DIR / "schemas.py").read_text(encoding="utf-8")
+    types_ts = (FRONTEND / "src/api/types.ts").read_text(encoding="utf-8")
+    fields = ("weakness_map", "resume_pointers", "resume_pointers_notice", "role_fit")
+    for name in fields:
+        assert re.search(rf"\b{name}\s*:", schemas_py), f"schemas.py 缺字段 {name}"
+        assert re.search(rf"\b{name}\s*:", types_ts), f"types.ts 缺镜像字段 {name}"
+    for model in ("WeaknessItem", "WeaknessSample", "ResumePointer", "RoleFitItem", "RoleFit"):
+        assert f"class {model}" in schemas_py, f"schemas.py 缺模型 {model}"
+        assert f"interface {model} " in types_ts or f"interface {model}{{" in types_ts, (
+            f"types.ts 缺镜像 interface {model}"
+        )
+
+
+def test_r7_closed_sets_not_duplicated() -> None:
+    """门禁 40：闭集（方向/难度/必备级别）只能来自 `rules.py`，新服务不得复制字面量。"""
+    closed = set(rules.DIRECTIONS) | set(rules.DIFFICULTIES) | set(rules.ESSENTIALITIES)
+    for name in ("weakness.py", "role_fit.py"):
+        literals = _string_literals((SERVICES / name).read_text(encoding="utf-8"))
+        assert not (literals & closed), f"{name} 复制了闭集字面量：{sorted(literals & closed)}"
+
+
+def test_r7_copy_parity() -> None:
+    """门禁 42：`coach_copy.py` 的 6 条中文文案必须逐字出现在 `lib/coach.ts`（同源不漂移）。"""
+    backend = (SERVICES / "coach_copy.py").read_text(encoding="utf-8")
+    frontend = (FRONTEND / "src/lib/coach.ts").read_text(encoding="utf-8")
+    names = (
+        "LEGACY_BLOCK_NOTICE",
+        "WEAKNESS_EMPTY",
+        "RESUME_NO_TEXT",
+        "RESUME_AI_FALLBACK",
+        "ROLE_NO_MODEL",
+        "ROLE_NO_MODEL_HINT",
+    )
+    for name in names:
+        matched = re.search(rf'{name} = "([^"]+)"', backend)
+        assert matched, f"coach_copy.py 缺常量 {name}"
+        assert matched.group(1) in frontend, f"lib/coach.ts 未逐字镜像 {name}"
+
+
+def test_r7_markdown_single_source() -> None:
+    """门禁 43：三块的 .md 只在 `markdown.py` 里拼；页面与 lib 不得自行拼 markdown。"""
+    targets = [FRONTEND / "src/pages/ReportPage.tsx", *sorted((FRONTEND / "src/lib").glob("*.ts"))]
+    headings = ("# 能力诊断报告", "## 知识薄弱地图", "## 简历改进要点", "## 市场竞争力对标")
+    offenders = [
+        path.name
+        for path in targets
+        if path.is_file()
+        for heading in headings
+        if heading in path.read_text(encoding="utf-8")
+    ]
+    assert not offenders, f"前端自行拼 markdown 标题：{offenders}"
+
+
+def test_r7_style_tokens_defined() -> None:
+    """DESIGN r7 §0.7：5 个新尺寸 token 必须定义在 `tokens.css` 且被 `base.css` 使用。"""
+    tokens = (FRONTEND / "src/styles/tokens.css").read_text(encoding="utf-8")
+    base = (FRONTEND / "src/styles/base.css").read_text(encoding="utf-8")
+    for name in ("weak-rank-w", "weak-rate-w", "role-level-w", "role-gap-w", "prio-dot"):
+        assert f"--{name}:" in tokens, f"tokens.css 缺 --{name}"
+        assert f"var(--{name})" in base, f"base.css 未使用 --{name}（定义了却没人用等于死 token）"
 
 

@@ -239,6 +239,89 @@ export interface Shortfall {
   question_ref: string | null
 }
 
+/* ------------------------------------------------------------------ *
+ * r7 契约 · 诊断报告三块补强（与 backend/app/schemas.py 逐字镜像）
+ *
+ * 三态语义（**禁止用 `?? []` 兜底**，否则旧报告会被误报成「没有计分题」）：
+ * `null` = 旧报告（字段未落库）→ 「旧报告不含该区块，重新生成可补全」；
+ * `[]`   = 新报告但本块无内容 → 各块自己的中文空态；
+ * 非空   = 正常渲染。三态判定集中在 `lib/coach.ts` 的 `blockStateOf()`。
+ * ------------------------------------------------------------------ */
+
+/** 薄弱分组里的单条证据：题目 id + 得分（与短板主轴同一口径）。 */
+export interface WeaknessSample {
+  question_id: string
+  score: number
+  /** 如「Q3 · 4/10」，服务端用 `markdown.format_score` 生成。 */
+  evidence: string
+}
+
+/** 知识薄弱地图的一条：方向 × 难度 × 必备级别 的分组聚合。 */
+export interface WeaknessItem {
+  /** 分组键 `方向|难度,|必备度,`（React key / AI 合并键）。 */
+  key: string
+  /** 展示名，来自 `diagnosis._bucket_name`。 */
+  point: string
+  direction: string
+  wrong: number
+  total: number
+  /** 错误率 = round(wrong/total, 3)，服务端算好，前端零除法。 */
+  rate: number
+  avg: number
+  difficulty: string[]
+  essentiality: string[]
+  samples: WeaknessSample[]
+  /** 一句话薄弱描述（模板文案；AI 可替换）。 */
+  summary: string
+}
+
+/** 简历改进要点的一条：锚点是简历正文里的逐字切片，点跳 `/polish` 靠它定位。 */
+export interface ResumePointer {
+  section: PolishSection
+  /** 如「项目经历 · 第 12 行」。 */
+  location: string
+  /** 正文逐字切片（≤40 字）。 */
+  anchor_text: string
+  /** 一句话问题（≤60 字）。 */
+  issue: string
+  /** 定位键，当前语义即「与 anchor_text 逐字相等」。 */
+  focus_key: string
+}
+
+/** 命中的内置岗位能力模型（`role_fit.model === null` 表示未命中）。 */
+export interface RoleModelRef {
+  level: string
+  /** 如「前端工程师 · 中级」。 */
+  label: string
+}
+
+/** 竞争力差距表的一行：要求 / 当前 / 差距全部可复算。 */
+export interface RoleFitItem {
+  name: string
+  required: number
+  user_level: number
+  gap: number
+  must: boolean
+}
+
+/** 市场竞争力对标：目标岗位 + 来源 + 差距表 + 缺失必备 + 先补 1/2/3。 */
+export interface RoleFit {
+  target_role: string | null
+  /** 来源优先级：本次面试设定 > 简历画像（AC-9）。 */
+  role_source: 'interview' | 'profile' | null
+  /** 「本次面试设定」/「简历画像」。 */
+  role_source_label: string | null
+  model: RoleModelRef | null
+  items: RoleFitItem[]
+  /** gap>0 的必备技能（缺 ⇔ 未达标）。 */
+  missing_must: string[]
+  /** 前 3 个 gap>0 的 name，顺序即优先级（前端不得重排）。 */
+  first_fix: string[]
+  conclusion: string | null
+  /** 降级原因文案（服务端定，前端只渲染）。 */
+  notice: string | null
+}
+
 export interface ReportGenerateRequest {
   run_ids?: string[]
 }
@@ -251,6 +334,14 @@ export interface Report {
   shortfalls: Shortfall[]
   generated_at: string
   interview_settings: InterviewSettings | null
+  /** 知识薄弱地图；`null` = 旧报告，`[]` = 本次无已计分题。 */
+  weakness_map: WeaknessItem[] | null
+  /** 简历改进要点；`null` = 旧报告，`[]` = 无正文 / AI 降级（原因见 `resume_pointers_notice`）。 */
+  resume_pointers: ResumePointer[] | null
+  /** `resume_pointers` 为空时的中文原因；非空数组时为 `null`。 */
+  resume_pointers_notice: string | null
+  /** 市场竞争力对标；`null` = 旧报告。 */
+  role_fit: RoleFit | null
 }
 
 export interface RunSummary {

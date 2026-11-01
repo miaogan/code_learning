@@ -3019,3 +3019,225 @@ input:not([type='radio']):not([type='checkbox']):not([type='file']):disabled {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ---------- r7 · 报告「提升路线」三块（DESIGN r7 §2/§4，append-only） ---------- */
+/* 视觉词汇全部沿用既有类（.sc-card / .sc-trend-table / .sc-chip / .sc-source-quote），
+   这里只补分区外壳、三块内部对齐与润色页定位高亮；既有声明一个字都不改。 */
+.sc-coach {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+  margin-top: var(--sp-7);
+  padding-top: var(--sp-6);
+  border-top: 1px solid var(--border-hair);
+}
+.sc-coach-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-2); }
+.sc-coach-title {
+  margin: 0;
+  font-size: var(--fs-section);
+  line-height: var(--lh-section);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.sc-coach-sub { margin: 0; font-size: var(--fs-meta); line-height: var(--lh-meta); color: var(--text-tertiary); }
+
+.sc-coach-block { display: flex; flex-direction: column; gap: var(--sp-3); }
+.sc-coach-blockhead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+.sc-coach-blocktitle {
+  margin: 0;
+  font-size: var(--fs-card);
+  line-height: var(--lh-card);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.sc-coach-meta { font-size: var(--fs-meta); line-height: var(--lh-meta); color: var(--text-tertiary); }
+.sc-coach-note { margin: 0; font-size: var(--fs-small); line-height: var(--lh-small); color: var(--text-tertiary); }
+
+/* 薄弱表：复用 .sc-trend-table 的行/表头口径，仅重定义三列对齐与宽度 */
+.sc-weak-table th:nth-child(n + 2),
+.sc-weak-table td:nth-child(n + 2) { text-align: right; }
+.sc-weak-table th:nth-child(1),
+.sc-weak-table td:nth-child(1) { width: var(--weak-rank-w); text-align: right; }
+.sc-weak-table th:nth-child(2),
+.sc-weak-table td:nth-child(2) { text-align: left; }
+.sc-weak-table th:last-child,
+.sc-weak-table td:last-child { width: var(--weak-rate-w); }
+.sc-weak-rate { font-size: var(--fs-value-sm); line-height: var(--lh-value-sm); color: var(--text-primary); }
+.sc-weak-line { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
+.sc-weak-name { font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 500; color: var(--text-primary); }
+.sc-weak-summary {
+  margin: 0;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+  overflow-wrap: anywhere;
+}
+.sc-weak-count { font-size: var(--fs-meta); line-height: var(--lh-meta); color: var(--text-tertiary); }
+
+/* 折叠按钮：与 .sc-tl-toggle 同口径（32 高、透明底、0 间距），只是不继承时间线网格 */
+.sc-fold-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  height: var(--btn-h-sm);
+  padding: 0 var(--sp-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-6);
+  background: transparent;
+  color: var(--text-tertiary);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  font-weight: 500;
+  cursor: pointer;
+  transition: color var(--fast) var(--ease), background-color var(--fast) var(--ease);
+}
+.sc-fold-toggle:hover { color: var(--text-secondary); background: var(--overlay-04); }
+.sc-fold-toggle::before { content: '⌄'; display: inline-block; transition: transform var(--fast) var(--ease); }
+.sc-fold-toggle[aria-expanded='true']::before { transform: rotate(180deg); }
+
+/* 简历要点卡：卡面复用 .sc-card，只加 meta 行与问题行 */
+.sc-hint { display: flex; flex-direction: column; gap: var(--sp-3); }
+.sc-hint-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
+.sc-hint-loc { font-size: var(--fs-meta); line-height: var(--lh-meta); color: var(--text-tertiary); }
+.sc-hint-head .sc-btn { margin-left: auto; }
+.sc-hint-issue { margin: 0; font-size: var(--fs-body); line-height: var(--lh-body); color: var(--text-primary); }
+.sc-hint-label { margin-right: var(--sp-2); font-size: var(--fs-meta); font-weight: 500; color: var(--text-tertiary); }
+
+/* 竞争力：目标岗位行 / 差距表 / 先补 / 缺失 chip */
+.sc-role-target {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-2);
+  font-size: var(--fs-card);
+  line-height: var(--lh-card);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.sc-role-target-meta {
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  font-weight: 400;
+  color: var(--text-tertiary);
+}
+.sc-role-table { width: 100%; border-collapse: collapse; font-size: var(--fs-body); line-height: var(--lh-body); }
+.sc-role-table th {
+  padding: 0 var(--sp-2) var(--sp-2);
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  font-weight: 500;
+  color: var(--text-tertiary);
+  text-align: left;
+}
+.sc-role-table td {
+  padding: var(--sp-3) var(--sp-2);
+  border-bottom: 1px solid var(--border-hair);
+  color: var(--text-secondary);
+}
+.sc-role-table tbody tr:hover td { background: var(--overlay-03); }
+.sc-role-table tbody tr:last-child td { border-bottom: 0; }
+.sc-role-table th:nth-child(2),
+.sc-role-table td:nth-child(2) { width: var(--role-level-w); text-align: right; }
+.sc-role-table th:nth-child(3),
+.sc-role-table td:nth-child(3) { width: var(--role-gap-w); text-align: right; }
+.sc-role-gap { color: var(--warn); }
+.sc-role-met { color: var(--success); font-size: var(--fs-meta); }
+.sc-role-prio { display: flex; flex-direction: column; gap: var(--sp-2); margin: 0; padding: 0; list-style: none; }
+.sc-role-prio-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--text-primary);
+}
+.sc-prio-dot {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--prio-dot);
+  height: var(--prio-dot);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--accent-line-30);
+  background: var(--accent-tint);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  font-weight: 600;
+  color: var(--accent);
+}
+.sc-must-chip {
+  display: inline-flex;
+  align-items: center;
+  height: var(--chip-h);
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--warn-line-35);
+  border-radius: var(--radius-4);
+  background: var(--warn-tint-12);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  font-weight: 500;
+  color: var(--warn);
+}
+
+/* 润色页定位高亮：追加在 .sc-sugg-card 既有规则之后，不改既有声明（AC-5） */
+.sc-sugg-card { scroll-margin-top: calc(var(--topbar-h) + var(--sp-4)); }
+.sc-sugg-card.is-focused {
+  border-color: var(--accent);
+  border-left-color: var(--accent);
+  background: var(--accent-wash-06);
+  box-shadow: var(--elev-accent);
+  transition:
+    border-color var(--base) var(--ease),
+    box-shadow var(--base) var(--ease),
+    background-color var(--base) var(--ease);
+}
+
+/* 定位提示条 / 待定提示：中性底 + hairline，强调色只留给真正命中的那一张卡 */
+.sc-focus-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border-hair);
+  border-radius: var(--radius-6);
+  background: var(--overlay-03);
+}
+.sc-focus-banner-text { font-size: var(--fs-meta); line-height: var(--lh-meta); color: var(--text-secondary); }
+.sc-focus-clear {
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  font-weight: 500;
+  cursor: pointer;
+  transition: color var(--fast) var(--ease);
+}
+.sc-focus-clear:hover { color: var(--accent-hover); }
+.sc-focus-clear:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.sc-focus-pending { margin-top: var(--sp-3); }
+
+/* 390px：三块内部只允许换行，不允许横向滚动（DESIGN §0.7 的反面清单） */
+@media (max-width: 640px) {
+  .sc-weak-table th:nth-child(1),
+  .sc-weak-table td:nth-child(1) { width: auto; }
+  .sc-role-table th:nth-child(2),
+  .sc-role-table td:nth-child(2),
+  .sc-role-table th:nth-child(3),
+  .sc-role-table td:nth-child(3) { width: auto; }
+  .sc-hint-head .sc-btn { margin-left: 0; }
+}

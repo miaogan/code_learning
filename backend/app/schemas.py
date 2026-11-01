@@ -279,6 +279,82 @@ class Shortfall(BaseModel):
     )
 
 
+# --- 诊断报告三块补强（r7 AC-13：全部可选、带默认值，旧 payload 直接反序列化）--------
+#
+# 三块语义（**必须照此实现**，`None` 与 `[]` 在页面/`.md` 上是两套文案）：
+# - `None`  = 旧报告，字段从未落库 → 「旧报告不含该区块，重新生成可补全」
+# - `[]`    = 新报告但本块无内容 → 各块自己的中文空态（文案见 `services/coach_copy.py`）
+# - 非空    = 正常渲染
+# 前端**禁止** `?? []` 兜底（会把旧报告误报成「没有计分题」），三态判定集中在 `lib/coach.ts`。
+
+
+class WeaknessSample(BaseModel):
+    """薄弱分组里的单条证据：题目 id + 得分，与短板主轴同一口径。"""
+
+    question_id: str
+    score: float
+    evidence: str = Field(description="如「Q3 · 4/10」，由 `markdown.format_score` 生成")
+
+
+class WeaknessItem(BaseModel):
+    """知识薄弱地图的一条：方向 × 难度 × 必备级别 的分组聚合结果（只投影、不重算）。"""
+
+    key: str = Field(description="分组键 `方向|难度,|必备度,`，前端 React key 与 AI 合并键")
+    point: str = Field(description="展示名，来自 `diagnosis._bucket_name`（与主轴同口径）")
+    direction: str = Field(default="", description="组内题目的方向；无标签组为空串")
+    wrong: int = Field(description="低于 `rules.SEVERITY_MEDIUM_BELOW` 的题数")
+    total: int
+    rate: float = Field(description="错误率 = round(wrong/total, 3)，服务端算好")
+    avg: float = Field(description="组内均分，round(...,1)")
+    difficulty: list[str] = Field(default_factory=list, description="⊆ rules.DIFFICULTIES；无标签为 []")
+    essentiality: list[str] = Field(default_factory=list, description="⊆ rules.ESSENTIALITIES；无标签为 []")
+    samples: list[WeaknessSample] = Field(default_factory=list, description="1..3 条，按得分升序")
+    summary: str = Field(description="一句话薄弱描述（模板文案，AI 可替换）")
+
+
+class ResumePointer(BaseModel):
+    """简历改进要点的一条：锚点是简历正文里的**逐字**切片，点跳 `/polish` 靠它定位。"""
+
+    section: PolishSection
+    location: str = Field(description="如「项目经历 · 第 12 行」，由服务端算出的 start 推出")
+    anchor_text: str = Field(description="正文逐字切片（≤40 字），无改写、无归一化")
+    issue: str = Field(description="一句话问题，≤60 字")
+    focus_key: str = Field(description="定位键；当前语义即「与 anchor_text 逐字相等」")
+
+
+class RoleModelRef(BaseModel):
+    """命中的内置岗位能力模型（`model=None` 表示未命中，走降级文案）。"""
+
+    level: str = Field(description="初级 / 中级 / 高级 / 专家")
+    label: str = Field(description="如「前端工程师 · 中级」")
+
+
+class RoleFitItem(BaseModel):
+    """竞争力差距表的一行：要求 / 当前 / 差距全部可复算，AI 不参与数值。"""
+
+    name: str
+    required: int = Field(description="模型要求档位，1..4")
+    user_level: int = Field(description="画像档位，0..4（规则见 `services/role_fit.py`）")
+    gap: int = Field(description="max(0, required-user_level)")
+    must: bool = Field(description="是否该级模型的必备技能（排序与缺失清单都用它）")
+
+
+class RoleFit(BaseModel):
+    """市场竞争力对标：目标岗位 + 来源 + 差距表 + 缺失必备 + 先补 1/2/3。"""
+
+    target_role: str | None = None
+    role_source: Literal["interview", "profile"] | None = Field(
+        default=None, description="目标岗位来源优先级：本次面试设定 > 简历画像（AC-9）"
+    )
+    role_source_label: str | None = Field(default=None, description="「本次面试设定」/「简历画像」")
+    model: RoleModelRef | None = Field(default=None, description="None ⇒ 无匹配模型（AC-10）")
+    items: list[RoleFitItem] = Field(default_factory=list)
+    missing_must: list[str] = Field(default_factory=list, description="gap>0 的必备技能（缺 ⇔ 未达标）")
+    first_fix: list[str] = Field(default_factory=list, description="前 3 个 gap>0 的 name，顺序即优先级")
+    conclusion: str | None = Field(default=None, description="一句话结论（AI 可替换）")
+    notice: str | None = Field(default=None, description="降级原因文案（服务端定，前端只渲染）")
+
+
 class ReportGenerateRequest(BaseModel):
     """报告生成请求体：run_ids 缺省时由服务端取最近面试 + 最近笔试各一次。"""
 
@@ -295,6 +371,17 @@ class Report(BaseModel):
     interview_settings: InterviewSettings | None = Field(
         default=None, description="报告引用面试的设定；无面试或旧 run 时为 None"
     )
+    # --- r7 三块补强（全部可选：旧报告 payload 里没有这些键，反序列化即 None）----------
+    weakness_map: list[WeaknessItem] | None = Field(
+        default=None, description="知识薄弱地图；None=旧报告，[]=本次无已计分题"
+    )
+    resume_pointers: list[ResumePointer] | None = Field(
+        default=None, description="简历改进要点；None=旧报告，[]=无正文或 AI 降级（原因见 notice）"
+    )
+    resume_pointers_notice: str | None = Field(
+        default=None, description="resume_pointers 为空时的中文原因；非空数组时为 None"
+    )
+    role_fit: RoleFit | None = Field(default=None, description="市场竞争力对标；None=旧报告")
 
 
 class RunSummary(BaseModel):

@@ -4,6 +4,7 @@ import { ApiError, api } from '../api/client'
 import type { Report } from '../api/types'
 import { scoreRingState } from '../components/interview/ScoreBadge'
 import { SettingsBar } from '../components/interview/SettingsBar'
+import { CoachBlocks } from '../components/report/CoachBlocks'
 import { ShortfallCard } from '../components/report/ShortfallCard'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
@@ -283,6 +284,9 @@ export default function ReportPage() {
                 />
               ))}
             </div>
+
+            {/* 提升路线三块（r7）：DOM 必须在短板主轴之后（超长内容不抢首屏，AC-14） */}
+            <CoachBlocks report={report} />
           </div>
         ) : null}
 

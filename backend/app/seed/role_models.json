@@ -1,0 +1,272 @@
+{
+  "models": [
+    {
+      "role": "前端工程师",
+      "direction": "前端",
+      "level": "初级",
+      "years_min": 0,
+      "years_max": 2,
+      "must_have": ["JavaScript", "HTML/CSS", "React"],
+      "skills": [
+        {"name": "JavaScript", "required": 2},
+        {"name": "HTML/CSS", "required": 2},
+        {"name": "React", "required": 1},
+        {"name": "浏览器与网络", "required": 1},
+        {"name": "Git", "required": 1},
+        {"name": "数据结构", "required": 1}
+      ]
+    },
+    {
+      "role": "前端工程师",
+      "direction": "前端",
+      "level": "中级",
+      "years_min": 2,
+      "years_max": 5,
+      "must_have": ["JavaScript", "React", "构建与工程化"],
+      "skills": [
+        {"name": "JavaScript", "required": 3},
+        {"name": "TypeScript", "required": 2},
+        {"name": "React", "required": 3},
+        {"name": "CSS 布局", "required": 2},
+        {"name": "构建与工程化", "required": 2},
+        {"name": "浏览器与网络", "required": 2},
+        {"name": "性能优化", "required": 2}
+      ]
+    },
+    {
+      "role": "前端工程师",
+      "direction": "前端",
+      "level": "高级",
+      "years_min": 5,
+      "years_max": 10,
+      "must_have": ["TypeScript", "前端架构", "性能优化"],
+      "skills": [
+        {"name": "JavaScript", "required": 4},
+        {"name": "TypeScript", "required": 3},
+        {"name": "React", "required": 3},
+        {"name": "前端架构", "required": 3},
+        {"name": "构建与工程化", "required": 3},
+        {"name": "性能优化", "required": 3},
+        {"name": "浏览器与网络", "required": 3}
+      ]
+    },
+    {
+      "role": "前端工程师",
+      "direction": "前端",
+      "level": "专家",
+      "years_min": 10,
+      "years_max": 99,
+      "must_have": ["前端架构", "性能优化", "工程效率"],
+      "skills": [
+        {"name": "TypeScript", "required": 4},
+        {"name": "前端架构", "required": 4},
+        {"name": "性能优化", "required": 4},
+        {"name": "工程效率", "required": 3},
+        {"name": "构建与工程化", "required": 4},
+        {"name": "技术影响力", "required": 3},
+        {"name": "浏览器与网络", "required": 4}
+      ]
+    },
+    {
+      "role": "后端工程师",
+      "direction": "后端",
+      "level": "初级",
+      "years_min": 0,
+      "years_max": 2,
+      "must_have": ["Python", "SQL", "HTTP 与 REST"],
+      "skills": [
+        {"name": "Python", "required": 2},
+        {"name": "SQL", "required": 2},
+        {"name": "HTTP 与 REST", "required": 2},
+        {"name": "Linux 基础", "required": 1},
+        {"name": "Git", "required": 1},
+        {"name": "数据结构", "required": 1}
+      ]
+    },
+    {
+      "role": "后端工程师",
+      "direction": "后端",
+      "level": "中级",
+      "years_min": 2,
+      "years_max": 5,
+      "must_have": ["Python", "SQL", "接口设计"],
+      "skills": [
+        {"name": "Python", "required": 3},
+        {"name": "SQL", "required": 3},
+        {"name": "数据库索引与事务", "required": 2},
+        {"name": "接口设计", "required": 2},
+        {"name": "Redis 与缓存", "required": 2},
+        {"name": "并发与异步", "required": 2},
+        {"name": "消息队列", "required": 1}
+      ]
+    },
+    {
+      "role": "后端工程师",
+      "direction": "后端",
+      "level": "高级",
+      "years_min": 5,
+      "years_max": 10,
+      "must_have": ["系统设计", "数据库索引与事务", "并发与异步"],
+      "skills": [
+        {"name": "Python", "required": 4},
+        {"name": "系统设计", "required": 3},
+        {"name": "数据库索引与事务", "required": 3},
+        {"name": "分布式系统", "required": 3},
+        {"name": "并发与异步", "required": 3},
+        {"name": "消息队列", "required": 3},
+        {"name": "可观测性", "required": 2}
+      ]
+    },
+    {
+      "role": "后端工程师",
+      "direction": "后端",
+      "level": "专家",
+      "years_min": 10,
+      "years_max": 99,
+      "must_have": ["系统设计", "高可用架构", "技术决策"],
+      "skills": [
+        {"name": "系统设计", "required": 4},
+        {"name": "分布式系统", "required": 4},
+        {"name": "高可用架构", "required": 4},
+        {"name": "数据库索引与事务", "required": 3},
+        {"name": "可观测性", "required": 3},
+        {"name": "容量与成本", "required": 3},
+        {"name": "技术决策", "required": 3}
+      ]
+    },
+    {
+      "role": "算法工程师",
+      "direction": "算法与数据结构",
+      "level": "初级",
+      "years_min": 0,
+      "years_max": 2,
+      "must_have": ["数组与字符串", "哈希表", "复杂度分析"],
+      "skills": [
+        {"name": "数组与字符串", "required": 2},
+        {"name": "链表与栈队列", "required": 2},
+        {"name": "哈希表", "required": 2},
+        {"name": "排序与二分", "required": 1},
+        {"name": "复杂度分析", "required": 2},
+        {"name": "编程语言基础", "required": 1}
+      ]
+    },
+    {
+      "role": "算法工程师",
+      "direction": "算法与数据结构",
+      "level": "中级",
+      "years_min": 2,
+      "years_max": 5,
+      "must_have": ["二叉树与递归", "动态规划", "复杂度分析"],
+      "skills": [
+        {"name": "二叉树与递归", "required": 3},
+        {"name": "动态规划", "required": 2},
+        {"name": "图与搜索", "required": 2},
+        {"name": "排序与二分", "required": 3},
+        {"name": "复杂度分析", "required": 3},
+        {"name": "字符串算法", "required": 2},
+        {"name": "代码实现规范", "required": 2}
+      ]
+    },
+    {
+      "role": "算法工程师",
+      "direction": "算法与数据结构",
+      "level": "高级",
+      "years_min": 5,
+      "years_max": 10,
+      "must_have": ["动态规划", "算法设计", "复杂度分析"],
+      "skills": [
+        {"name": "动态规划", "required": 4},
+        {"name": "图与搜索", "required": 3},
+        {"name": "算法设计", "required": 3},
+        {"name": "复杂度分析", "required": 4},
+        {"name": "数学与概率", "required": 2},
+        {"name": "代码实现规范", "required": 3},
+        {"name": "问题建模", "required": 3}
+      ]
+    },
+    {
+      "role": "算法工程师",
+      "direction": "算法与数据结构",
+      "level": "专家",
+      "years_min": 10,
+      "years_max": 99,
+      "must_have": ["算法设计", "问题建模", "工程落地与验证"],
+      "skills": [
+        {"name": "算法设计", "required": 4},
+        {"name": "问题建模", "required": 4},
+        {"name": "动态规划", "required": 4},
+        {"name": "图与搜索", "required": 4},
+        {"name": "数学与概率", "required": 3},
+        {"name": "复杂度分析", "required": 4},
+        {"name": "工程落地与验证", "required": 3}
+      ]
+    },
+    {
+      "role": "通用软件工程师",
+      "direction": "计算机基础",
+      "level": "初级",
+      "years_min": 0,
+      "years_max": 2,
+      "must_have": ["操作系统基础", "计算机网络", "编程语言基础"],
+      "skills": [
+        {"name": "操作系统基础", "required": 2},
+        {"name": "计算机网络", "required": 2},
+        {"name": "数据库基础", "required": 2},
+        {"name": "编程语言基础", "required": 2},
+        {"name": "计算机组成", "required": 1},
+        {"name": "Git", "required": 1}
+      ]
+    },
+    {
+      "role": "通用软件工程师",
+      "direction": "计算机基础",
+      "level": "中级",
+      "years_min": 2,
+      "years_max": 5,
+      "must_have": ["操作系统基础", "计算机网络", "数据库索引与事务"],
+      "skills": [
+        {"name": "操作系统基础", "required": 3},
+        {"name": "计算机网络", "required": 3},
+        {"name": "数据库索引与事务", "required": 2},
+        {"name": "并发与异步", "required": 2},
+        {"name": "Linux 基础", "required": 2},
+        {"name": "内存与性能", "required": 2},
+        {"name": "数据结构", "required": 2}
+      ]
+    },
+    {
+      "role": "通用软件工程师",
+      "direction": "计算机基础",
+      "level": "高级",
+      "years_min": 5,
+      "years_max": 10,
+      "must_have": ["操作系统基础", "并发与异步", "内存与性能"],
+      "skills": [
+        {"name": "操作系统基础", "required": 4},
+        {"name": "计算机网络", "required": 3},
+        {"name": "数据库索引与事务", "required": 3},
+        {"name": "并发与异步", "required": 3},
+        {"name": "内存与性能", "required": 3},
+        {"name": "系统设计", "required": 3},
+        {"name": "数据结构", "required": 3}
+      ]
+    },
+    {
+      "role": "通用软件工程师",
+      "direction": "计算机基础",
+      "level": "专家",
+      "years_min": 10,
+      "years_max": 99,
+      "must_have": ["操作系统基础", "内存与性能", "系统设计"],
+      "skills": [
+        {"name": "操作系统基础", "required": 4},
+        {"name": "计算机网络", "required": 4},
+        {"name": "数据库索引与事务", "required": 4},
+        {"name": "并发与异步", "required": 4},
+        {"name": "内存与性能", "required": 4},
+        {"name": "系统设计", "required": 4},
+        {"name": "可观测性", "required": 3}
+      ]
+    }
+  ]
+}

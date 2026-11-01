@@ -1,5 +1,6 @@
 import { Fragment, useState } from 'react'
 import type { PolishSuggestion } from '../../api/types'
+import { FOCUS_ELEMENT_ID, SECTION_LABEL } from '../../lib/polishFocus'
 import { Button } from '../ui/Button'
 
 export type SuggestionState = 'pending' | 'adopted' | 'ignored'
@@ -12,18 +13,13 @@ export interface SuggestionCardProps {
   onIgnore: () => void
   /** 该条建议是否来自临时岗位（来自本次重跑的目标岗位，非画像默认） */
   roleIsTemporary?: boolean
+  /** r7 AC-5：报告页点「去改这一条」跳过来命中时的高亮态（可获得程序焦点）。 */
+  focused?: boolean
 }
 
 /** 缺数值处的占位符（AC-9 降级路径）：只渲染，不改文本。 */
 const PLACEHOLDER = '〈待补充〉'
 const CLAMP_CHARS = 96
-
-const SECTION_LABEL: Record<PolishSuggestion['section'], string> = {
-  project: '项目经历',
-  experience: '工作经历',
-  education: '教育背景',
-  summary: '个人简介',
-}
 
 const NUMERIC_FLAG = 'numeric_added'
 
@@ -53,6 +49,7 @@ export function SuggestionCard({
   onAdopt,
   onIgnore,
   roleIsTemporary = false,
+  focused = false,
 }: SuggestionCardProps) {
   const [expanded, setExpanded] = useState(false)
   const degraded = suggestion.flags.includes(NUMERIC_FLAG)
@@ -62,9 +59,16 @@ export function SuggestionCard({
   if (state === 'adopted') classes.push('is-adopted')
   if (state === 'ignored') classes.push('is-ignored')
   if (busy) classes.push('is-busy')
+  if (focused) classes.push('is-focused')
 
   return (
-    <article className={classes.join(' ')} aria-busy={busy || undefined}>
+    <article
+      className={classes.join(' ')}
+      aria-busy={busy || undefined}
+      // 定位态：可编程聚焦（`tabIndex=-1` 不打断 Tab 顺序，只用 `.focus()` 给读屏落点）。
+      id={focused ? FOCUS_ELEMENT_ID : undefined}
+      tabIndex={focused ? -1 : undefined}
+    >
       <div className="sc-sugg-meta">
         {degraded ? <span className="sc-sugg-flag">仅措辞建议</span> : null}
         <span className="sc-sugg-section">{SECTION_LABEL[suggestion.section]}</span>
