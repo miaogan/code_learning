@@ -22,9 +22,10 @@ from pydantic import BaseModel, Field
 
 from .. import repository
 from ..errors import NOT_FOUND, VALIDATION_ERROR, AppError
-from ..schemas import Report, Severity, Shortfall
+from ..schemas import InterviewSettings, Report, Severity, Shortfall
 from . import courses, rules
 from .ai import AIClient
+from .history import _interviews_settings_of
 from .markdown import SEVERITY_LABEL, format_score
 
 #: 严重度排序的单一出处（`rules.py`）；本文件只做转出，方便下游 `from .diagnosis import SEVERITY_ORDER`。
@@ -337,9 +338,32 @@ async def build_report(
         exam_total=_exam_total(runs),
         shortfalls=shortfalls,
         generated_at=datetime.now(UTC).isoformat(),
+        interview_settings=interview_settings_of(runs),
     )
     repository.insert_report(report)
     return report
+
+
+def interview_settings_of(runs: list[dict[str, Any]]) -> InterviewSettings | None:
+    """本报告引用的「本次面试设定」：取 `runs` 里**最新一条**合法面试 run 的设定（AC-12）。
+
+    报告是跨 run 合并的（一条短板可由多次面试归因），设定只能记一个 —— 因此取 `created_at`
+    最新的那一场面试，`_resolve_runs` 的返回顺序（显式 id 顺序 / 自动取最近）都不影响结果。
+    参与报告的面试全是旧 payload（无 `settings`）、或压根没有面试 → `None`，页面整行不渲染。
+
+    解析口径不另写一份：直接复用历史的投影函数 `history._interviews_settings_of`，
+    同一个 payload 在历史页与报告页必须给出同一份设定（否则两处「本场设定」会互相矛盾）。
+    """
+    candidates = [
+        (str(run.get("created_at") or ""), settings)
+        for run in runs
+        if str(run.get("kind") or "") == "interview"
+        for settings in [_interviews_settings_of(run.get("payload") or {})]
+        if settings is not None
+    ]
+    if not candidates:
+        return None
+    return max(candidates, key=lambda item: item[0])[1]
 
 
 def _resolve_runs(run_ids: list[str] | None) -> list[dict[str, Any]]:

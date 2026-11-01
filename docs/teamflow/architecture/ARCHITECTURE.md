@@ -108,17 +108,18 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
 | `app/config.py` | `Settings`（AI_BASE_URL / AI_API_KEY / AI_MODEL / AI_TIMEOUT_S / DB_PATH / 上传上限） | ✅ |
 | `app/db.py` | 连接、`init_db()` 建 4 表、`get_connection()` 依赖 | ✅（表结构见 §3.4） |
 | `app/errors.py` | 错误码常量 + `AppError` | ✅ |
-| `app/schemas.py` | pydantic v2 模型（Profile 5 维度 / 题目 / 报告 / 课程） | ✅ 模型齐备，AI 侧未接 |
+| `app/schemas.py` | pydantic v2 模型（Profile 5 维度 / 题目 / 报告 / 课程）；**HTTP 契约唯一真源** | ✅ 齐备；r5 起含 4 项面试设定（`InterviewSettings` / `InterviewSettingsPatch`）、会话与回合（`InterviewRun` / `InterviewTurn` / `InterviewSession`），`RunSummary` / `Report` 增 `interview_settings` |
 | `app/routers/resume.py` | `POST /api/resumes` 上传 → 校验 → 抽取 → 入库 → 元信息 | ✅ 文本/ PDF / DOCX 抽取（依赖装好后生效） |
 | `app/routers/profile.py` | `POST /api/resumes/{id}/profile`、`GET|PATCH /api/profiles/{id}` | ⛔ 501 待 M2 |
-| `app/routers/interview.py` | 出题 / 逐题作答评分 | ⛔ 501 待 M3 |
-| `app/routers/exam.py` | 出卷 / 提交判分 | ⛔ 501 待 M3 |
-| `app/routers/report.py` | 生成诊断报告 / `GET /markdown` | ⛔ 501 待 M4 |
-| `app/routers/history.py` | 历史记录列表 | ⛔ 501 待 M5 |
+| `app/routers/interview.py` | 开局 / 每轮作答 / 会话恢复（r5 契约 v2：只转发与错误 envelope，业务在 `services/interview.py`） | ✅ 三路由 |
+| `app/routers/exam.py` | 出卷 / 提交判分 | ✅ 已交付 |
+| `app/routers/report.py` | 生成诊断报告 / `GET /markdown` | ✅ 已交付 |
+| `app/routers/history.py` | 历史记录列表（r3 起含长期记忆聚合） | ✅ 已交付 |
 | `app/routers/courses.py` | `GET /api/courses`（读 seed，校验 ≥20 门且 ≥3 门入门） | ✅ |
 | `app/services/parser.py` | 类型白名单、10MB、空文件/加密 PDF 中文错误、`chars/sections` 统计 | ✅ |
 | `app/services/ai.py` | OpenAI 兼容客户端：`complete_model(system, user, Model)`，超时、1 次重试、非法 JSON → `AI_SCHEMA_INVALID` | ✅（无 key 时抛 `AI_UNAVAILABLE`，页面得中文提示而非 500） |
-| `app/services/{profile,interview,exam,diagnosis}.py` | 提示词 + 校验 + 落库 | ⛔ 待 M2–M4（仅签名与契约注释） |
+| `app/services/{profile,interview,exam,diagnosis}.py` | 提示词 + 校验 + 落库 | ✅ 已交付；`interview.py` 为 r5 会话引擎（比赛制/评分/追问/会话读取闭环） |
+| `app/services/rules.py` | 阈值与口径唯一出处（r5 增 4 项面试配置闭集 + `experience_band_of` / `is_follow_up_allowed`） | ✅ |
 | `app/services/courses.py` | 加载 seed、按方向/短板匹配（含「无匹配兜底」） | ✅ 加载与匹配骨架 |
 
 ### 3.3 HTTP 契约（单一前缀 `/api`）
@@ -127,17 +128,18 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
 | --- | --- | --- | --- | --- |
 | GET | `/health` | — | `{status, version, ai_configured, db}` | AC-8 即时探活 |
 | POST | `/api/resumes` | multipart `file` | `{resume_id, file_name, chars, sections}` | AC-1；错误码见 §3.5 |
-| POST | `/api/resumes/{resume_id}/profile` | — | `Profile` | 501 待 M2（AC-2） |
+| POST | `/api/resumes/{resume_id}/profile` | — | `Profile` | AC-2 |
 | GET | `/api/profiles/latest` | — | `Profile` | 404 = 尚无画像（前端引导态） |
 | PATCH | `/api/profiles/{id}` | `ProfilePatch` | `Profile` | 逐条编辑（AC-2） |
-| POST | `/api/interviews` | `{profile_id}` | `{run_id, questions[]}` | 501 待 M3（AC-3） |
-| POST | `/api/interviews/{run_id}/answers` | `{question_id, answer}` | `{score, comment}` | 失败不丢答案由前端保证 |
-| POST | `/api/exams` | `{profile_id}` | `{run_id, questions[]}` | 501 待 M3（AC-4） |
-| POST | `/api/exams/{run_id}/submit` | `{answers[]}` | `{total, correct_count, elapsed_s, per_question[]}` | 501 待 M3 |
-| POST | `/api/reports/generate` | `{run_ids[]}` | `Report` | 501 待 M4（AC-5/6） |
+| POST | `/api/interviews` | `InterviewCreateRequest`（`profile_id` + 可选 `settings` 4 项） | `InterviewRun`（`{run_id, settings, question, total}`，**只含第 1 条发言**） | 开局：补全 settings → 生成计划 → 闸门校验（≥8 题/技术 ≥5/项目 ≥3/挑战 ≤20%）→ 落库；不合规 502 且不落 run（AC-3） |
+| POST | `/api/interviews/{run_id}/answers` | `{question_id, answer}` | `{score, comment, next_question, run_status, answered_count, total, interview_avg}` | 每轮一次 AI 调用同轮产出「评分 + 下一条发言」（可追问，带 `parent_id`）；先算后写，失败零副作用（AC-5/AC-9/AC-10） |
+| GET | `/api/interviews/{run_id}` | — | `InterviewSession`（`{run_id, status, settings, questions[], answered_count, total, current_id, interview_avg}`） | **r5 新增**：刷新/重进恢复会话；`status=completed` ⇒ `current_id=null`（前端只读） |
+| POST | `/api/exams` | `{profile_id}` | `{run_id, questions[]}` | AC-4 |
+| POST | `/api/exams/{run_id}/submit` | `{answers[]}` | `{total, correct_count, elapsed_s, per_question[]}` | — |
+| POST | `/api/reports/generate` | `{run_ids[]}` | `Report`（r5 起含 `interview_settings`） | AC-5/6 |
 | GET | `/api/reports/latest` | — | `Report` | 404 = 未生成 |
 | GET | `/api/reports/{id}/markdown` | — | `text/markdown` | AC-9（P1） |
-| GET | `/api/history` | — | `RunSummary[]` | AC-10（P1） |
+| GET | `/api/history` | — | `RunSummary[]`（r5 起每行带 `interview_settings: InterviewSettings\|null`） | AC-10（P1）；`null` 前端渲染「未记录设定」，不出现 undefined |
 | GET | `/api/courses` | — | `Course[]` | ✅ AC-6 数据面 |
 
 **错误 envelope**（全站唯一形态，HTTP 状态码取 4xx/5xx）：
@@ -158,6 +160,17 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
 | `reports` | `id TEXT PK, payload TEXT(JSON), created_at` | AC-5/6 诊断报告（短板 + 课程映射） |
 
 约定：时间为 ISO-8601 UTC 字符串；payload 存 JSON 文本，读写两侧过 pydantic 模型；`init_db()` 只用 `CREATE TABLE IF NOT EXISTS`，字段变更需在 `memory.md` 记录一次性升级说明（不做迁移框架）。
+
+#### 3.4.1 `runs.payload` v2（r5 起，面试会话的唯一真相）
+
+面试不再"一次性下发 8 题"，payload 升级为**对话流会话**：`settings` / `calibration` / `plan` / `plan_index` / 递增 `questions[]` / `answered_count` / `total` / `follow_up_count` / `turn` / `current_id`。**零新表、零 SQL 迁移**（表结构不动，只加 JSON 字段），`version: 2` 仅用于读取分支。
+
+- `questions[]` 只追加、永不变序，`id = iq-{len+1}` 单调；`len(questions) ≤ turn + 1`（running 时恰等于）⇒ **气泡条数 = 已提出题数**，不预先铺开未来题目。
+- `parent_id ≠ null` 表示追问，且 `kind` 与父题逐字相同；追问配额 ≤ 4，`challenge` 类不生成追问（开局计划合格 ⇒ 结束仍合格）。
+- `current_id` 指向唯一未答发言，结束置 `null`；它是**并发/重试的唯一推进依据**（重答旧题只覆盖分数，不追加发言、不推进 turn）。
+- `settings`（4 项：`target_role` / `years_experience` / `market` / `company_size`）**只进 payload、绝不写回 `profiles`**（临时设定不污染长期资产）；每轮提示词由 `rules.py` 纯映射注入。
+- `status` 不进 payload —— 权威在 `runs.status`（`running` / `completed`）。
+- 向后兼容：旧 payload 缺 `settings`/`parent_id`/`plan`/`current_id` 逐字段降级（`null` / `null` / `[]` / 首个未答 id）；历史与报告投影读不到设定 → `interview_settings: null`，前端显示「未记录设定」。
 
 ### 3.5 上传解析契约（AC-1）
 
@@ -239,8 +252,14 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
 | 上传解析链路（文本 / PDF / DOCX + 四类中文错误） | `backend/app/services/parser.py`、`routers/resume.py` |
 | AI 客户端骨架（超时 / 重试 / schema 校验 / 无 key 提示） | `backend/app/services/ai.py` |
 | 课程清单 25 门 + `/api/courses` | `backend/app/seed/courses.json`、`services/courses.py` |
+| 画像生成（AC-2 端到端） | `services/profile.py`、`routers/profile.py`（生成 / 读取 / 逐条编辑）、`pages/ProfilePage.tsx` 五维卡 + 溯源 |
+| 双测评（AC-3/AC-4 端到端） | `services/{interview,exam}.py`、`routers/{interview,exam}.py`、`pages/{InterviewPage,ExamPage}.tsx` |
+| 诊断报告 + 课程匹配（AC-5/AC-6） | `services/diagnosis.py`、`routers/report.py`（含 `GET /markdown`）、`pages/ReportPage.tsx` |
+| 历史与趋势（AC-9/AC-10） | `services/history.py`、`routers/history.py`、`pages/HistoryPage.tsx`；r3 起含长期记忆聚合 |
+| 题库种子 80 道 | `backend/app/seed/questions.json` |
 | pydantic 契约模型（画像 5 维度 / 题目 / 报告 / 课程） | `backend/app/schemas.py` |
-| 后端测试 3 文件 | `backend/tests/*.py` |
+| 后端测试 13 文件（pytest 零网络） | `backend/tests/*.py` |
+| 前端 `package-lock.json` + 已装依赖 | `frontend/package-lock.json`、`frontend/node_modules/` |
 | CI 双 job | `.github/workflows/ci.yml` |
 | AGENTS.md + memory.md + README | 仓库根与 `docs/teamflow/` |
 
@@ -248,27 +267,17 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
 
 | 项 | 现状 | 归属 |
 | --- | --- | --- |
-| 画像生成（AC-2 端到端） | 路由返回 501 `NOT_IMPLEMENTED`，prompt / 校验 / 编辑保存未写 | M2 |
-| 面试出题与逐题评分（AC-3） | 501，含「失败不丢答案」的前端状态机未接 | M3 |
-| 笔试卷生成与判分（AC-4） | 501，计时与未答确认未接 | M3 |
-| 诊断报告与课程匹配（AC-5/6 端到端） | 501，严重度算法 + Markdown 导出未写 | M4 |
-| 历史与趋势（AC-9/AC-10） | 501，页面仅空态 | M5 |
-| 题库种子量 | 仅 12 道（frontend/backend/algorithm/basics 各 3），目标 ~80 | M2/M3 |
-| 前端页面业务态 | 6 页均只有「引导空态 + 壳」，卡片/答题/报告 UI 未接 | M2–M5 |
-| 真实 PDF / DOCX 解析实测 | 代码已写，但本机缺 `pypdf` / `python-docx` 且 pip 安装被 sandbox 拒绝，**未用真实文件验证** | M2 |
-| 前端依赖与构建（typecheck / lint / vitest / build） | **未执行**：本机 sandbox 拒绝 npm 生命周期脚本 spawn（`EPERM`），`node_modules` 装不起来；只做了 import 图静态校验（30 条相对引用全部可解析、22 个模块） | 依赖装好后第一件事 |
-| `frontend/package-lock.json` | **未生成**（同上；`npm ci` 尚不可用，CI 前端 job 会因缺 lockfile 失败） | 首次联网安装 |
-| 后端 ruff lint 实跑 | **未执行**：全局 Python 无 `ruff`，`venv` 创建被 sandbox 拒绝（`WinError 5`）；`pytest` 10 项已实跑通过 | 验收前补跑 |
-| E2E / 浏览器自动化 | 未建（首版无该要求） | — |
-| CI 实跑 | workflow 已写，**未在 GitHub 上真跑过**；后端等价命令（pytest）本地已通过，前端等价命令受上述环境限制未跑 | 验收前 |
+| **r5 面试对话流（n=20261101-r5-interview-chat-config）** | 契约 v2 已落盘（`schemas.py` / `types.ts` / `client.ts`：3 条面试路由 + 会话模型）；**会话引擎、7 态页面与 6 个气泡组件、r5 测试套件仍待落地** | T2–T7；最终门禁以 QA 报告为准 |
+| 真实 PDF / DOCX 解析实测 | 代码已写，但本机缺 `pypdf` / `python-docx`，**未用真实文件验证**（单测走 stub） | 装依赖后 |
+| 后端 ruff lint 实跑 | **未执行**：全局 Python 无 `ruff`（`No module named ruff`），后端 lint 由 `tests/test_engineering_gates.py` + 人工复审覆盖 | 验收前补跑 |
+| CI 实跑 | workflow 已写，**未在 GitHub 上真跑过** | 验收前 |
 | Docker 打包 / 一键启动脚本 | 未做（README 为三步手动流程） | 后续 |
 
 ---
 
 ## 8. 下游交接（谁在哪填哪）
 
-- **M2 画像**：`services/profile.py`（prompt + `Profile` 校验）、`routers/profile.py` 四个端点、`pages/ProfilePage.tsx` 五维卡 + `SourceQuote` + 原地编辑 + 「缺失来源」徽章、`seed/questions.json` 扩到 ~80。
-- **M3 双测评**：`services/{interview,exam}.py`（出题 / 评分 / 判分）、`routers/{interview,exam}.py`、`pages/{InterviewPage,ExamPage}.tsx`（逐题单屏、得分环 56、计时环 64、粘性提交条）。
-- **M4 报告**：`services/diagnosis.py`（严重度 + 优先级 + 课程映射兜底）、`routers/report.py`、`pages/ReportPage.tsx`（短板卡 / 证据 chip / 课程卡 132）。
-- **M5 闭环**：`pages/HistoryPage.tsx` + `routers/history.py`、`GET /api/reports/{id}/markdown`、刷新持久化与 5 分钟演练、AC-8 产物级密钥核查。
+- **M1–M5 已全部交付**（画像 / 双测评 / 报告 / 历史与趋势），各里程碑的模块与页面清单见 §7.1；本文件不再保留「待填」交接清单。
+- **r5 面试对话流（进行中）**：`services/interview.py`（会话引擎：`fill_settings` / `calibration_of` / `validate_questions` / `validate_session` / `create_run` / `score_answer` / `load_session`）、`services/rules.py`（4 项配置闭集 + `experience_band_of` + `is_follow_up_allowed`）、`routers/interview.py`（3 路由）、`pages/InterviewPage.tsx` + `components/interview/*`（7 态 + 6 气泡组件）、`RunSummary` / `Report` 投影字段。契约与 payload 不变量见 §3.3 / §3.4.1；完整技术方案见任务夹 `docs/teamflow/20261101-r5-interview-chat-config/TECHNICAL.md`。
+- **统一约束（不许破）**：所有新组件复用 `tokens.css`；所有新端点返回 `AppError` envelope 与中文 message；所有改字段同步 `frontend/src/api/types.ts` ↔ `backend/app/schemas.py`；新增尺寸必须回写 DESIGN §0.7 的推导。
 - **统一约束（不许破）**：所有新组件复用 `tokens.css`；所有新端点返回 `AppError` envelope 与中文 message；所有改字段同步 `frontend/src/api/types.ts` ↔ `backend/app/schemas.py`；新增尺寸必须回写 DESIGN §0.7 的推导。

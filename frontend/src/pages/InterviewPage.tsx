@@ -1,93 +1,148 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import type { ReactNode } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { ApiError, api } from '../api/client'
-import type { InterviewQuestion, InterviewRun, ScoreResult } from '../api/types'
-import { QuestionCard, QUESTION_KIND_LABEL } from '../components/interview/QuestionCard'
-import { ScoreBadge, scoreRingState } from '../components/interview/ScoreBadge'
+import type {
+  InterviewRun,
+  InterviewSession,
+  InterviewSettingsPatch,
+  InterviewTurn,
+} from '../api/types'
+import { ChatStream } from '../components/interview/ChatStream'
+import { Composer } from '../components/interview/Composer'
+import { InterviewSetupForm } from '../components/interview/InterviewSetupForm'
+import { draftToPatch, prefillOf } from '../components/interview/setupModel'
+import type { SetupDraft, SetupSources } from '../components/interview/setupModel'
+import { SessionSummary } from '../components/interview/SessionSummary'
+import { SettingsBar } from '../components/interview/SettingsBar'
 import { Button } from '../components/ui/Button'
-import { Card } from '../components/ui/Card'
-import { Chip } from '../components/ui/Chip'
 import { EmptyState } from '../components/ui/EmptyState'
 import { InlineError } from '../components/ui/InlineError'
 import { PhaseLoader } from '../components/ui/PhaseLoader'
-import { RingProgress } from '../components/ui/RingProgress'
-import { formatElapsed, formatScore } from '../lib/format'
 import { useAsync } from '../lib/useAsync'
 
-/** 页面阶段：intro 由画像请求派生，其余为用户推进后的确定状态。 */
-type Stage = 'intro' | 'creating' | 'running' | 'done'
-type View = 'gate' | 'empty' | 'error' | 'intro' | Stage
+/** 页面阶段（TECHNICAL §4.1）：gate / empty / error 由画像请求派生，其余为用户推进后的确定态。 */
+type Stage = 'configure' | 'creating' | 'chat' | 'ended'
 
-/** 出题阶段文案（DESIGN §0.6：AI 调用用三段式步进，禁止只有转圈）。 */
-const CREATE_PHASES = ['读取画像要点', '按画像配比出题（技术 / 项目深挖）', '校验题量与去重']
-
-/** 本题计时环显示上限 59:59（DESIGN §2.3）。 */
-const TIMER_DISPLAY_MAX_S = 59 * 60 + 59
-
-/** 逐题进度格：得分档上色 + 数字双通道（<4 红 / 4–7 黄 / >7 中性描边）。 */
-function stripBadgeClass(score: ScoreResult): string {
-  const state = scoreRingState(score.score)
-  if (state === 'danger') return 'sc-badge sc-badge--high'
-  if (state === 'warn') return 'sc-badge sc-badge--medium'
-  return 'sc-badge sc-badge--low'
+/** 单场运行态（TECHNICAL §4.1）：一次轮次只更新这一个对象，避免散落的 loading/error 布尔。 */
+interface RunTrack {
+  submitting: boolean
+  elapsedS: number
+  /** 开局失败（配置卡内 InlineError，四项原样保留）。 */
+  error: string | null
+  /** 单轮失败 / 超时（输入区上方 InlineError，答案留在 textarea）。 */
+  turnError: string | null
 }
 
-function averageOf(values: number[]): number {
-  if (values.length === 0) return 0
-  return values.reduce((sum, value) => sum + value, 0) / values.length
+const EMPTY_TRACK: RunTrack = { submitting: false, elapsedS: 0, error: null, turnError: null }
+
+/** 开局三段式文案（DESIGN §0.4：AI 调用禁止只有转圈）。 */
+const CREATE_PHASES = ['读取本场设定', '生成面试计划', '准备第一问']
+/** 会话恢复文案（?run_id=）。 */
+const RESTORE_PHASES = ['正在恢复本场会话']
+
+interface RestoreState {
+  status: 'idle' | 'loading' | 'error'
+  error: string | null
+}
+
+/** 错误 envelope 统一由 client.ts 归一；非 ApiError 也回落中文文案（AC-13）。 */
+function messageOf(error: unknown, fallback: string): string {
+  if (error instanceof ApiError && error.message) return error.message
+  return fallback
+}
+
+/** 开局响应 → 会话镜像（后端为唯一真相：开局只投放第 1 条发言，答案/分数为空）。 */
+function sessionOf(run: InterviewRun): InterviewSession {
+  return {
+    run_id: run.run_id,
+    status: 'running',
+    settings: run.settings,
+    questions: [{ ...run.question, answer: null, score: null, comment: null }],
+    answered_count: 0,
+    total: run.total,
+    current_id: run.question.id,
+    interview_avg: null,
+  }
 }
 
 /**
- * 模拟面试（AC-3）：逐题单屏、同卡出分、失败永不清空作答；
- * 最后一题出分后进入本场汇总（均分），再进诊断报告。
+ * 模拟面试（AC-4 / AC-5 / AC-9 / AC-18）：七态编排 —— 配置 → 开局 → 多轮对话 → 结束；
+ * `?run_id=` 恢复整场会话（已完成为只读）。页面只做编排与单一 session state（后端镜像），
+ * 气泡/评分/输入区/汇总的渲染与纯函数全部在 components/interview/ 下。
  */
 export default function InterviewPage() {
-  const createAbortRef = useRef<AbortController | null>(null)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const runIdParam = searchParams.get('run_id')
 
   const profileAsync = useAsync((signal) => api.latestProfile(signal), [])
+  const createAbortRef = useRef<AbortController | null>(null)
+  const prefilledIdRef = useRef<string | null>(null)
+  const activeRunIdRef = useRef<string | null>(null)
 
-  const [stage, setStage] = useState<Stage>('intro')
-  const [run, setRun] = useState<InterviewRun | null>(null)
-  const [index, setIndex] = useState(0)
-  const [answers, setAnswers] = useState<Partial<Record<string, string>>>({})
-  const [scores, setScores] = useState<Partial<Record<string, ScoreResult>>>({})
-
-  const [submitting, setSubmitting] = useState(false)
-  const [scoreError, setScoreError] = useState<string | null>(null)
-  const [createError, setCreateError] = useState<string | null>(null)
-  const [createElapsed, setCreateElapsed] = useState(0)
-  const [answerElapsed, setAnswerElapsed] = useState(0)
-  const [reviewing, setReviewing] = useState(false)
+  /** 会话唯一真相：后端 GET/开局/轮次返回的镜像，页面不做 payload 解析。 */
+  const [session, setSession] = useState<InterviewSession | null>(null)
+  const [stage, setStage] = useState<Stage>('configure')
+  const [draft, setDraft] = useState<SetupDraft>(() => prefillOf(null).draft)
+  const [prefill, setPrefill] = useState<SetupDraft>(() => prefillOf(null).draft)
+  const [sources, setSources] = useState<SetupSources>(() => prefillOf(null).sources)
+  const [track, setTrack] = useState<RunTrack>(EMPTY_TRACK)
+  const [answer, setAnswer] = useState('')
+  const [restore, setRestore] = useState<RestoreState>({ status: 'idle', error: null })
 
   const profile = profileAsync.data
-  const total = run ? run.questions.length : 0
-  const currentQuestion: InterviewQuestion | null = run ? (run.questions[index] ?? null) : null
-  const currentScore: ScoreResult | null = currentQuestion ? (scores[currentQuestion.id] ?? null) : null
 
-  // 门禁：画像请求三态直接决定空态 / 错误态，不额外引入 sync 副作用。
-  const gateView: 'gate' | 'empty' | 'error' | 'intro' =
-    profileAsync.status === 'success'
-      ? 'intro'
-      : profileAsync.status === 'error'
-        ? profileAsync.error?.status === 404
-          ? 'empty'
-          : 'error'
-        : 'gate'
-  const view: View = stage === 'intro' ? gateView : stage
-
-  // 出题等待：阶段文案随秒数步进（<2s → 0，<5s → 1，之后 → 2）。
+  // 画像到手即预填（同一画像只应用一次，重载不覆盖用户手改）。
   useEffect(() => {
-    if (view !== 'creating') return
-    const timer = window.setInterval(() => setCreateElapsed((value) => value + 1), 1000)
-    return () => window.clearInterval(timer)
-  }, [view])
+    if (!profile) return
+    if (prefilledIdRef.current === profile.id) return
+    prefilledIdRef.current = profile.id
+    const prefilled = prefillOf(profile)
+    setDraft(prefilled.draft)
+    setPrefill(prefilled.draft)
+    setSources(prefilled.sources)
+  }, [profile])
 
-  // 本题正计时：提交中 / 已出分即停表（DESIGN §2.3 计时环含义）。
+  // ?run_id= 恢复：GET 会话镜像 → running 续答 / completed 只读。
   useEffect(() => {
-    if (view !== 'running' || currentScore !== null || submitting) return
-    const timer = window.setInterval(() => setAnswerElapsed((value) => value + 1), 1000)
+    if (!runIdParam) return
+    if (activeRunIdRef.current === runIdParam) return
+    const controller = new AbortController()
+    setRestore({ status: 'loading', error: null })
+    api
+      .getInterview(runIdParam, controller.signal)
+      .then((restored) => {
+        if (controller.signal.aborted) return
+        activeRunIdRef.current = restored.run_id
+        setSession(restored)
+        setAnswer('')
+        setTrack(EMPTY_TRACK)
+        setRestore({ status: 'idle', error: null })
+        setStage(restored.status === 'completed' ? 'ended' : 'chat')
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return
+        setRestore({ status: 'error', error: messageOf(error, '无法恢复本场面试') })
+      })
+    return () => controller.abort()
+  }, [runIdParam])
+
+  // 开局计时（三段文案按秒步进）+ 单轮评分计时。
+  useEffect(() => {
+    if (stage !== 'creating') return
+    const timer = window.setInterval(() => {
+      setTrack((prev) => ({ ...prev, elapsedS: prev.elapsedS + 1 }))
+    }, 1000)
     return () => window.clearInterval(timer)
-  }, [view, index, currentScore, submitting])
+  }, [stage])
+
+  useEffect(() => {
+    if (!track.submitting) return
+    const timer = window.setInterval(() => {
+      setTrack((prev) => (prev.submitting ? { ...prev, elapsedS: prev.elapsedS + 1 } : prev))
+    }, 1000)
+    return () => window.clearInterval(timer)
+  }, [track.submitting])
 
   useEffect(() => {
     return () => {
@@ -95,283 +150,230 @@ export default function InterviewPage() {
     }
   }, [])
 
-  const startRun = async () => {
+  const reloadRestore = () => {
+    const target = runIdParam
+    if (!target) return
+    activeRunIdRef.current = null
+    setRestore({ status: 'idle', error: null })
+    setSearchParams({ run_id: target }, { replace: true })
+  }
+
+  /** 开局（AC-1）：patch 省略 = 跳过表单，由服务端 fill_settings 补全（不把表单清空）。 */
+  const startSession = async (patch?: InterviewSettingsPatch) => {
     if (!profile) return
     createAbortRef.current?.abort()
     const controller = new AbortController()
     createAbortRef.current = controller
-    setCreateError(null)
-    setCreateElapsed(0)
+    setTrack(EMPTY_TRACK)
     setStage('creating')
     try {
-      const result = await api.createInterview({ profile_id: profile.id })
+      const run = await api.createInterview({ profile_id: profile.id, settings: patch })
       if (controller.signal.aborted) return
-      if (result.questions.length === 0) {
-        setCreateError('本次出题没有返回题目，请重试')
-        setStage('intro')
-        return
-      }
-      setRun(result)
-      setAnswers({})
-      setScores({})
-      setIndex(0)
-      setAnswerElapsed(0)
-      setScoreError(null)
-      setReviewing(false)
-      setStage('running')
-    } catch (err) {
+      activeRunIdRef.current = run.run_id
+      setSession(sessionOf(run))
+      setAnswer('')
+      setStage('chat')
+      setSearchParams({ run_id: run.run_id }, { replace: true })
+    } catch (error) {
       if (controller.signal.aborted) return
-      setCreateError(err instanceof ApiError ? err.message : '出题失败，请重试')
-      setStage('intro')
+      setTrack({ ...EMPTY_TRACK, error: messageOf(error, '开局失败，请重试') })
+      setStage('configure')
     }
   }
 
   const cancelCreate = () => {
     createAbortRef.current?.abort()
-    setCreateElapsed(0)
-    setStage('intro')
+    setTrack(EMPTY_TRACK)
+    setStage('configure')
   }
 
-  /** 单题评分：失败只报错，answers 原样保留 → textarea 不清空（AC-3）。 */
-  const submitAnswer = async () => {
-    if (!run || !currentQuestion || submitting) return
-    const questionId = currentQuestion.id
-    const text = (answers[questionId] ?? '').trim()
+  /** 单轮提交（TECHNICAL §4.3）：失败只报错，答案与已答气泡原样保留。 */
+  const submitTurn = async () => {
+    if (!session || !session.current_id || track.submitting) return
+    const questionId = session.current_id
+    const text = answer.trim()
     if (text.length === 0) return
-
-    setSubmitting(true)
-    setScoreError(null)
+    setTrack({ submitting: true, elapsedS: 0, error: null, turnError: null })
     try {
-      const result = await api.scoreAnswer(run.run_id, { question_id: questionId, answer: text })
-      setScores((prev) => ({ ...prev, [questionId]: result }))
-    } catch (err) {
-      setScoreError(
-        err instanceof ApiError
-          ? `${err.message}（你的答案已保留，可直接重试）`
-          : '评分失败，你的答案已保留，请重试',
-      )
-    } finally {
-      setSubmitting(false)
+      const turn: InterviewTurn = await api.scoreAnswer(session.run_id, {
+        question_id: questionId,
+        answer: text,
+      })
+      setSession((prev) => {
+        if (!prev) return prev
+        const answered = prev.questions.map((item) =>
+          item.id === questionId
+            ? { ...item, answer: text, score: turn.score, comment: turn.comment }
+            : item,
+        )
+        const next = turn.next_question
+          ? [{ ...turn.next_question, answer: null, score: null, comment: null }]
+          : []
+        return {
+          ...prev,
+          status: turn.run_status,
+          answered_count: turn.answered_count,
+          interview_avg: turn.interview_avg,
+          questions: [...answered, ...next],
+          current_id: turn.next_question ? turn.next_question.id : null,
+        }
+      })
+      setAnswer('')
+      setTrack((prev) => ({ ...prev, submitting: false, elapsedS: 0 }))
+      if (!turn.next_question) setStage('ended')
+    } catch (error) {
+      setTrack((prev) => ({
+        ...prev,
+        submitting: false,
+        turnError: messageOf(error, '评分失败或超时，你的答案已保留，可直接重试'),
+      }))
     }
   }
 
-  const goNext = () => {
-    if (!run) return
-    if (index + 1 < run.questions.length) {
-      setIndex(index + 1)
-      setAnswerElapsed(0)
-      setScoreError(null)
-      return
-    }
-    setStage('done')
+  /** 重开一场：清会话与 ?run_id=，按当前画像重新预填。 */
+  const restart = () => {
+    createAbortRef.current?.abort()
+    activeRunIdRef.current = null
+    setSession(null)
+    setAnswer('')
+    setTrack(EMPTY_TRACK)
+    setStage('configure')
+    setRestore({ status: 'idle', error: null })
+    setSearchParams({}, { replace: true })
+    const prefilled = prefillOf(profile)
+    setDraft(prefilled.draft)
+    setPrefill(prefilled.draft)
+    setSources(prefilled.sources)
   }
 
-  /** 重新作答：只清分数，保留原答案（DESIGN §2.3 评分态次按钮）。 */
-  const reopenAnswer = () => {
-    if (!currentQuestion) return
-    const questionId = currentQuestion.id
-    setScores((prev) => {
-      const next = { ...prev }
-      delete next[questionId]
-      return next
-    })
-    setScoreError(null)
-  }
+  // 门禁：画像请求三态直接决定加载 / 空态 / 错误态（ready 才进配置卡）。
+  const profileView: 'loading' | 'empty' | 'error' | 'ready' =
+    profileAsync.status === 'success'
+      ? 'ready'
+      : profileAsync.status === 'error'
+        ? profileAsync.error?.status === 404
+          ? 'empty'
+          : 'error'
+        : 'loading'
+  // 恢复中：带 ?run_id= 且会话未就绪（首帧也算，避免闪一帧配置卡）；失败态单独走错误分支。
+  const restoring = runIdParam !== null && session === null && restore.status !== 'error'
+  const creating = stage === 'creating'
+  const hasSession = session !== null
 
-  const answeredCount = run ? run.questions.filter((item) => scores[item.id]).length : 0
-  const answeredScores = run
-    ? run.questions
-        .map((item) => scores[item.id]?.score)
-        .filter((value): value is number => typeof value === 'number')
-    : []
-  const overallAvg = averageOf(answeredScores)
-  const kindAvg = (kind: InterviewQuestion['kind']): number => {
-    if (!run) return 0
-    const values = run.questions
-      .filter((item) => item.kind === kind)
-      .map((item) => scores[item.id]?.score)
-      .filter((value): value is number => typeof value === 'number')
-    return averageOf(values)
-  }
+  let content: ReactNode = null
 
-  const createPhase = createElapsed < 2 ? 0 : createElapsed < 5 ? 1 : 2
-  const timerLabel = submitting ? '评分中' : formatElapsed(Math.min(answerElapsed, TIMER_DISPLAY_MAX_S))
+  if (restoring) {
+    content = (
+      <PhaseLoader title="正在恢复本场会话" phases={RESTORE_PHASES} active={0} elapsedSec={track.elapsedS} />
+    )
+  } else if (restore.status === 'error') {
+    content = (
+      <div className="sc-qcard">
+        <InlineError
+          message={restore.error ?? '无法恢复本场面试'}
+          onRetry={reloadRestore}
+          retryLabel="重新读取"
+        />
+        <div className="sc-btn-row">
+          <Button variant="ghost" onClick={restart}>
+            开新一场
+          </Button>
+        </div>
+      </div>
+    )
+  } else if (hasSession && (stage === 'chat' || stage === 'ended')) {
+    const current = stage === 'ended' || session.status === 'completed' ? 'ended' : 'chat'
+    content = (
+      <div className="sc-iq-col">
+        <p className="sc-iq-meta">
+          已提出 {session.questions.length} 题 · 已答 {session.answered_count} 题
+          {current === 'ended' ? ' · 本场已结束' : ''}
+        </p>
+        <SettingsBar settings={session.settings} />
+        <ChatStream questions={session.questions} pending={track.submitting} />
+        {current === 'ended' ? (
+          <>
+            <p className="sc-iq-readonly">本场面试已结束 · 输入区已关闭</p>
+            <SessionSummary
+              questions={session.questions}
+              settings={session.settings}
+              onRestart={restart}
+            />
+          </>
+        ) : (
+          <Composer
+            value={answer}
+            onChange={setAnswer}
+            onSubmit={() => void submitTurn()}
+            submitting={track.submitting}
+            disabled={track.submitting}
+            readonly={false}
+            elapsedS={track.elapsedS}
+            error={track.turnError}
+          />
+        )}
+      </div>
+    )
+  } else if (creating) {
+    content = (
+      <div className="sc-iq-col">
+        <PhaseLoader
+          title="正在准备本场面试"
+          phases={CREATE_PHASES}
+          active={track.elapsedS < 2 ? 0 : track.elapsedS < 5 ? 1 : 2}
+          elapsedSec={track.elapsedS}
+        />
+        <div className="sc-btn-row">
+          <Button variant="ghost" onClick={cancelCreate}>
+            取消
+          </Button>
+        </div>
+      </div>
+    )
+  } else if (profileView === 'loading') {
+    content = <PhaseLoader title="正在读取你的最新画像" phases={['读取画像']} active={0} />
+  } else if (profileView === 'empty') {
+    content = (
+      <EmptyState
+        reason="模拟面试会依据你的画像出题（技术题 ≥5 · 项目深挖 ≥3 · 进阶 ≤20%）。先上传简历并确认画像，再来测评。"
+        actionLabel="上传简历"
+        actionTo="/"
+      />
+    )
+  } else if (profileView === 'error') {
+    content = (
+      <InlineError
+        message={profileAsync.error?.message ?? '画像读取失败，请稍后重试'}
+        onRetry={profileAsync.reload}
+      />
+    )
+  } else {
+    content = (
+      <div className="sc-iq-col">
+        <InterviewSetupForm
+          draft={draft}
+          sources={sources}
+          prefill={prefill}
+          submitting={creating}
+          error={track.error}
+          profileYears={profile?.years_experience ?? null}
+          onDraft={setDraft}
+          onStart={() => void startSession(draftToPatch(draft))}
+          onSkip={() => void startSession()}
+        />
+      </div>
+    )
+  }
 
   return (
     <section>
       <header className="sc-page-header">
         <h1 className="sc-page-title">模拟面试</h1>
-        <p className="sc-page-sub">逐题作答、同卡出分：每题 0–10 分与一段点评；失败不会清空你的答案</p>
+        <p className="sc-page-sub">
+          多轮对话式面试：每题 0–10 分与逐字点评长在你的回答里；首问之后每轮只出一道，失败不会清空你的答案
+        </p>
       </header>
-
-      {view === 'gate' ? <PhaseLoader title="正在读取你的最新画像" phases={['读取画像']} active={0} /> : null}
-
-      {view === 'empty' ? (
-        <EmptyState
-          reason="模拟面试会依据你的画像出题（技术题 ≥5 · 项目深挖 ≥3 · 进阶 ≤20%，逐题 0–10 分）。先上传简历并确认画像，再来测评。"
-          actionLabel="上传简历"
-          actionTo="/"
-        />
-      ) : null}
-
-      {view === 'error' && profileAsync.error ? (
-        <InlineError message={profileAsync.error.message} onRetry={profileAsync.reload} />
-      ) : null}
-
-      {view === 'intro' ? (
-        <Card>
-          <div className="sc-qcard-head">
-            <Chip label="本场规则" />
-            <Chip label="技术题 ≥5" tone="direction" />
-            <Chip label="项目深挖 ≥3" tone="direction" />
-            <span className="sc-badge sc-badge--medium">进阶 ≤20%</span>
-          </div>
-          <p className="sc-qcard-prompt">
-            依据画像：目标岗位 {profile?.target_role ?? '未填写'} · 技能 {profile?.skills.length ?? 0} 项 · 项目{' '}
-            {profile?.projects.length ?? 0} 个
-          </p>
-          <p className="sc-qcard-hint">
-            逐题单屏作答，提交后当场出分；评分失败或超时时答案会保留在输入框，绝不丢失。
-          </p>
-          {createError ? (
-            <InlineError message={createError} onRetry={() => void startRun()} retryLabel="重新出题" />
-          ) : null}
-          <div className="sc-btn-row">
-            <Button onClick={() => void startRun()}>开始模拟面试</Button>
-            <Link className="sc-btn sc-btn--secondary" to="/profile">
-              先看看画像
-            </Link>
-          </div>
-        </Card>
-      ) : null}
-
-      {view === 'creating' ? (
-        <Card>
-          <PhaseLoader title="正在依据画像出题" phases={CREATE_PHASES} active={createPhase} elapsedSec={createElapsed} />
-          <div className="sc-btn-row">
-            <Button variant="ghost" onClick={cancelCreate}>
-              取消
-            </Button>
-          </div>
-        </Card>
-      ) : null}
-
-      {view === 'running' && run && currentQuestion ? (
-        <>
-          <div className="sc-actions">
-            <RingProgress
-              size={64}
-              stroke={6}
-              value={answerElapsed % 60}
-              max={60}
-              label={timerLabel}
-              state={submitting ? 'indeterminate' : 'default'}
-              ariaLabel={`本题已用时 ${formatElapsed(Math.min(answerElapsed, TIMER_DISPLAY_MAX_S))}`}
-            />
-            <span className="sc-meta-line">
-              第 {index + 1} / {total} 题 · 已答 {answeredCount} 题
-              {currentScore ? ' · 本题已出分' : submitting ? ' · 正在评分' : ''}
-            </span>
-          </div>
-
-          <div className="sc-chips" aria-label="逐题进度">
-            {run.questions.map((item, slot) => {
-              const slotScore = scores[item.id]
-              return (
-                <span
-                  key={item.id}
-                  className={slotScore ? stripBadgeClass(slotScore) : 'sc-badge sc-muted'}
-                  aria-current={slot === index ? 'step' : undefined}
-                >
-                  Q{slot + 1}
-                  {slotScore ? ` ${formatScore(slotScore.score)}` : ''}
-                </span>
-              )
-            })}
-          </div>
-
-          <QuestionCard
-            index={index}
-            total={total}
-            question={currentQuestion}
-            answer={answers[currentQuestion.id] ?? ''}
-            score={currentScore}
-            submitting={submitting}
-            errorMessage={scoreError ?? undefined}
-            onAnswerChange={(value) => setAnswers((prev) => ({ ...prev, [currentQuestion.id]: value }))}
-            onSubmit={() => void submitAnswer()}
-            onRetry={() => void submitAnswer()}
-          />
-
-          {currentScore ? (
-            <div className="sc-btn-row">
-              <Button onClick={goNext}>{index + 1 < total ? '下一题' : '完成并查看汇总'}</Button>
-              <Button variant="secondary" onClick={reopenAnswer}>
-                重新作答（保留原答案）
-              </Button>
-            </div>
-          ) : null}
-        </>
-      ) : null}
-
-      {view === 'done' && run ? (
-        <>
-          <Card>
-            <div className="sc-qcard-head">
-              <Chip label="本场汇总" />
-              <span className="sc-meta-line">
-                已答 {answeredCount} / {total} 题
-                {answeredCount < total ? `（还有 ${total - answeredCount} 题未作答）` : ' · 全部完成'}
-              </span>
-            </div>
-            <div className="sc-score-side">
-              <RingProgress
-                size={56}
-                stroke={5}
-                value={overallAvg}
-                max={10}
-                label={formatScore(overallAvg)}
-                state={scoreRingState(overallAvg)}
-                ariaLabel={`本次面试均分 ${formatScore(overallAvg)} 分，满分 10 分`}
-              />
-              <p className="sc-mono">本场均分 {formatScore(overallAvg)} / 10</p>
-              <p className="sc-score-comment">
-                技术题 {formatScore(kindAvg('technical'))} · 项目深挖 {formatScore(kindAvg('project'))}
-                {kindAvg('challenge') > 0 ? ` · 进阶 ${formatScore(kindAvg('challenge'))}` : ''}
-              </p>
-            </div>
-            <p className="sc-meta-line">短板与课程由诊断报告统一给出，面试评分只是其中一类证据。</p>
-            <div className="sc-btn-row">
-              <Link className="sc-btn sc-btn--primary" to="/report">
-                生成诊断报告
-              </Link>
-              <Button variant="secondary" onClick={() => setReviewing((value) => !value)}>
-                {reviewing ? '收起本次作答' : '回看本次作答'}
-              </Button>
-            </div>
-          </Card>
-
-          {reviewing
-            ? run.questions.map((item, slot) => {
-                const slotScore = scores[item.id]
-                return (
-                  <Card key={item.id} className="sc-qcard">
-                    <div className="sc-qcard-head">
-                      <Chip label={`Q${slot + 1}`} />
-                      <Chip label={QUESTION_KIND_LABEL[item.kind]} tone="direction" />
-                      <span className="sc-meta-line">
-                        {slotScore ? `${formatScore(slotScore.score)} / 10` : '未作答'}
-                      </span>
-                    </div>
-                    <h2 className="sc-qcard-prompt">{item.prompt}</h2>
-                    <p className="sc-qcard-hint">{(answers[item.id] ?? '').trim() || '（本题未作答）'}</p>
-                    {slotScore ? <ScoreBadge score={slotScore.score} comment={slotScore.comment} /> : null}
-                  </Card>
-                )
-              })
-            : null}
-        </>
-      ) : null}
+      {content}
     </section>
   )
 }

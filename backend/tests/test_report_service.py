@@ -7,6 +7,7 @@ import re
 from typing import Any
 
 import pytest
+from conftest import drive_session
 
 from app import repository
 from app.errors import AI_UNAVAILABLE, AppError
@@ -69,10 +70,8 @@ def _prepare_runs(
 
     fake_ai.responder = _bad_score_responder
     interview = asyncio.run(interview_service.create_run(profile.id, client=fake_ai))
-    for question in interview.questions:
-        asyncio.run(
-            interview_service.score_answer(interview.run_id, question.id, "答不上来", client=fake_ai)
-        )
+    turns = drive_session(interview, fake_ai, answer="答不上来")
+    assert turns and turns[-1].next_question is None, "面试必须被推进到终态（r5：一次一问）"
 
     paper = exam_service.create_run(profile.id)
     exam_service.submit_run(paper.run_id, {question.id: ["Z"] for question in paper.questions})

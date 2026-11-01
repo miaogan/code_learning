@@ -8,6 +8,9 @@ Severity = Literal["high", "medium", "low"]
 CourseLevel = Literal["入门", "进阶"]
 RunKind = Literal["interview", "exam"]
 QuestionKind = Literal["technical", "project", "challenge"]
+ExperienceBand = Literal["应届", "1-3年", "3-5年", "5-10年", "10年以上"]
+InterviewMarket = Literal["国内", "北美", "欧洲", "其他"]
+CompanySize = Literal["大厂", "中型", "初创"]
 ExamKind = Literal["single", "multiple", "text"]
 #: 能力项状态：`active` 参与出题/诊断，`historical` 只留在画像里做记忆（消失项不删，r3 AC-6）。
 SkillStatus = Literal["active", "historical"]
@@ -114,10 +117,29 @@ class ProfilePatch(BaseModel):
     target_role: str | None = None
 
 
+class InterviewSettings(BaseModel):
+    """本场面试的四项设定（r5）：开局可改，落 runs.payload.settings，永不写回画像。"""
+
+    target_role: str = Field(default="通用软件工程师", min_length=1)
+    years_experience: ExperienceBand = "1-3年"
+    market: InterviewMarket = "国内"
+    company_size: CompanySize = "中型"
+
+
+class InterviewSettingsPatch(BaseModel):
+    """开局请求里的设定补丁：4 键全可选，缺省由服务端按画像/默认值补全。"""
+
+    target_role: str | None = None
+    years_experience: ExperienceBand | None = None
+    market: InterviewMarket | None = None
+    company_size: CompanySize | None = None
+
+
 class InterviewCreateRequest(BaseModel):
     """面试出题请求体。profile_id 必须走 body，裸函数签名会被 FastAPI 当 query。"""
 
     profile_id: str
+    settings: InterviewSettingsPatch | None = None
 
 
 class InterviewQuestion(BaseModel):
@@ -125,11 +147,42 @@ class InterviewQuestion(BaseModel):
     kind: QuestionKind
     prompt: str
     hint: str
+    parent_id: str | None = Field(default=None, description="追问：父题 id；正题为 None")
 
 
 class InterviewRun(BaseModel):
+    """开局响应：只投放第 1 条发言（计划正文在 payload.plan，不随响应外泄）。"""
+
     run_id: str
-    questions: list[InterviewQuestion]
+    settings: InterviewSettings
+    question: InterviewQuestion
+    total: int
+
+
+class InterviewSessionQuestion(BaseModel):
+    """会话回溯用的单条发言（题目 + 该题的答案/分数/点评，未答为 None）。"""
+
+    id: str
+    kind: QuestionKind
+    prompt: str
+    hint: str
+    parent_id: str | None = None
+    answer: str | None = None
+    score: float | None = Field(default=None, ge=0, le=10)
+    comment: str | None = None
+
+
+class InterviewSession(BaseModel):
+    """GET /api/interviews/{run_id}：刷新/重进后的完整会话镜像。"""
+
+    run_id: str
+    status: str
+    settings: InterviewSettings | None = None
+    questions: list[InterviewSessionQuestion] = Field(default_factory=list)
+    answered_count: int
+    total: int
+    current_id: str | None = None
+    interview_avg: float | None = None
 
 
 class AnswerRequest(BaseModel):
@@ -140,6 +193,16 @@ class AnswerRequest(BaseModel):
 class ScoreResult(BaseModel):
     score: float = Field(ge=0, le=10)
     comment: str
+
+
+class InterviewTurn(ScoreResult):
+    """单轮响应：本轮评分 + 下一条发言（ScoreResult 超集，score/comment 原样保留）。"""
+
+    next_question: InterviewQuestion | None = None
+    run_status: str
+    answered_count: int
+    total: int
+    interview_avg: float | None = None
 
 
 class ExamOption(BaseModel):
@@ -220,6 +283,9 @@ class Report(BaseModel):
     exam_total: float | None = None
     shortfalls: list[Shortfall]
     generated_at: str
+    interview_settings: InterviewSettings | None = Field(
+        default=None, description="报告引用面试的设定；无面试或旧 run 时为 None"
+    )
 
 
 class RunSummary(BaseModel):
@@ -228,6 +294,9 @@ class RunSummary(BaseModel):
     score: float | None = None
     shortfall_count: int | None = None
     created_at: str
+    interview_settings: InterviewSettings | None = Field(
+        default=None, description="面试 run 的设定；笔试与旧 run 为 None"
+    )
 
 
 # --- 成长时间线（r3 AC-1 / AC-2 / AC-5）---------------------------------------

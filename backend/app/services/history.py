@@ -20,7 +20,8 @@
 from typing import Any
 
 from .. import repository
-from ..schemas import Report, RunSummary
+from ..schemas import InterviewSettings, Report, RunSummary
+from . import rules
 
 INTERVIEW_KIND = "interview"
 EXAM_KIND = "exam"
@@ -85,6 +86,19 @@ def score_of(kind: str, payload: dict[str, Any]) -> float | None:
     return None
 
 
+def _interviews_settings_of(payload: dict[str, Any]) -> InterviewSettings | None:
+    """面试 run 的本场设定投影：`payload.settings` 合法则回读，缺失/非法 → `None`（r5 AC-11）。
+
+    「不补给」是刻意的：r5 之前的面试 run（payload v1）没有 `settings`，笔试 payload 从不写它 ——
+    一律返回 `None` 让页面显示「未记录设定」，绝不用今天的默认值兜底，否则历史记录的
+    「当时设定」会被填成一场从未发生过的配置。返回的是**投影**，不回写任何 run。
+
+    解析口径不在这里另写一份（QA D-5）：唯一实现在 `rules.settings_or_none`，与面试会话页
+    共用，缺一个键的脏 payload 在两处都必须是 `None`，不能一边 `None`、一边补默认值。
+    """
+    return rules.settings_or_none(payload)
+
+
 def _shortfall_count(run_id: str, report: Report | None = None) -> int | None:
     """反查最新报告：该 run 参与生成时返回短板条数，未参与则 `None`。
 
@@ -118,6 +132,11 @@ def list_history(limit: int = DEFAULT_LIMIT) -> list[RunSummary]:
                 score=score_of(kind, row["payload"] or {}),
                 shortfall_count=_shortfall_count(row["id"], report),
                 created_at=row["created_at"],
+                interview_settings=(
+                    _interviews_settings_of(row["payload"] or {})
+                    if kind == INTERVIEW_KIND
+                    else None
+                ),
             )
         )
         if len(summaries) == limit:

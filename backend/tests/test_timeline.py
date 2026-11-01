@@ -16,6 +16,7 @@ import asyncio
 from typing import Any
 
 import pytest
+from conftest import drive_session
 from fastapi.testclient import TestClient
 
 from app import repository
@@ -135,11 +136,12 @@ def test_interview_completion_writes_exactly_one_event(
     fake_ai.responder = _responder_for_paper(INTERVIEW_KINDS)
     run = asyncio.run(interview_service.create_run(profile.id, client=fake_ai))
 
-    for question in run.questions:
-        asyncio.run(
-            interview_service.score_answer(run.run_id, question.id, "我负责组件库重构", client=fake_ai)
-        )
-        assert len(timeline.list_timeline()) <= 1, "未答完不得提前写事件"
+    def _no_event_before_completion(turn: Any) -> None:
+        if turn.next_question is not None:
+            assert len(timeline.list_timeline()) == 0, "未答完不得提前写事件"
+
+    drive_session(run, fake_ai, answer="我负责组件库重构", on_turn=_no_event_before_completion)
+    assert len(timeline.list_timeline()) == 1, "答满整场只写 1 条事件"
 
     stored = repository.get_run(run.run_id)
     assert stored["status"] == repository.RUN_COMPLETED
@@ -187,10 +189,7 @@ def test_interview_event_matches_history_and_diagnosis(
     profile = _seed_profile(profile_factory)
     fake_ai.responder = _responder_for_paper(INTERVIEW_KINDS)
     run = asyncio.run(interview_service.create_run(profile.id, client=fake_ai))
-    for question in run.questions:
-        asyncio.run(
-            interview_service.score_answer(run.run_id, question.id, "补充说明", client=fake_ai)
-        )
+    drive_session(run, fake_ai, answer="补充说明")
 
     event = timeline.list_timeline()[0]
     rows = client.get("/api/history?limit=10").json()
@@ -209,10 +208,7 @@ def test_event_metrics_do_not_drift_after_payload_changes(
     profile = _seed_profile(profile_factory)
     fake_ai.responder = _responder_for_paper(INTERVIEW_KINDS)
     run = asyncio.run(interview_service.create_run(profile.id, client=fake_ai))
-    for question in run.questions:
-        asyncio.run(
-            interview_service.score_answer(run.run_id, question.id, "补充说明", client=fake_ai)
-        )
+    drive_session(run, fake_ai, answer="补充说明")
 
     first = timeline.list_timeline()[0]
     stored = repository.get_run(run.run_id)
@@ -236,10 +232,7 @@ def test_repeated_completion_keeps_single_event(
     profile = _seed_profile(profile_factory)
     fake_ai.responder = _responder_for_paper(INTERVIEW_KINDS)
     run = asyncio.run(interview_service.create_run(profile.id, client=fake_ai))
-    for question in run.questions:
-        asyncio.run(
-            interview_service.score_answer(run.run_id, question.id, "补充说明", client=fake_ai)
-        )
+    drive_session(run, fake_ai, answer="补充说明")
 
     first = timeline.list_timeline()[0]
     stored = repository.get_run(run.run_id)
@@ -261,7 +254,7 @@ def test_ai_failure_writes_no_event(tmp_db: Any, profile_factory: Any, fake_ai: 
     with pytest.raises(AppError) as excinfo:
         asyncio.run(
             interview_service.score_answer(
-                run.run_id, run.questions[0].id, "回答", client=_DownAI()
+                run.run_id, run.question.id, "回答", client=_DownAI()
             )
         )
     assert excinfo.value.code == AI_UNAVAILABLE
@@ -386,10 +379,7 @@ def test_exam_event_has_no_comparison_when_previous_is_interview(
     profile = _seed_profile(profile_factory)
     fake_ai.responder = _responder_for_paper(INTERVIEW_KINDS)
     run = asyncio.run(interview_service.create_run(profile.id, client=fake_ai))
-    for question in run.questions:
-        asyncio.run(
-            interview_service.score_answer(run.run_id, question.id, "补充说明", client=fake_ai)
-        )
+    drive_session(run, fake_ai, answer="补充说明")
     paper = exam_service.create_run(profile.id)
     exam_service.submit_run(paper.run_id, {q.id: ["Z"] for q in paper.questions})
 
@@ -480,10 +470,7 @@ def test_growth_journey_end_to_end(
     fake_ai.responder = _responder_for_paper(INTERVIEW_KINDS)
 
     run = asyncio.run(interview_service.create_run(profile.id, client=fake_ai))
-    for question in run.questions:
-        asyncio.run(
-            interview_service.score_answer(run.run_id, question.id, "补充说明", client=fake_ai)
-        )
+    drive_session(run, fake_ai, answer="补充说明")
     stored = repository.get_run(run.run_id)
     assert stored["status"] == repository.RUN_COMPLETED
 
@@ -504,10 +491,10 @@ def test_growth_journey_end_to_end(
     exam_row = next(row for row in rows if row["type"] == "exam")
     assert exam_row["key_metrics"]["exam_total"] == result.total
 
-    # 重复完成（重放）不再新增
-    for question in run.questions[:1]:
+    # 重复完成（重放）：r5 起已完成会话只读 ⇒ 400 拒绝，时间线不新增（与 QA D-2 同源语义）
+    with pytest.raises(AppError):
         asyncio.run(
-            interview_service.score_answer(run.run_id, question.id, "再答一次", client=fake_ai)
+            interview_service.score_answer(run.run_id, run.question.id, "再答一次", client=fake_ai)
         )
     assert len(client.get("/api/timeline?limit=20").json()) == 3
 

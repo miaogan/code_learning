@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from collections.abc import Callable, Iterator
 from pathlib import Path
@@ -399,3 +400,34 @@ def assert_chinese() -> Callable[[str], None]:
         assert any("\u4e00" <= char <= "\u9fff" for char in text), f"提示必须是中文：{text}"
 
     return _assert
+
+
+def drive_session(
+    run: Any,
+    client: Any = None,
+    *,
+    answer: str = "补充说明",
+    rounds: int = 40,
+    on_turn: Callable[[Any], None] | None = None,
+) -> list[Any]:
+    """把一场面试按 r5 契约推进到结束（一次只投放一条发言），返回每轮的 `InterviewTurn`。
+
+    r5 起 `InterviewRun` 只带第 1 条发言（`run.question`），后续发言从上一轮的 `next_question`
+    取；**不能**再像 r1 那样遍历 `run.questions`（那个字段已随破坏性契约移除）。
+    重放已答旧题会被服务端拒绝（QA D-2），所以这里只按 `current_id` 单向推进。
+    `on_turn` 给需要在「每一轮之后」断言的用例留钩子（例如时间线不得提前写事件）。
+    """
+    from app.services import interview as interview_service
+
+    turns: list[Any] = []
+    question_id = run.question.id
+    while question_id is not None and len(turns) < rounds:
+        turn = asyncio.run(
+            interview_service.score_answer(run.run_id, question_id, answer, client=client)
+        )
+        turns.append(turn)
+        if on_turn is not None:
+            on_turn(turn)
+        question_id = turn.next_question.id if turn.next_question is not None else None
+    return turns
+

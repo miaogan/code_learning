@@ -78,8 +78,31 @@ export interface ProfilePatch {
   target_role?: string | null
 }
 
+/* ------------------------------------------------------------------ *
+ * r5 契约 · 面试会话与四项配置（TECHNICAL §2.6；与 backend/app/schemas.py 逐字段镜像）
+ * ------------------------------------------------------------------ */
+
+export type ExperienceBand = '应届' | '1-3年' | '3-5年' | '5-10年' | '10年以上'
+export type InterviewMarket = '国内' | '北美' | '欧洲' | '其他'
+export type CompanySize = '大厂' | '中型' | '初创'
+
+export interface InterviewSettings {
+  target_role: string
+  years_experience: ExperienceBand
+  market: InterviewMarket
+  company_size: CompanySize
+}
+
+export interface InterviewSettingsPatch {
+  target_role?: string
+  years_experience?: ExperienceBand
+  market?: InterviewMarket
+  company_size?: CompanySize
+}
+
 export interface InterviewCreateRequest {
   profile_id: string
+  settings?: InterviewSettingsPatch
 }
 
 export interface InterviewQuestion {
@@ -87,11 +110,15 @@ export interface InterviewQuestion {
   kind: 'technical' | 'project' | 'challenge'
   prompt: string
   hint: string
+  parent_id: string | null
 }
 
+/** 开局响应：只投放第 1 条发言（计划正文在服务端 payload.plan，不外泄）。 */
 export interface InterviewRun {
   run_id: string
-  questions: InterviewQuestion[]
+  settings: InterviewSettings
+  question: InterviewQuestion
+  total: number
 }
 
 export interface AnswerRequest {
@@ -102,6 +129,38 @@ export interface AnswerRequest {
 export interface ScoreResult {
   score: number
   comment: string
+}
+
+/** 单轮响应：本轮评分 + 下一条发言（ScoreResult 超集）。 */
+export interface InterviewTurn extends ScoreResult {
+  next_question: InterviewQuestion | null
+  run_status: 'running' | 'completed'
+  answered_count: number
+  total: number
+  interview_avg: number | null
+}
+
+export interface InterviewSessionQuestion {
+  id: string
+  kind: 'technical' | 'project' | 'challenge'
+  prompt: string
+  hint: string
+  parent_id: string | null
+  answer: string | null
+  score: number | null
+  comment: string | null
+}
+
+/** GET /api/interviews/{run_id}：刷新/重进后的完整会话镜像。 */
+export interface InterviewSession {
+  run_id: string
+  status: 'running' | 'completed'
+  settings: InterviewSettings | null
+  questions: InterviewSessionQuestion[]
+  answered_count: number
+  total: number
+  current_id: string | null
+  interview_avg: number | null
 }
 
 export interface ExamOption {
@@ -175,6 +234,7 @@ export interface Report {
   exam_total: number | null
   shortfalls: Shortfall[]
   generated_at: string
+  interview_settings: InterviewSettings | null
 }
 
 export interface RunSummary {
@@ -183,6 +243,7 @@ export interface RunSummary {
   score: number | null
   shortfall_count: number | null
   created_at: string
+  interview_settings: InterviewSettings | null
 }
 
 export interface ApiErrorBody {

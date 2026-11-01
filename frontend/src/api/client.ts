@@ -9,6 +9,8 @@ import type {
   Health,
   InterviewCreateRequest,
   InterviewRun,
+  InterviewSession,
+  InterviewTurn,
   Profile,
   ProfilePatch,
   ProfileWithMerge,
@@ -20,7 +22,6 @@ import type {
   ReportGenerateRequest,
   ResumeMeta,
   RunSummary,
-  ScoreResult,
   TimelineEvent,
 } from './types'
 
@@ -137,11 +138,15 @@ export const api = {
   createInterview: (payload: InterviewCreateRequest): Promise<InterviewRun> =>
     request<InterviewRun>('/api/interviews', jsonInit('POST', payload)),
 
-  scoreAnswer: (runId: string, payload: AnswerRequest): Promise<ScoreResult> =>
-    request<ScoreResult>(
+  scoreAnswer: (runId: string, payload: AnswerRequest): Promise<InterviewTurn> =>
+    request<InterviewTurn>(
       `/api/interviews/${encodeURIComponent(runId)}/answers`,
       jsonInit('POST', payload),
     ),
+
+  /** 会话回溯（r5）：刷新 / 重进 ?run_id= 时恢复整场对话与设定。 */
+  getInterview: (runId: string, signal?: AbortSignal): Promise<InterviewSession> =>
+    request<InterviewSession>(`/api/interviews/${encodeURIComponent(runId)}`, { signal }),
 
   createExam: (payload: ExamCreateRequest): Promise<ExamRun> =>
     request<ExamRun>('/api/exams', jsonInit('POST', payload)),

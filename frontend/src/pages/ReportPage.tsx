@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { ApiError, api } from '../api/client'
 import type { Report } from '../api/types'
 import { scoreRingState } from '../components/interview/ScoreBadge'
+import { SettingsBar } from '../components/interview/SettingsBar'
 import { ShortfallCard } from '../components/report/ShortfallCard'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
@@ -181,6 +182,12 @@ export default function ReportPage() {
           短板按严重度从高到低排序，每条都带题目证据、建议动作与推荐课程
         </p>
       </header>
+
+      {/*
+        本场设定条（AC-12 / DESIGN §2.6）：取参与本报告的最新面试设定，置于页头之下、正文之上。
+        `interview_settings` 为 null（报告只含笔试 / 旧记录）→ 整行不渲染，不出现空条或「暂无」占位。
+      */}
+      {report?.interview_settings ? <SettingsBar settings={report.interview_settings} /> : null}
 
       <div className="sc-profile-dim">
         {generating ? (

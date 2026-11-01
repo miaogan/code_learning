@@ -11,6 +11,12 @@ export interface TimelineEventProps {
   event: TimelineEventData
   /** 列表首条（服务端 `occurred_at` 倒序的第一条）：全屏仅此一处 accent 强调（DESIGN §0.3）。 */
   latest?: boolean
+  /**
+   * 面试事件卡第三行「本场设定」（AC-11 / DESIGN §2.5）：`岗位 · 经验 · 市场 · 规模`，
+   * 旧记录（`null` 设定）为「未记录设定」。由 `TimelineSection` 用既有 `ref_id ↔ runRows.id`
+   * 关联后传入 —— 本组件只接收文本，不含任何业务判断与二次拼接。
+   */
+  settingsText?: string | null
 }
 
 /** 类型徽章文案：文字承载语义，颜色不单独表意（DESIGN §5 冗余编码）。 */
@@ -121,7 +127,7 @@ function ShortfallChips({
  * - 整卡可点展开（DESIGN §0.3），键盘走展开按钮（`aria-expanded` / `aria-controls`）；
  * - 展开后焦点移到对比块标题（`tabindex="-1"`），折叠后焦点回到按钮（DESIGN §4）。
  */
-export function TimelineEvent({ event, latest = false }: TimelineEventProps) {
+export function TimelineEvent({ event, latest = false, settingsText = null }: TimelineEventProps) {
   const [expanded, setExpanded] = useState(false)
   const panelId = useId()
   const toggleRef = useRef<HTMLButtonElement>(null)
@@ -156,6 +162,9 @@ export function TimelineEvent({ event, latest = false }: TimelineEventProps) {
   const classes = ['sc-tl-event']
   if (expanded) classes.push('is-expanded')
   if (latest) classes.push('is-latest')
+  // 面试事件多一行「本场设定」：卡高走 --tl-row-h-lg 112（DESIGN §0.5-8），其余类型保持 88。
+  // 只有第三行**真的要渲染**时才加 `is-interview`：趋势表未取到（runRows 为 null）时不留 24px 空槽。
+  if (type === 'interview' && settingsText) classes.push('is-interview')
 
   return (
     <div className={classes.join(' ')} onClick={onCardClick}>
@@ -197,6 +206,11 @@ export function TimelineEvent({ event, latest = false }: TimelineEventProps) {
           // 无短板变化（简历事件 / 短板为空）：用服务端组装的一句话占位，不留空行
           <p className="sc-tl-meta">{event.summary}</p>
         )}
+
+        {/* 第三行「本场设定」（AC-11）：旧记录同字号同色显示「未记录设定」，不留空白、不出现 undefined */}
+        {type === 'interview' && settingsText ? (
+          <p className="sc-tl-settings">{settingsText}</p>
+        ) : null}
 
         {expanded ? (
           <div id={panelId} className={comparison === null ? 'sc-cmp is-first' : 'sc-cmp'}>

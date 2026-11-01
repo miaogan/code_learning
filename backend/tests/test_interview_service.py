@@ -106,15 +106,19 @@ def test_create_run_returns_questions_without_answers(
 
     run = asyncio.run(interview_service.create_run(profile.id, client=fake_ai))
 
-    assert len(run.questions) >= rules.MIN_INTERVIEW_QUESTIONS
-    for question in run.questions:
-        assert set(question.model_dump()) == {"id", "kind", "prompt", "hint"}
+    assert run.question.id == "iq-1", "开局只投放第 1 条发言（r5 AC-4）"
+    assert set(run.question.model_dump()) == {"id", "kind", "prompt", "hint", "parent_id"}
+    assert run.question.parent_id is None, "第 1 条是计划正题，不是追问"
     stored = repository.get_run(run.run_id)
     assert stored is not None
     assert stored["kind"] == "interview"
     assert stored["profile_id"] == profile.id
-    assert stored["payload"]["total"] == len(run.questions)
-    assert stored["payload"]["answered_count"] == 0
+    payload = stored["payload"]
+    assert len(payload["questions"]) == 1, "整场计划留在 payload.plan，不预铺题目列表"
+    assert len(payload["plan"]) >= rules.MIN_INTERVIEW_QUESTIONS
+    assert payload["total"] == len(payload["plan"])
+    assert run.total == len(payload["plan"])
+    assert payload["answered_count"] == 0
 
 
 def test_create_run_unknown_profile_404(tmp_db: Any, fake_ai: Any) -> None:
@@ -146,44 +150,59 @@ def test_score_answer_persists_then_completes_run(
     assert interview_service.SCORING_TIMEOUT_S <= 15.0, "AC-3 要求单题评分 15s 内"
 
     run = asyncio.run(interview_service.create_run(profile.id, client=fake_ai))
-    first = run.questions[0]
+    question_id: str | None = run.question.id
+    turns = 0
 
-    result = asyncio.run(
-        interview_service.score_answer(run.run_id, first.id, "我负责组件库重构", client=fake_ai)
-    )
-    assert isinstance(result, ScoreResult)
-    assert 0.0 <= result.score <= 10.0
-    assert result.comment
-    assert fake_ai.calls[-1][2] is None or fake_ai.calls[-1][2] <= 15.0
+    while question_id is not None:
+        result = asyncio.run(
+            interview_service.score_answer(run.run_id, question_id, "我负责组件库重构", client=fake_ai)
+        )
+        turns += 1
+        assert isinstance(result, ScoreResult)
+        assert 0.0 <= result.score <= 10.0
+        assert result.comment
+        assert result.answered_count == turns
+        assert fake_ai.calls[-1][2] is None or fake_ai.calls[-1][2] <= 15.0
+
+        question_id = result.next_question.id if result.next_question is not None else None
+        if question_id is not None:
+            stored = repository.get_run(run.run_id)
+            assert stored is not None
+            assert stored["status"] != repository.RUN_COMPLETED, "未答完不能提前标 completed"
+            assert stored["payload"]["current_id"] == question_id
+
+    assert turns == len(VALID_KINDS), "计划 8 题逐轮推进，一次只投放一条发言"
 
     stored = repository.get_run(run.run_id)
     assert stored is not None
-    assert stored["payload"]["answered_count"] == 1
-    assert stored["status"] != repository.RUN_COMPLETED, "未答完不能提前标 completed"
-
-    for question in run.questions[1:]:
-        asyncio.run(
-            interview_service.score_answer(run.run_id, question.id, "补充说明", client=fake_ai)
-        )
-
-    stored = repository.get_run(run.run_id)
-    assert stored["payload"]["answered_count"] == len(run.questions)
+    assert stored["payload"]["answered_count"] == len(VALID_KINDS)
+    assert len(stored["payload"]["questions"]) == len(VALID_KINDS)
+    assert stored["payload"]["current_id"] is None
     assert stored["status"] == repository.RUN_COMPLETED
+    assert len(repository.list_timeline_events()) == 1, "完成态只写 1 条时间线事件"
 
 
-def test_reanswer_same_question_is_idempotent(
+def test_replay_answered_question_rejected(
     tmp_db: Any, profile_factory: Any, fake_ai: Any
 ) -> None:
+    """已答旧题再提交一次：400 + 零副作用（QA D-2；旧断言「覆盖计分」即缺陷本体）。"""
     profile = _seed_profile(profile_factory)
     fake_ai.responder = _responder_for_paper(VALID_KINDS)
     run = asyncio.run(interview_service.create_run(profile.id, client=fake_ai))
-    first = run.questions[0]
+    first = run.question
+    asyncio.run(interview_service.score_answer(run.run_id, first.id, "第一次作答", client=fake_ai))
+    before = repository.get_run(run.run_id)["payload"]
 
-    for _ in range(2):
+    with pytest.raises(AppError) as excinfo:
         asyncio.run(interview_service.score_answer(run.run_id, first.id, "再答一次", client=fake_ai))
 
+    assert excinfo.value.status == 400
     stored = repository.get_run(run.run_id)
-    assert stored["payload"]["answered_count"] == 1
+    assert stored is not None
+    payload = stored["payload"]
+    assert payload == before, "重放不得改写既成事实"
+    assert payload["answered_count"] == 1
+    assert payload["questions"][0]["answer"] == "第一次作答"
 
 
 def test_score_answer_unknown_run_404(tmp_db: Any, fake_ai: Any) -> None:

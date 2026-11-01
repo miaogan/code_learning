@@ -176,18 +176,22 @@ def test_interview_create_and_answer(
     created = client.post("/api/interviews", json={"profile_id": profile.id})
     assert created.status_code == 200
     run = created.json()
-    assert len(run["questions"]) >= rules.MIN_INTERVIEW_QUESTIONS
-    for question in run["questions"]:
-        assert set(question) == {"id", "kind", "prompt", "hint"}
+    # r5 契约：开局只投放第 1 条发言（计划留在 payload.plan，不随响应铺开）
+    assert set(run) == {"run_id", "settings", "question", "total"}
+    assert set(run["question"]) == {"id", "kind", "prompt", "hint", "parent_id"}
+    assert run["question"]["id"] == "iq-1"
+    assert run["total"] >= rules.MIN_INTERVIEW_QUESTIONS
 
     answered = client.post(
         f"/api/interviews/{run['run_id']}/answers",
-        json={"question_id": run["questions"][0]["id"], "answer": "我负责组件库重构"},
+        json={"question_id": run["question"]["id"], "answer": "我负责组件库重构"},
     )
     assert answered.status_code == 200
-    score = answered.json()
-    assert 0 <= score["score"] <= 10
-    assert score["comment"]
+    turn = answered.json()
+    assert 0 <= turn["score"] <= 10
+    assert turn["comment"]
+    assert turn["answered_count"] == 1
+    assert turn["next_question"]["id"] == "iq-2", "同轮返回下一条发言"
 
     missing_run = client.post(
         "/api/interviews/no-such-run/answers",
@@ -459,12 +463,19 @@ def test_full_flow_reaches_terminal_report(
     interview = client.post("/api/interviews", json={"profile_id": profile_id})
     assert interview.status_code == 200
     run = interview.json()
-    for question in run["questions"]:
+    # r5：一次一问，逐轮按 next_question 推进到终态（不再预铺 8 题）
+    question_id: str | None = run["question"]["id"]
+    rounds = 0
+    while question_id is not None:
         answer = client.post(
             f"/api/interviews/{run['run_id']}/answers",
-            json={"question_id": question["id"], "answer": "结合项目讲了做法与结果"},
+            json={"question_id": question_id, "answer": "结合项目讲了做法与结果"},
         )
         assert answer.status_code == 200
+        turn = answer.json()
+        rounds += 1
+        question_id = turn["next_question"]["id"] if turn["next_question"] else None
+    assert rounds >= rules.MIN_INTERVIEW_QUESTIONS
 
     paper = client.post("/api/exams", json={"profile_id": profile_id})
     assert paper.status_code == 200

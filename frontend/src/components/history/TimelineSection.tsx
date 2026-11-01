@@ -5,6 +5,7 @@ import { EmptyState } from '../ui/EmptyState'
 import { InlineError } from '../ui/InlineError'
 import { PhaseLoader } from '../ui/PhaseLoader'
 import { TimelineEvent } from './TimelineEvent'
+import { settingsTextOf } from './TrendTable'
 
 export interface TimelineSectionProps {
   /**
@@ -22,6 +23,18 @@ const DEFAULT_LIMIT = 20
 /** 「测评事件」= 面试 / 笔试；简历事件不计入趋势表行数的对比（趋势表只含测评）。 */
 function isRunEvent(event: TimelineEventData): boolean {
   return event.type === 'interview' || event.type === 'exam'
+}
+
+/**
+ * 时间线事件卡第三行「本场设定」（AC-11 / DESIGN §2.5）——**零新契约字段**：
+ * 时间线接口本身不带设定，用既有 `event.ref_id` ↔ 趋势表 `runRows.id` 关联，
+ * 文本仍由 `settingsTextOf`（→ `SettingsBar.settingsLine`）单点产出，不在此另拼。
+ * `runRows` 未取得 / 没有对应 run（时间线里有趋势表未覆盖的事件）→ `null`（第三行不渲染）。
+ */
+function settingsTextFor(rows: RunSummary[] | null, refId: string): string | null {
+  if (rows === null) return null
+  const row = rows.find((item) => item.id === refId)
+  return row === undefined ? null : settingsTextOf(row)
 }
 
 /**
@@ -108,7 +121,12 @@ export function TimelineSection({ runRows, limit = DEFAULT_LIMIT }: TimelineSect
           tabIndex={0}
         >
           {events.map((event, index) => (
-            <TimelineEvent key={event.id} event={event} latest={index === 0} />
+            <TimelineEvent
+              key={event.id}
+              event={event}
+              latest={index === 0}
+              settingsText={settingsTextFor(runRows, event.ref_id)}
+            />
           ))}
         </div>
       ) : null}

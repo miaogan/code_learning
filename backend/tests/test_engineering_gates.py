@@ -109,3 +109,28 @@ def test_no_raw_colors_outside_tokens() -> None:
             offenders.append(f"{css.relative_to(REPO_ROOT)}: {len(hits)} 处")
     assert not offenders, f"非 tokens.css 出现裸色值：{offenders}"
 
+
+#: 项目根只允许团队文档；其余命令输出 / scratch 必须留在 logs/（已被 gitignore 挡住）。
+ROOT_FILES_ALLOWED = {"AGENTS.md", "README.md"}
+DUMP_SUFFIXES = {".log", ".out", ".txt", ".dump", ".tmp"}
+
+
+def test_no_command_output_dumps_in_repo_root() -> None:
+    """r5 QA D-4：dev 轮次的命令输出 dump 不得散落项目根（收口提交会连带入库）。"""
+    offenders = [
+        path.name
+        for path in REPO_ROOT.iterdir()
+        if path.is_file()
+        and path.name not in ROOT_FILES_ALLOWED
+        and not path.name.startswith(".git")
+        and (path.suffix in DUMP_SUFFIXES or path.name.startswith("_"))
+    ]
+    assert not offenders, f"项目根散落命令输出 dump（请移到 logs/teamflow/<runId>/）：{offenders}"
+
+
+def test_run_logs_stay_out_of_git() -> None:
+    """运行日志是 transient scratch：`logs/teamflow/` 必须被 gitignore 挡住。"""
+    ignored = (REPO_ROOT / ".gitignore").read_text(encoding="utf-8")
+    assert re.search(r"^logs/teamflow/$", ignored, re.MULTILINE), "运行日志未纳入 gitignore"
+
+

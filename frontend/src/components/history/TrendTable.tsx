@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { RunKind, RunSummary } from '../../api/types'
 import { formatScore } from '../../lib/format'
+import { settingsLine } from '../interview/chatModel'
 import { Chip } from '../ui/Chip'
 
 export interface TrendTableProps {
@@ -43,6 +44,17 @@ function scoreText(kind: RunKind, score: number | null): string {
   if (score === null || !Number.isFinite(score)) return DASH
   const body = kind === 'interview' ? formatScore(score) : trimmed(score)
   return `${body} ${KIND_UNIT[kind]}`
+}
+
+/**
+ * 历史行「本场设定」文本（AC-11）：面试行的设定由服务端投影 `RunSummary.interview_settings` 给出，
+ * 旧记录（`null`）同字号同色显示「未记录设定」；笔试卷没有「本场设定」概念，返回 `null` 整行不渲染。
+ * 文本一律经 `settingsLine`（唯一格式化入口），禁止在页面/组件里另拼一份，否则会出现
+ * 「未记录设定 / undefined」三处漂移（TECHNICAL §重复风险-1）。
+ */
+export function settingsTextOf(row: RunSummary): string | null {
+  if (row.kind !== 'interview') return null
+  return settingsLine(row.interview_settings)
 }
 
 type DeltaTone = 'up' | 'down' | 'flat' | 'none'
@@ -109,12 +121,14 @@ export function TrendTable({ rows }: TrendTableProps) {
           const delta = deltaOf(rows, index)
           const shortfalls =
             row.shortfall_count === null ? DASH : `${row.shortfall_count} 条`
+          const settings = settingsTextOf(row)
           return (
             <div className="sc-card" key={row.id}>
               <div className="sc-meta-line">
                 <Chip label={KIND_LABEL[row.kind]} tone="direction" />
                 <span className="sc-mono">{formatWhen(row.created_at)}</span>
               </div>
+              {settings === null ? null : <p className="sc-td-settings">{settings}</p>}
               <p className="sc-meta-line">
                 分数 <span className="sc-mono">{scoreText(row.kind, row.score)}</span>
               </p>
@@ -145,10 +159,14 @@ export function TrendTable({ rows }: TrendTableProps) {
       <tbody>
         {rows.map((row, index) => {
           const delta = deltaOf(rows, index)
+          const settings = settingsTextOf(row)
           return (
             <tr key={row.id}>
               <td>
-                <Chip label={KIND_LABEL[row.kind]} tone="direction" />
+                <div className="sc-td-kind">
+                  <Chip label={KIND_LABEL[row.kind]} tone="direction" />
+                  {settings === null ? null : <span className="sc-td-settings">{settings}</span>}
+                </div>
               </td>
               <td className="sc-mono">{formatWhen(row.created_at)}</td>
               <td className="sc-mono">{scoreText(row.kind, row.score)}</td>

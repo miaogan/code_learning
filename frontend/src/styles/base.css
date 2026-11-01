@@ -2364,6 +2364,602 @@ input:not([type='radio']):not([type='checkbox']):not([type='file']):disabled {
   margin-top: var(--sp-2);
 }
 
+/* ==========================================================================================
+   r5 基座（DESIGN r5 §0 / §2.3 / §2.5 / §2.6）：
+   面试对话流 .sc-iq-* / 本场设定条 .sc-settings-bar* / 历史面试卡变体 .sc-tl-event.is-interview /
+   趋势表设定行 .sc-td-* 。
+   约束：只用 tokens.css 变量（r5 新增 8 个尺寸 token 见 §0.2，既有值一个不改）；1px 边框、2px 竖条、
+   6px 圆点无对应 token，沿用既有裸值约定并在行内注明推导（AGENTS §4）。
+   语义：一场面试是一条往下长的时间线 —— 评分与点评长在候选人气泡里（AC-5），
+   题号只回看已问过的（AC-4），设定文本由 SettingsBar.settingsLine 单点产出（AC-11）。
+   ========================================================================================== */
+
+/* ---------- 对话列（720 = --iq-col-w；左对齐，与页头标题同基线，§0.5-7） ---------- */
+.sc-iq-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  width: 100%;
+  max-width: var(--iq-col-w);
+  min-width: 0;
+  /* 底部留白 172（= 粘性输入区 156 + 16）：容器尾部留够空间，页尾才「放得开」粘性输入区，
+     最后一条候选人气泡的评分区才能完整滚出（§0.5-1 / AC-18）。配置态在下面归零。 */
+  padding-bottom: var(--iq-scroll-pad);
+}
+
+/* 会话计数行 / 输入区标尺：12/16 tertiary；≥13s 转 warn（§0.3） */
+.sc-iq-meta {
+  margin: 0;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+}
+
+.sc-iq-meta.is-warn {
+  color: var(--warn);
+}
+
+/* ---------- 本场设定摘要条（会话顶 / 报告顶共用；48 = 边框 1×2 + padding 12×2 + 正文 22） ---------- */
+.sc-settings-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  min-height: var(--merge-bar-h);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--accent-wash-06);
+  border: 1px solid var(--border-subtle);
+  border-left: 2px solid var(--accent);
+  border-radius: var(--radius-8);
+}
+
+/* 四项「 · 」连接；窄屏允许换行（min-height 自适应），不截断不省略（§0.5-10） */
+.sc-settings-bar-text {
+  min-width: 0;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--text-primary);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* 报告页：页头之下、正文之上（DESIGN §2.6）——null 时整条不渲染，所以这里只给存在时的下间距 */
+.sc-settings-bar + .sc-profile-dim {
+  margin-top: var(--sp-4);
+}
+
+/* ---------- 气泡流容器（只有一层滚动：页面主滚动；气泡之间 gap 16） ---------- */
+.sc-iq-stream {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  min-width: 0;
+}
+
+/* 槽位 = 滚动锚点：底部留 172 让最后一条评分区完整滚出粘性输入区（§0.4 / §0.5-1） */
+.sc-iq-slot {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  scroll-margin-top: calc(var(--topbar-h) + var(--sp-3));
+  scroll-margin-bottom: var(--iq-scroll-pad);
+}
+
+/* 只有「本轮新增」的 1–2 条入场；恢复会话不重播（§0.4） */
+.sc-iq-slot.is-new {
+  animation: sc-iq-in var(--base) var(--ease) both;
+}
+
+/* 顶部说明（轮次提示等）：不进入气泡流 */
+.sc-iq-notice {
+  margin: 0;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+}
+
+/* 配置态没有粘性输入区：172 底部留白归零，不长出空白页脚（`:has` 不支持时只多出空白，不遮挡内容） */
+.sc-iq-col:has(.sc-iq-setup) {
+  padding-bottom: 0;
+}
+
+/* ---------- 单条消息（身份行在气泡外，与气泡间距 4；宽 ≤ 640 = --iq-bubble-max） ---------- */
+.sc-iq-msg {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: var(--iq-bubble-max);
+  min-width: 0;
+}
+
+.sc-iq-msg--interviewer {
+  align-items: flex-start;
+}
+
+.sc-iq-msg--candidate {
+  align-items: flex-end;
+}
+
+/* 身份行高 16：6px 圆点 + 12/16 文案；题号 chip 24 时行高由 chip 决定 */
+.sc-iq-who-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  min-height: var(--lh-meta);
+  margin-bottom: var(--sp-1);
+}
+
+/* 6 = 圆点直径（tokens 无该值，沿用 r1 §0.3 的圆点口径） */
+.sc-iq-dot {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+}
+
+/* 候选人圆点走中性色：一眼分清左右两侧是谁在说话 */
+.sc-iq-msg--candidate .sc-iq-dot {
+  background: var(--text-tertiary);
+}
+
+.sc-iq-who {
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  font-weight: 500;
+  color: var(--text-tertiary);
+}
+
+.sc-iq-who-meta {
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+}
+
+/* 题号 / 题型 chip：高 24 pill、非交互（AC-8 证据反查用的就是这串 Q 编号） */
+.sc-iq-qno,
+.sc-iq-kind {
+  display: inline-flex;
+  align-items: center;
+  height: var(--chip-h);
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--overlay-06);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.sc-iq-qno {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 「↳ 追问自 Q2」：非交互，只回指父题（AC-6） */
+.sc-iq-parent {
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+/* ---------- 气泡本体（圆角 12、padding 12；面试官左（左上角 4）/ 候选人右（右上角 4）） ---------- */
+.sc-iq-bubble {
+  width: fit-content;
+  max-width: 100%;
+  padding: var(--sp-3);
+  border-radius: var(--radius-12);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  overflow-wrap: anywhere;
+}
+
+.sc-iq-bubble--interviewer {
+  background: var(--bg-raised);
+  border: 1px solid var(--border-subtle);
+  border-top-left-radius: var(--radius-4);
+  box-shadow: var(--elev-1);
+}
+
+.sc-iq-bubble--candidate {
+  background: var(--accent-wash-06);
+  border: 1px solid var(--accent-line-30);
+  border-top-right-radius: var(--radius-4);
+}
+
+/* 正文逐字展示：作答里的换行原样保留（不 trim、不改写） */
+.sc-iq-text {
+  margin: 0;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--text-primary);
+  white-space: pre-wrap;
+}
+
+/* 面试官气泡内「提示」行（与题面间距 8） */
+.sc-iq-hint {
+  margin: var(--sp-2) 0 0;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-secondary);
+}
+
+.sc-iq-hint-label {
+  margin-right: var(--sp-1);
+  color: var(--text-tertiary);
+}
+
+/* 正文与评分区之间 1px 分隔（左右各缩进 12 = 气泡 padding，故不加负 margin，§0.3） */
+.sc-iq-divider {
+  height: 0;
+  margin: var(--sp-3) 0;
+  border-top: 1px solid var(--border-hair);
+}
+
+/* ---------- 气泡内评分区（最小高 88 = padding 8×2 + 行一 24 + gap 8 + 点评 2 行 40，§0.5-2） ---------- */
+.sc-iq-strip {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-height: var(--iq-strip-min-h);
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--bg-inset);
+  border-radius: var(--radius-8);
+}
+
+.sc-iq-strip-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  min-height: var(--badge-h);
+}
+
+.sc-iq-score-label {
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+/* 得分徽章：最小宽 104 防数字串宽抖动（§0.5-3）；等宽 16/19 600、数字左对齐 */
+.sc-iq-score {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-width: var(--iq-score-w);
+  height: var(--badge-h);
+  padding: 0 var(--sp-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-value-sm);
+  line-height: var(--lh-value-sm);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* 三档只换既有语义色的 tint/line（>7 良好 / 4–7 一般 / <4 薄弱，与 ScoreBadge 同一阈值） */
+.sc-iq-score--good {
+  background: var(--success-tint-10);
+  border-color: var(--success-line-55);
+  color: var(--success);
+}
+
+.sc-iq-score--mid {
+  background: var(--warn-tint-12);
+  border-color: var(--warn-line-35);
+  color: var(--warn);
+}
+
+.sc-iq-score--low {
+  background: var(--danger-tint-12);
+  border-color: var(--danger-line-55);
+  color: var(--danger);
+}
+
+/* 档位词：数字之外的第二通道，颜色不单独表意（AC-18 / §0.6） */
+.sc-iq-tier {
+  display: inline-flex;
+  align-items: center;
+  height: var(--badge-h);
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--overlay-06);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* 点评逐字：不 line-clamp、不 trim、不加省略号（AC-5）；pre-wrap 承接服务端换行 */
+.sc-iq-comment {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  padding-left: var(--sp-3);
+  border-left: 2px solid var(--accent);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* ---------- 轮次占位泡（评分中；不用全屏 loader，已答内容始终可见） ---------- */
+.sc-iq-bubble--pending {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.sc-iq-pending-text {
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+}
+
+/* ---------- 粘性输入区（156 = padding 12×2 + 输入 84 + gap 8 + 按钮行 40，§0.5-1） ---------- */
+.sc-iq-composer {
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-height: var(--iq-composer-h);
+  padding: var(--sp-3);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-12);
+  box-shadow: var(--elev-1);
+}
+
+/* 作答框 84 高起、128（5 行）封顶后框内滚动：粘性区高度有上界，永不遮住整屏（§0.5-1） */
+.sc-iq-input {
+  min-height: var(--iq-input-h);
+  max-height: var(--textarea-min-h);
+  resize: none;
+  overflow-y: auto;
+}
+
+.sc-iq-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  min-height: var(--btn-h);
+}
+
+/* 只读态：底 bg-surface + tertiary + not-allowed，不用 opacity（AC-18 对比度） */
+.sc-iq-composer.is-readonly .sc-iq-input {
+  background: var(--bg-surface);
+  color: var(--text-tertiary);
+  cursor: not-allowed;
+}
+
+/* 只读提示条（48，圆角 8；会话结束态与输入区内复用） */
+.sc-iq-readonly {
+  display: flex;
+  align-items: center;
+  min-height: var(--merge-bar-h);
+  margin: 0;
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--bg-inset);
+  border: 1px solid var(--border-hair);
+  border-left: 2px solid var(--border-strong);
+  border-radius: var(--radius-8);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--text-secondary);
+}
+
+/* ---------- 配置卡（宽 720、padding 24；Card 已给表面/圆角/--elev-1，这里只补几何） ---------- */
+.sc-iq-setup {
+  width: 100%;
+  max-width: var(--iq-col-w);
+  padding: var(--sp-6);
+}
+
+/* 选项 chip（高 32 = --btn-h-sm、pill、13/20；未选中性 / 已选 accent + 「✓」双通道） */
+.sc-iq-chip {
+  height: var(--btn-h-sm);
+  padding: 0 var(--sp-3);
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  white-space: nowrap;
+}
+
+.sc-iq-chip.is-clickable {
+  cursor: pointer;
+  transition: background-color var(--fast) var(--ease), border-color var(--fast) var(--ease);
+}
+
+/* 未选 hover 只提亮边框，底回到静止态（§0.3），避免与 .sc-chip 的 hover 底叠加 */
+.sc-iq-chip.is-clickable:hover {
+  border-color: var(--border-strong);
+  background: var(--overlay-06);
+}
+
+.sc-iq-chip.is-clickable:active {
+  background: var(--overlay-10);
+}
+
+.sc-iq-chip.is-selected {
+  background: var(--accent-tint);
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+/* ---------- 结束态汇总块（列内，圆角 12、padding 20；56 环 + 均分 + 分类均分，§2.4） ---------- */
+.sc-iq-summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-5);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-12);
+  box-shadow: var(--elev-1);
+}
+
+.sc-iq-summary-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-4);
+}
+
+.sc-iq-summary-nums {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  min-width: 0;
+}
+
+.sc-iq-summary-avg {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-value-sm);
+  line-height: var(--lh-value-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.sc-iq-summary-sub {
+  margin: 0;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+}
+
+.sc-iq-summary-kinds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  margin: 0;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--text-secondary);
+}
+
+.sc-iq-summary-kind {
+  white-space: nowrap;
+}
+
+.sc-iq-summary-note,
+.sc-iq-summary-hint {
+  margin: 0;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+}
+
+.sc-iq-summary-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+/* ---------- 历史页面试事件卡第三行「本场设定」（AC-11，§2.5） ---------- */
+/* 112 = r3 88 + gap 8 + 设定行 16（§0.5-8）；用 min-height 而非固定高，长岗位名换行也不被切 */
+.sc-tl-event.is-interview {
+  min-height: var(--tl-row-h-lg);
+}
+
+/* 旧记录同字号同色显示「未记录设定」：不留空白、不出现 undefined */
+.sc-tl-settings {
+  margin: 0;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* ---------- 趋势表首列的设定行（AC-11：字段就在 RunSummary.interview_settings） ---------- */
+.sc-td-kind {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-1);
+  min-width: 0;
+}
+
+/* 同一类既用于表格单元格（<span>）也用于窄屏卡（<p>）：margin 归零，否则 <p> 默认上下 margin 会顶开卡内间距 */
+.sc-td-settings {
+  margin: 0;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+  white-space: normal;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+/* ---------- 窄屏（390：视口 390 − 页 padding 24×2 = 342，§0.5-9 / §0.5-11） ---------- */
+@media (max-width: 640px) {
+  .sc-iq-col,
+  .sc-iq-setup {
+    max-width: 100%;
+  }
+
+  /* 气泡退化为百分比：仍留 12% 左右对齐差足以区分发言人 */
+  .sc-iq-msg {
+    max-width: 88%;
+  }
+
+  .sc-iq-setup {
+    padding: var(--sp-4);
+  }
+
+  .sc-iq-summary {
+    padding: var(--sp-4);
+  }
+
+  /* 窄屏证据 chip：r1 的 .sc-evidence-chip 是 nowrap 单行（桌面 1080 够用），390 下长证据会撑出
+     横向滚动（/report 实测 scrollWidth 405 > 390，AC-18）。窄屏改「可换行 + 高度自适应」，证据仍
+     逐字可见（不裁切、不省略）；桌面规则一字不动。 */
+  .sc-evidence-chip {
+    max-width: 100%;
+    height: auto;
+    min-height: var(--chip-h);
+    padding: var(--sp-1) var(--sp-2);
+    white-space: normal;
+    text-align: left;
+    line-height: var(--lh-meta);
+  }
+}
+
+/* ---------- r5 动效（新气泡入场：opacity + 8px 上移，§0.4） ---------- */
+@keyframes sc-iq-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 减少动效：不播放位移，只落到终值（§0.4 末行） */
+@media (prefers-reduced-motion: reduce) {
+  .sc-iq-slot.is-new {
+    animation: none;
+  }
+}
+
 /* ---------- r3 动效（stagger 40ms/条，最多 6 条；§0.4） ---------- */
 @keyframes sc-tl-in {
   from {
