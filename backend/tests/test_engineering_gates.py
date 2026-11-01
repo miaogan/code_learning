@@ -501,3 +501,123 @@ def test_r7_style_tokens_defined() -> None:
         assert f"var(--{name})" in base, f"base.css 未使用 --{name}（定义了却没人用等于死 token）"
 
 
+def _py_class_block(source: str, class_name: str) -> str:
+    """取 `class_name` 的类体源码（到下一个顶格行为止，含装饰器/注释）。
+
+    必须按块取，不能全文正则：`role:` 这类断言一旦全文匹配，`target_role: str | None = None`
+    会把门禁喂绿 —— 那正是「门禁写了但拦不住回退」的经典空转（T6 的变异自检就抓到过）。
+    """
+    header = f"class {class_name}"
+    start = source.index(header)
+    tail = source[start:]
+    stop = re.search(r"\n(?=\S)", tail[1:])
+    return tail if stop is None else tail[: 1 + stop.start()]
+
+
+def _ts_interface_block(source: str, name: str) -> str:
+    """按花括号配平取 `interface name { ... }` 的完整片段（体内可能有嵌套对象字面量）。"""
+    start = source.index(f"interface {name}")
+    brace = source.index("{", start)
+    depth = 0
+    for offset in range(brace, len(source)):
+        depth += (source[offset] == "{") - (source[offset] == "}")
+        if depth == 0:
+            return source[start : offset + 1]
+    raise AssertionError(f"types.ts 的 {name} 接口未闭合")
+
+
+def test_r8_profile_nullable_mirror() -> None:
+    """门禁 46：`role` / `period` 的三层口径（提示词 / schemas.py / types.ts）必须同向。
+
+    r8 的缺陷就是这三层不同向：提示词允许 `null`，`schemas.py` 要 `str`，`types.ts` 要
+    `string` —— 真实模型按提示词给 `null`，画像生成必 502。只改其中一层（无论哪层）都会
+    重新造出一个「契约说 A、提示词说 B」的缝隙，因此这条门禁一次性钉住三处：
+    - 后端契约可空 + 列表维度 null 归一存在 + 未用 `extra="allow"` 换绿；
+    - 前端镜像 `string | null` + 空值归一单点（`lib/profileText.ts`）；
+    - 提示词仍允许 `null`（若有人把提示词改成「必须输出字符串」，契约的可空就成死代码）。
+    反向自检：把 `role` 改回 `str` 后本用例必须红（`logs/.../scripts/check_r8_contract_mutation.py`）。
+    """
+    schemas_py = (APP_DIR / "schemas.py").read_text(encoding="utf-8")
+    types_ts = (FRONTEND / "src/api/types.ts").read_text(encoding="utf-8")
+    profile_py = (SERVICES / "profile.py").read_text(encoding="utf-8")
+    merge_py = (SERVICES / "profile_merge.py").read_text(encoding="utf-8")
+    profile_text_ts = (FRONTEND / "src/lib/profileText.ts").read_text(encoding="utf-8")
+
+    project_cls = _py_class_block(schemas_py, "ProfileProject")
+    project_iface = _ts_interface_block(types_ts, "ProfileProject")
+    # 区块提取的越界自检：两个块都不该含 `target_role`（同名子串会让断言空转）。
+    assert "target_role" not in project_cls and "target_role" not in project_iface
+
+    py_pattern = r"^\s+{field}:\s*str\s*\|\s*None\s*=\s*None\s*$"
+    ts_pattern = r"^\s+{field}:\s*string\s*\|\s*null\s*$"
+    for field in ("role", "period"):
+        assert re.search(py_pattern.format(field=field), project_cls, re.MULTILINE), (
+            f"schemas.py 的 ProfileProject.{field} 不再是 str | None = None"
+        )
+        assert re.search(ts_pattern.format(field=field), project_iface, re.MULTILINE), (
+            f"types.ts 的 ProfileProject.{field} 少了 string | null 镜像"
+        )
+    assert "_normalize_null_lists" in schemas_py, "列表维度的 null→[] 归一丢了"
+    assert "_null_bullets" in schemas_py, "bullets 的 null→[] 归一跳了"
+    assert 'extra="allow"' not in schemas_py, "不得用 extra=allow 换绿（闸门不放松）"
+    assert "无法判断填 null" in profile_py, "提示词不再允许 null：契约的可空成了死代码"
+    assert "_prefer_text" in merge_py, "合并的「空值不覆盖」必须走单点 _prefer_text"
+    assert "export function textOrEmpty" in profile_text_ts, (
+        "前端空值归一必须单点收敛在 lib/profileText.ts 的 textOrEmpty"
+    )
+    assert "export function joinMeta" in profile_text_ts
+
+
+def test_interview_prompt_paper_feasible() -> None:
+    """门禁 47：开局提示词的题量声明必须装得下「技术下限 + 项目下限 + 挑战题」。
+
+    QA D-1（r8 轮次确认）：`INTERVIEW_SYSTEM` 规则 1 曾写「共 8 道题：technical ≥5、
+    project ≥3，challenge ≤2」，而 `_check_structure` 要求 `project ≥ 3` ——
+    5 + 3 + 1 = 9 > 8，三条同时成立在算术上不可能；真实模型稳定给 technical 5 /
+    project 2 / challenge 1，于是开局被闸门拦成 502（AC-9 闭环断在第一步）。
+
+    判据：提示词声明的最小合规卷（技术下限 + 项目下限 + 至少 1 道挑战）必须装进它自己
+    声明的总题量，且这份卷真的能过同一份结构闸门。任一侧回退（提示词改回「共 8 道题」
+    或闸门常量上调）本用例即红。
+    """
+    match = re.search(r"共\s*(\d+)\s*道题", interview_service.INTERVIEW_SYSTEM)
+    assert match is not None, "INTERVIEW_SYSTEM 必须声明总题量（形如「共 N 道题」）"
+    stated_total = int(match.group(1))
+
+    minimum_paper = (
+        ["technical"] * rules.MIN_TECHNICAL_QUESTIONS
+        + ["project"] * rules.MIN_PROJECT_QUESTIONS
+        + ["challenge"]
+    )
+    assert stated_total >= len(minimum_paper), (
+        f"提示词声明共 {stated_total} 道题，装不下最小合规卷 {len(minimum_paper)} 道"
+        f"（technical {rules.MIN_TECHNICAL_QUESTIONS} + project "
+        f"{rules.MIN_PROJECT_QUESTIONS} + challenge 1）"
+    )
+    assert stated_total >= rules.MIN_INTERVIEW_QUESTIONS
+    # 同一份最小合规卷必须真的能过结构闸门：提示词与闸门同向，而不是各说一套。
+    interview_service._check_structure(
+        minimum_paper,
+        [f"第 {index} 题：请说明做法、取舍与结果" for index in range(len(minimum_paper))],
+    )
+
+    # 门禁 48（r8 D-4）：题量一改，**轮次上限必须同步派生**。上一轮把题量 8 → 9 时只改了
+    # 提示词，轮次上限仍是标准卷的 8 + 4 = 12，于是 9 正题 + 4 追问走到第 13 条发言、且
+    # `quota.turns_left` 提前报 0 —— 本用例钉住「上限 ≥ 计划题量」「上限随题量增长」两条。
+    assert rules.max_turns(stated_total) >= stated_total, (
+        f"轮次上限 {rules.max_turns(stated_total)} 装不下 {stated_total} 道计划正题（会溢出越界）"
+    )
+    assert rules.max_turns(stated_total) >= rules.MAX_INTERVIEW_TURNS, "上限不得低于标准卷预算"
+    assert rules.max_turns(rules.MAX_INTERVIEW_TURNS + 1) > rules.MAX_INTERVIEW_TURNS, (
+        "轮次上限必须由计划题量派生，不能写死 MAX_INTERVIEW_TURNS（D-4 的类）"
+    )
+    # 开局额度自洽：turns_left = 剩余计划正题 + 可追问轮次（D-4 的「turns_left 与实际剩余不符」）。
+    opener_follow_ups = rules.follow_ups_left(stated_total, 1, 0)
+    assert rules.max_turns(stated_total) - 1 == (stated_total - 1) + opener_follow_ups, (
+        f"开局额度不自洽：上限 {rules.max_turns(stated_total)} - 已问 1 ≠ "
+        f"剩余正题 {stated_total - 1} + 可追问 {opener_follow_ups}"
+    )
+    assert opener_follow_ups <= rules.MAX_FOLLOW_UPS
+
+
+

@@ -2,7 +2,7 @@
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 Severity = Literal["high", "medium", "low"]
 CourseLevel = Literal["入门", "进阶"]
@@ -82,10 +82,15 @@ class ProfileSkill(BaseModel):
 
 
 class ProfileProject(BaseModel):
+    """项目条目。`role` / `period` 可空（r8）：提示词明确允许模型对「无法判断」给 `null`，
+    契约必须接受同一语义，否则真实模型下画像生成必 502；`None` 表示「简历没写」，
+    与用户编辑清空（落库前归一为 `None`）同解，渲染侧统一吞掉，不出现 `null` / 悬空分隔符。
+    """
+
     name: str
-    role: str
-    period: str
-    bullets: list[str]
+    role: str | None = None
+    period: str | None = None
+    bullets: list[str] = Field(default_factory=list, description="缺省 []；模型偶尔给 null")
     source_quote: str = Field(min_length=1)
     source_quotes: list[Evidence] = Field(
         default_factory=list, description="证据链（旧→新）；存量行读回时由 source_quote 回填"
@@ -94,9 +99,26 @@ class ProfileProject(BaseModel):
 
     _normalize_evidence = model_validator(mode="after")(_backfill_evidence)
 
+    @field_validator("bullets", mode="before")
+    @classmethod
+    def _null_bullets(cls, value: Any) -> Any:
+        """模型对「无要点」既可能给 []、也可能给 null；两者都归一为 []。
+
+        只动列表形状的缺省，不碰元素校验（`:memory:` 去重、`min_length` 照旧）。
+        """
+        return [] if value is None else value
+
+
+#: 提示词允许给 `null` 表示「这一维没写」的三个维度（r8）；键缺失与显式 null 同解。
+_NULL_LIST_FIELDS = ("skills", "tech_stack", "projects")
+
 
 class ProfileDraft(BaseModel):
-    """模型直接产出的 5 维度草稿（无 id / 时间戳），落库前由 Profile 组装。"""
+    """模型直接产出的 5 维度草稿（无 id / 时间戳），落库前由 Profile 组装。
+
+    `Profile` 继承本模型 ⇒ 一个 before-validator 同时覆盖「模型草稿 / 响应落地 / 存量读回」
+    三条路径；`ProfilePatch` 不继承，其顶层 `None` 仍是「不改这一维」，两套语义不混。
+    """
 
     model_config = ConfigDict(extra="ignore")
 
@@ -105,6 +127,19 @@ class ProfileDraft(BaseModel):
     years_experience: float | None = None
     projects: list[ProfileProject]
     target_role: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_null_lists(cls, data: Any) -> Any:
+        """提示词第 3 条允许整个维度给 null；键缺失与显式 null 一视同仁 → []。
+
+        只动「列表形状的缺省」，不碰元素校验：`name` / `source_quote` 仍必填非空，
+        因此「AI 编造内容」仍会在元素级 ValidationError 处被拦。
+        """
+        if not isinstance(data, dict):
+            return data
+        patch = {name: [] for name in _NULL_LIST_FIELDS if data.get(name) is None}
+        return {**data, **patch} if patch else data
 
 
 class Profile(ProfileDraft):

@@ -143,6 +143,21 @@ def _merge_entries(
     return merged
 
 
+def _prefer_text(new: object, old: object) -> str | None:
+    """空值不覆盖已知值：新草稿有内容取新，否则沿用旧；两侧皆空 ⇒ `None`（不写 `""`）。
+
+    r8 的单一出口：新简历没写角色/时间不等于「写过又删掉」，与 r3 `target_role` 的
+    「空不覆盖」同源。`None` 表示「简历没写」，绝不用空串伪装。
+    """
+    if isinstance(new, str) and new.strip():
+        return new
+    if old is None:
+        return None
+    if isinstance(old, str) and not old.strip():
+        return None
+    return str(old)
+
+
 def _entry_payload(
     base: ProfileSkill | ProfileProject,
     quotes: list[Evidence],
@@ -163,9 +178,10 @@ def _entry_payload(
     source = draft_entry or base
     payload.update(
         {
-            "role": getattr(source, "role", ""),
-            "period": getattr(source, "period", ""),
-            "bullets": list(getattr(source, "bullets", []) or []),
+            # r8：role / period / bullets 都走「空值不覆盖旧值」；bullets 空不得抹掉旧要点。
+            "role": _prefer_text(getattr(source, "role", None), getattr(base, "role", None)),
+            "period": _prefer_text(getattr(source, "period", None), getattr(base, "period", None)),
+            "bullets": list(getattr(source, "bullets", None) or getattr(base, "bullets", None) or []),
         }
     )
     return payload

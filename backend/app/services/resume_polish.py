@@ -185,7 +185,8 @@ def _allowed_numbers(profile: Profile | None) -> set[float]:
     if profile.years_experience is not None:
         allowed.add(float(profile.years_experience))
     for project in profile.projects:
-        for token in _NUMBER_RE.findall(project.period) + _NUMBER_RE.findall(
+        # r8：`period` 可空（简历没写就不采数字），空值不得让白名单采集抛错。
+        for token in _NUMBER_RE.findall(project.period or "") + _NUMBER_RE.findall(
             " ".join(project.bullets)
         ):
             allowed.add(float(token))

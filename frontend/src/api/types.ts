@@ -48,8 +48,14 @@ export interface ProfileSkill {
 
 export interface ProfileProject {
   name: string
-  role: string
-  period: string
+  /**
+   * r8：与 `backend/app/schemas.py` 的 `ProfileProject.role: str | None = None` 逐字段对齐。
+   * 提示词明确允许模型对「简历没写」的项填 `null`，故契约必须接受 `null`；
+   * `null` 表示**未知**，不要用 `''` 伪装成已知（渲染前经 `lib/profileText.ts` 的 `textOrEmpty` 归一）。
+   */
+  role: string | null
+  /** r8：同 `role`，`None` 表示简历里没有时间信息。 */
+  period: string | null
   bullets: string[]
   source_quote: string
   source_quotes?: Evidence[]

@@ -1,0 +1,7 @@
+{
+  "reqId": "req-8",
+  "runId": "tf-mvxkiihc-y5p1qf",
+  "title": "修复真实 AI 下「依据简历生成画像」必定返回 502 AI_SCHEMA_INVALID 的缺陷",
+  "mode": "lite",
+  "createdAt": 1793521702453
+}

@@ -19,6 +19,7 @@ import { Chip } from '../components/ui/Chip'
 import { EmptyState } from '../components/ui/EmptyState'
 import { InlineError } from '../components/ui/InlineError'
 import { PhaseLoader } from '../components/ui/PhaseLoader'
+import { joinMeta, textOrEmpty } from '../lib/profileText'
 import { useAsync } from '../lib/useAsync'
 
 
@@ -140,7 +141,9 @@ export function dimensionEntries(profile: Profile): Record<ProfileDimensionKey, 
             {
               key: entryKeyOf('projects', index),
               title: item.name,
-              meta: [item.role, item.period].filter((part) => part.trim() !== '').join(' · '),
+              // r8：role/period 契约可空（提示词允许 null），拼接统一走 joinMeta，
+              // 两侧皆空返回 '' ⇒ ProfileDimension 的 `entry.meta ? … : null` 直接吞掉，不渲染空行。
+              meta: joinMeta([item.role, item.period]),
               bullets: item.bullets,
               // 同上：累积证据优先，兼容字段兜底。
               sourceQuote: evidenceOf(item)[0]?.quote ?? item.source_quote,
@@ -268,8 +271,9 @@ export function buildEntryPatch(
       ...target,
       ...quoteFields(target, values),
       name: (values.name ?? target.name).trim(),
-      role: (values.role ?? target.role).trim(),
-      period: (values.period ?? target.period).trim(),
+      // r8：编辑框清空 = 用户显式「我不知道」，出站存 null（不是 ''），与 target_role 既有写法同口径。
+      role: trimToNull(textOrEmpty(values.role ?? target.role)),
+      period: trimToNull(textOrEmpty(values.period ?? target.period)),
       bullets: values.bullets === undefined ? target.bullets : splitList(values.bullets),
     }
     return { projects: items }
@@ -308,8 +312,23 @@ export function entryEditorFields(
     if (!target) return []
     return [
       { key: 'name', label: '项目名称', kind: 'text', value: target.name },
-      { key: 'role', label: '角色', kind: 'text', value: target.role },
-      { key: 'period', label: '时间', kind: 'text', value: target.period },
+      // r8：编辑框 value 必须是 string（受控输入不收 null），未知项以空串进入编辑，
+      // 用户不改则原样 null 回写（见 buildEntryPatch 的 trimToNull）。
+      // D-2：空字段给占位提示，和「技术栈 / 年限」一致地说明这是「简历没写」而非加载失败。
+      {
+        key: 'role',
+        label: '角色',
+        kind: 'text',
+        value: textOrEmpty(target.role),
+        placeholder: '简历未填写，可留空',
+      },
+      {
+        key: 'period',
+        label: '时间',
+        kind: 'text',
+        value: textOrEmpty(target.period),
+        placeholder: '简历未填写，可留空',
+      },
       {
         key: 'bullets',
         label: '项目要点（每行一条）',

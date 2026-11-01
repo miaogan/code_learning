@@ -40,8 +40,11 @@ DEFAULT_EXPERIENCE_BAND = "1-3年"
 DEFAULT_MARKET = "国内"
 DEFAULT_COMPANY_SIZE = "中型"
 
-#: 每场追问上限（8 正题 + 4 追问 = 12 轮，与 `MAX_INTERVIEW_TURNS` 同步推导）。
+#: 每场追问上限。
 MAX_FOLLOW_UPS = 4
+#: 轮次总预算（标准卷 = 正题下限 8 + 追问上限 4 = 12）。r8 D-4：它只是**标准卷**的预算，
+#: 本场口径必须经 `max_turns()` / `follow_ups_left()` 派生 —— 提示词题量改到 9 题后直接拿
+#: 它当上限会放出第 13 条发言（越界）；别再把它和「实际计划题量」直接比较。
 MAX_INTERVIEW_TURNS = MIN_INTERVIEW_QUESTIONS + MAX_FOLLOW_UPS
 
 # --- 笔试 ---------------------------------------------------------------
@@ -126,17 +129,39 @@ def experience_band_of(years: float | None) -> str:
     return "10年以上"
 
 
-def is_follow_up_allowed(kind: str, follow_up_count: int, total_questions: int) -> bool:
-    """追问守门（AC-6/AC-7）：配额未满 ∧ 非 challenge 父题 ∧ 再加一条仍不超过轮次上限。
+def max_turns(planned_total: int) -> int:
+    """本场轮次上限：不小于标准预算 `MAX_INTERVIEW_TURNS`，也绝不把计划正题挤出上限。
+
+    r8 D-4：提示词题量 8 → 9 之后，再拿 `MAX_INTERVIEW_TURNS`（8 + 4 = 12）当一场会的上限
+    就会多出第 13 条发言。上限一律由**实际计划题量**派生：计划比标准卷长时先保证每道正题
+    问得到，追问额度随之压缩；这样「发言数 ≤ 上限」对任何题量都成立，而不是只在 8 题卷上成立。
+    """
+    return max(MAX_INTERVIEW_TURNS, planned_total)
+
+
+def follow_ups_left(planned_total: int, asked: int, follow_up_count: int) -> int:
+    """剩余追问额度 = min(配额余量, 轮次预算里没被**剩余计划正题**占用的机动轮次)。
+
+    `asked` 是本场已提出的发言数（正题 + 追问）。先把「剩余正题」的轮次扣出来，追问就透支
+    不到正题 —— 这正是 D-4 越界的机制：12 轮预算先花掉 4 条追问，9 道正题只好排到第 13 条。
+    """
+    asked_plan = max(0, asked - follow_up_count)
+    remaining_plan = max(0, planned_total - asked_plan)
+    spare = max_turns(planned_total) - asked - remaining_plan
+    return max(0, min(MAX_FOLLOW_UPS - follow_up_count, spare))
+
+
+def is_follow_up_allowed(
+    kind: str, follow_up_count: int, asked: int, planned_total: int
+) -> bool:
+    """追问守门（AC-6/AC-7）：配额未满 ∧ 非 challenge 父题 ∧ 不挤占剩余正题的轮次。
 
     非 challenge 的追问只会抬高 technical/project 计数、拉低 challenge 占比，因此
     「开局结构闸门通过 ⇒ 结束闸门必通过」；challenge 一律不给追问（否则挑战题会破 20% 上限）。
     """
     if is_challenge_kind(kind):
         return False
-    if follow_up_count >= MAX_FOLLOW_UPS:
-        return False
-    return total_questions + 1 <= MAX_INTERVIEW_TURNS
+    return follow_ups_left(planned_total, asked, follow_up_count) > 0
 
 
 def severity_of(avg: float) -> Severity:

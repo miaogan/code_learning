@@ -348,6 +348,47 @@ def test_follow_up_gated_by_quota(tmp_db: Any, profile_factory: Any, fake_ai: An
     assert turns[-1].run_status == repository.RUN_COMPLETED
 
 
+#: r8 D-4 的题量梯子：最小合规卷 8 题 / 提示词声明的 9 题 / 比标准预算(12)还长的 13 题。
+PAPER_SIZE_LADDER = {
+    "8题": ["technical"] * 5 + ["project"] * 3,
+    "9题": ["technical"] * 5 + ["project"] * 3 + ["challenge"],
+    "13题": ["technical"] * 7 + ["project"] * 5 + ["challenge"],
+}
+
+
+@pytest.mark.parametrize("kinds", list(PAPER_SIZE_LADDER.values()), ids=list(PAPER_SIZE_LADDER))
+def test_turn_cap_derives_from_paper_size(
+    tmp_db: Any, profile_factory: Any, fake_ai: Any, kinds: list[str]
+) -> None:
+    """r8 D-4：轮次上限必须由**实际计划题量**派生，而不是写死标准卷的 8 + 4 = 12。
+
+    每轮都要求追问，把追问配额与轮次预算同时压到极限：一场会的发言数必须 ≤
+    `rules.max_turns(计划题量)`，且**计划正题一题不落**（计划比标准卷长时压缩的是追问，不是正题）。
+    修复前 9 题卷会走到 13 条（9 正题 + 4 追问 > 12＝上限），本用例即红；上限写死常量时
+    13 题卷同样变红。
+    """
+    profile = _seed_profile(profile_factory)
+    fake_ai.responder = _responder(
+        kinds=kinds, next_of=lambda round_no, _ctx: _follow_up(round_no)
+    )
+    run = _create(fake_ai, profile.id, None)
+    plan_total = len(kinds)
+    turns = _drive(run.run_id, fake_ai)
+
+    payload = _payload_of(run.run_id)
+    entries = payload["questions"]
+    planned_prompts = {item["prompt"] for item in _plan_items(kinds)}
+    assert {entry["prompt"] for entry in entries} >= planned_prompts, "计划正题必须全部问到"
+    assert len(turns) <= rules.max_turns(plan_total), "发言数越过由题量派生的轮次上限"
+    assert len(entries) <= rules.max_turns(plan_total)
+    assert rules.max_turns(plan_total) >= plan_total, "上限不得把计划正题挤出去"
+    follow_ups = sum(1 for entry in entries if entry["parent_id"])
+    assert follow_ups <= rules.MAX_FOLLOW_UPS
+    assert payload["follow_up_count"] == follow_ups
+    assert payload["current_id"] is None
+    assert turns[-1].run_status == repository.RUN_COMPLETED
+
+
 def test_bad_plan_502_and_no_run_inserted(
     tmp_db: Any, profile_factory: Any, fake_ai: Any
 ) -> None:

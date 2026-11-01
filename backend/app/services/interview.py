@@ -68,7 +68,7 @@ INTERVIEW_SYSTEM = """你是程序员模拟面试官。依据本场设定与候�
 {"questions":[{"kind":"technical|project|challenge","prompt":"题面（≤120 字）","hint":"作答提示（≤40 字）"}]}
 
 硬性规则：
-1. 共 8 道题：technical ≥5、project ≥3，challenge ≤2（challenge 占总题量不超过 20%）。
+1. 共 9 道题：technical 5 道、project 3 道、challenge 1 道（challenge 占总题量 11%，不超过 20%）。
 2. 必须按 user JSON 的 settings 与 calibration 出题：目标岗位、工作经验、面试市场、公司规模都要改变题目口径，
    不得只做措辞替换。
 3. technical 题对准画像的 tech_stack / skills；project 题必须点名画像里的具体项目；
@@ -288,22 +288,31 @@ def validate_session(entries: list[dict[str, Any]]) -> None:
 
 
 def _profile_brief(profile: Profile) -> dict[str, Any]:
-    """画像 → 计划输入（只送结构化维度，不送整份简历正文，避免题目漂到无关段落）。"""
-    return {
-        "target_role": profile.target_role,
-        "years_experience": profile.years_experience,
+    """画像 → 计划输入（只送结构化维度，不送整份简历正文，避免题目漂到无关段落）。
+
+    r8：项目 `role` / `period` 可空（简历没写的「未知」维度），**键整体省略**而不是送
+    `null` —— 提示词输入里出现 `"role": null` 会让模型把「未知」当已知事实作答（AC-4②）。
+    """
+    projects: list[dict[str, Any]] = []
+    for project in profile.projects:
+        item: dict[str, Any] = {"name": project.name, "bullets": project.bullets}
+        if project.role:
+            item["role"] = project.role
+        if project.period:
+            item["period"] = project.period
+        projects.append(item)
+    brief: dict[str, Any] = {
         "tech_stack": profile.tech_stack,
         "skills": [skill.name for skill in profile.skills],
-        "projects": [
-            {
-                "name": project.name,
-                "role": project.role,
-                "period": project.period,
-                "bullets": project.bullets,
-            }
-            for project in profile.projects
-        ],
+        "projects": projects,
     }
+    # 与项目维度同一口径（D-3）：未知的画像维度不投喂 `"target_role": null`，
+    # 让模型从 settings 的岗位 / 经验档取口径，而不是把「未知」当已知事实。
+    if profile.target_role:
+        brief["target_role"] = profile.target_role
+    if profile.years_experience is not None:
+        brief["years_experience"] = profile.years_experience
+    return brief
 
 
 def _plan_input(
@@ -348,6 +357,15 @@ def _entry_of(question: InterviewQuestion) -> dict[str, Any]:
     }
 
 
+def _planned_total(payload: dict[str, Any], entries: list[dict[str, Any]], follow_up_count: int) -> int:
+    """本场**计划正题数**（轮次上限的唯一输入）：v2 取 `plan` 长度；存量 v1 卷没有 `plan`，
+    正题就是已落库的非追问发言（追问会追加进 `questions`，不能算进计划，否则上限随追问自增）。"""
+    plan = payload.get("plan")
+    if isinstance(plan, list) and plan:
+        return len(plan)
+    return max(0, len(entries) - follow_up_count)
+
+
 def _round_input(
     payload: dict[str, Any],
     target: dict[str, Any],
@@ -380,6 +398,9 @@ def _round_input(
                 "hint": candidate.get("hint"),
             }
     follow_up_count = int(payload.get("follow_up_count") or 0)
+    # r8 D-4：轮次/追问额度一律由「实际计划题量」派生（`rules.max_turns`），不再拿
+    # 只描述标准卷的 `MAX_INTERVIEW_TURNS` 直接跟本场发言数比 —— 否则 9 题卷会溢出 1 轮。
+    planned_total = _planned_total(payload, entries, follow_up_count)
     return json.dumps(
         {
             "settings": settings.model_dump(),
@@ -404,11 +425,11 @@ def _round_input(
             "answer": text,
             "next_plan": plan_item,
             "quota": {
-                "follow_ups_left": max(0, rules.MAX_FOLLOW_UPS - follow_up_count),
-                "turns_left": max(0, rules.MAX_INTERVIEW_TURNS - len(entries)),
+                "follow_ups_left": rules.follow_ups_left(planned_total, len(entries), follow_up_count),
+                "turns_left": max(0, rules.max_turns(planned_total) - len(entries)),
             },
             "allow_follow_up": rules.is_follow_up_allowed(
-                str(target.get("kind") or ""), follow_up_count, len(entries)
+                str(target.get("kind") or ""), follow_up_count, len(entries), planned_total
             ),
         },
         ensure_ascii=False,
@@ -436,14 +457,17 @@ def _next_question(
     """
     prompt = (draft.prompt or "").strip() if draft is not None else ""
     known = {_squash(str(entry.get("prompt") or "")) for entry in entries}
+    follow_up_count = int(payload.get("follow_up_count") or 0)
+    planned_total = _planned_total(payload, entries, follow_up_count)
     if (
         draft is not None
         and str(draft.mode or "").strip() == "follow_up"
         and prompt
         and rules.is_follow_up_allowed(
             str(target.get("kind") or ""),
-            int(payload.get("follow_up_count") or 0),
+            follow_up_count,
             len(entries),
+            planned_total,
         )
         and _squash(prompt) not in known
     ):
