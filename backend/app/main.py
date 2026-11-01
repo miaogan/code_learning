@@ -88,11 +88,17 @@ def create_app() -> FastAPI:
 
     @app.get("/health", response_model=HealthResponse, tags=["ops"], summary="探活（AC-8）")
     def health() -> HealthResponse:
+        # r9：请求内 live 读取（不是 create_app 的 import 期快照），切供应商后无需重启即可被探活观测。
+        # 只透传 `resolve_ai()` 的结果，不在这里做任何就绪判定 / 文案拼接（唯一出口在 config）。
+        runtime = get_settings().resolve_ai()
         return HealthResponse(
             status="ok",
             version=APP_VERSION,
-            ai_configured=settings.ai_configured,
+            ai_configured=runtime.ready,
             db="sqlite",
+            ai_provider=runtime.provider,
+            ai_model=runtime.model,
+            ai_json_mode=runtime.json_mode,
         )
 
     return app

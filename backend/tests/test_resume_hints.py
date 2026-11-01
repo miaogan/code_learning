@@ -13,7 +13,6 @@ from typing import Any
 
 import pytest
 
-from app.config import get_settings
 from app.schemas import Profile, PolishSuggestion
 from app.services import resume_hints, resume_polish
 from app.services.ai import AIClient
@@ -73,12 +72,12 @@ def _run(
 
 
 @pytest.fixture()
-def _no_ai_key(monkeypatch: pytest.MonkeyPatch) -> Any:
-    """模拟「服务端没有 AI_API_KEY」：走真实 `AIClient` 的未配置分支。"""
-    monkeypatch.setenv("AI_API_KEY", "")
-    get_settings.cache_clear()
-    yield
-    get_settings.cache_clear()
+def _no_ai_key(neutral_ai_env: None) -> None:
+    """模拟「服务端没有任何 AI 配置」：走真实 `AIClient` 的未配置分支。
+
+    r9 起环境中性化统一由 `neutral_ai_env` 提供（此前此处自行 `setenv("AI_API_KEY","")`，
+    是本文件唯一一处「宿主把 `AI_PROVIDER` 设成 lmstudio 就真出网」的漏点）。
+    """
 
 
 # --- 23 / 25：复用润色引擎 + 条数上限 + 顺序 -----------------------------------

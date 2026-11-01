@@ -620,4 +620,205 @@ def test_interview_prompt_paper_feasible() -> None:
     assert opener_follow_ups <= rules.MAX_FOLLOW_UPS
 
 
+# --- r9：AI 供应商档位（门禁 49-52）---------------------------------------------------
+#: `ai.py` 只允许有一处 `{"type": "json_object"}` 投影；第二处就是第二条事实来源。
+_JSON_OBJECT_FORMAT = '"type": "json_object"'
+
+#: r9 起 `ai.py` 只认 `AiRuntime`，裸配置字段一个都不许出现（否则与 `resolve_ai` 成二维真相）。
+_NAKED_AI_FIELDS = (
+    "ai_base_url",
+    "ai_model",
+    "ai_api_key",
+    "ai_timeout_s",
+    "ai_max_retries",
+    "ai_json_mode",
+    "ai_provider",
+)
+
+
+def _dict_items(tree: ast.Module, name: str) -> dict[str, ast.expr | None]:
+    """取 `name = {"a": ..., "b": ...}` 的「字符串键 → 值表达式」（r9 的 `json_mode` 投影表）。"""
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign) and node.value is not None:
+            targets, value = list(node.targets), node.value
+        elif isinstance(node, ast.AnnAssign) and node.value is not None:
+            targets, value = [node.target], node.value
+        else:
+            continue
+        if not any(isinstance(t, ast.Name) and t.id == name for t in targets):
+            continue
+        if isinstance(value, ast.Dict):
+            return {
+                key.value: item
+                for key, item in zip(value.keys, value.values)
+                if isinstance(key, ast.Constant) and isinstance(key.value, str)
+            }
+    return {}
+
+
+def test_r9_health_contract_mirror() -> None:
+    """门禁 49：`/health` 的运维白名单三字段必须后端契约与前端镜像逐字同形（AC-7）。
+
+    r9 把「当前解析成哪套端点 / 模型 / JSON 模式」暴露成探活字段。三字段是**白名单**而不是
+    `AiRuntime` 直出：多半列一个字段＝多一个泄密面，所以这里同时钉住「三字段在」与「任何
+    key 形状的字段都不在」。前端 `types.ts` 必须镜像（AGENTS §4 硬约束），否则下一次读
+    `Health` 的代码会缺字段。反向自检：删掉 `HealthResponse.ai_model` 或 `types.ts` 的
+    镜像行，本用例必须红（`scripts/check_r9_gate_sensitivity.py`）。
+    """
+    schemas_tree = _r6_ast("backend/app/schemas.py")
+    fields = _class_annotations(schemas_tree, "HealthResponse")
+    assert {"status", "version", "ai_configured", "db"} <= set(fields), (
+        f"HealthResponse 丢了既有字段：{sorted(fields)}"
+    )
+    assert {"ai_provider", "ai_model", "ai_json_mode"} <= set(fields), (
+        f"HealthResponse 缺 r9 运维白名单三字段（实际 {sorted(fields)}）"
+    )
+    leaked = sorted(name for name in fields if "key" in name.lower() or "secret" in name.lower())
+    assert not leaked, f"/health 契约面混进了密钥类字段：{leaked}"
+
+    types_ts = (FRONTEND / "src/api/types.ts").read_text(encoding="utf-8")
+    health_iface = _ts_interface_block(types_ts, "Health")
+    for name in ("ai_provider", "ai_model", "ai_json_mode"):
+        assert re.search(rf"^\s+{name}\?:?\s*string\s*$", health_iface, re.MULTILINE), (
+            f"types.ts 的 Health 缺镜像字段 {name}（后端加了字段必须同步 TS）"
+        )
+    assert not re.search(r"^\s+\w*key\w*\??\s*:", health_iface, re.MULTILINE | re.IGNORECASE), (
+        "types.ts 的 Health 混进了密钥类字段镜像"
+    )
+
+
+def test_r9_json_mode_closed_set_single_source() -> None:
+    """门禁 50：`json_mode` 闭集只在 `config.py`，`ai.py` 只许留一张等键集的投影表（AC-8）。
+
+    三处自然漂移点一次钉住：
+    - 闭集来源：`JsonMode` 的取值集合 == `JSON_MODES` == `get_args(JsonMode)`，且 `JSON_MODES`
+      必须由 `get_args` 派生（手写第二份 tuple ＝ 二维真相，迟早漂）；
+    - 投影表键集：`_RESPONSE_FORMAT_BY_MODE` 的键必须与闭集相等（`none` 的语义是**整键不发**，
+      值必须字面 `None`；LM Studio 实测发 `{"type":"text"}` 也不等价）；
+    - 请求体形状：`{"type": "json_object"}` 与 `"response_format"` 在 `ai.py` 里各只出现一次
+      （第二次注入 `response_format` ＝ 绕过投影表）。
+    """
+    from app.config import DEFAULT_JSON_MODE, JSON_MODES, JsonMode
+
+    config_tree = _r6_ast("backend/app/config.py")
+    literal_values = _literal_values(config_tree, "JsonMode")
+    assert literal_values == {"json_object", "none"}, (
+        f"JsonMode 闭集变成了 {sorted(literal_values)}（只允许 json_object / none）"
+    )
+    assert set(get_args(JsonMode)) == literal_values
+    assert JSON_MODES == frozenset(get_args(JsonMode)), (
+        f"JSON_MODES {sorted(JSON_MODES)} 不再等于 get_args(JsonMode)"
+    )
+    assert DEFAULT_JSON_MODE in JSON_MODES
+    config_source = (APP_DIR / "config.py").read_text(encoding="utf-8")
+    assert re.search(r"JSON_MODES[^\n]*=\s*frozenset\(\s*get_args\(", config_source), (
+        "JSON_MODES 必须由 get_args(JsonMode) 派生，不能另写一份同义字面量"
+    )
+
+    ai_source = (SERVICES / "ai.py").read_text(encoding="utf-8")
+    projection = _dict_items(_r6_ast("backend/app/services/ai.py"), "_RESPONSE_FORMAT_BY_MODE")
+    assert set(projection) == set(JSON_MODES), (
+        f"投影表键集 {sorted(projection)} != json_mode 闭集 {sorted(JSON_MODES)}"
+    )
+    none_value = projection.get("none")
+    assert isinstance(none_value, ast.Constant) and none_value.value is None, (
+        "`none` 的投影值必须是字面 None（整键不发），不是 {'type': 'text'}"
+    )
+    assert ai_source.count(_JSON_OBJECT_FORMAT) == 1, (
+        f"ai.py 出现了 {ai_source.count(_JSON_OBJECT_FORMAT)} 处 json_object 投影，只允许 1 处（投影表）"
+    )
+    response_format_hits = ai_source.count('"response_format"')
+    assert response_format_hits == 1, (
+        f"ai.py 出现了 {response_format_hits} 处 response_format 键，只允许 1 处（投影表之外的第二次注入）"
+    )
+
+
+def test_r9_ai_uses_runtime_not_naked_fields() -> None:
+    """门禁 51：`ai.py` 不得再读裸配置字段，配置口径只有 `Settings.resolve_ai()` 一处。
+
+    r9 之前 `_chat` 直接读 `settings.ai_base_url / ai_model / ai_api_key / ai_timeout_s`，
+    与 `resolve_ai()` 构成两条事实来源：解析器说「切到 lmstudio」，传输层照旧把云端端点 +
+    云端 Key 发出去。判据是「结构上无从直读」：源码里不出现这批字段名、AST 里也没有任何
+    `*.ai_*` 属性访问；此外 `resolve_ai()` 在 `ai.py` 只能出现一次（构造期快照），
+    每请求现读会让一次请求内的模型 / 超时口径前后不一致。
+    """
+    ai_source = (SERVICES / "ai.py").read_text(encoding="utf-8")
+    offenders = [name for name in _NAKED_AI_FIELDS if re.search(rf"\b{name}\b", ai_source)]
+    assert not offenders, f"ai.py 又在直读裸配置字段：{offenders}（请改读 self._runtime）"
+    ai_tree = _r6_ast("backend/app/services/ai.py")
+    attributes = {
+        node.attr for node in ast.walk(ai_tree) if isinstance(node, ast.Attribute)
+    }
+    sneaky = sorted(attributes & set(_NAKED_AI_FIELDS))
+    assert not sneaky, f"ai.py 通过属性访问绕过了 runtime 快照：{sneaky}"
+    resolve_calls = [
+        node
+        for node in ast.walk(ai_tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "resolve_ai"
+    ]
+    assert len(resolve_calls) == 1, (
+        f"ai.py 有 {len(resolve_calls)} 处 resolve_ai() 调用，只允许构造期快照一次（每请求现读会漂）"
+    )
+    assert "self._runtime" in ai_source, "AIClient 必须持有构造期快照 self._runtime"
+
+
+def test_r9_env_example_lists_provider_keys() -> None:
+    """门禁 52：`.env.example` 必须覆盖 `Settings` 的每个 `ai_*` 字段，且永不含真实 Key。
+
+    `.env.example` 是配置档的第二份「人肉文档」：新增一个档位字段只改代码不改示例，运维照示例
+    抄完仍然起不来。这里反向从 `Settings` 的注解枚举字段名，要求大写键逐字出现在示例里；
+    同时钉住两条实测硬约束（`AI_LMSTUDIO_JSON_MODE=none`、`TIMEOUT_S`）与「密钥示例留空」。
+
+    D-1（r9 QA）：`TIMEOUT_S` 不再钉字面量，改成钉两件事 —— ①示例数值必须等于
+    `Settings.ai_lmstudio_timeout_s` 的字段默认值（两份手写清单互锁：只改代码不改示例、
+    只改示例不改代码都会红）；②该默认值不得低于实测下限 300s（本机 qwen3.5-9b 单次画像
+    实测 201.25s，旧默认 180s 会把该链路掐成 503 `AI_UNAVAILABLE`）。
+    """
+    env_path = REPO_ROOT / "backend" / ".env.example"
+    assert env_path.is_file(), ".env.example 是配置示例的唯一出处，不得删除"
+    env_text = env_path.read_text(encoding="utf-8")
+
+    settings_fields = _class_annotations(_r6_ast("backend/app/config.py"), "Settings")
+    ai_fields = sorted(name for name in settings_fields if name.startswith("ai_"))
+    assert {"ai_provider", "ai_json_mode", "ai_deepseek_model", "ai_lmstudio_model"} <= set(
+        ai_fields
+    ), f"Settings 的 r9 档位字段缺失（实际 {ai_fields}）"
+    missing = [name.upper() for name in ai_fields if name.upper() not in env_text]
+    assert not missing, f".env.example 缺 Settings 的 ai_* 键：{missing}（改代码必须同步示例）"
+
+    for line in env_text.splitlines():
+        match = re.match(r"^(AI_\w*API_KEY)\s*=(.*)$", line.strip())
+        if match:
+            assert not match.group(2).strip(), (
+                f".env.example 的 {match.group(1)} 不是空值（示例一旦带值＝密钥进了版本库）"
+            )
+    assert not re.search(r"\bsk-[A-Za-z0-9_\-]{8,}", env_text), ".env.example 出现了真实密钥样式"
+    assert re.search(r"^AI_LMSTUDIO_JSON_MODE=none$", env_text, re.MULTILINE), (
+        "本地端点实测拒绝 json_object，示例必须给 none（否则照抄就 400）"
+    )
+
+    # D-1：示例数值 ⇄ `Settings` 默认值互锁，且不得低于实测下限。
+    example_match = re.search(r"^AI_LMSTUDIO_TIMEOUT_S=(\d+(?:\.\d+)?)$", env_text, re.MULTILINE)
+    assert example_match, (
+        "示例的 AI_LMSTUDIO_TIMEOUT_S 必须给可照抄的数值（留空/写 0 ＝继承全局 20s，本地画像必 503）"
+    )
+    example_timeout = float(example_match.group(1))
+    config_source = (REPO_ROOT / "backend" / "app" / "config.py").read_text(encoding="utf-8")
+    config_match = re.search(
+        r"^    ai_lmstudio_timeout_s: float = (\d+(?:\.\d+)?)$", config_source, re.MULTILINE
+    )
+    assert config_match, "Settings.ai_lmstudio_timeout_s 必须给显式数值默认值（不靠继承全局）"
+    config_timeout = float(config_match.group(1))
+    assert example_timeout == config_timeout, (
+        f"示例 TIMEOUT_S={example_timeout}s 与 Settings 默认 {config_timeout}s 不一致"
+        "（改一处忘了另一处，运维照抄就会超时）"
+    )
+    assert config_timeout >= 300.0, (
+        f"lmstudio 档默认超时 {config_timeout}s 低于实测下限 300s"
+        "（qwen3.5-9b 单次画像实测 201.25s，旧默认 180s 必 503）"
+    )
+
+
 

@@ -27,10 +27,21 @@ PolishSection = Literal["project", "experience", "education", "summary"]
 
 
 class HealthResponse(BaseModel):
+    """探活响应（`/health`，契约面）。
+
+    r9 追加的三个字段是**运维白名单**：只暴露「当前解析成哪套端点/模型/JSON 模式」，
+    永远不包含 `api_key` 的任何片段（key 只在 `AiRuntime` 里，且带 `repr=False`）。
+    三个值由 `Settings.resolve_ai()` 一次解析给出，故 `ai_configured` 与它们同源，
+    不会出现「说已配置、却报了 legacy」的两套就绪语义。
+    """
+
     status: str
     version: str
     ai_configured: bool
     db: str
+    ai_provider: str
+    ai_model: str
+    ai_json_mode: str
 
 
 class ResumeMeta(BaseModel):

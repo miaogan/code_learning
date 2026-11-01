@@ -171,13 +171,51 @@ def polish_payload(*, hallucinated: bool = False) -> dict[str, Any]:
     }
 
 
+#: 测试期一律置空的 AI 环境变量（字符串类型）。行为口径见 TECHNICAL §3.1：
+#: `AI_PROVIDER` 空＝legacy、`AI_JSON_MODE` 空＝闭集缺省、各档端点/模型/Key 空＝未配置。
+#: **只碰字符串字段**——数值型档位（`*_TIMEOUT_S`）绝不能 `setenv("")`：空串进 `float`
+#: 字段会在 `Settings()` 构造期抛校验错，连带 `lru_cache` 与整批用例崩；需要改就用 0＝继承全局。
+_NEUTRAL_AI_ENV: dict[str, str] = {
+    "AI_PROVIDER": "",
+    "AI_JSON_MODE": "",
+    "AI_API_KEY": "",
+    "AI_DEEPSEEK_BASE_URL": "",
+    "AI_DEEPSEEK_MODEL": "",
+    "AI_DEEPSEEK_API_KEY": "",
+    "AI_DEEPSEEK_JSON_MODE": "",
+    "AI_LMSTUDIO_BASE_URL": "",
+    "AI_LMSTUDIO_MODEL": "",
+    "AI_LMSTUDIO_API_KEY": "",
+    "AI_LMSTUDIO_JSON_MODE": "",
+}
+
+
 @pytest.fixture()
-def tmp_db(monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
-    """把 SQLite 指到临时文件并建表；用例结束删库、清配置缓存。"""
+def neutral_ai_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """把 AI 相关环境变量清成「未配置」，让用例与本机 `backend/.env` 解耦（r9 单一出口）。
+
+    r8 及之前，环境中性化散落两处（`tmp_db` 只清 `AI_API_KEY`、`test_resume_hints._no_ai_key`
+    再清一次），r9 每多一个 `AI_*` 变量就要改 N 处，漏一处即「宿主 `.env` 一设就集体变红」。
+    置空后必须 `cache_clear()`（`get_settings` 是 `@lru_cache`），teardown 再清一次避免串味。
+    """
+    for name, value in _NEUTRAL_AI_ENV.items():
+        monkeypatch.setenv(name, value)
+    get_settings.cache_clear()
+    try:
+        yield
+    finally:
+        get_settings.cache_clear()
+
+
+@pytest.fixture()
+def tmp_db(monkeypatch: pytest.MonkeyPatch, neutral_ai_env: None) -> Iterator[Path]:
+    """把 SQLite 指到临时文件并建表；用例结束删库、清配置缓存。
+
+    `neutral_ai_env` 是显式依赖：任何拿到 `tmp_db`（或 `client`）的用例都自动获得环境中性化。
+    """
     SCRATCH_DIR.mkdir(exist_ok=True)
     db_file = SCRATCH_DIR / f"{uuid4().hex}.db"
     monkeypatch.setenv("DB_PATH", str(db_file))
-    monkeypatch.setenv("AI_API_KEY", "")
     get_settings.cache_clear()
     init_db()
     try:

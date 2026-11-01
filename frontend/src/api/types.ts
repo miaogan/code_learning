@@ -9,6 +9,11 @@ export interface Health {
   version: string
   ai_configured: boolean
   db: string
+  // r9 运维白名单三字段（与 /health 逐字镜像，永不携带 Key 片段）。
+  // 标可选是为了旧后端 / 旧构建产物仍类型安全；本轮不渲染它们。
+  ai_provider?: string
+  ai_model?: string
+  ai_json_mode?: string
 }
 
 export interface ResumeMeta {

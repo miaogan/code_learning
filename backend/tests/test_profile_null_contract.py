@@ -38,7 +38,7 @@ from app.schemas import (
     ResumeMeta,
 )
 from app.services import interview as interview_service
-from app.services import profile_merge, resume_polish
+from app.services import profile_merge, resume_polish, role_fit, rules
 from app.services.profile import PROFILE_SYSTEM, verify_quotes
 
 #: 数据看板项目的溯源片段：与 conftest 的 `RESUME_TEXT` 逐字对应（`verify_quotes` 用）。
@@ -360,3 +360,25 @@ def test_merge_bullets_not_lost() -> None:
     merged, _summary = profile_merge.merge_profile(old, draft, resume_id="res-2")
 
     assert merged.projects[0].bullets == ["表格虚拟滚动", "查询结果缓存"]
+
+
+# --- r9 D-2 口径：本地档 `target_role` 允许为 null，下游默认值必须有出口 -------------
+
+
+def test_target_role_null_is_accepted_and_downstream_defaults_hold() -> None:
+    """r9 D-2（本地 LM Studio + qwen3.5-9b 实测）：画像 `target_role` 允许落库为 null。
+
+    真机取证：`logs/teamflow/<runId>/scripts/check_r9_local_target_role.py` 打印的模型**原始 JSON**
+    就是 `"target_role": null`，`ProfileDraft` → `Profile` → `profile_merge` 三段零改写 ⇒ 这是
+    「本地小模型按提示词第 1/3 条保守产出」（宁缺毋滥、不推断目标岗位），**不是代码丢值**。
+    因此 TECH-CHANGE §5-1 的「target_role 有值」在本地档降级为观察项（口径记录于任务夹
+    `docs/teamflow/20261101-r9-ai-provider-switch/FIX-NOTE.md`），本条钉住降级后仍然安全：
+    ① 契约接受 null；② 面试开局输入回落 `DEFAULT_TARGET_ROLE` 而不是把 `null` 喂给模型；
+    ③ 诊断的对标走 `TargetRole(None)` 降级文案，不崩、也不伪造一次「通用软件工程师」配置。
+    """
+    profile = _as_profile(_draft())
+
+    assert profile.target_role is None
+    assert interview_service._role_text(profile.target_role) == rules.DEFAULT_TARGET_ROLE
+    resolved = role_fit.resolve_target_role(interview_settings=None, profile=profile)
+    assert (resolved.role, resolved.source, resolved.label) == (None, None, None)
