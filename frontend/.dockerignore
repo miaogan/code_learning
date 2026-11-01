@@ -1,0 +1,21 @@
+# 前端构建上下文裁剪。
+# 本机 frontend/ 下同时存在 node_modules/、node_modules-pnpm/、.pnpm-store/
+# （沙箱禁 symlink 的 pnpm 退化产物），不挡会给构建上下文塞上千文件、显著拖慢 build，
+# 并可能把残缺副本带进镜像。
+
+node_modules/
+# 覆盖本机真实存在的 node_modules-pnpm/ 等改名副本
+node_modules-*/
+.pnpm-store/
+
+# dist 由容器内重新构建；带进去会掩盖陈旧产物
+dist/
+.vite/
+.npm-cache/
+
+*.tsbuildinfo
+coverage/
+
+# 本机环境配置不应进入镜像构建上下文（生产走同源反代，不需要 VITE_API_BASE）
+.env
+.env.*

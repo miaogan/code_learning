@@ -1,0 +1,36 @@
+# r10 · backend 构建上下文裁剪（纵深防御）
+#
+# 主边界是「构建上下文取 ./backend 子目录 + Dockerfile 只 COPY requirements.txt 与 app/」，
+# 本文件只是第二道：层缓存一旦带入 .env 或本地 *.db，即使后续删除文件，
+# docker history / 层内 grep 仍能捞到痕迹，等于永久泄露 —— 所以在上下文层就挡死，
+# 而不是靠 COPY 指令逐条排除。
+#
+# 模式一律带 `**/` 前缀：Docker 的 .dockerignore 不是 .gitignore —— 不带 `**/` 的模式只在
+# 上下文根层匹配（实测 `__pycache__/` 挡不住 app/__pycache__，宿主的 .pyc 会跟着
+# `COPY app/ ./app/` 进镜像）。`**` 表示「零层或多层目录」，因此同时覆盖根层与嵌套层。
+#
+# 不得排除：app/、requirements.txt（Dockerfile 依赖它们）。
+
+# 凭据：任何环境变量文件都不进上下文（.env.example 例外：示例可入库，且不会被 COPY 带走）
+**/.env
+**/.env.*
+!**/.env.example
+
+# 本地数据库：SQLite 主体与 WAL/SHM 旁文件（容器里由命名卷另行提供）
+**/*.db
+**/*.db-wal
+**/*.db-shm
+
+# 测试与缓存：镜像只跑 uvicorn，不跑 pytest；宿主生成的字节码不进镜像
+**/tests/
+**/__pycache__/
+**/*.py[cod]
+**/.venv/
+**/venv/
+**/.pytest_cache/
+**/.ruff_cache/
+**/.mypy_cache/
+
+# 日志与编辑器垃圾
+**/*.log
+**/.DS_Store

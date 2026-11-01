@@ -1,0 +1,69 @@
+# docker-compose.yml · SkillCoach r10 两容器交付
+#   frontend = nginx:alpine 静态托管 + 同源反代（浏览器唯一入口）
+#   backend  = FastAPI 非 root（不发布宿主端口，只在 compose 内网暴露 8000）
+#
+# 契约单源：docs/teamflow/memory.md「容器化交付约定」——服务名 backend/frontend、后端端口 8000、
+# 命名卷 skillcoach-data、宿主端口 ${WEB_PORT:-8080}。改任一项必须三处同改：本文件 + 本夹 DEPLOY.md + README.md。
+#
+# 硬禁令：本文件不得出现任何 Key；environment 里不得出现 AI_PROVIDER
+#（compose 的 ${VAR} 只读宿主 shell 与仓库根 .env，写进去会把 backend/.env 的显式选择冲成空值）。
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    # 配置唯一来源仍是 backend/.env —— 这里只「引用」，不复制内容（Key 永不进 compose）。
+    # required:false：新克隆还没有 .env 时 config/build/up 不炸，/health 如实报未就绪，而不是构造期炸进程。
+    env_file:
+      - path: ./backend/.env
+        required: false
+    environment:
+      # 只此一项：把 SQLite 落到命名卷。禁止在此追加任何 *_API_KEY / AI_PROVIDER。
+      - DB_PATH=/data/app.db
+    volumes:
+      - skillcoach-data:/data
+    healthcheck:
+      # 探针命令与 backend/Dockerfile 的 HEALTHCHECK 逐字相同（compose 会整体覆盖镜像定义），
+      # 只调 interval / start_period / retries。slim 无 curl，故用标准库 urllib。
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          'import urllib.request,sys; sys.exit(0 if urllib.request.urlopen("http://127.0.0.1:8000/health",timeout=3).status==200 else 1)',
+        ]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+    # 「默认走 DeepSeek」的唯一落点（不改 config.py 语义，不进业务代码）：
+    #   显式 AI_PROVIDER 非空 → 尊重用户选择（deepseek / lmstudio）
+    #   否则 AI_DEEPSEEK_API_KEY 非空 → export AI_PROVIDER=deepseek
+    #   否则保持空 = legacy 三件套（AI_BASE_URL / AI_API_KEY / AI_MODEL）
+    # $$ 转义 = 交给容器内的 sh 展开（compose 只对 $VAR 做插值）。
+    command:
+      - sh
+      - -c
+      - |
+        if [ -z "$$AI_PROVIDER" ] && [ -n "$$AI_DEEPSEEK_API_KEY" ]; then
+          export AI_PROVIDER=deepseek
+        fi
+        exec uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - '${WEB_PORT:-8080}:80'
+    depends_on:
+      backend:
+        # 等 backend 真正 /health 通过再起前端：探针未过时 nginx 反代上去必是 502。
+        condition: service_healthy
+
+volumes:
+  # 命名卷：docker compose down 保留数据，down -v 才删除（备份/恢复见 DEPLOY.md）。
+  skillcoach-data:

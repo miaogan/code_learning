@@ -29,6 +29,27 @@ npm run dev        # http://127.0.0.1:5173，/api 与 /health 已代理到 :8000
 
 `.env` 里填 `AI_API_KEY` 后 AI 链路才有真实输出；**不填也不会 500**，页面会给出中文提示（AC-8）。
 
+## Docker 部署（可选，一条命令起两容器）
+
+不装 Python / Node 也能跑：`frontend`（nginx 托管构建产物 + 同源反代 `/api`、`/health`）+ `backend`（FastAPI，非 root、只在容器内网），数据落命名卷。
+
+```bash
+# 1) 准备配置：backend/.env 是容器唯一的配置来源，需在其中填上真实 AI_DEEPSEEK_API_KEY
+#    首次部署（还没有 backend/.env）：照 docker.env.example 建一份再填 Key
+copy docker.env.example backend\.env               # macOS/Linux: cp docker.env.example backend/.env
+#    已有 backend/.env：只手工补 AI_DEEPSEEK_API_KEY / AI_PROVIDER 两个键，**别覆盖原文件**
+
+# 2) 构建并启动
+docker compose up -d --build
+
+# 3) 打开 http://127.0.0.1:8080（先看 /health：ai_configured=true 表示 AI 链路可用）
+docker compose ps        # backend 的 STATUS 应带 (healthy)
+```
+
+- **换端口**：把 `docker.env.example` 复制成仓库根 `.env`，改 `WEB_PORT=8080`，再 `docker compose up -d`。
+- **停止**：`docker compose down`（**保留**数据卷）；`docker compose down -v` 会连数据一起删。
+- **排障与运维**（lmstudio 本地档、备份恢复、502 / 413 / 504 排查）：见 [DEPLOY.md](./docs/teamflow/20261101-r10-docker-compose-deploy/DEPLOY.md)。
+
 ## 自检命令
 
 | 位置 | 命令 | 期望 |
