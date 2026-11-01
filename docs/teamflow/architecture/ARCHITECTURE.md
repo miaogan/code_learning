@@ -15,7 +15,7 @@
 | 样式 | 手写 CSS + CSS 变量 token | `src/styles/tokens.css` | DESIGN §0 是写死规格（token / 几何 / 逐组件状态色），CSS 变量最贴近、产物零运行时 |
 | 后端 | Python 3.11+ + FastAPI + uvicorn | `fastapi>=0.110` | 与简历解析（pypdf / python-docx）与 AI 结构化校验（pydantic）天然同栈 |
 | 模型调用 | httpx 异步调用 OpenAI 兼容 `/chat/completions` | `httpx>=0.27` | 单一入口、超时/重试/JSON 兜底集中在一个模块 |
-| 持久化 | SQLite（标准库 `sqlite3`，`backend/app.db`） | 3.x | 4 张表、单用户、零外部服务；手写 SQL 比引 ORM 更轻 |
+| 持久化 | SQLite（标准库 `sqlite3`，`backend/app.db`） | 3.x | 7 张表、单用户、零外部服务；手写 SQL 比引 ORM 更轻 |
 | 测试 | pytest + ruff（后端）/ vitest + tsc + eslint（前端） | — | 只需在两处夹具中防回归，不引 E2E 框架（首版无浏览器自动化要求） |
 | CI | GitHub Actions 双 job | — | 与本地命令等价，便于「网关失败即定位」 |
 
@@ -71,7 +71,7 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
    │  ├─ __init__.py
    │  ├─ main.py                      # app 工厂、lifespan 建库、CORS、异常处理器、GET /health *
    │  ├─ config.py                    # pydantic-settings：AI_* / DB_PATH / 上传上限 *
-   │  ├─ db.py                        # sqlite3 连接 + 4 表 create-if-not-exists *
+   │  ├─ db.py                        # sqlite3 连接 + 7 表 create-if-not-exists *
    │  ├─ errors.py                    # AppError → 统一错误 envelope（中文 message）*
    │  ├─ schemas.py                   # Profile / Question / Report / Course / ErrorBody *
    │  ├─ routers/                     # resume / profile / interview / exam / report / courses / history *
@@ -106,7 +106,7 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
 | --- | --- | --- |
 | `app/main.py` | app 工厂、CORS（5173/127.0.0.1）、`AppError` → envelope、`GET /health` | ✅ 已实现 |
 | `app/config.py` | `Settings`（AI_BASE_URL / AI_API_KEY / AI_MODEL / AI_TIMEOUT_S / DB_PATH / 上传上限） | ✅ |
-| `app/db.py` | 连接、`init_db()` 建 4 表、`get_connection()` 依赖 | ✅（表结构见 §3.4） |
+| `app/db.py` | 连接、`init_db()` 建 7 表、`get_connection()` 依赖 | ✅（表结构见 §3.4；r6 增 `questions` / `question_attempts`） |
 | `app/errors.py` | 错误码常量 + `AppError` | ✅ |
 | `app/schemas.py` | pydantic v2 模型（Profile 5 维度 / 题目 / 报告 / 课程）；**HTTP 契约唯一真源** | ✅ 齐备；r5 起含 4 项面试设定（`InterviewSettings` / `InterviewSettingsPatch`）、会话与回合（`InterviewRun` / `InterviewTurn` / `InterviewSession`），`RunSummary` / `Report` 增 `interview_settings` |
 | `app/routers/resume.py` | `POST /api/resumes` 上传 → 校验 → 抽取 → 入库 → 元信息 | ✅ 文本/ PDF / DOCX 抽取（依赖装好后生效） |
@@ -158,6 +158,11 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
 | `profiles` | `id TEXT PK, document_id TEXT, payload TEXT(JSON), created_at, updated_at` | AC-2 画像；5 维度整体 JSON，靠 pydantic 校验而非列约束 |
 | `runs` | `id TEXT PK, kind TEXT('interview'|'exam'), profile_id, payload TEXT(JSON), status TEXT, created_at` | AC-3/4 测评；逐题得分与答案都在 payload |
 | `reports` | `id TEXT PK, payload TEXT(JSON), created_at` | AC-5/6 诊断报告（短板 + 课程映射） |
+| `timeline_events` | `id TEXT PK, type, ref_id, occurred_at, payload TEXT(JSON), created_at`，`UNIQUE(type, ref_id)` | r3 成长时间线：事件以 JSON 快照定格，重算报告不回写事件、分数不漂移 |
+| `questions` | `id TEXT PK, direction, kind, difficulty, essentiality, prompt, options TEXT(JSON), answer TEXT(JSON), source, created_at, updated_at` | r6 **题库承载**（11 列）：`seed/questions.json` 退为唯一导入源；`answer` 只服务端可见，不入任何响应模型 |
+| `question_attempts` | `id TEXT PK, question_id, run_id, correct INT(0/1), answered_at, created_at`，`UNIQUE(question_id, run_id)` | r6 客观题作答事件：熟练度判定的唯一事实源（简答不计分故永不写入） |
+
+> 共 **7 张表**（r1 的 4 张 + r3 的 `timeline_events` + r6 的 `questions` / `question_attempts`）。DDL 只有 `app/db.py` 一处出处，SQL 只有 `app/repository.py` 一处出口。
 
 约定：时间为 ISO-8601 UTC 字符串；payload 存 JSON 文本，读写两侧过 pydantic 模型；`init_db()` 只用 `CREATE TABLE IF NOT EXISTS`，字段变更需在 `memory.md` 记录一次性升级说明（不做迁移框架）。
 
@@ -256,7 +261,7 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
 | 双测评（AC-3/AC-4 端到端） | `services/{interview,exam}.py`、`routers/{interview,exam}.py`、`pages/{InterviewPage,ExamPage}.tsx` |
 | 诊断报告 + 课程匹配（AC-5/AC-6） | `services/diagnosis.py`、`routers/report.py`（含 `GET /markdown`）、`pages/ReportPage.tsx` |
 | 历史与趋势（AC-9/AC-10） | `services/history.py`、`routers/history.py`、`pages/HistoryPage.tsx`；r3 起含长期记忆聚合 |
-| 题库种子 80 道 | `backend/app/seed/questions.json` |
+| 题库种子 80 道 | `backend/app/seed/questions.json`（r6 起退为**唯一导入源**，运行时由 `questions` 表承载） |
 | pydantic 契约模型（画像 5 维度 / 题目 / 报告 / 课程） | `backend/app/schemas.py` |
 | 后端测试 13 文件（pytest 零网络） | `backend/tests/*.py` |
 | 前端 `package-lock.json` + 已装依赖 | `frontend/package-lock.json`、`frontend/node_modules/` |

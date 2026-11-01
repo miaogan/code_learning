@@ -1,19 +1,26 @@
-"""阈值与判定规则唯一出处（跨面试 / 笔试 / 报告共用）。
+"""规则唯一出处：闭集 + 结构闸门（跨面试 / 笔试 / 报告共用）。
 
 题量下限、挑战题占比、短板条数与严重度分档都写在这里：一旦散落到各 services 里就地写魔数，
 面试与笔试的口径会各自漂移，测试也失去单一断言点。
 
-字段差异适配（既有 schemas 决定的差异，下游请用下面两个帮助函数，别自己猜字段）：
+**分工（r6 写死）**：本题只放**闭集与结构闸门**（方向 / 难度 / 必备度 / 组卷阶梯 / 题量与占比）；
+**可调阈值**（熟练度窗口天数、答对次数、近卷去重卷数）只住 `config.Settings`，可被环境变量覆盖。
+阈值漂回本题、或闭集散到 `config.py`，都会让面试 / 笔试 / 报告口径各自漂移 —— 两个模块的
+docstring 互相点名，`tests/test_engineering_gates.py` 反向钉住。
+
+字段差异适配（既有 schemas 决定的差异，下游请用下面几个帮助函数，别自己猜字段）：
 - 面试题挑战判定 = `InterviewQuestion.kind == "challenge"` → `is_challenge_kind()`
 - 笔试题挑战判定 = 题库条目的 `difficulty == "challenge"`（不进响应）→ `is_challenge_difficulty()`
+- 笔试客观题判定 = 题库条目的 `kind ∈ {"single","multiple"}` → `is_objective_kind()`
+- 笔试必备度读取 = 题库条目的 `essentiality`（脏值兜底）→ `essentiality_of()`
 """
 
 import math
-from typing import Any
+from typing import Any, get_args
 
 from pydantic import ValidationError
 
-from ..schemas import InterviewSettings, Severity
+from ..schemas import ExamKind, InterviewSettings, Severity
 
 # --- 面试 ---------------------------------------------------------------
 MIN_INTERVIEW_QUESTIONS = 8
@@ -42,6 +49,25 @@ MIN_EXAM_QUESTIONS = 10
 MIN_OBJECTIVE_QUESTIONS = 8
 MAX_EXAM_QUESTIONS = 12
 
+# --- 题库闭集（r6：方向 / 难度 / 必备度 / 组卷阶梯）------------------------
+# 闭集只此一份：`backend/app/schemas.py` 的 `ExamDifficulty` / `QuestionEssentiality` Literal
+# 与这里逐字对齐（双向断言见 `tests/test_engineering_gates.py::test_closed_sets_single_source`）；
+# 可调阈值**不在这里**，见 `config.Settings` 的三个熟练度字段。
+DIRECTIONS: tuple[str, ...] = ("前端", "后端", "算法与数据结构", "计算机基础")
+DIFFICULTIES: tuple[str, ...] = ("basic", "intermediate", "challenge")
+ESSENTIALITIES: tuple[str, ...] = ("must_know", "advanced", "nice_to_know")
+#: 组卷兜底阶梯：L1 最优 → L6 全库兜底，**顺序即优先级**，任何一层都不得因过滤而返回 400。
+PAPER_STAGES: tuple[str, ...] = ("L1", "L2", "L3", "L4", "L5", "L6")
+#: 客观题闭集（`ExamKind` 里 `text` 是简答题）：只有它们判分并写熟练度事件。
+OBJECTIVE_KINDS: tuple[str, ...] = ("single", "multiple")
+#: 可出卷 kind 闭集：直接取 API 契约 `schemas.ExamKind` 的取值，不另立字面量。
+QUESTION_KINDS: tuple[str, ...] = tuple(get_args(ExamKind))
+#: 简答题 kind（不计分、不写熟练度事件）：闭集里不属于客观题的那一档。
+#: 别处引用本常量，不要就地写 `"text"`（闭集改档时字面量副本会静默失效，见 QA D-4）。
+TEXT_KIND: str = next(kind for kind in QUESTION_KINDS if kind not in OBJECTIVE_KINDS)
+#: 必备度最高档（`ESSENTIALITIES` 首档）：组卷 L2 只回这一档，L3 才放开其余档。
+MUST_KNOW: str = ESSENTIALITIES[0]
+
 # --- 报告 ----------------------------------------------------------------
 MIN_SHORTFALLS = 3
 MAX_SHORTFALLS = 5
@@ -62,9 +88,25 @@ def is_challenge_kind(kind: str) -> bool:
     return kind == "challenge"
 
 
+def is_objective_kind(kind: str) -> bool:
+    """笔试客观题判定（闭集 `OBJECTIVE_KINDS`）：`text` 简答题不判分、不写熟练度事件。"""
+    return kind in OBJECTIVE_KINDS
+
+
 def is_challenge_difficulty(difficulty: str) -> bool:
-    """笔试侧挑战题判定：题库条目的 `difficulty`（取值 basic / challenge），该字段不进响应模型。"""
+    """笔试侧挑战题判定：题库条目的 `difficulty`（取值 `DIFFICULTIES` 三档），该字段不进响应模型。"""
     return difficulty == "challenge"
+
+
+def essentiality_of(question: dict[str, Any]) -> str:
+    """题库条目的必备度（`must_know` / `advanced` / `nice_to_know`），脏值一律兜底。
+
+    缺失 / 越出 `ESSENTIALITIES` 一律当 `nice_to_know`：坏标签若被当成 `must_know`，
+    阶梯回流会把一道其实不重要的题提前排进卷面，反而污染组卷结构；最晚回流最保守。
+    读侧兜底放在这里（唯一一份），别在下游各自 `.get("essentiality")`。
+    """
+    value = str(question.get("essentiality") or "").strip()
+    return value if value in ESSENTIALITIES else "nice_to_know"
 
 
 def experience_band_of(years: float | None) -> str:

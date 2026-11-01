@@ -11,6 +11,7 @@ import { EmptyState } from '../components/ui/EmptyState'
 import { InlineError } from '../components/ui/InlineError'
 import { PhaseLoader } from '../components/ui/PhaseLoader'
 import { RingProgress } from '../components/ui/RingProgress'
+import { filteredNotice } from '../lib/examNotice'
 import { formatElapsed } from '../lib/format'
 import { useAsync } from '../lib/useAsync'
 
@@ -92,6 +93,11 @@ export default function ExamPage() {
   const submitting = stage === 'submitting'
   const createPhase = createElapsed < 3 ? 0 : createElapsed < 7 ? 1 : 2
   const timerLabel = submitting ? '判分中' : formatElapsed(Math.min(runElapsed, TIMER_DISPLAY_MAX_S))
+  /**
+   * AC-12：卷面首行的一行透明度文案。语义（净过滤数怎么算、0/NaN/负数怎么静默）
+   * 只在 `lib/examNotice.ts` 一处定义，本页只取结果、**不再比较/改写**。
+   */
+  const notice = run ? filteredNotice(run.filtered_count) : null
 
   const startExam = async () => {
     if (!profile) return
@@ -235,6 +241,15 @@ export default function ExamPage() {
 
       {(view === 'running' || view === 'submitting') && run ? (
         <>
+          {/* AC-12：`filtered_count = 0` / 字段缺失时 notice 为 null → 不挂载节点（零占位）。 */}
+          {notice ? (
+            <span className="sc-meta-line">
+              <Chip label="熟练过滤" />
+              {' '}
+              <span>{notice}</span>
+            </span>
+          ) : null}
+
           <div className="sc-actions">
             <RingProgress
               size={64}

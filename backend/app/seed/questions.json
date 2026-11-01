@@ -4,6 +4,7 @@
     "direction": "前端",
     "kind": "single",
     "difficulty": "basic",
+    "essentiality": "must_know",
     "prompt": "以下哪个 Hook 用于在组件挂载后执行副作用并支持清理函数？",
     "options": [
       { "key": "A", "text": "useMemo" },
@@ -18,6 +19,7 @@
     "direction": "前端",
     "kind": "single",
     "difficulty": "basic",
+    "essentiality": "must_know",
     "prompt": "React 列表渲染时 key 的主要作用是什么？",
     "options": [
       { "key": "A", "text": "标识元素身份，帮助 Diff 复用节点" },
@@ -32,6 +34,7 @@
     "direction": "前端",
     "kind": "multiple",
     "difficulty": "challenge",
+    "essentiality": "advanced",
     "prompt": "关于浏览器事件循环，下列说法正确的有？",
     "options": [
       { "key": "A", "text": "微任务在本轮宏任务结束后、下一轮渲染前清空" },
@@ -46,6 +49,7 @@
     "direction": "前端",
     "kind": "single",
     "difficulty": "basic",
+    "essentiality": "nice_to_know",
     "prompt": "在 JavaScript 中执行 typeof null 的返回值是？",
     "options": [
       { "key": "A", "text": "\"null\"" },
@@ -59,7 +63,8 @@
     "id": "fe-q5",
     "direction": "前端",
     "kind": "single",
-    "difficulty": "basic",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
     "prompt": "用 let 在 for 循环块内声明的变量，在循环块之外直接访问会怎样？",
     "options": [
       { "key": "A", "text": "正常访问到循环结束时的值" },
@@ -74,6 +79,7 @@
     "direction": "前端",
     "kind": "single",
     "difficulty": "basic",
+    "essentiality": "nice_to_know",
     "prompt": "TypeScript 中表示「这个值可能是字符串也可能是 null」的联合类型写法是？",
     "options": [
       { "key": "A", "text": "string & null" },
@@ -88,6 +94,7 @@
     "direction": "前端",
     "kind": "single",
     "difficulty": "basic",
+    "essentiality": "nice_to_know",
     "prompt": "用 CSS Grid 定义三列等宽布局，下列写法正确的是？",
     "options": [
       { "key": "A", "text": "grid-template-columns: repeat(3, 1fr)" },
@@ -102,6 +109,7 @@
     "direction": "前端",
     "kind": "multiple",
     "difficulty": "basic",
+    "essentiality": "advanced",
     "prompt": "关于 HTTP 缓存，下列说法正确的有？",
     "options": [
       { "key": "A", "text": "Cache-Control: max-age 表示资源可被缓存的最长新鲜期" },
@@ -116,6 +124,7 @@
     "direction": "前端",
     "kind": "single",
     "difficulty": "basic",
+    "essentiality": "must_know",
     "prompt": "关于 Promise 的状态变化，下列说法正确的是？",
     "options": [
       { "key": "A", "text": "pending / fulfilled / rejected 三种状态可以任意来回切换" },
@@ -129,7 +138,8 @@
     "id": "fe-q10",
     "direction": "前端",
     "kind": "single",
-    "difficulty": "basic",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
     "prompt": "React 中把更新写成 setCount((c) => c + 1) 这种函数式更新，主要好处是？",
     "options": [
       { "key": "A", "text": "减少组件渲染次数" },
@@ -144,6 +154,7 @@
     "direction": "前端",
     "kind": "single",
     "difficulty": "basic",
+    "essentiality": "must_know",
     "prompt": "JavaScript 中 == 与 === 的核心区别是？",
     "options": [
       { "key": "A", "text": "两者完全等价" },
@@ -158,6 +169,7 @@
     "direction": "前端",
     "kind": "multiple",
     "difficulty": "basic",
+    "essentiality": "nice_to_know",
     "prompt": "关于 CSS 盒模型，下列说法正确的有？",
     "options": [
       { "key": "A", "text": "box-sizing: border-box 时设置的 width 已包含 padding 与 border" },
@@ -171,7 +183,8 @@
     "id": "fe-q13",
     "direction": "前端",
     "kind": "single",
-    "difficulty": "basic",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
     "prompt": "TypeScript 中 unknown 与 any 的区别是？",
     "options": [
       { "key": "A", "text": "两者完全等价" },
@@ -186,6 +199,7 @@
     "direction": "前端",
     "kind": "multiple",
     "difficulty": "challenge",
+    "essentiality": "advanced",
     "prompt": "关于 React 常见性能优化手段，下列说法正确的有？",
     "options": [
       { "key": "A", "text": "React.memo 对 props 做浅比较，可避免不必要的重渲染" },
@@ -200,6 +214,7 @@
     "direction": "前端",
     "kind": "single",
     "difficulty": "basic",
+    "essentiality": "nice_to_know",
     "prompt": "关于箭头函数的 this，下列说法正确的是？",
     "options": [
       { "key": "A", "text": "指向运行时的调用者" },
@@ -214,6 +229,7 @@
     "direction": "前端",
     "kind": "multiple",
     "difficulty": "basic",
+    "essentiality": "nice_to_know",
     "prompt": "关于浏览器 localStorage，下列说法正确的有？",
     "options": [
       { "key": "A", "text": "同源共享，关闭浏览器后数据仍保留" },
@@ -228,6 +244,7 @@
     "direction": "前端",
     "kind": "single",
     "difficulty": "basic",
+    "essentiality": "nice_to_know",
     "prompt": "下列哪条 CSS 选择器优先级关系是正确的？",
     "options": [
       { "key": "A", "text": "内联样式 > id 选择器 > 类选择器 > 元素选择器" },
@@ -242,6 +259,7 @@
     "direction": "前端",
     "kind": "text",
     "difficulty": "basic",
+    "essentiality": "must_know",
     "prompt": "请简述浏览器事件传播的三个阶段，以及各阶段中监听器的触发顺序。",
     "options": [],
     "answer": []
@@ -251,6 +269,7 @@
     "direction": "前端",
     "kind": "text",
     "difficulty": "basic",
+    "essentiality": "nice_to_know",
     "prompt": "为什么 React 列表渲染需要稳定唯一的 key？使用随机 key 或以数组下标作 key 分别会带来什么问题？",
     "options": [],
     "answer": []
@@ -260,6 +279,7 @@
     "direction": "前端",
     "kind": "text",
     "difficulty": "basic",
+    "essentiality": "nice_to_know",
     "prompt": "简述 var、let、const 三种声明的区别：作用域、重复声明、是否允许重新赋值。",
     "options": [],
     "answer": []
@@ -269,6 +289,7 @@
     "direction": "后端",
     "kind": "single",
     "difficulty": "basic",
+    "essentiality": "must_know",
     "prompt": "HTTP 状态码 401 与 403 的核心区别是？",
     "options": [
       { "key": "A", "text": "401 未认证，403 已认证但无权限" },
@@ -283,6 +304,7 @@
     "direction": "后端",
     "kind": "single",
     "difficulty": "basic",
+    "essentiality": "must_know",
     "prompt": "数据库中索引最主要的作用是？",
     "options": [
       { "key": "A", "text": "减少写入的数据量" },
@@ -297,6 +319,7 @@
     "direction": "后端",
     "kind": "multiple",
     "difficulty": "challenge",
+    "essentiality": "advanced",
     "prompt": "关于 REST 接口的幂等性，下列说法正确的有？",
     "options": [
       { "key": "A", "text": "GET 应当是幂等的" },
@@ -311,6 +334,7 @@
     "direction": "后端",
     "kind": "single",
     "difficulty": "basic",
+    "essentiality": "nice_to_know",
     "prompt": "HTTP 状态码 201 表示？",
     "options": [
       { "key": "A", "text": "请求成功且已创建了新资源" },
@@ -325,6 +349,7 @@
     "direction": "后端",
     "kind": "single",
     "difficulty": "basic",
+    "essentiality": "must_know",
     "prompt": "数据库事务的「原子性（Atomicity）」含义是？",
     "options": [
       { "key": "A", "text": "事务内的操作要么全部生效，要么全部不生效" },
@@ -339,6 +364,7 @@
     "direction": "后端",
     "kind": "single",
     "difficulty": "basic",
+    "essentiality": "advanced",
     "prompt": "Python 中把可变对象（如 list）用作函数默认参数，最典型的问题是？",
     "options": [
       { "key": "A", "text": "会直接报语法错误" },
@@ -353,6 +379,7 @@
     "direction": "后端",
     "kind": "single",
     "difficulty": "basic",
+    "essentiality": "nice_to_know",
     "prompt": "FastAPI 中给 POST 接口声明 JSON 请求体，最推荐的做法是？",
     "options": [
       { "key": "A", "text": "用 Pydantic 模型作为参数类型标注，由框架解析与校验" },
@@ -367,6 +394,7 @@
     "direction": "后端",
     "kind": "multiple",
     "difficulty": "basic",
+    "essentiality": "nice_to_know",
     "prompt": "关于 SQL 的表连接（JOIN），下列说法正确的有？",
     "options": [
       { "key": "A", "text": "INNER JOIN 只返回两表中匹配上的行" },
@@ -381,6 +409,7 @@
     "direction": "后端",
     "kind": "single",
     "difficulty": "basic",
+    "essentiality": "nice_to_know",
     "prompt": "关于 SQLite，下列说法最准确的是？",
     "options": [
       { "key": "A", "text": "无独立服务进程、单文件存储，适合单机读多写少的场景" },
@@ -395,6 +424,7 @@
     "direction": "后端",
     "kind": "single",
     "difficulty": "basic",
+    "essentiality": "must_know",
     "prompt": "关于 HTTP GET 与 POST，下列说法正确的是？",
     "options": [
       { "key": "A", "text": "GET 语义是读取资源、通常可缓存且不应产生副作用" },
@@ -408,7 +438,8 @@
     "id": "be-q11",
     "direction": "后端",
     "kind": "single",
-    "difficulty": "basic",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
     "prompt": "ORM 中一次查出 N 条主记录后逐条再查关联表的做法（N+1 查询问题），最常见的治理方式是？",
     "options": [
       { "key": "A", "text": "改为 JOIN 或按主键集合批量 IN 查询，一次拿回关联数据" },
@@ -423,6 +454,7 @@
     "direction": "后端",
     "kind": "multiple",
     "difficulty": "challenge",
+    "essentiality": "advanced",
     "prompt": "关于数据库索引与事务隔离，下列说法正确的有？",
     "options": [
       { "key": "A", "text": "联合索引通常遵循最左前缀匹配原则" },
@@ -437,6 +469,7 @@
     "direction": "后端",
     "kind": "single",
     "difficulty": "basic",
+    "essentiality": "nice_to_know",
     "prompt": "HTTP 状态码 500 表示？",
     "options": [
       { "key": "A", "text": "客户端请求格式错误" },
@@ -451,6 +484,7 @@
     "direction": "后端",
     "kind": "multiple",
     "difficulty": "basic",
+    "essentiality": "nice_to_know",
     "prompt": "关于 Docker 镜像与容器，下列说法正确的有？",
     "options": [
       { "key": "A", "text": "镜像是只读的分层模板，容器是镜像的运行实例" },
@@ -464,7 +498,8 @@
     "id": "be-q15",
     "direction": "后端",
     "kind": "single",
-    "difficulty": "basic",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
     "prompt": "Python asyncio 中 await 的实际行为是？",
     "options": [
       { "key": "A", "text": "阻塞当前线程直到该操作完成" },
@@ -479,6 +514,7 @@
     "direction": "后端",
     "kind": "multiple",
     "difficulty": "basic",
+    "essentiality": "nice_to_know",
     "prompt": "以下哪些属于常见的 HTTP 请求头？",
     "options": [
       { "key": "A", "text": "Content-Type" },
@@ -492,7 +528,8 @@
     "id": "be-q17",
     "direction": "后端",
     "kind": "single",
-    "difficulty": "basic",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
     "prompt": "SQL 中 WHERE 与 HAVING 的区别是？",
     "options": [
       { "key": "A", "text": "WHERE 在分组前过滤行，HAVING 在分组后过滤分组" },
@@ -507,6 +544,7 @@
     "direction": "后端",
     "kind": "text",
     "difficulty": "basic",
+    "essentiality": "must_know",
     "prompt": "请简述数据库事务的 ACID 四个特性分别指什么。",
     "options": [],
     "answer": []
@@ -516,6 +554,7 @@
     "direction": "后端",
     "kind": "text",
     "difficulty": "basic",
+    "essentiality": "nice_to_know",
     "prompt": "为什么给列建索引能加快查询？索引又会带来哪些代价？",
     "options": [],
     "answer": []
@@ -525,6 +564,7 @@
     "direction": "后端",
     "kind": "text",
     "difficulty": "basic",
+    "essentiality": "nice_to_know",
     "prompt": "简述 REST 风格中资源命名与 HTTP 状态码的常见选择，并举 2 到 3 个状态码示例说明其适用场景。",
     "options": [],
     "answer": []
@@ -534,6 +574,7 @@
     "direction": "算法与数据结构",
     "kind": "single",
     "difficulty": "basic",
+    "essentiality": "must_know",
     "prompt": "在一个已排序数组中二分查找的时间复杂度是？",
     "options": [
       { "key": "A", "text": "O(1)" },
@@ -548,6 +589,7 @@
     "direction": "算法与数据结构",
     "kind": "single",
     "difficulty": "basic",
+    "essentiality": "must_know",
     "prompt": "栈这种数据结构的特点是？",
     "options": [
       { "key": "A", "text": "先进先出" },
@@ -562,6 +604,7 @@
     "direction": "算法与数据结构",
     "kind": "multiple",
     "difficulty": "challenge",
+    "essentiality": "advanced",
     "prompt": "下列关于哈希表的说法正确的有？",
     "options": [
       { "key": "A", "text": "平均查找接近 O(1)" },
@@ -576,6 +619,7 @@
     "direction": "算法与数据结构",
     "kind": "single",
     "difficulty": "basic",
+    "essentiality": "nice_to_know",
     "prompt": "队列（Queue）的核心操作特点是？",
     "options": [
       { "key": "A", "text": "先进先出（FIFO）" },
@@ -590,6 +634,7 @@
     "direction": "算法与数据结构",
     "kind": "single",
     "difficulty": "basic",
+    "essentiality": "must_know",
     "prompt": "快速排序在平均情况下的时间复杂度是？",
     "options": [
       { "key": "A", "text": "O(n)" },
@@ -604,6 +649,7 @@
     "direction": "算法与数据结构",
     "kind": "single",
     "difficulty": "basic",
+    "essentiality": "must_know",
     "prompt": "写递归函数时缺少基线条件（base case）会导致？",
     "options": [
       { "key": "A", "text": "编译期直接报错" },
@@ -617,7 +663,8 @@
     "id": "al-q7",
     "direction": "算法与数据结构",
     "kind": "single",
-    "difficulty": "basic",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
     "prompt": "与数组相比，链表的主要优势与代价是？",
     "options": [
       { "key": "A", "text": "随机访问更快，但插入删除更慢" },
@@ -632,6 +679,7 @@
     "direction": "算法与数据结构",
     "kind": "single",
     "difficulty": "basic",
+    "essentiality": "nice_to_know",
     "prompt": "对二叉搜索树（BST）做中序遍历，得到的键序列是？",
     "options": [
       { "key": "A", "text": "随机顺序" },
@@ -646,6 +694,7 @@
     "direction": "算法与数据结构",
     "kind": "multiple",
     "difficulty": "basic",
+    "essentiality": "nice_to_know",
     "prompt": "关于排序算法的稳定性，下列说法正确的有？",
     "options": [
       { "key": "A", "text": "稳定指排序后相等的元素仍保持原来的相对顺序" },
@@ -659,7 +708,8 @@
     "id": "al-q10",
     "direction": "算法与数据结构",
     "kind": "single",
-    "difficulty": "basic",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
     "prompt": "动态规划与普通分治法的关键区别在于？",
     "options": [
       { "key": "A", "text": "动态规划的子问题存在重叠，可缓存结果避免重复计算" },
@@ -674,6 +724,7 @@
     "direction": "算法与数据结构",
     "kind": "single",
     "difficulty": "basic",
+    "essentiality": "nice_to_know",
     "prompt": "在边上权值均为 1 的无权图中求最短路径，最合适的算法是？",
     "options": [
       { "key": "A", "text": "深度优先搜索（DFS）" },
@@ -688,6 +739,7 @@
     "direction": "算法与数据结构",
     "kind": "multiple",
     "difficulty": "challenge",
+    "essentiality": "advanced",
     "prompt": "关于算法复杂度分析，下列说法正确的有？",
     "options": [
       { "key": "A", "text": "大 O 记号描述的是渐进上界" },
@@ -701,7 +753,8 @@
     "id": "al-q13",
     "direction": "算法与数据结构",
     "kind": "single",
-    "difficulty": "basic",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
     "prompt": "从含 n 个元素的大顶堆中取出并删除堆顶最大值的复杂度是？",
     "options": [
       { "key": "A", "text": "O(1)" },
@@ -716,6 +769,7 @@
     "direction": "算法与数据结构",
     "kind": "multiple",
     "difficulty": "basic",
+    "essentiality": "nice_to_know",
     "prompt": "关于图算法，下列说法正确的有？",
     "options": [
       { "key": "A", "text": "Dijkstra 不能正确处理带负权边的图" },
@@ -730,6 +784,7 @@
     "direction": "算法与数据结构",
     "kind": "single",
     "difficulty": "basic",
+    "essentiality": "nice_to_know",
     "prompt": "递归算法的空间复杂度主要取决于？",
     "options": [
       { "key": "A", "text": "全局变量的个数" },
@@ -744,6 +799,7 @@
     "direction": "算法与数据结构",
     "kind": "multiple",
     "difficulty": "basic",
+    "essentiality": "nice_to_know",
     "prompt": "关于二叉树的遍历，下列说法正确的有？",
     "options": [
       { "key": "A", "text": "前序遍历顺序是根、左、右" },
@@ -758,6 +814,7 @@
     "direction": "算法与数据结构",
     "kind": "single",
     "difficulty": "basic",
+    "essentiality": "nice_to_know",
     "prompt": "数据规模很大且要求排序结果稳定时，下列哪种算法更合适？",
     "options": [
       { "key": "A", "text": "归并排序" },
@@ -772,6 +829,7 @@
     "direction": "算法与数据结构",
     "kind": "text",
     "difficulty": "basic",
+    "essentiality": "must_know",
     "prompt": "请简述 O(n log n) 与 O(n^2) 在数据规模增大时的差距，并说明工程上为什么要在意复杂度。",
     "options": [],
     "answer": []
@@ -781,6 +839,7 @@
     "direction": "算法与数据结构",
     "kind": "text",
     "difficulty": "basic",
+    "essentiality": "nice_to_know",
     "prompt": "对比哈希表与平衡二叉搜索树：分别说明适合的使用场景以及各自的局限。",
     "options": [],
     "answer": []
@@ -790,6 +849,7 @@
     "direction": "算法与数据结构",
     "kind": "text",
     "difficulty": "basic",
+    "essentiality": "nice_to_know",
     "prompt": "简述使用动态规划需要满足的两个前提条件，并举一个你熟悉的例子说明状态与转移。",
     "options": [],
     "answer": []
@@ -799,6 +859,7 @@
     "direction": "计算机基础",
     "kind": "single",
     "difficulty": "basic",
+    "essentiality": "nice_to_know",
     "prompt": "git 中用于创建并切换到新分支的命令是？",
     "options": [
       { "key": "A", "text": "git branch" },
@@ -813,6 +874,7 @@
     "direction": "计算机基础",
     "kind": "single",
     "difficulty": "basic",
+    "essentiality": "must_know",
     "prompt": "操作系统中的进程与线程，最准确的描述是？",
     "options": [
       { "key": "A", "text": "进程是资源分配单位，线程是调度单位" },
@@ -827,6 +889,7 @@
     "direction": "计算机基础",
     "kind": "multiple",
     "difficulty": "challenge",
+    "essentiality": "advanced",
     "prompt": "关于 TCP 与 UDP，下列说法正确的有？",
     "options": [
       { "key": "A", "text": "TCP 提供可靠传输" },
@@ -841,6 +904,7 @@
     "direction": "计算机基础",
     "kind": "single",
     "difficulty": "basic",
+    "essentiality": "nice_to_know",
     "prompt": "8 位无符号整数能表示的最大值是？",
     "options": [
       { "key": "A", "text": "127" },
@@ -855,6 +919,7 @@
     "direction": "计算机基础",
     "kind": "single",
     "difficulty": "basic",
+    "essentiality": "must_know",
     "prompt": "虚拟内存的主要作用是？",
     "options": [
       { "key": "A", "text": "让每个进程拥有独立地址空间，并可用磁盘扩展可用内存" },
@@ -869,6 +934,7 @@
     "direction": "计算机基础",
     "kind": "single",
     "difficulty": "basic",
+    "essentiality": "must_know",
     "prompt": "HTTPS 相比 HTTP 的核心安全增强是？",
     "options": [
       { "key": "A", "text": "对传输内容做压缩" },
@@ -883,6 +949,7 @@
     "direction": "计算机基础",
     "kind": "single",
     "difficulty": "basic",
+    "essentiality": "must_know",
     "prompt": "DNS 的主要作用是？",
     "options": [
       { "key": "A", "text": "把域名解析成 IP 地址" },
@@ -897,6 +964,7 @@
     "direction": "计算机基础",
     "kind": "multiple",
     "difficulty": "basic",
+    "essentiality": "nice_to_know",
     "prompt": "关于 git 常用操作，下列说法正确的有？",
     "options": [
       { "key": "A", "text": "git status 用于查看工作区与暂存区的状态" },
@@ -911,6 +979,7 @@
     "direction": "计算机基础",
     "kind": "single",
     "difficulty": "basic",
+    "essentiality": "nice_to_know",
     "prompt": "Linux shell 中竖线 | 的作用是？",
     "options": [
       { "key": "A", "text": "把前一个命令的标准输出作为后一个命令的标准输入" },
@@ -925,6 +994,7 @@
     "direction": "计算机基础",
     "kind": "single",
     "difficulty": "basic",
+    "essentiality": "nice_to_know",
     "prompt": "正则表达式中 * 与 + 的区别是？",
     "options": [
       { "key": "A", "text": "* 匹配 0 次或多次，+ 匹配 1 次或多次" },
@@ -938,7 +1008,8 @@
     "id": "cs-q11",
     "direction": "计算机基础",
     "kind": "single",
-    "difficulty": "basic",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
     "prompt": "下列哪一项是死锁产生的必要条件之一？",
     "options": [
       { "key": "A", "text": "请求并保持（持有资源的同时等待新资源）" },
@@ -953,6 +1024,7 @@
     "direction": "计算机基础",
     "kind": "multiple",
     "difficulty": "challenge",
+    "essentiality": "advanced",
     "prompt": "关于 TCP 的流量控制与拥塞控制，下列说法正确的有？",
     "options": [
       { "key": "A", "text": "滑动窗口用于流量控制，避免发送方压垮接收方" },
@@ -966,7 +1038,8 @@
     "id": "cs-q13",
     "direction": "计算机基础",
     "kind": "single",
-    "difficulty": "basic",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
     "prompt": "进程上下文切换时需要保存并恢复的主要是？",
     "options": [
       { "key": "A", "text": "CPU 寄存器、程序计数器等执行现场，以及进程地址空间相关状态" },
@@ -981,6 +1054,7 @@
     "direction": "计算机基础",
     "kind": "multiple",
     "difficulty": "basic",
+    "essentiality": "nice_to_know",
     "prompt": "关于数据库事务隔离级别，下列说法正确的有？",
     "options": [
       { "key": "A", "text": "读未提交（Read Uncommitted）可能读到其他事务尚未提交的数据" },
@@ -994,7 +1068,8 @@
     "id": "cs-q15",
     "direction": "计算机基础",
     "kind": "single",
-    "difficulty": "basic",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
     "prompt": "引用计数式垃圾回收的典型缺陷是？",
     "options": [
       { "key": "A", "text": "循环引用导致对象无法被回收" },
@@ -1009,6 +1084,7 @@
     "direction": "计算机基础",
     "kind": "multiple",
     "difficulty": "basic",
+    "essentiality": "nice_to_know",
     "prompt": "关于 git 的 reset 与 revert，下列说法正确的有？",
     "options": [
       { "key": "A", "text": "git revert 通过新增一次反向提交来撤销某次改动" },
@@ -1023,6 +1099,7 @@
     "direction": "计算机基础",
     "kind": "single",
     "difficulty": "basic",
+    "essentiality": "nice_to_know",
     "prompt": "C 程序从源码到可执行文件的典型流程是？",
     "options": [
       { "key": "A", "text": "预处理 → 编译 → 汇编 → 链接" },
@@ -1037,6 +1114,7 @@
     "direction": "计算机基础",
     "kind": "text",
     "difficulty": "basic",
+    "essentiality": "nice_to_know",
     "prompt": "简述进程与线程的区别，并各自举例说明适用场景。",
     "options": [],
     "answer": []
@@ -1046,6 +1124,7 @@
     "direction": "计算机基础",
     "kind": "text",
     "difficulty": "basic",
+    "essentiality": "must_know",
     "prompt": "解释 TCP 三次握手的目的，并说明为什么两次握手不够。",
     "options": [],
     "answer": []
@@ -1055,6 +1134,7 @@
     "direction": "计算机基础",
     "kind": "text",
     "difficulty": "basic",
+    "essentiality": "nice_to_know",
     "prompt": "简述什么是虚拟内存，以及它解决了哪些具体问题。",
     "options": [],
     "answer": []

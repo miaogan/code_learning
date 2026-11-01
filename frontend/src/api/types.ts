@@ -163,6 +163,16 @@ export interface InterviewSession {
   interview_avg: number | null
 }
 
+/* ------------------------------------------------------------------ *
+ * r6 契约 · 题目四维标签（与 backend/app/schemas.py 的 ExamDifficulty /
+ * QuestionEssentiality 逐字镜像；闭集单一出处在 backend/app/services/rules.py）
+ * ------------------------------------------------------------------ */
+
+/** 难度三档：基础 / 中级（r6 新增）/ 挑战。 */
+export type ExamDifficulty = 'basic' | 'intermediate' | 'challenge'
+/** 必备度三档：必备 / 进阶 / 加分项。 */
+export type QuestionEssentiality = 'must_know' | 'advanced' | 'nice_to_know'
+
 export interface ExamOption {
   key: string
   text: string
@@ -183,6 +193,12 @@ export interface ExamQuestion {
 export interface ExamRun {
   run_id: string
   questions: ExamQuestion[]
+  /**
+   * 本次**净过滤**掉的熟练题数（r6 AC-12）＝ `|熟练 ∩ 可用| − |熟练 ∩ 本卷|`，恒 `>= 0`。
+   * 服务端恒返回（`Field(default=0)`）；读侧仍交给 `lib/examNotice` 的 `filteredNotice()` 解释，
+   * 旧 payload 缺该字段时按 0 静默处理（页面不挂载任何断言性文案）。
+   */
+  filtered_count: number
 }
 
 export interface ExamAnswers {

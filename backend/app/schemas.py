@@ -12,6 +12,12 @@ ExperienceBand = Literal["应届", "1-3年", "3-5年", "5-10年", "10年以上"]
 InterviewMarket = Literal["国内", "北美", "欧洲", "其他"]
 CompanySize = Literal["大厂", "中型", "初创"]
 ExamKind = Literal["single", "multiple", "text"]
+#: 题目难度三档（r6：`basic` / `intermediate` / `challenge`）。闭集单一出处在
+#: `services/rules.py:DIFFICULTIES` —— 那份元组与本 Literal 逐字对齐，改一处必须改两处。
+ExamDifficulty = Literal["basic", "intermediate", "challenge"]
+#: 题目必备度三档（r6）：必备 / 进阶 / 加分项。闭集单一出处在
+#: `services/rules.py:ESSENTIALITIES`，语义见 `rules.essentiality_of()`。
+QuestionEssentiality = Literal["must_know", "advanced", "nice_to_know"]
 #: 能力项状态：`active` 参与出题/诊断，`historical` 只留在画像里做记忆（消失项不删，r3 AC-6）。
 SkillStatus = Literal["active", "historical"]
 #: 时间线事件类型：面试 / 笔试 / 简历上传（各写 1 条，r3 AC-1）。
@@ -227,6 +233,9 @@ class ExamQuestion(BaseModel):
 class ExamRun(BaseModel):
     run_id: str
     questions: list[ExamQuestion]
+    #: 本次**净过滤**掉的熟练题数 = `|熟练 ∩ 可用| − |熟练 ∩ 本卷|`（r6 AC-12）。
+    #: 恒 `>= 0`；声明必填但给默认 0，旧客户端/旧 payload 不会因缺字段而炸；服务端恒显式赋值。
+    filtered_count: int = 0
 
 
 class ExamAnswers(BaseModel):

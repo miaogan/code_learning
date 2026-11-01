@@ -14,6 +14,7 @@ from .db import init_db
 from .errors import HTTP_ERROR, NOT_FOUND, VALIDATION_ERROR, AppError
 from .routers import courses, exam, history, interview, profile, report, resume, timeline
 from .schemas import HealthResponse
+from .services import question_bank
 
 APP_VERSION = "0.1.0"
 
@@ -21,6 +22,8 @@ APP_VERSION = "0.1.0"
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     init_db()
+    # 启动即补种子（数据不是 DDL，故不进 db.py）：空库补 80 行、重复启动 0 新增（AC-1）。
+    question_bank.ensure_seeded()
     yield
 
 

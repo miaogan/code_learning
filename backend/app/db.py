@@ -1,8 +1,11 @@
-"""SQLite 单库访问层：5 张表，结构化产物以 JSON 文本列存（ARCHITECTURE §3.4）。
+"""SQLite 单库访问层：7 张表，结构化产物以 JSON 文本列存（ARCHITECTURE §3.4）。
 
 不做迁移框架：只用 CREATE TABLE IF NOT EXISTS，字段变更需在 memory.md 记录一次性升级说明。
 r3 追加 `timeline_events`（成长时间线的事件快照，`(type, ref_id)` 唯一）——对既有 `app.db`
 反复执行 `init_db()` 即得新表，无迁移语句。
+r6 追加 `questions`（题库，`seed/questions.json` 退为唯一导入源）与 `question_attempts`
+（客观题作答事件，`(question_id, run_id)` 唯一）——同样反复执行 `init_db()` 即得新表与新索引，
+既有 `app.db` 无需迁移语句；空库由 `services/question_bank.ensure_seeded()` 幂等补 80 行。
 """
 
 import sqlite3
@@ -66,6 +69,38 @@ CREATE TABLE IF NOT EXISTS timeline_events (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_timeline_type_ref ON timeline_events (type, ref_id);
 -- 读取与「上一次对比」的唯一排序口径：occurred_at DESC, created_at DESC。
 CREATE INDEX IF NOT EXISTS idx_timeline_occurred ON timeline_events (occurred_at);
+
+-- r6 题库承载：seed JSON 只做导入源。11 个业务列，answer 只服务端可见（不入任何响应模型）。
+CREATE TABLE IF NOT EXISTS questions (
+    id           TEXT PRIMARY KEY,
+    direction    TEXT NOT NULL,
+    kind         TEXT NOT NULL,
+    difficulty   TEXT NOT NULL,   -- basic | intermediate | challenge
+    essentiality TEXT NOT NULL,   -- must_know | advanced | nice_to_know
+    prompt       TEXT NOT NULL,
+    options      TEXT NOT NULL,   -- JSON: [{"key","text"}]
+    answer       TEXT NOT NULL,   -- JSON: ["B"] / ["A","B","C"] / []（text 型恒 []）
+    source       TEXT NOT NULL,   -- 'seed'（本轮唯一取值，为将来题库管理 UI 留位）
+    created_at   TEXT NOT NULL,
+    updated_at   TEXT NOT NULL
+);
+
+-- 选池的唯一索引：按 (direction, difficulty) 取候选池时不必扫全表。
+CREATE INDEX IF NOT EXISTS idx_questions_pool ON questions (direction, difficulty);
+
+-- r6 作答事件：熟练度判定的唯一事实源（只记客观题，简答不计分故永不写入）。
+CREATE TABLE IF NOT EXISTS question_attempts (
+    id          TEXT PRIMARY KEY,
+    question_id TEXT NOT NULL,
+    run_id      TEXT NOT NULL,
+    correct     INTEGER NOT NULL,  -- 0/1
+    answered_at TEXT NOT NULL,     -- ISO8601 UTC
+    created_at  TEXT NOT NULL,
+    UNIQUE (question_id, run_id)   -- 同一卷同一题只有一条事件（重复提交再兜一层）
+);
+
+-- 熟练度窗口读取口径：按题取该题的作答序列（`answered_at` 升序）。
+CREATE INDEX IF NOT EXISTS idx_attempts_question ON question_attempts (question_id, answered_at);
 """
 
 

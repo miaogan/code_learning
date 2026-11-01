@@ -290,3 +290,174 @@ def previous_timeline_event(
             (event_type, before, exclude_id),
         ).fetchone()
     return None if row is None else _timeline_of(row)
+
+
+# --- questions / attempts（r6 题库与作答事件） -------------------------------
+
+
+def _json_text(value: Any) -> str:
+    """JSON 列的唯一编码口径：list → JSON 文本；已是字符串时原样存（调用方自带序列化）。"""
+    if isinstance(value, str):
+        return value
+    return json.dumps(value if value is not None else [], ensure_ascii=False)
+
+
+def _json_list(value: Any) -> list[Any]:
+    """JSON 列的唯一解码口径：坏值 / 非列表一律退化为 `[]`（查不到不抛异常）。"""
+    if isinstance(value, list):
+        return value
+    if not isinstance(value, str):
+        return []
+    try:
+        decoded = json.loads(value)
+    except json.JSONDecodeError:
+        return []
+    return decoded if isinstance(decoded, list) else []
+
+
+_QUESTION_INSERT = (
+    "INSERT INTO questions (id, direction, kind, difficulty, essentiality, prompt, "
+    "options, answer, source, created_at, updated_at) "
+    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+    "ON CONFLICT(id) DO NOTHING"
+)
+
+_QUESTION_SELECT = (
+    "SELECT id, direction, kind, difficulty, essentiality, prompt, options, answer, source "
+    "FROM questions"
+)
+
+
+def insert_question(question: dict[str, Any]) -> bool:
+    """幂等导入单题：新增 `True`，同 `id` 已存在 `False`（**绝不覆盖**既有行，AC-1）。
+
+    幂等的最终真值是 `questions.id` 主键 + `ON CONFLICT(id) DO NOTHING`：重复导入既不新增
+    也不改写，标签回填只在首次导入那一刻生效。
+    """
+    now = _now()
+    with connection() as conn:
+        cursor = conn.execute(
+            _QUESTION_INSERT,
+            (
+                question["id"],
+                question["direction"],
+                question["kind"],
+                question["difficulty"],
+                question["essentiality"],
+                question["prompt"],
+                _json_text(question.get("options")),
+                _json_text(question.get("answer")),
+                question.get("source") or "seed",
+                now,
+                now,
+            ),
+        )
+        return cursor.rowcount > 0
+
+
+def _question_of(row: sqlite3.Row) -> dict[str, Any]:
+    """questions 行 → 组卷字典（`options` / `answer` 就地解码，服务层不再碰 JSON 文本）。"""
+    return {
+        "id": row["id"],
+        "direction": row["direction"],
+        "kind": row["kind"],
+        "difficulty": row["difficulty"],
+        "essentiality": row["essentiality"],
+        "prompt": row["prompt"],
+        "options": _json_list(row["options"]),
+        "answer": _json_list(row["answer"]),
+        "source": row["source"],
+    }
+
+
+def list_questions() -> list[dict[str, Any]]:
+    """全表按 `id` 升序（排序口径单一来源，服务层不得二次排序）。"""
+    with connection() as conn:
+        rows = conn.execute(_QUESTION_SELECT + " ORDER BY id").fetchall()
+    return [_question_of(row) for row in rows]
+
+
+def count_questions() -> int:
+    """表内行数：幂等断言与「空库自动种子」判定的唯一读取口径。"""
+    with connection() as conn:
+        row = conn.execute("SELECT COUNT(*) AS total FROM questions").fetchone()
+    return 0 if row is None else int(row["total"])
+
+
+_ATTEMPT_INSERT = (
+    "INSERT INTO question_attempts (id, question_id, run_id, correct, answered_at, created_at) "
+    "VALUES (?, ?, ?, ?, ?, ?) "
+    "ON CONFLICT(question_id, run_id) DO NOTHING"
+)
+
+
+def insert_attempts(rows: list[dict[str, Any]]) -> int:
+    """单事务批量写作答事件，返回**实际新增**条数。
+
+    幂等真值同样是 `db.py` 的 `UNIQUE(question_id, run_id)`：同卷同题重复提交不会写出
+    第二条、也不抛异常；空列表直接返回 0（不打扰库）。
+    """
+    if not rows:
+        return 0
+    with connection() as conn:
+        written = 0
+        for row in rows:
+            cursor = conn.execute(
+                _ATTEMPT_INSERT,
+                (
+                    row["id"],
+                    row["question_id"],
+                    row["run_id"],
+                    int(row.get("correct") or 0),
+                    row["answered_at"],
+                    row.get("created_at") or row["answered_at"],
+                ),
+            )
+            written += max(cursor.rowcount, 0)
+    return written
+
+
+def list_attempts() -> list[dict[str, Any]]:
+    """全表作答事件，按 `answered_at` 升序（窗口聚合在服务层；同刻用 `created_at`、`id` 定序）。"""
+    with connection() as conn:
+        rows = conn.execute(
+            "SELECT id, question_id, run_id, correct, answered_at, created_at "
+            "FROM question_attempts ORDER BY answered_at ASC, created_at ASC, id ASC"
+        ).fetchall()
+    return [
+        {
+            "id": row["id"],
+            "question_id": row["question_id"],
+            "run_id": row["run_id"],
+            "correct": int(row["correct"]),
+            "answered_at": row["answered_at"],
+            "created_at": row["created_at"],
+        }
+        for row in rows
+    ]
+
+
+def list_recent_exam_question_ids(limit: int) -> list[set[str]]:
+    """近 `limit` 卷笔试题 id，返回 **newest-first 的 set 列表**（近卷去重的唯一读取口径）。
+
+    只读 `runs.payload.questions[]`，不回查 `questions` 表：去重要对**历史出题事实**生效，
+    题库事后改标签不得改写已出过的卷子。`limit <= 0` 返回空列表。
+    """
+    if limit <= 0:
+        return []
+    with connection() as conn:
+        rows = conn.execute(
+            "SELECT payload FROM runs WHERE kind = 'exam' ORDER BY created_at DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+    papers: list[set[str]] = []
+    for row in rows:
+        questions = _row_payload(row).get("questions") or []
+        papers.append(
+            {
+                str(item.get("id"))
+                for item in questions
+                if isinstance(item, dict) and item.get("id")
+            }
+        )
+    return papers
