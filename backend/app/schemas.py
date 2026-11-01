@@ -323,6 +323,15 @@ class PolishResponse(BaseModel):
     polish_id: str = Field(description="本次建议集的一次性句柄，供 `/polish/full` 复用同一次结果")
     resume_id: str
     target_role: str | None = None
+    resume_text: str = Field(
+        description=(
+            "简历正文，与 `documents.text` 逐字相等（字节级）；「原版」Tab 的唯一真源"
+            "（成稿只取 `/polish/full` 的 markdown，本字段不参与拼装）"
+        )
+    )
+    file_name: str = Field(
+        default="", description="来源文件名（`documents.file_name`），导出命名用；存量数据可能为空串"
+    )
     suggestions: list[PolishSuggestion]
     dropped_count: int = Field(default=0, description="未通过事实校验被整条剔除的条数")
     insufficient_reason: str | None = Field(default=None, description="条目不足时的中文说明")

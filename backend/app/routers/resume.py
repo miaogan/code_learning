@@ -65,19 +65,24 @@ async def upload_resume(
 # --- 润色（r3 AC-8 ~ AC-13）---------------------------------------------------
 
 
-def _resume_body(resume_id: str) -> str:
-    """取简历正文；不存在 / 正文为空按既有错误码拒绝（不新增错误码）。"""
+def _load_resume(resume_id: str) -> tuple[str, str]:
+    """取简历正文与源文件名；不存在 / 正文为空按既有错误码拒绝（不新增错误码）。
+
+    一次 `repository.get_document` 同时拿到 `text` 与 `file_name`，润色响应与前端导出命名
+    共用同一条读路径，不重复查库。
+    """
     document = repository.get_document(resume_id)
     if document is None:
         raise AppError(NOT_FOUND, "没有找到这份简历，请重新上传后再润色", status=404)
     text = str(document.get("text") or "")
+    file_name = str(document.get("file_name") or "")
     if not text.strip():
         raise AppError(
             VALIDATION_ERROR,
             "这份简历没有可润色的正文，请换一份可复制文本的文件重试",
             status=400,
         )
-    return text
+    return text, file_name
 
 
 def _resolve_target_role(payload_role: str | None, profile: Profile | None) -> str | None:
@@ -104,7 +109,7 @@ async def polish_resume(
     resume_id: str,
     payload: PolishRequest | None = None,
 ) -> PolishResponse:
-    text = _resume_body(resume_id)
+    text, file_name = _load_resume(resume_id)
     profile = repository.latest_profile()
     target_role = _resolve_target_role(
         payload.target_role if payload is not None else None, profile
@@ -119,6 +124,8 @@ async def polish_resume(
         polish_id=polish_id,
         resume_id=resume_id,
         target_role=target_role,
+        resume_text=text,
+        file_name=file_name,
         suggestions=kept,
         dropped_count=dropped,
         insufficient_reason=resume_polish.insufficient_reason(kept),
@@ -134,7 +141,7 @@ async def polish_full(
     resume_id: str,
     payload: PolishFullRequest | None = None,
 ) -> PolishFullResponse:
-    text = _resume_body(resume_id)
+    text, _ = _load_resume(resume_id)
     profile = repository.latest_profile()
     request = payload or PolishFullRequest()
     requested_role = (request.target_role or "").strip() or None

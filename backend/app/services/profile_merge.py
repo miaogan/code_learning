@@ -18,9 +18,16 @@ import uuid
 from datetime import UTC, datetime
 from typing import NamedTuple
 
-from pydantic import BaseModel, Field
-
-from ..schemas import Profile, ProfileDraft, ProfileProject, ProfileSkill
+from ..schemas import (
+    Evidence,
+    Profile,
+    ProfileDraft,
+    ProfileMergeSummary,
+    ProfileProject,
+    ProfileSkill,
+    # 显式再导出：`services/profile.py` 从这里取 `ProfileWithMerge`（契约真源在 schemas）。
+    ProfileWithMerge as ProfileWithMerge,
+)
 
 #: 历史项的状态值。active 表示「当前简历仍然写了」，historical 表示「只在旧简历里出现」。
 STATUS_ACTIVE = "active"
@@ -28,90 +35,6 @@ STATUS_HISTORICAL = "historical"
 
 #: 出题素材的下限：active 能力项少于这个数时，出题侧以 `tech_stack` 兜底（AC-7）。
 MIN_ACTIVE_SKILLS = 3
-
-# --- 契约兼容层（TECHNICAL §3）------------------------------------------------
-# `Evidence` / `ProfileSkill(source_quotes, status)` / `ProfileMergeSummary` /
-# `ProfileWithMerge` 的契约归属是 `schemas.py`（T1）。并行开发窗口内该契约可能尚未
-# 落地：此时在**本模块**声明字段等价的超集模型，POST 照样返回 r3 形状（前端 T7/T8
-# 直接消费，不空等契约），而 `schemas.py` 一旦声明了同名字段，下面每个名字都会自动
-# 切回契约真源 —— 本层随即退化为空操作，不产生第二份契约定义。
-
-try:  # pragma: no cover - 走哪个分支由 `schemas.py` 是否已含 r3 契约决定
-    from ..schemas import Evidence as _SchemaEvidence
-    from ..schemas import ProfileMergeSummary as _SchemaMergeSummary
-    from ..schemas import ProfileWithMerge as _SchemaWithMerge
-except ImportError:  # pragma: no cover - 契约未落地
-    _SchemaEvidence = None  # type: ignore[assignment,misc]
-    _SchemaMergeSummary = None  # type: ignore[assignment,misc]
-    _SchemaWithMerge = None  # type: ignore[assignment,misc]
-
-#: `schemas.py` 是否已声明证据链字段（`ProfileSkill` 的两个 r3 新字段）。
-SKILL_HAS_EVIDENCE_FIELDS = all(
-    name in getattr(ProfileSkill, "model_fields", {}) for name in ("source_quotes", "status")
-)
-
-#: 契约真源是否就绪（证据字段 + 摘要 + 响应模型三件齐备）。
-CONTRACT_READY = (
-    SKILL_HAS_EVIDENCE_FIELDS
-    and _SchemaEvidence is not None
-    and _SchemaMergeSummary is not None
-    and _SchemaWithMerge is not None
-)
-
-
-class _FallbackEvidence(BaseModel):  # pragma: no cover - 契约未落地时才实例化
-    """一条可溯源证据（字段与 `schemas.Evidence` 等价）。"""
-
-    quote: str
-    resume_id: str = ""
-    file_name: str = ""
-    captured_at: str = ""
-
-
-class _FallbackMergeSummary(BaseModel):  # pragma: no cover - 契约未落地时才实例化
-    """合并摘要（字段与 `schemas.ProfileMergeSummary` 等价）。"""
-
-    added: int = 0
-    historical: int = 0
-    evidence_added: int = 0
-    duplicate: bool = False
-
-
-Evidence = _SchemaEvidence if _SchemaEvidence is not None else _FallbackEvidence
-ProfileMergeSummary = (
-    _SchemaMergeSummary if _SchemaMergeSummary is not None else _FallbackMergeSummary
-)
-
-
-if CONTRACT_READY:  # pragma: no cover - 契约真源就绪：本模块零模型定义
-    MergedSkill = ProfileSkill
-    MergedProject = ProfileProject
-    MergedProfile = Profile
-    ProfileWithMerge = _SchemaWithMerge
-else:  # pragma: no cover - 并行开发窗口：字段等价超集，契约落地后整段失效
-
-    class MergedSkill(ProfileSkill):
-        """带证据链与历史标记的能力项（`source_quotes` 旧→新累积）。"""
-
-        source_quotes: list[Evidence] = Field(default_factory=list)  # type: ignore[valid-type]
-        status: str = STATUS_ACTIVE
-
-    class MergedProject(ProfileProject):
-        """带证据链与历史标记的项目经历（字段口径与技能一致）。"""
-
-        source_quotes: list[Evidence] = Field(default_factory=list)  # type: ignore[valid-type]
-        status: str = STATUS_ACTIVE
-
-    class MergedProfile(Profile):
-        """合并结果：技能/项目换成带证据链的条目，其余维度沿用契约本体。"""
-
-        skills: list[MergedSkill] = Field(default_factory=list)
-        projects: list[MergedProject] = Field(default_factory=list)
-
-    class ProfileWithMerge(MergedProfile):  # type: ignore[no-redef]
-        """POST 的一次性响应：`merge_summary` 只挂这里，不进 GET 的持久契约。"""
-
-        merge_summary: ProfileMergeSummary | None = None  # type: ignore[valid-type]
 
 
 def normalize_name(name: str) -> str:
@@ -256,7 +179,7 @@ def merge_profile(
     file_name: str = "",
     captured_at: str = "",
     duplicate: bool = False,
-) -> tuple[MergedProfile, ProfileMergeSummary]:
+) -> tuple[Profile, ProfileMergeSummary]:
     """把新简历草稿合并进当前画像：同 `profile_id`、证据旧→新累积、消失项转 historical。"""
     now = datetime.now(UTC).isoformat()
     source = _EvidenceSource(
@@ -280,8 +203,7 @@ def merge_profile(
         ),
         "target_role": draft.target_role if draft.target_role is not None else (old.target_role if old else None),
     }
-    # 用兼容层模型校验：契约落地时它等价于 `Profile`，未落地时它保留证据链/历史标记。
-    profile = MergedProfile.model_validate(payload)
+    profile = Profile.model_validate(payload)
     summary = ProfileMergeSummary(
         added=counters["added"],
         historical=counters["historical"],
@@ -303,14 +225,14 @@ def _backfill_entry(entry: dict[str, object], resume_id: str) -> dict[str, objec
     }
 
 
-def backfill_evidence(profile: Profile) -> MergedProfile:
-    """兼容读取（TECHNICAL §3「`source_quotes` 为空则用 `source_quote` 回填」）的读侧实现。
+def backfill_evidence(profile: Profile) -> Profile:
+    """兼容读取的读侧实现（`source_quotes` 为空则用兼容字段 `source_quote` 回填）。
 
-    为什么读侧也需要它：契约（`schemas.py`）未声明 `source_quotes`/`status` 时，
-    `repository` 的读路径（`_profile_of → Profile.model_validate_json`）会把证据链丢掉，
-    于是 GET/PATCH 的条目形状与 POST 合并结果不一致。本函数让两侧形状一致
+    为什么读侧也需要它：存量画像行只写了 `source_quote`，而 `repository` 的读路径
+    （`_profile_of → Profile.model_validate_json`）要求条目带 `source_quotes`，
+    于是 GET/PATCH 的条目形状会与 POST 合并结果不一致。本函数让两侧形状一致
     （`source_quotes[0].quote == source_quote`，`status` 缺省 active）。
-    契约落地后**自动退化为空操作**：条目本就带证据链时原样返回（多证据不被截断）。
+    条目本就带证据链时**原样返回**（多证据不被截断），所以对 r3 之后的写路径是空操作。
     """
     payload = profile.model_dump()
     payload["skills"] = [
@@ -319,7 +241,7 @@ def backfill_evidence(profile: Profile) -> MergedProfile:
     payload["projects"] = [
         _backfill_entry(entry, profile.resume_id) for entry in payload.get("projects", [])
     ]
-    return MergedProfile.model_validate(payload)
+    return Profile.model_validate(payload)
 
 
 def _merge_skills(

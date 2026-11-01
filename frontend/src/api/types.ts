@@ -292,6 +292,13 @@ export interface PolishResponse {
   polish_id: string
   resume_id: string
   target_role: string | null
+  /**
+   * 简历正文，与 `documents.text` **逐字相等**（字节级，服务端不 trim 不归一）。
+   * 「原版」Tab 的唯一真源（r4 AC-1/AC-2/AC-5）：前端只渲染，不切片、不拼接、不参与成稿拼装。
+   */
+  resume_text: string
+  /** 来源文件名（`documents.file_name`），导出命名用；存量数据可能为空串（AC-7/AC-8，空则回退日期）。 */
+  file_name: string
   suggestions: PolishSuggestion[]
   dropped_count: number
   /** 条目不足时的中文说明（不造假条目）。 */

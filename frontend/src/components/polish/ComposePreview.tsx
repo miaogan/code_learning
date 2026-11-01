@@ -2,8 +2,11 @@ import { InlineError } from '../ui/InlineError'
 import { PhaseLoader } from '../ui/PhaseLoader'
 
 export interface ComposePreviewProps {
-  /** preview = 本地切片预览（未生成）；generated = 服务端成稿（单源，导出取此文本） */
-  mode: 'preview' | 'generated'
+  /**
+   * preview = 本地切片预览（未生成）；generated = 服务端成稿（单源，导出取此文本）；
+   * original = 简历原版正文（契约 `resume_text` 整篇，**逐字渲染**，见下方 plain 分支）。
+   */
+  mode: 'preview' | 'generated' | 'original'
   text: string
   loading: boolean
   error: string | null
@@ -16,6 +19,8 @@ export interface ComposePreviewProps {
   elapsedSec?: number
   /** 覆盖顶部 meta 文案（原版 Tab 等非生成场景） */
   meta?: string
+  /** 覆盖空态中文占位（原版 Tab 的加载中 / 未分析 / 正文为空三态） */
+  emptyText?: string
 }
 
 const DEFAULT_PHASES = ['汇总已采纳条目', '重写段落', '拼装成稿']
@@ -52,7 +57,12 @@ function renderMarkdown(text: string) {
   })
 }
 
-/** 成稿区：预览与成稿两种真源在同一组件内，用 meta 文案区分（DESIGN §2.4）。 */
+/**
+ * 成稿区：预览 / 成稿 / 简历原版三种真源在同一组件内，用 mode 与 meta 文案区分（DESIGN §2.4）。
+ *
+ * 注意 `mode='original'` **不能**走 `renderMarkdown()`：那条路径会剥掉 `#` 与 `- ` 前缀，
+ * 导致渲染文本与 `resume_text` 不再逐字相等（r4 AC-2）。原版正文因此走纯文本单节点分支。
+ */
 export function ComposePreview({
   mode,
   text,
@@ -63,12 +73,22 @@ export function ComposePreview({
   activePhase = 0,
   elapsedSec,
   meta: metaOverride,
+  emptyText,
 }: ComposePreviewProps) {
+  const isOriginal = mode === 'original'
   const meta = metaOverride ?? (loading
     ? '正在生成成稿'
     : mode === 'generated'
       ? '已生成 · 导出取此文本（单源）'
-      : '预览 · 未生成')
+      : isOriginal
+        ? '原版 · 逐字取自简历正文'
+        : '预览 · 未生成')
+  const bodyLabel = isOriginal
+    ? '简历原版正文'
+    : mode === 'generated'
+      ? '成稿全文'
+      : '成稿预览'
+  const emptyMessage = emptyText ?? EMPTY_PREVIEW
 
   return (
     <div className="sc-compose">
@@ -92,13 +112,16 @@ export function ComposePreview({
 
       {!loading && !error ? (
         <div
-          className="sc-compose-body"
+          className={isOriginal ? 'sc-compose-body is-plain' : 'sc-compose-body'}
           tabIndex={0}
           role="region"
-          aria-label={mode === 'generated' ? '成稿全文' : '成稿预览'}
+          aria-label={bodyLabel}
         >
           {text.trim() === '' ? (
-            <p className="sc-compose-empty">{EMPTY_PREVIEW}</p>
+            <p className="sc-compose-empty">{emptyMessage}</p>
+          ) : isOriginal ? (
+            /** 逐字渲染：单文本节点、零切片零替换（`textContent === text`，AC-2）。 */
+            text
           ) : (
             renderMarkdown(text)
           )}

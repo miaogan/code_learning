@@ -20,8 +20,10 @@ __pycache__/
 backend/.venv/
 venv/
 .venv/
-backend/.pytest_cache/
-backend/.ruff_cache/
+# 通用缓存目录（无 backend/ 前缀）：pytest/ruff 在 backend/ 下运行时产物落在
+# backend/.pytest_cache，但从仓库根调用或编辑器插件也可能落在根目录，统一覆盖
+.pytest_cache/
+.ruff_cache/
 backend/pytest-cache-files-*/
 backend/.test-scaffold.db
 *.db

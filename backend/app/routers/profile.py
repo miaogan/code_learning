@@ -17,13 +17,9 @@ from fastapi import APIRouter
 
 from .. import repository
 from ..errors import NOT_FOUND, AppError
-from ..schemas import ProfilePatch
+from ..schemas import Profile, ProfilePatch, ProfileWithMerge
 from ..services.profile import generate_profile
-from ..services.profile_merge import (
-    MergedProfile,
-    ProfileWithMerge,
-    backfill_evidence,
-)
+from ..services.profile_merge import backfill_evidence
 
 router = APIRouter(prefix="/api", tags=["profile"])
 
@@ -41,8 +37,8 @@ def _document_meta(document_id: str) -> dict[str, Any]:
     return document if isinstance(document, dict) else {}
 
 
-@router.get("/profiles/latest", response_model=MergedProfile, summary="读取最近一次画像")
-def read_latest_profile() -> MergedProfile:
+@router.get("/profiles/latest", response_model=Profile, summary="读取最近一次画像")
+def read_latest_profile() -> Profile:
     profile = repository.latest_profile()
     if profile is None:
         raise AppError(NOT_FOUND, "还没有画像，请先上传简历", status=404)
@@ -68,8 +64,8 @@ async def create_profile(resume_id: str) -> ProfileWithMerge:
     )
 
 
-@router.patch("/profiles/{profile_id}", response_model=MergedProfile, summary="编辑画像条目")
-def update_profile(profile_id: str, patch: ProfilePatch) -> MergedProfile:
+@router.patch("/profiles/{profile_id}", response_model=Profile, summary="编辑画像条目")
+def update_profile(profile_id: str, patch: ProfilePatch) -> Profile:
     profile = repository.get_profile(profile_id)
     if profile is None:
         raise AppError(NOT_FOUND, "没有找到这份画像，请先生成画像", status=404)
@@ -79,7 +75,7 @@ def update_profile(profile_id: str, patch: ProfilePatch) -> MergedProfile:
     changes = {name: value for name, value in fields.items() if value is not None}
     # 基底走兼容读取：未改动的条目带着证据链/历史标记一起回写，PATCH 不会把它抹平。
     base = backfill_evidence(profile)
-    updated = MergedProfile.model_validate(
+    updated = Profile.model_validate(
         {
             **base.model_dump(),
             **changes,

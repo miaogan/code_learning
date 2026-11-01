@@ -54,9 +54,13 @@ def _payload(cases: tuple[dict[str, str], ...], prefix: str = "ps") -> dict[str,
     }
 
 
-def _seed_resume(resume_text: str, resume_id: str = "res-1") -> str:
+def _seed_resume(
+    resume_text: str, resume_id: str = "res-1", file_name: str = "简历.txt"
+) -> str:
     repository.insert_document(
-        ResumeMeta(resume_id=resume_id, file_name="简历.txt", chars=len(resume_text), sections=4),
+        ResumeMeta(
+            resume_id=resume_id, file_name=file_name, chars=len(resume_text), sections=4
+        ),
         resume_text,
     )
     return resume_id
@@ -265,6 +269,130 @@ def test_polish_endpoint_returns_suggestions_and_does_not_touch_text(
     assert repository.get_document_text(resume_id) == resume_text
     latest = repository.latest_profile()
     assert latest is not None and latest.target_role == DEFAULT_ROLE
+
+
+def test_polish_response_carries_verbatim_resume_text(
+    client: TestClient,
+    patch_ai: Callable[[Callable[[type[Any], str], dict[str, Any]]], None],
+    polish_responder: Callable[[type[Any], str], dict[str, Any]],
+    resume_text: str,
+) -> None:
+    """R-1（AC-1/2）：响应正文与 `documents.text` 逐字相等，源文件名随响应回传（AC-7）。
+
+    「原版」Tab 只认这份 `resume_text`，因此服务端必须立住「逐字、字节级不变」这条
+    真源保证：前端一旦渲染走形（例如 Markdown 剥掉 `#` / `-` 前缀），这里就是唯一能
+    定位归因的断言。
+    """
+    resume_id = _seed_resume(resume_text, file_name="张三-前端-简历.pdf")
+    patch_ai(polish_responder)
+
+    response = client.post(f"/api/resumes/{resume_id}/polish", json={"target_role": None})
+    assert response.status_code == 200
+    body = response.json()
+
+    document = repository.get_document(resume_id)
+    assert document is not None
+    assert document["text"] == resume_text, "落库正文本身不应被润色链路改动"
+    assert body["resume_text"] == resume_text
+    assert body["resume_text"] == document["text"], "响应正文必须与 documents.text 逐字相等"
+    assert len(body["resume_text"]) == len(document["text"]), "长度全等（无 trim / 归一）"
+    assert body["resume_text"].encode() == document["text"].encode(), "字节级相等（含换行/空白）"
+    assert body["file_name"] == "张三-前端-简历.pdf", "文件名源自 documents.file_name，不得自造"
+
+
+def test_polish_response_file_name_empty_when_missing(
+    client: TestClient,
+    patch_ai: Callable[[Callable[[type[Any], str], dict[str, Any]]], None],
+    polish_responder: Callable[[type[Any], str], dict[str, Any]],
+    resume_text: str,
+) -> None:
+    """AC-8：源文件名缺失时回落空串；日期格式的兜底命名由前端 `lib/exportName` 负责。"""
+    resume_id = _seed_resume(resume_text, resume_id="res-no-name", file_name="")
+    patch_ai(polish_responder)
+
+    response = client.post(f"/api/resumes/{resume_id}/polish", json={"target_role": None})
+    assert response.status_code == 200
+    body = response.json()
+
+    assert body["file_name"] == ""
+    assert body["resume_text"] == resume_text, "文件名缺失不影响正文真源"
+
+
+def test_polish_full_does_not_carry_resume_text(
+    client: TestClient,
+    patch_ai: Callable[[Callable[[type[Any], str], dict[str, Any]]], None],
+    polish_responder: Callable[[type[Any], str], dict[str, Any]],
+    resume_text: str,
+) -> None:
+    """TECHNICAL §5/AC-5：长正文只走 `/polish` 一趟；成稿响应只回 `markdown`，不重复携带正文/文件名。
+
+    `resume_text` 是独立只读通道，不参与成稿拼装：`PolishFullResponse` 字段集必须与 r3
+    完全一致，加字段就等于给成稿通道开了第二份正文真源。
+    """
+    resume_id = _seed_resume(resume_text)
+    patch_ai(polish_responder)
+
+    first = client.post(f"/api/resumes/{resume_id}/polish", json={"target_role": None})
+    assert first.status_code == 200
+    polish_id = first.json()["polish_id"]
+
+    full = client.post(
+        f"/api/resumes/{resume_id}/polish/full", json={"polish_id": polish_id}
+    )
+    assert full.status_code == 200
+    payload = full.json()
+
+    assert set(payload) == {"id", "markdown", "dropped_count", "regenerated"}
+    assert "resume_text" not in payload
+    assert "file_name" not in payload
+    assert '"resume_text"' not in full.text, "成稿响应体也不得挟带正文字段"
+    assert payload["regenerated"] is False, "命中同一份建议集缓存，不重复调模型"
+
+
+def test_end_to_end_upload_polish_full_terminal_state(
+    client: TestClient,
+    patch_ai: Callable[[Callable[[type[Any], str], dict[str, Any]]], None],
+    polish_responder: Callable[[type[Any], str], dict[str, Any]],
+    resume_text: str,
+) -> None:
+    """E2E 终态：真实上传 → `/polish` → `/polish/full` 三跳走完，逐跳核对落库真源。
+
+    这一例不自己 `insert_document`，走的是用户真实路径（`POST /api/resumes` 多部分上传 +
+    解析入库），因此同时验证了「上传落库的 `file_name` / `text` 经润色契约原样回传」
+    这条 T1 才闭合的链路；终态是 `/polish/full` 返回的成稿响应。
+    """
+    patch_ai(polish_responder)
+
+    upload = client.post(
+        "/api/resumes",
+        files={
+            "file": ("张三-前端-简历.txt", resume_text.encode("utf-8"), "text/plain")
+        },
+    )
+    assert upload.status_code == 200, upload.text
+    meta = upload.json()
+    resume_id = meta["resume_id"]
+    assert meta["file_name"] == "张三-前端-简历.txt"
+
+    stored = repository.get_document_text(resume_id)
+    assert stored is not None and stored.strip()
+
+    polish = client.post(f"/api/resumes/{resume_id}/polish", json={"target_role": None})
+    assert polish.status_code == 200, polish.text
+    body = polish.json()
+    assert body["resume_text"] == stored, "上传落库的正文经契约原样回传（无再加工）"
+    assert body["file_name"] == meta["file_name"], "文件名同源（documents.file_name）"
+
+    full = client.post(
+        f"/api/resumes/{resume_id}/polish/full", json={"polish_id": body["polish_id"]}
+    )
+    assert full.status_code == 200, full.text
+    final = full.json()
+    assert set(final) == {"id", "markdown", "dropped_count", "regenerated"}
+    assert final["id"] == body["polish_id"]
+    assert final["markdown"].strip(), "成稿不得为空"
+    assert final["regenerated"] is False
+    assert "resume_text" not in full.text
 
 
 def test_temp_target_role_not_persisted(

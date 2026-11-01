@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { ApiError, api } from '../api/client'
 import type {
@@ -85,6 +85,15 @@ export function historicalSkills(profile: Profile): ProfileSkill[] {
 export function historicalProjects(profile: Profile): ProfileProject[] {
   return profile.projects.filter((item) => isHistorical(item))
 }
+
+/**
+ * 历史分组容器的 DOM id（r4 D-4）：`MergeSummaryBar` 按钮的 `aria-controls` 与容器 `id`
+ * **必须来自同一常量**，页面里不各写一遍，避免两处字符串漂移（AC-11）。
+ */
+export const HISTORY_GROUP_ID = {
+  skills: 'profile-history-skills',
+  projects: 'profile-history-projects',
+} as const
 
 /** 一次性合并摘要的入参校验：`location.state` 属不可信外部输入，字段不合法就整条不渲染。 */
 export function normalizeMergeSummary(raw: unknown): ProfileMergeSummary | null {
@@ -397,6 +406,13 @@ export default function ProfilePage() {
     skills: false,
     projects: false,
   })
+  /**
+   * r4 D-4：一次性跳转信号用**计数器**而非布尔（重复点击也能重放滚动/聚焦），
+   * 并放在 effect 里执行——保证「展开态已提交 DOM」之后再滚动与聚焦。
+   */
+  const [historyJump, setHistoryJump] = useState(0)
+  const skillsHistoryRef = useRef<HTMLDivElement | null>(null)
+  const projectsHistoryRef = useRef<HTMLDivElement | null>(null)
 
   /** 已保存的画像：base 记下「保存时服务端那一版」的 updated_at，服务端刷新出新版就让位给它。 */
   const [patched, setPatched] = useState<{ base: string | null; profile: Profile } | null>(null)
@@ -420,6 +436,38 @@ export default function ProfilePage() {
 
   const entries = profile === null ? null : dimensionEntries(profile)
   const truncationNote = resumeTruncationNote(profile)
+
+  /** 历史能力 / 历史项目条数（摘要条入口按钮的显示条件，AC-12：0 项 = 不渲染）。 */
+  const historyCounts = {
+    skills: profile === null ? 0 : historicalSkills(profile).length,
+    projects: profile === null ? 0 : historicalProjects(profile).length,
+  }
+  const historyTotal = historyCounts.skills + historyCounts.projects
+  const historyControls = (['skills', 'projects'] as const)
+    .filter((dimension) => historyCounts[dimension] > 0)
+    .map((dimension) => HISTORY_GROUP_ID[dimension])
+
+  /** 入口：展开两个历史分组 → 递增跳转信号（滚动与聚焦由下面的 effect 完成）。 */
+  const viewHistory = () => {
+    setHistoryOpen({ skills: true, projects: true })
+    setHistoryJump((current) => current + 1)
+  }
+
+  useEffect(() => {
+    if (historyJump === 0 || profile === null) return
+    // 取**第一个已渲染**（计数 >0）的容器：只有它才真正存在于 DOM 里
+    const counts = {
+      skills: historicalSkills(profile).length,
+      projects: historicalProjects(profile).length,
+    }
+    const dimension: 'skills' | 'projects' = counts.skills > 0 ? 'skills' : 'projects'
+    if (counts[dimension] === 0) return
+    const container = dimension === 'skills' ? skillsHistoryRef.current : projectsHistoryRef.current
+    if (container === null) return
+    container.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    // preventScroll：滚动已由上一行完成，避免 focus 再跳一次（AC-11）
+    container.focus({ preventScroll: true })
+  }, [historyJump, profile])
 
   const submitPatch = async (patch: ProfilePatch | null): Promise<boolean> => {
     if (profile === null) return false
@@ -507,7 +555,18 @@ export default function ProfilePage() {
         ) : null}
 
         {historical.length > 0 ? (
-          <div>
+          /*
+           * 历史分组容器（r4 D-4）：id / ref / 焦点落在**始终渲染**的分组外壳上，
+           * 这样 `aria-controls` 在展开前后都能解析到真实元素（AC-11），
+           * 展开后焦点环包住的也是「开关 + 历史条目」这一整块，滚动落点即分组本身。
+           */
+          <div
+            id={HISTORY_GROUP_ID[dimension]}
+            ref={dimension === 'skills' ? skillsHistoryRef : projectsHistoryRef}
+            tabIndex={-1}
+            className="sc-hist sc-hist-group"
+            aria-label={dimension === 'skills' ? '历史能力分组' : '历史项目分组'}
+          >
             <button
               type="button"
               className={open ? 'sc-evidence-chip is-expanded' : 'sc-evidence-chip'}
@@ -552,7 +611,14 @@ export default function ProfilePage() {
         </p>
       </header>
 
-      {mergeSummary !== null ? <MergeSummaryBar summary={mergeSummary} /> : null}
+      {mergeSummary !== null ? (
+        <MergeSummaryBar
+          summary={mergeSummary}
+          historyCount={historyTotal}
+          historyControls={historyControls}
+          onViewHistory={viewHistory}
+        />
+      ) : null}
 
       {view === 'gate' ? (
         <PhaseLoader title="正在读取你的最新画像" phases={['读取最新画像']} active={0} />

@@ -13,6 +13,7 @@ import { EmptyState } from '../components/ui/EmptyState'
 import { InlineError } from '../components/ui/InlineError'
 import { PhaseLoader } from '../components/ui/PhaseLoader'
 import { Toast } from '../components/ui/Toast'
+import { exportFileName } from '../lib/exportName'
 import { useAsync } from '../lib/useAsync'
 
 /** 建议生成三段文案（DESIGN §0.6：AI 等待必须有文字步进）。 */
@@ -33,6 +34,10 @@ interface PolishSession {
   polishId: string
   resumeId: string
   targetRole: string | null
+  /** 契约 `resume_text`：整篇简历正文，「原版」Tab 的唯一真源（r4 AC-1/AC-2）。 */
+  resumeText: string
+  /** 契约 `file_name`：导出命名的来源（可能为空串 → 回退日期，r4 AC-7/AC-8）。 */
+  fileName: string
   suggestions: PolishSuggestion[]
   droppedCount: number
   insufficientReason: string | null
@@ -46,13 +51,6 @@ interface GeneratedFull {
 
 function errorMessage(error: unknown, fallback: string): string {
   return error instanceof ApiError && error.message ? error.message : fallback
-}
-
-function exportFileName(): string {
-  const now = new Date()
-  const pad = (value: number) => String(value).padStart(2, '0')
-  const day = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
-  return `简历润色-${day}.md`
 }
 
 /** 按 `start` 升序（服务端按正文顺序返回，这里只防乱序，不做二次语义排序）。 */
@@ -71,12 +69,6 @@ function buildPreview(suggestions: PolishSuggestion[], states: Record<string, Su
   const ordered = inResumeOrder(suggestions)
   return ordered
     .map((item) => (states[item.id] === 'adopted' ? item.suggested_text : item.original_text))
-    .join('\n\n')
-}
-
-function buildOriginal(suggestions: PolishSuggestion[]): string {
-  return inResumeOrder(suggestions)
-    .map((item) => item.original_text)
     .join('\n\n')
 }
 
@@ -225,6 +217,9 @@ export default function PolishPage() {
         polishId: response.polish_id,
         resumeId: response.resume_id,
         targetRole: response.target_role,
+        // 原版正文与导出文件名都只从契约取（服务端读 `documents.text` / `documents.file_name`）
+        resumeText: response.resume_text,
+        fileName: response.file_name,
         suggestions: response.suggestions,
         droppedCount: response.dropped_count,
         insufficientReason: response.insufficient_reason,
@@ -283,7 +278,7 @@ export default function PolishPage() {
       const url = URL.createObjectURL(blob)
       const anchor = document.createElement('a')
       anchor.href = url
-      anchor.download = exportFileName()
+      anchor.download = exportFileName(session?.fileName)
       document.body.appendChild(anchor)
       anchor.click()
       document.body.removeChild(anchor)
@@ -451,12 +446,27 @@ export default function PolishPage() {
 
               <div id={`sc-seg-panel-${tab}`} role="tabpanel" aria-labelledby={`sc-seg-tab-${tab}`}>
                 {tab === 'original' ? (
+                  /**
+                   * R-1：原版 Tab 直接渲染契约 `resume_text`（整篇逐字），不再由建议句拼接；
+                   * 三态占位覆盖「加载中 / 未分析 / 已分析但正文为空」（AC-6），失败态走同一条 InlineError。
+                   */
                   <ComposePreview
-                    mode="preview"
+                    mode="original"
                     meta="原版 · 逐字取自简历正文"
-                    text={buildOriginal(suggestions)}
-                    loading={false}
-                    error={null}
+                    text={session?.resumeText ?? ''}
+                    loading={analyzing}
+                    error={analyzeError}
+                    onRetry={() => void analyze(roleInput)}
+                    phases={ANALYSIS_PHASES}
+                    activePhase={phaseOf(analyzeElapsed, ANALYSIS_STEP_S)}
+                    elapsedSec={analyzeElapsed}
+                    emptyText={
+                      analyzing
+                        ? '正在读取简历正文…'
+                        : session === null
+                          ? '点「开始分析」后，这里显示这份简历的原始正文（整篇、逐字、只读）。'
+                          : '这份简历没有可显示的正文，请重新上传后再试。'
+                    }
                   />
                 ) : (
                   <ComposePreview

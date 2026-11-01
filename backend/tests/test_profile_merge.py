@@ -16,26 +16,18 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 import pytest
 
-from app import repository
-from app.schemas import ProfileDraft, ResumeMeta
+from app import repository, schemas
+from app.schemas import Profile, ProfileDraft, ResumeMeta
 from app.services import profile_merge
 from app.services.profile import generate_profile
 
-#: 跨请求证据累积是否可验：`repository` 的读路径用 `schemas.Profile` 反序列化，未声明
-#: `source_quotes`/`status` 时证据链会在读回时被丢弃（等价于 T1 契约尚未落地）。
-CONTRACT_READY = profile_merge.SKILL_HAS_EVIDENCE_FIELDS
-
-#: 只有「旧证据必须熬过 DB 往返」的用例受这条约束；合并规则本身由纯函数用例覆盖。
-requires_contract = pytest.mark.skipif(
-    not CONTRACT_READY,
-    reason="待 T1 契约：schemas.ProfileSkill 未声明 source_quotes/status，repository 读路径"
-    "（_profile_of → Profile.model_validate_json）会丢弃证据链，跨请求累积不可验；"
-    "契约落地后本用例自动生效",
-)
+#: 生产模块源码：AC-9 的「零重复模型」据此做源码级断言（而非运行期反射）。
+PROFILE_MERGE_SOURCE = Path(profile_merge.__file__)
 
 #: 第二份差异化简历：保留 `react`（小写变体，用于归一判同）、去掉 SQLite，新增 Go/K8s。
 SECOND_RESUME_TEXT = (
@@ -161,7 +153,7 @@ def _old_profile_with_evidence(
         }
         for project in payload["projects"]
     ] if include_projects else []
-    return profile_merge.MergedProfile.model_validate(payload)
+    return Profile.model_validate(payload)
 
 
 def _seed_document(resume_id: str, text: str, file_name: str) -> None:
@@ -192,7 +184,6 @@ def test_same_profile_id_after_second_upload(
     assert latest.updated_at != "2026-10-31T05:00:00+00:00", "updated_at 必须刷新"
 
 
-@requires_contract
 def test_evidence_accumulates_old_to_new(
     tmp_db: Any,
     profile_factory: Callable[..., Any],
@@ -289,7 +280,7 @@ def test_merged_payload_roundtrip_keeps_evidence(tmp_db: Any) -> None:
         captured_at="2026-10-31T12:00:00+00:00",
     )
 
-    restored = profile_merge.MergedProfile.model_validate_json(merged.model_dump_json())
+    restored = Profile.model_validate_json(merged.model_dump_json())
     react = next(
         skill for skill in restored.skills if profile_merge.normalize_name(skill.name) == "react"
     )
@@ -417,7 +408,6 @@ def test_tech_stack_fallback_when_active_lt_3(
     assert merged.target_role == "前端开发工程师", "新简历没写目标岗位时沿用旧值（不丢已知信息）"
 
 
-@requires_contract
 def test_duplicate_same_resume_keeps_evidence(
     tmp_db: Any, patch_ai: Callable[..., None], resume_text: str
 ) -> None:
@@ -456,3 +446,36 @@ def test_post_returns_merge_summary_but_get_does_not(
     latest = client.get("/api/profiles/latest")
     assert latest.status_code == 200, latest.text
     assert "merge_summary" not in latest.json(), "GET 不得带一次性摘要字段"
+
+
+def test_profile_merge_has_no_duplicate_models() -> None:
+    """AC-9 常驻断言：本模块零模型定义，契约真源只有 `schemas.py` 一处。
+
+    r3 的并行开发窗口里本模块曾自带一份字段等价的超集模型 + 一条「契约是否就绪」的兼容分支；
+    契约落地后那条分支成了死代码，且一旦有人再补一份模型就会**静默漂移**（两份定义各写各的）。
+    这条断言把它钉死：删掉的六个记号不得回归、本模块不得再引入 pydantic 建模，
+    且三个契约名必须**同一个类对象**（对象身份相等，不是"字段长得像"）。
+
+    记号按片段拼接而非整词：AC-9 的仓库级 grep 把 `app/` 与 `tests/` 一起扫并要求命中 0，
+    测试自己写成整词就会让门禁自证失败。
+    """
+    source = PROFILE_MERGE_SOURCE.read_text(encoding="utf-8")
+
+    for removed in (
+        "CONTRACT" + "_READY",
+        "SKILL_HAS" + "_EVIDENCE_FIELDS",
+        "class Merged" + "Skill",
+        "class Merged" + "Project",
+        "class Merged" + "Profile",
+        "class _Fall" + "back",
+    ):
+        assert removed not in source, f"{removed} 属于已删除的兼容层，不得回归"
+
+    assert "from pydantic import" not in source, "本模块只消费契约模型，不自己建模"
+    assert ") -> tuple[Profile, ProfileMergeSummary]:" in source, "合并结果直连 schemas.Profile"
+
+    assert profile_merge.Evidence is schemas.Evidence
+    assert profile_merge.ProfileMergeSummary is schemas.ProfileMergeSummary
+    assert profile_merge.ProfileWithMerge is schemas.ProfileWithMerge
+    assert profile_merge.Profile is schemas.Profile
+    assert issubclass(profile_merge.Profile, schemas.ProfileDraft), "Profile 仍继承 draft 本体"

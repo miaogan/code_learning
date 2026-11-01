@@ -1619,7 +1619,7 @@ input:not([type='radio']):not([type='checkbox']):not([type='file']):disabled {
 }
 
 /* ---------- 合并摘要条（/profile 页头下，一次性会话态） ---------- */
-/* 48 = 边框 1×2 + padding 12×2 + 正文 22（§0.5-4）；纯信息条，无点击行为 */
+/* 48 = 边框 1×2 + padding 12×2 + 正文 22（§0.5-4）；无按钮时是纯信息条，有按钮时走下面的 .has-action */
 .sc-merge-bar {
   display: flex;
   align-items: center;
@@ -1634,6 +1634,17 @@ input:not([type='radio']):not([type='checkbox']):not([type='file']):disabled {
   border-radius: var(--radius-8);
 }
 
+/*
+ * r4 D-4 入口按钮槽：按钮固定 --btn-h（40），条高仍必须精确 48（border-box，AC-12）。
+ * 推导：48 = 上下边框 1+1 + 上下 padding 3+3 + 按钮 40 → padding = sp-1(4) 减去 1px 边框补偿。
+ * 只改本类，不动 --merge-bar-h / --sp-* 等既有 token。
+ */
+.sc-merge-bar.has-action {
+  flex-wrap: nowrap;
+  padding-top: calc(var(--sp-1) - 1px);
+  padding-bottom: calc(var(--sp-1) - 1px);
+}
+
 .sc-merge-bar-label {
   font-size: var(--fs-meta);
   line-height: var(--lh-meta);
@@ -1642,9 +1653,19 @@ input:not([type='radio']):not([type='checkbox']):not([type='file']):disabled {
 }
 
 .sc-merge-bar-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: var(--fs-body);
   line-height: var(--lh-body);
   color: var(--text-primary);
+}
+
+/* 入口按钮固定在右侧、不参与收缩（收缩让给文本的省略号），保证单行不换行（AC-12） */
+.sc-merge-bar-action {
+  margin-left: auto;
+  flex: 0 0 auto;
 }
 
 /* ---------- 能力证据累积（旧→新；来源文件名 + 日期） ---------- */
@@ -1658,6 +1679,15 @@ input:not([type='radio']):not([type='checkbox']):not([type='file']):disabled {
 
 .sc-evidence-item {
   display: block;
+}
+
+/*
+ * r4 D-4：历史分组容器被摘要条入口按钮聚焦时的可见焦点环（tabIndex=-1 可聚焦，AC-11/AC-12）。
+ * 2px 沿用既有微值约定（tokens 无该值），颜色只取 --accent。
+ */
+.sc-hist-group:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 /* ---------- 历史能力分组（禁止用 opacity 表达历史，DESIGN r3 §0.6） ---------- */
@@ -1955,6 +1985,17 @@ input:not([type='radio']):not([type='checkbox']):not([type='file']):disabled {
   overscroll-behavior: contain;
   scrollbar-width: thin;
   scrollbar-color: var(--border-strong) transparent;
+}
+
+/*
+ * r4 R-1 原版正文：单文本节点渲染 + pre-wrap，保留换行与缩进，使 textContent 与 resume_text 逐字相等（AC-2）。
+ * 高度与自身滚动沿用上面的 .sc-compose-body（--polish-prev-h），两 Tab 天然等高（AC-4）。
+ */
+.sc-compose-body.is-plain {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
 }
 
 .sc-compose-state {
