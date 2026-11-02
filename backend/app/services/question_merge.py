@@ -35,6 +35,8 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
+from app.services import question_shuffle
+
 from .. import repository
 from . import question_bank, rules
 
@@ -85,7 +87,7 @@ REPORT_PATH = (
     _PROJECT_ROOT
     / "docs"
     / "teamflow"
-    / "20261102-r12-question-bank-merge"
+    / "20261102-r13-answer-bias-shuffle"
     / "QUESTION-BANK-MERGE-REPORT.md"
 )
 
@@ -428,6 +430,10 @@ def build_seed(
     stats["total"] = _totals(stats)
     stats["existing"] = len(existing)
     stats["reimported"] = reimported
+    # 只在这条唯一重算路径上打乱：`--check` 与 `--write` 共用它，
+    # 否则「重算 == 磁盘字节」不成立（拿未打乱的流水线比已打乱的 seed，恒红）。
+    merged, shuffle_metrics = question_shuffle.apply(merged)
+    stats["shuffle"] = shuffle_metrics
     return merged, stats
 
 
@@ -683,13 +689,21 @@ def write(
     seed_path: Path = SEED_PATH,
     staging_dir: Path = STAGING_DIR,
     report_path: Path = REPORT_PATH,
+    shuffle_report_path: Path = question_shuffle.REPORT_PATH,
 ) -> dict[str, Any]:
-    """重算 → 写 seed（字节）→ 写报表 → 用 `question_bank.load_seed()` 复核可用条数。"""
+    """重算 → 写 seed（字节）→ 写两份报表 → 用 `question_bank.load_seed()` 复核可用条数。"""
     rows, stats = build_seed(staging_dir, seed_path)
     payload = dumps(rows)
     Path(seed_path).write_bytes(payload.encode("utf-8"))
     Path(report_path).parent.mkdir(parents=True, exist_ok=True)
     Path(report_path).write_text(render_report(rows, stats), encoding="utf-8", newline="\n")
+    # 打乱报表与数据同源生成（指标来自 `build_seed` 里的同一次 `apply()`），不手抄数字。
+    Path(shuffle_report_path).parent.mkdir(parents=True, exist_ok=True)
+    Path(shuffle_report_path).write_text(
+        question_shuffle.render_report(stats.get("shuffle") or {}),
+        encoding="utf-8",
+        newline="\n",
+    )
 
     usable = len(question_bank.load_seed(Path(seed_path)))
     if usable != len(rows):
@@ -702,6 +716,7 @@ def write(
         "usable": usable,
         "seed_path": str(seed_path),
         "report_path": str(report_path),
+        "shuffle_report_path": str(shuffle_report_path),
         "stats": stats,
     }
 
@@ -749,6 +764,7 @@ def main(argv: list[str] | None = None) -> int:
             f"方向纠正 {total.get('corrected', 0)}、方向推断 {total.get('derived', 0)}"
         )
         print(f"报表：{result['report_path']}")
+        print(f"打乱报表：{result['shuffle_report_path']}")
         return 0
     if "--rollback" in args:
         try:

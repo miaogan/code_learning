@@ -1242,6 +1242,12 @@ R12_TOUCHED = (
 #: 离线合并工具本身（不是运行时模块：门禁 2 的依据）。
 R12_MERGE_TOOL = "backend/app/services/question_merge.py"
 
+#: r13 打乱库（同样只在离线跑；它委托合并工具写盘，故两件工具互为合法引用对象）。
+R13_SHUFFLE_TOOL = "backend/app/services/question_shuffle.py"
+
+#: 离线工具白名单：运行时不得把其中任何一个拉进启动路径，工具间互引则允许。
+OFFLINE_TOOLS = (R12_MERGE_TOOL, R13_SHUFFLE_TOOL)
+
 #: r12 来源枚举（`source` 列的业务取值；存量行缺省 `'seed'` 不在此列）。
 R12_SOURCES = ("tiji", "local100", "iq380", "fe-interview")
 
@@ -1257,11 +1263,16 @@ def test_r12_touched_paths_resolve() -> None:
 
 
 def test_r12_merge_tool_not_imported_by_runtime() -> None:
-    """合并工具只在离线跑：运行时不得 `import` 它（注释里提到名字可以，真引用不行）。"""
+    """合并工具只在离线跑：运行时不得 `import question_merge`（它读 staging、写文件）。
+
+    白名单从「合并工具单独豁免」放宽为「两件离线工具成对豁免」：工具**之间**的委托是
+    合法的（打乱库 `--write` 委托合并工具写盘，保住单一序列化出口）。黑名单的「打乱库」
+    那一侧由 `test_r13_shuffle_tool_not_imported_by_runtime` 独立断言，两条分开才好归因。
+    """
     offenders: list[str] = []
     for path in sorted(APP_DIR.rglob("*.py")):
         relative = path.relative_to(REPO_ROOT).as_posix()
-        if relative == R12_MERGE_TOOL:
+        if relative in OFFLINE_TOOLS:
             continue
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
@@ -1285,6 +1296,33 @@ def test_r12_merge_tool_not_imported_by_runtime() -> None:
     assert imported == {"repository", "question_bank", "rules"}, (
         "合并工具只允许依赖这三处（唯一 SQL 出口 / 种子读口径 / 闭集与方向归属），"
         f"实际：{sorted(imported)}"
+    )
+
+
+def test_r13_shuffle_tool_not_imported_by_runtime() -> None:
+    """r13 反向断言：打乱库同样只在离线跑，运行时模块不得 `import question_shuffle`。
+
+    与上面 r12 那条分开断言，是为了让失败可归因：合并工具被拉进启动路径、打乱库被拉进
+    启动路径是两条独立的回归（两者都属于 `OFFLINE_TOOLS`，工具**之间**的委托仍合法）。
+    """
+    offenders: list[str] = []
+    for path in sorted(APP_DIR.rglob("*.py")):
+        relative = path.relative_to(REPO_ROOT).as_posix()
+        if relative in OFFLINE_TOOLS:
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                names = [alias.name for alias in node.names]
+            elif isinstance(node, ast.ImportFrom):
+                names = [node.module or "", *(alias.name for alias in node.names)]
+            else:
+                continue
+            if any("question_shuffle" in name for name in names):
+                offenders.append(f"{relative}:{node.lineno}")
+    assert not offenders, (
+        "运行时模块 import 了离线打乱库（它只该由合并工具的离线流水线调用，"
+        f"不许进启动路径）：{offenders}"
     )
 
 

@@ -33,14 +33,15 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = BACKEND_ROOT.parent
 NOTICE_PATH = REPO_ROOT / "docs" / "question-bank-staging" / "NOTICE-fe-interview.md"
 
-#: r11 提交时 seed 的字节数：合并后**前 260 行**的序列化必须仍然是这个长度
-#: （动过任何一行存量数据，这条就会红——「存量逐字节不变」的机器化）。
-R11_SEED_BYTES = 192393
+#: r13 基线（由 r12 的 r11 常量就地迁移，语义不变）：合并后**前 260 行**的序列化
+#: 必须是这个长度（动过任何一行存量数据，这条就会红——「存量逐字节不变」的机器化）。
+R13_SEED_BYTES = 192073
 
 #: 存量 260 行序列化块的 sha256：**内容**级冻结。只钉字节数挡不住「等长改写」
 #: （QA D-1：改一个字、字节数不变），这里钉摘要才能让内容漂移真正变红。
-#: 该块是历史数据，永不重算：真要动存量行，必须同时改这个常量并在任务夹留痕。
-R11_SEED_SHA256 = "8743a8ba45231c02f8381d72ab2f16ad952c88969d603c8474236f45aa356f7f"
+#: r13 的选项打乱与判断题陈述改写已落在这 260 行上（行序/行数/来源不变），故基线由
+#: r11 迁移到 r13：真要再动存量行，必须同时改这个常量并在任务夹留痕。
+R13_SEED_SHA256 = "9cc60b1bc3b3ff690cca5ee544f944a8810740d49d0670082d768644abbc9794"
 
 #: 合并后的期望规模与来源分布（TECH-CHANGE §3.4 逐项）。门禁是唯一断言点，故允许字面量。
 EXPECTED_TOTAL = 779
@@ -371,19 +372,19 @@ def test_merge_prefers_source_priority_then_longer_explanation_then_sha1() -> No
 
 # --- ⑦ 幂等与字节级序列化 -----------------------------------------------------
 def test_dumps_reproduces_current_seed_bytes() -> None:
-    """`dumps()` 逐字节复现已提交 seed；前 260 行仍是 r11 的 192393 字节。"""
+    """`dumps()` 逐字节复现已提交 seed；前 260 行仍是 r13 基线的 192073 字节。"""
     raw = qm.SEED_PATH.read_bytes()
     rows = json.loads(raw.decode("utf-8"))
     assert len(rows) == EXPECTED_TOTAL
     assert qm.dumps(rows).encode("utf-8") == raw, "dumps() 与已提交 seed 不一致（--check 永不成立）"
 
     legacy = qm.dumps(rows[:260]).encode("utf-8")
-    assert len(legacy) == R11_SEED_BYTES, "存量 260 行的字节数变了（动了历史数据或格式）"
-    assert hashlib.sha256(legacy).hexdigest() == R11_SEED_SHA256, (
-        "存量 260 行的内容变了（等长改写也算）：这一块必须与 r11 提交时逐字节一致，"
-        "改它等于改历史数据，需要产品确认并同步更新 R11_SEED_SHA256"
+    assert len(legacy) == R13_SEED_BYTES, "存量 260 行的字节数变了（动了历史数据或格式）"
+    assert hashlib.sha256(legacy).hexdigest() == R13_SEED_SHA256, (
+        "存量 260 行的内容变了（等长改写也算）：这一块必须与 r13 基线逐字节一致，"
+        "改它等于改历史数据，需要产品确认并同步更新 R13_SEED_SHA256"
     )
-    assert raw.startswith(legacy[:-3]), "前 260 行必须与 r11 提交时逐字节一致"
+    assert raw.startswith(legacy[:-3]), "前 260 行必须与 r13 基线逐字节一致"
     assert raw[len(legacy) - 3 : len(legacy) - 2] == b",", "存量块之后应紧跟新增块"
 
     indented = json.dumps(rows, ensure_ascii=False, indent=2)
