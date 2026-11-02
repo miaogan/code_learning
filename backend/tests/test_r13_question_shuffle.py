@@ -21,12 +21,15 @@ from app.services import question_merge, question_shuffle
 SINGLE_POSITION_RATIO = (0.20, 0.32)
 #: 判断题「正确」占比区间（156 样本 p=0.5 时 σ≈4%，取 ±10% ≈ 2.5σ）。
 JUDGE_TRUE_RATIO = (0.40, 0.60)
-#: >3x 的答案长度比条数上限（r13 基线 40 条 + 5 条缓冲）。
-MAX_LONG_ANSWER_COUNT = 45
+#: >3x 的答案长度比条数上限（r14 · P3-2 起由 `LENGTH_REWRITES` 改写，必须为 0）。
+MAX_LONG_ANSWER_COUNT = 0
 #: 2–3x 的抽检门槛（只出清单，不自动改写语义）。
 LENGTH_RATIO_SPOTCHECK = 2.0
-#: 判断题极性改写表条数（107/49 → 78/78 的最小翻转数）。
-JUDGE_FLIP_COUNT = 29
+#: 判断题极性改写表条数（r13 的 29 条 + r14（P3-3）双向调整后的净条数）。
+JUDGE_FLIP_COUNT = 38
+#: 按语言分桶的门禁：单选样本 ≥20 才断言 20%–32%，判断题样本 ≥6 才断言 40%–60%。
+MIN_SINGLE_SAMPLE_PER_LANGUAGE = 20
+MIN_JUDGE_SAMPLE_PER_LANGUAGE = 6
 
 SEED_PATH = Path(
     os.environ.get("R13_SEED_PATH")
@@ -107,6 +110,73 @@ def test_judge_polarity_half_half() -> None:
     assert low <= true_ratio <= high, f"判断题「正确」占比 {true_ratio:.3f} 越界 {low}-{high}"
 
 
+def _by_language(rows: list[dict[str, object]], kind: str) -> dict[str, Counter[str]]:
+    """按 `language` 分桶的答案 key 计数（`""` 是通用题，不是「未填」）。"""
+    buckets: dict[str, Counter[str]] = {}
+    for row in rows:
+        if str(row["kind"]) != kind or not isinstance(row.get("answer"), list):
+            continue
+        if len(row["answer"]) != 1:  # type: ignore[arg-type]
+            continue
+        language = str(row.get("language") or "")
+        buckets.setdefault(language, Counter())[str(row["answer"][0])] += 1  # type: ignore[index]
+    return buckets
+
+
+def test_single_positions_balanced_per_language() -> None:
+    """P3-4：单选按 `language` 分桶后，每个语言子集也要落在 20%–32%（样本 ≥20 才断言）。
+
+    全局分布达标不代表子集达标：整体均衡时某一语言仍可能「几乎全 A」，按语言出题
+    的练习就会重新暴露偏置。`by_language` 指标必须与实时重算分布逐桶一致。
+    """
+    rows, metrics = _shuffled()
+    buckets = _by_language(rows, "single")
+    low, high = SINGLE_POSITION_RATIO
+    offenders: dict[str, dict[str, float]] = {}
+    for language, counts in sorted(buckets.items()):
+        total = sum(counts.values())
+        if total < MIN_SINGLE_SAMPLE_PER_LANGUAGE:
+            continue
+        ratios = {key: counts.get(key, 0) / total for key in question_shuffle.KEYS}
+        if not all(low <= value <= high for value in ratios.values()):
+            offenders[language or "（通用）"] = {key: round(value, 3) for key, value in ratios.items()}
+    assert not offenders, f"按语言分桶的单选位置占比越界（区间 {low}-{high}）：{offenders}"
+
+    reported = metrics["single"]["by_language"]["after"]  # type: ignore[index]
+    expected = {
+        language: {key: counts.get(key, 0) for key in question_shuffle.KEYS}
+        for language, counts in buckets.items()
+    }
+    assert reported == expected, "single.by_language 指标与实时重算分布不一致"
+
+
+def test_judge_polarity_half_half_per_language() -> None:
+    """P3-4：判断题按 `language` 分桶后，每个语言子集的「正确」占比落在 40%–60%。
+
+    样本 ≥6 才断言（小样本 ±1 题就是 8%+ 的摆动）；`by_language` 指标同样要与
+    实时重算逐桶一致，否则报表里的「按语言表」可以悄悄写错。
+    """
+    rows, metrics = _shuffled()
+    buckets = _by_language(rows, "judge")
+    low, high = JUDGE_TRUE_RATIO
+    offenders: dict[str, float] = {}
+    for language, counts in sorted(buckets.items()):
+        total = sum(counts.values())
+        if total < MIN_JUDGE_SAMPLE_PER_LANGUAGE:
+            continue
+        ratio = counts.get("A", 0) / total
+        if not low <= ratio <= high:
+            offenders[language or "（通用）"] = round(ratio, 3)
+    assert not offenders, f"按语言分桶的判断题「正确」占比越界（区间 {low}-{high}）：{offenders}"
+
+    reported = metrics["judge"]["by_language"]["after"]  # type: ignore[index]
+    expected = {
+        language: {key: counts.get(key, 0) for key in question_shuffle.KEYS}
+        for language, counts in buckets.items()
+    }
+    assert reported == expected, "judge.by_language 指标与实时重算分布不一致"
+
+
 def test_judge_options_stay_two_choices() -> None:
     """判断题选项恒为 `question_merge.JUDGE_OPTIONS` 两项且顺序固定（打乱不得动它）。"""
     expected = [item["text"] for item in question_merge.JUDGE_OPTIONS]
@@ -128,7 +198,7 @@ def test_option_keys_are_positions_in_order() -> None:
 
 
 def test_long_answer_ratio_within_budget() -> None:
-    """>3x 的「正确项远长于干扰项」条数受控（只出清单，不自动改写语义）。"""
+    """>3x 的「正确项远长于干扰项」条数必须为 0（P3-2 起由 `LENGTH_REWRITES` 自动压缩）。"""
     _rows, metrics = _shuffled()
     ratio = metrics["length_ratio"]  # type: ignore[index]
     assert int(ratio["sample"]) > 0
@@ -138,6 +208,22 @@ def test_long_answer_ratio_within_budget() -> None:
     )
     assert float(ratio["median"]) <= LENGTH_RATIO_SPOTCHECK, (
         f"答案长度比中位 {ratio['median']} 已超过抽检线 {LENGTH_RATIO_SPOTCHECK}"
+    )
+
+
+def test_length_rewrites_are_current() -> None:
+    """P3-2：改写表的 `before` 必须与 seed 现状逐字对得上（stale 为空）。
+
+    `stale` 非空 = 表里某题的正确项既不是 `before` 也不是 `after`（素材/存量被换过，
+    这张绝对映射表已失效）。此时改写会静默跳过、比值门禁随之失守，必须先人工复核。
+    """
+    _rows, metrics = _shuffled()
+    rewrites = metrics["length_rewrites"]  # type: ignore[index]
+    assert not rewrites["stale"], f"改写表基线失配（正确项既非 before 也非 after）：{rewrites['stale']}"
+    assert len(question_shuffle.LENGTH_REWRITES) > 0, "改写表为空，P3-2 等于没做"
+    covered = set(rewrites["applied"]) | set(rewrites["already"])
+    assert covered == set(question_shuffle.LENGTH_REWRITES), (
+        "改写表里的每一条都必须在流水线里被识别（applied 或 already）"
     )
 
 
@@ -180,20 +266,28 @@ def test_explanation_refs_stay_consistent_with_answers() -> None:
 
 
 def test_judge_flip_table_is_self_consistent() -> None:
-    """29 条绝对映射表自洽：条数、id 唯一、改写后答案为「错误」、题面已生效。"""
+    """绝对映射表自洽：条数、id 唯一、答案落在表内声明的 key、题面已生效。
+
+    r14（P3-3）起表是**双向**的：`answer` 缺省 `B`（正确→错误），显式 `A` 表示把
+    伪命题改写成真命题。两个方向都必须存在，否则「单向翻转」会悄悄退化成
+    「只把正确改错、永远不补真命题」。
+    """
     flips = question_shuffle.JUDGE_FLIPS
     assert len(flips) == JUDGE_FLIP_COUNT, f"翻转表条数 {len(flips)} 与常量 {JUDGE_FLIP_COUNT} 不一致"
     ids = [str(item["id"]) for item in flips]
     assert len(set(ids)) == len(ids), f"翻转表 id 重复：{ids}"
+    directions = {str(item.get("answer") or "B") for item in flips}
+    assert directions == {"A", "B"}, f"翻转表必须同时含 A→B 与 B→A 两个方向，实际 {directions}"
     rows = {str(row["id"]): row for row in _shuffled()[0]}
     missing = [item_id for item_id in ids if item_id not in rows]
     assert not missing, f"翻转表引用了不存在的题：{missing}"
     for item in flips:
         row = rows[str(item["id"])]
+        expected = [str(item.get("answer") or "B")]
         assert str(row["kind"]) == "judge", f"{item['id']} 不是判断题"
         assert str(row["prompt"]) == str(item["statement"]), f"{item['id']} 题面未按表改写"
-        assert [str(key) for key in row["answer"]] == ["B"], (
-            f"{item['id']} 改写后答案应为「错误」(B)，实际 {row['answer']}"
+        assert [str(key) for key in row["answer"]] == expected, (
+            f"{item['id']} 改写后答案应为 {expected}，实际 {row['answer']}"
         )
 
 

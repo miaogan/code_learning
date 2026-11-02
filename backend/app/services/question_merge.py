@@ -87,7 +87,7 @@ REPORT_PATH = (
     _PROJECT_ROOT
     / "docs"
     / "teamflow"
-    / "20261102-r13-answer-bias-shuffle"
+    / "20261102-r14-p3-closure"
     / "QUESTION-BANK-MERGE-REPORT.md"
 )
 
@@ -563,7 +563,7 @@ def render_report(rows: Sequence[dict[str, Any]], stats: dict[str, Any]) -> str:
     sources = Counter(str(row.get("source") or "seed") for row in rows)
 
     lines = [
-        "# 题库合并导入报表（r12 · 工具生成，勿手改）",
+        "# 题库合并导入报表（r14 · 工具生成，勿手改）",
         "",
         "命令：`cd backend && python -X utf8 -m app.services.question_merge --write`",
         "（重算 → 写 `backend/app/seed/questions.json` → 本报表；`--check` 用它做逐字节幂等比对）",
@@ -695,6 +695,12 @@ def write(
     rows, stats = build_seed(staging_dir, seed_path)
     payload = dumps(rows)
     Path(seed_path).write_bytes(payload.encode("utf-8"))
+    # 报表必须与「落盘后的重算」同源：`apply()` 的「重算前」分布取自磁盘存量行，
+    # 首轮写入后存量行已变成打乱后的状态。若仍用首轮 stats，报表会与任何后续
+    # `build_seed()`（含 `test_shuffle_report_matches_recomputed_metrics`）永久分叉。
+    rows, stats = build_seed(staging_dir, seed_path)
+    if dumps(rows) != payload:
+        raise ValueError("二次重算与首次写盘不一致（`question_shuffle.apply()` 不幂等）")
     Path(report_path).parent.mkdir(parents=True, exist_ok=True)
     Path(report_path).write_text(render_report(rows, stats), encoding="utf-8", newline="\n")
     # 打乱报表与数据同源生成（指标来自 `build_seed` 里的同一次 `apply()`），不手抄数字。

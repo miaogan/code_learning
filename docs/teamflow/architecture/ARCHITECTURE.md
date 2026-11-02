@@ -261,7 +261,7 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
 | 双测评（AC-3/AC-4 端到端） | `services/{interview,exam}.py`、`routers/{interview,exam}.py`、`pages/{InterviewPage,ExamPage}.tsx` |
 | 诊断报告 + 课程匹配（AC-5/AC-6） | `services/diagnosis.py`、`routers/report.py`（含 `GET /markdown`）、`pages/ReportPage.tsx` |
 | 历史与趋势（AC-9/AC-10） | `services/history.py`、`routers/history.py`、`pages/HistoryPage.tsx`；r3 起含长期记忆聚合 |
-| 题库种子 80 道 | `backend/app/seed/questions.json`（r6 起退为**唯一导入源**，运行时由 `questions` 表承载） |
+| 题库种子 779 道（r12 起） | `backend/app/seed/questions.json`（r6 起退为**唯一导入源**，运行时由 `questions` 表承载；r11 起每次启动幂等导入，r14 起启动同时覆写既有行差异） |
 | pydantic 契约模型（画像 5 维度 / 题目 / 报告 / 课程） | `backend/app/schemas.py` |
 | 后端测试 13 文件（pytest 零网络） | `backend/tests/*.py` |
 | 前端 `package-lock.json` + 已装依赖 | `frontend/package-lock.json`、`frontend/node_modules/` |

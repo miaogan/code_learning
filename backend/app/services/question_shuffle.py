@@ -39,7 +39,7 @@ REPORT_PATH = (
     _PROJECT_ROOT
     / "docs"
     / "teamflow"
-    / "20261102-r13-answer-bias-shuffle"
+    / "20261102-r14-p3-closure"
     / "SHUFFLE-REPORT.md"
 )
 
@@ -112,8 +112,10 @@ _NEGATIVE_ASK: tuple[str, ...] = (
 _CONSISTENCY_REVIEWED: dict[str, str] = {}
 
 #: 判断题极性改写表（**绝对映射**，不是相对取反 → 重复运行不会二次翻转）。
-#: 每条：`id`（题库 id）/ `before`（基线原句，仅供报表对照）/ `statement`（改写后的错误陈述）/
-#: `explanation`（该错误陈述的解析）。条数与 `29` 条达成 78 / 78 的最小翻转数一致。
+#: 每条：`id`（题库 id）/ `before`（基线原句，仅供报表对照）/ `statement`（改写后的陈述）/
+#: `explanation`（该陈述的解析）/ 可选 `answer`（改写后的答案 key，缺省 `B`＝「错误」）。
+#: r13 的 29 条只做「正确 → 错误」；r14（P3-3）起支持双向：`answer: "A"` 表示把伪命题
+#: 改写成真命题，并按语言分桶把少数语言的 A 占比也拉回 40%–60%。
 JUDGE_FLIPS: tuple[dict[str, str], ...] = (
     {
         "id": "tiji-017",
@@ -305,21 +307,260 @@ JUDGE_FLIPS: tuple[dict[str, str], ...] = (
         "并导出到多种后端（如 Jaeger、Tempo），三者可通过 trace_id 关联。",
     },
     {
-        "id": "iq380-036",
-        "before": "在 React 中，ErrorBoundary 可以捕获组件渲染期间发生的错误，并展示降级 UI。",
-        "statement": "在 React 中，ErrorBoundary 可以捕获事件处理函数与异步代码中抛出的错误。",
-        "explanation": "ErrorBoundary 只能捕获其子组件树在渲染期间发生的错误并展示降级 UI；"
-        "事件处理、异步错误需配合 window.onerror 或 unhandledrejection 进行全局捕获。",
-    },
-    {
         "id": "iq380-015",
         "before": "在 SSR 中，服务端与客户端首次渲染结果不一致（如使用 Date.now 或 Math.random）可能导致 hydration mismatch。",
         "statement": "在 SSR 中，服务端与客户端首次渲染结果不一致不会造成任何问题，React 会自动把两端内容对齐。",
         "explanation": "水合不匹配的核心原因正是两端渲染出的 HTML 不同："
         "Date.now、Math.random 等非确定性值会触发文本差异告警或结构差异报错。",
     },
+    # --- r14（P3-3）双向翻转：按 language 分桶复算后，以下语言的 A 占比越界，需补 A。 ---
+    {
+        "id": "iq380-215",
+        "before": "Go 的 sync.Cond 的 Broadcast 方法会唤醒所有等待者，而 Signal 只唤醒一个等待者。",
+        "statement": "Go 的 sync.Cond 的 Broadcast 与 Signal 都只唤醒一个等待者，无法唤醒全部等待者。",
+        "explanation": "说反了：Broadcast 唤醒所有等待者，只有 Signal 只唤醒一个等待者；"
+        "条件变化需要通知全部时用 Broadcast。",
+    },
+    {
+        "id": "iq380-230",
+        "before": "在 Go 中，只有发送方应关闭 channel，接收方不应关闭发送方的 channel。",
+        "statement": "在 Go 中，接收方应主动关闭发送方的 channel，发送方不应关闭 channel。",
+        "explanation": "说反了：channel 应由发送方关闭；接收方关闭后再发送会 panic，"
+        "多发送方时用额外 done channel 加 WaitGroup 协作关闭。",
+    },
+    {
+        "id": "ts-q17",
+        "before": "TypeScript 的类型标注会被保留在编译产出的 JavaScript 中，并在运行时对变量做类型校验。",
+        "statement": "TypeScript 的类型标注在编译后会被完全擦除，运行时不做任何类型校验。",
+        "answer": "A",
+        "explanation": "类型标注、接口、泛型在编译后全部擦除，运行时不校验类型；"
+        "来自外部的数据仍需运行时校验（如 zod 或手写类型守卫）。",
+    },
+    {
+        "id": "react-q17",
+        "before": "在 React 中直接修改 state 对象（例如 state.count++）也能可靠触发界面更新。",
+        "statement": "在 React 中直接修改 state 对象不会触发界面更新，必须用 setState 传入新对象。",
+        "answer": "A",
+        "explanation": "React 通过引用是否变化判断更新，直接修改同一对象不会触发渲染；"
+        "应传新对象（展开运算符或不可变更新库）。",
+    },
+    {
+        "id": "js-q18",
+        "before": "setTimeout(fn, 0) 注册的回调会在当前同步代码执行完之前就运行。",
+        "statement": "setTimeout(fn, 0) 注册的回调会等当前同步代码与微任务队列清空后才运行。",
+        "answer": "A",
+        "explanation": "setTimeout 回调是宏任务，必须等当前同步代码与微任务队列清空后才执行，"
+        "因此一定晚于后续同步语句。",
+    },
+    {
+        "id": "js-q20",
+        "before": "Object.freeze() 会递归冻结对象的全部嵌套属性，使对象彻底不可变。",
+        "statement": "Object.freeze() 是浅冻结，只冻结对象自身的直接属性，嵌套对象仍可修改。",
+        "answer": "A",
+        "explanation": "Object.freeze 只冻结对象自身的直接属性，嵌套对象仍可修改；"
+        "需要彻底不可变时要递归冻结或使用不可变库。",
+    },
+    {
+        "id": "html-q17",
+        "before": "在同一个 HTML 页面中，id 属性可以重复出现多次，用来给同类元素分组。",
+        "statement": "在同一个 HTML 页面中，id 属性必须全页唯一，同类元素分组应使用 class。",
+        "answer": "A",
+        "explanation": "id 必须全页唯一：label 的 for、锚点跳转、document.getElementById 都依赖唯一性；"
+        "需要分组复用样式应使用 class。",
+    },
+    {
+        "id": "html-q20",
+        "before": "把重要提示放在 <marquee> 标签里滚动展示是 HTML5 推荐的强调方式，读屏软件也能正确朗读滚动内容。",
+        "statement": "marquee 已从 HTML 标准中废弃，滚动内容会干扰阅读，重要提示应使用静态文本并配合 aria-live 播报。",
+        "answer": "A",
+        "explanation": "marquee 已从标准中废弃，滚动内容不利于无障碍与性能；"
+        "重要提示应使用静态高对比文本并配合 aria-live 播报。",
+    },
+    {
+        "id": "vue3-q17",
+        "before": "在 Vue 3 中把 v-if 与 v-for 写在同一个元素上是推荐做法，v-if 可以直接使用 v-for 的循环变量。",
+        "statement": "在 Vue 3 中 v-if 的优先级高于 v-for，把两者写在同一元素上时 v-if 拿不到循环变量。",
+        "answer": "A",
+        "explanation": "Vue 3 中 v-if 的优先级高于 v-for，因此 v-if 拿不到循环变量；"
+        "应把 v-if 移到外层 template 或用 computed 先过滤列表。",
+    },
+    {
+        "id": "vue3-q20",
+        "before": "Vue 3 的 computed 每次被访问时都会重新执行计算函数，不做任何缓存。",
+        "statement": "Vue 3 的 computed 会缓存计算结果，只有依赖的响应式数据变化时才重新求值。",
+        "answer": "A",
+        "explanation": "computed 会缓存计算结果，只有依赖变化时才重新求值；"
+        "因此计算函数里不应写副作用，副作用应放进 watch。",
+    },
 )
 
+
+#: 正确项过长的单选改写表（P3-2）：`id -> {before, after}`，**绝对映射**（不是相对压缩）。
+#: `before` 是 r13 基线原文，用来区分「还没改」与「已改过」（幂等）；正确项既不是
+#: `before` 也不是 `after` 时记为 `stale` 并交门禁报红，绝不猜。只动正确项文本，
+#: 不动选项顺序 / key / 解析；`apply()` 在重排完成后再套这张表，故不反过来影响定序。
+LENGTH_REWRITES: dict[str, dict[str, str]] = {
+    "cs-q11": {
+        "before": "请求并保持（持有资源的同时等待新资源）",
+        "after": "请求并保持（占有并等待）",
+    },
+    "cs-q13": {
+        "before": "CPU 寄存器、程序计数器等执行现场，以及进程地址空间相关状态",
+        "after": "CPU 寄存器、程序计数器与地址空间等状态",
+    },
+    "css-q2": {
+        "before": "最近的非 static 定位祖先元素，没有则相对初始包含块",
+        "after": "最近的非 static 定位祖先",
+    },
+    "css-q5": {
+        "before": "rem 相对根元素 html 的 font-size；em 相对当前元素（或父元素）计算出的 font-size",
+        "after": "rem 相对根字号，em 相对当前元素字号",
+    },
+    "css-q7": {
+        "before": "伪类选择元素的某个状态（如 :hover），伪元素创建元素的特定部分（如 ::before）",
+        "after": "伪类选择元素状态，伪元素创建元素的特定部分",
+    },
+    "fe-q15": {
+        "before": "取外层词法作用域中的 this，且 call/apply 无法改变",
+        "after": "取外层词法 this，call/apply 无法改变",
+    },
+    "html-q11": {
+        "before": "块级元素独占一行且可设置宽高，行内元素随文本流排列、宽高不直接生效",
+        "after": "块级独占一行可设宽高，行内随文本流排列",
+    },
+    "html-q2": {
+        "before": "让视口宽度等于设备宽度并按 1:1 缩放，移动端按响应式布局渲染",
+        "after": "视口宽度等于设备宽度",
+    },
+    "iq380-042": {
+        "before": "解决组件渲染到 DOM 树其他位置（如 body）以避免 overflow 或层级问题",
+        "after": "渲染到 DOM 树其他位置（如 body）以避开层级限制",
+    },
+    "iq380-047": {
+        "before": "使用 rollup-plugin-visualizer 或 webpack-bundle-analyzer 分析体积分布，查重复依赖并按需引入，开启 gzip/brotli 压缩，配置 CDN 缓存与长效 hash 名，进行路由/组件级 code splitting 并单独分包大依赖",
+        "after": "可视化分析体积分布，排查重复依赖并按需引入，开启 gzip/brotli，按路由/组件分包",
+    },
+    "iq380-060": {
+        "before": "使用 SSE/fetch-stream 累积 tokens，并节流 setState 渲染；用 AbortController 中断并保留已生成部分；维护消息状态机处理重新生成",
+        "after": "SSE/fetch-stream 累积 tokens 节流渲染，AbortController 中断保留已生成部分，状态机管理",
+    },
+    "iq380-131": {
+        "before": "用 @app.exception_handler 注册自定义异常处理，定义统一错误结构 {error:{code,message,retryable}}，并分别处理 HTTPException、Pydantic ValidationError 与业务异常",
+        "after": "用 @app.exception_handler 统一处理 HTTPException、ValidationError 与业务异常",
+    },
+    "iq380-132": {
+        "before": "用 PyJWT 签发 access/refresh token 并设 exp 与自定义 claims，用 Depends 做鉴权依赖校验签名与过期，refresh 端点用 refresh token 换新 access，密钥放环境变量且固定 alg",
+        "after": "用 PyJWT 签发带 exp 的 access/refresh token，Depends 校验签名与过期，密钥放环境变量且固定 alg",
+    },
+    "iq380-264": {
+        "before": "护栏在输入/输出两端做约束：输入侧做敏感词/注入检测、超长截断、意图白名单；输出侧做结构化校验、PII 脱敏、拒绝违规请求；可用规则+分类模型+LLM judge 组合实现。",
+        "after": "输入端做注入检测与截断，输出端做结构化校验、PII 脱敏与违规拦截，规则+分类模型+LLM judge",
+    },
+    "iq380-294": {
+        "before": "用显式状态（PLANNING/ACTING/REFLECTING/DONE）驱动循环，每步结果持久化以支持崩溃恢复与人工介入，状态转移条件明确避免死循环",
+        "after": "用显式状态（规划/执行/反思/完成）驱动循环，每步持久化支持恢复与人工介入，转移条件明确避免死循环",
+    },
+    "iq380-296": {
+        "before": "采用多层防御：输入过滤 + 系统指令约束 + 输出护栏 + 分类拦截，并检测常见越狱模板，输出前做合规与敏感内容分类，违规直接拦截，日志留痕持续对抗升级",
+        "after": "多层防御：输入过滤、指令约束、输出护栏与分类拦截，检测越狱模板并留痕",
+    },
+    "iq380-297": {
+        "before": "直接用 JSON Schema 或结构化输出约束格式，后端再做校验，缺失字段给默认值或带反馈重试补全，类型错误做转换校验，失败进入有限次修复循环",
+        "after": "用 JSON Schema 约束格式并由后端校验，缺失字段给默认值或带反馈重试，失败进入有限次修复",
+    },
+    "iq380-299": {
+        "before": "按模型、用户、功能、租户维度统计 token 与费用，定位长 context、贵模型滥用、重复调用、无缓存等高成本来源，设预算告警与单请求上限，并结合采纳率看每有效回答成本",
+        "after": "按模型、用户、功能、租户维度统计 token 与费用，定位高成本来源并设预算告警与单请求上限",
+    },
+    "iq380-310": {
+        "before": "使用 kubectl logs 和 describe 查看退出原因与 Events，检查是否 OOM、启动失败、依赖未就绪或 liveness 探针误杀，必要时调高 initialDelaySeconds",
+        "after": "用 kubectl logs 与 describe 查退出原因，排查 OOM、依赖未就绪与探针误杀",
+    },
+    "iq380-330": {
+        "before": "使用 p95/p99 延迟监控长尾恶化，并基于 SLO（如 99% 请求 < 300ms）的 burn rate 告警。",
+        "after": "用 p95/p99 延迟监控长尾，并按 SLO burn rate 告警",
+    },
+    "iq380-352": {
+        "before": "OT（操作变换）或 CRDT（无冲突复制数据类型）",
+        "after": "OT 或 CRDT 解决并发冲突",
+    },
+    "iq380-373": {
+        "before": "使用API Key/Secret或OAuth2 client_credentials鉴权，并对请求签名（timestamp+nonce防重放）",
+        "after": "用 API Key/Secret 或 OAuth2 鉴权，并对请求签名防重放",
+    },
+    "java-q4": {
+        "before": "== 比较引用（基本类型比较值），equals 默认比较引用，可被重写为比较内容",
+        "after": "== 比较对象地址，equals 默认为地址比较、可重写比较内容",
+    },
+    "java-q7": {
+        "before": "int 是基本类型、不能为 null；Integer 是包装类、可为 null 并可放进集合",
+        "after": "int 为基本类型，Integer 为可空包装类",
+    },
+    "java-q8": {
+        "before": "链表转换为红黑树，把极端查找从 O(n) 降到 O(log n)",
+        "after": "链表转为红黑树，避免查找退化",
+    },
+    "java-q9": {
+        "before": "Error 表示 JVM 层面的严重问题，通常不应捕获；Exception 是应用可处理的异常",
+        "after": "Error 属 JVM 严重问题不宜捕获，Exception 可处理",
+    },
+    "js-q10": {
+        "before": "防抖在停止触发一段时间后才执行一次；节流按固定时间间隔最多执行一次",
+        "after": "防抖在停止触发后执行，节流按固定间隔执行",
+    },
+    "js-q7": {
+        "before": "会丢失函数与 undefined、Date 变成字符串、遇到循环引用直接抛错",
+        "after": "会丢失函数与 undefined 等",
+    },
+    "l100-018": {
+        "before": "核心逻辑用框架无关的 TS 编写，React/Vue 仅提供薄适配层（hook/composable），上报走 sendBeacon 或 requestIdleCallback，重计算放 Web Worker",
+        "after": "核心用框架无关 TS，React/Vue 只做薄适配层，上报用 sendBeacon，重计算放 Web Worker",
+    },
+    "l100-019": {
+        "before": "采用命令模式记录每步操作的 inverse（反向命令），或使用快照+结构共享（如 Immer produce 的 patch），并限制历史栈深度、对大文档用 diff/patch 而非整树",
+        "after": "命令模式记录反向命令，或快照加结构共享（Immer patch），并限制历史深度、大文档用 diff/patch",
+    },
+    "l100-072": {
+        "before": "离线使用固定数据集和自动指标（如 Ragas/准确率）做回归对比；在线通过 A/B 测试不同 prompt/模型，关注采纳率、满意度、token 成本；闭环收集难例、人工标注后加入回归集迭代。",
+        "after": "离线固定数据集加自动指标做回归，在线 A/B 看采纳率、满意度与 token 成本，难例标注后入回归集",
+    },
+    "react-q2": {
+        "before": "props 由父组件传入且只读；state 由组件自身维护，更新会触发重新渲染",
+        "after": "props 传入后只读；state 由自身维护并驱动渲染",
+    },
+    "react-q4": {
+        "before": "受控组件的值由 state 驱动；非受控组件由 DOM 自己保存，通过 ref 读取",
+        "after": "受控值由 state 驱动，非受控用 ref 读取",
+    },
+    "react-q5": {
+        "before": "更新前的旧值，因为状态更新是批处理且异步生效",
+        "after": "更新前的旧值",
+    },
+    "react-q6": {
+        "before": "读取最近的 Provider 提供的上下文值，避免逐层传 props",
+        "after": "读取最近 Provider 的上下文值",
+    },
+    "ts-q3": {
+        "before": "x 的类型是 number | undefined，直接调用 toFixed 会编译报错",
+        "after": "可选参数 x 可能为 undefined，编译报错",
+    },
+    "ts-q5": {
+        "before": "一次性启用 noImplicitAny、strictNullChecks 等一组严格检查",
+        "after": "一次性开启一组严格检查（含 strictNullChecks）",
+    },
+    "ts-q7": {
+        "before": "永远不会正常返回的值，例如总是抛异常或死循环的函数返回类型",
+        "after": "永不正常返回的值，如总是抛错或死循环",
+    },
+    "vue3-q2": {
+        "before": "ref 可包装任意类型并需 .value 读写；reactive 只对对象/数组生效，直接访问属性",
+        "after": "ref 用 .value 读写；reactive 仅支持对象",
+    },
+    "vue3-q6": {
+        "before": "v-if 会销毁/重建元素与组件，v-show 只切换 CSS display",
+        "after": "v-if 销毁重建元素，v-show 只切换 display",
+    },
+}
 
 def _content_hash(*parts: str) -> str:
     """内容身份哈希：同一 `id` 与同一选项文本恒得同一序（幂等的依据）。"""
@@ -386,6 +627,32 @@ def _answer_counts(rows: Sequence[dict[str, Any]], kind: str) -> dict[str, int]:
         if len(answer) == 1:
             counts[str(answer[0])] += 1
     return {key: counts.get(key, 0) for key in KEYS}
+
+
+def _language_of(row: dict[str, Any]) -> str:
+    """题目语言桶（`""` 是通用 / 算法题的合法闭集成员，不是「未填」）。"""
+    return str(row.get("language") or "")
+
+
+def _answer_counts_by_language(
+    rows: Sequence[dict[str, Any]], kind: str
+) -> dict[str, dict[str, int]]:
+    """某一题型的答案 key 分布，按 `language` 分桶（P3-4：子集也要均衡）。
+
+    桶按语言名升序，桶内恒为 `KEYS` 全序 → 报表与指标逐字节可复现。
+    """
+    counts: dict[str, Counter[str]] = {}
+    for row in rows:
+        if str(row.get("kind") or "") != kind:
+            continue
+        answer = row.get("answer") or []
+        if len(answer) != 1:
+            continue
+        counts.setdefault(_language_of(row), Counter())[str(answer[0])] += 1
+    return {
+        language: {key: counts[language].get(key, 0) for key in KEYS}
+        for language in sorted(counts)
+    }
 
 
 def _length_ratio(row: dict[str, Any]) -> float:
@@ -496,18 +763,75 @@ def _length_metrics(rows: Sequence[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def _apply_length_rewrites(
+    rows: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], dict[str, list[str]]]:
+    """P3-2：按 `LENGTH_REWRITES` 压缩正确项，返回（新行, 三态记账）。
+
+    `applied` = 本次真改写；`already` = 正确项已是 `after`（重跑 / 幂等）；
+    `stale` = 表里有该 id 但正确项既不是 `before` 也不是 `after`（数据漂移，必须变红）。
+    表里不存在的题原样返回，绝不改动。
+    """
+    applied: list[str] = []
+    already: list[str] = []
+    stale: list[str] = []
+    rewritten: list[dict[str, Any]] = []
+    for row in rows:
+        question_id = str(row.get("id") or "")
+        item = LENGTH_REWRITES.get(question_id)
+        if item is None:
+            rewritten.append(row)
+            continue
+        answer = row.get("answer") or []
+        options = list(row.get("options") or [])
+        texts = {str(opt.get("key") or ""): str(opt.get("text") or "") for opt in options}
+        if len(answer) != 1 or str(answer[0]) not in texts:
+            stale.append(question_id)
+            rewritten.append(row)
+            continue
+        answer_key = str(answer[0])
+        current = texts[answer_key]
+        if current == item["after"]:
+            already.append(question_id)
+            rewritten.append(row)
+            continue
+        if current != item["before"]:
+            stale.append(question_id)
+            rewritten.append(row)
+            continue
+        updated = dict(row)
+        updated["options"] = [
+            {**opt, "text": item["after"]}
+            if str(opt.get("key") or "") == answer_key
+            else dict(opt)
+            for opt in options
+        ]
+        applied.append(question_id)
+        rewritten.append(updated)
+    return rewritten, {"applied": applied, "already": already, "stale": stale}
+
+
 def apply(rows: Sequence[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """按内容定序重排选项并重编 key、按绝对表改写判断题陈述，返回（新行, 指标）。
 
     不改入参、无 IO、幂等；解析判角不可靠（`classify_refs` 报出未知字母）或选项数不是
     四道的题**保持原序**（计入 `skipped`），不猜。重写后的字母引用由 `_refs_consistency()`
     按「`X 项错误 ⇔ X ∉ answer`」与「正确项集合 == answer」双校验，结果进 `metrics`。
+    P3-2 的 `LENGTH_REWRITES` 在重排**之后**才套：先定序再压文本，表就不会反过来扰动位置分配。
     """
     original = [dict(row) for row in rows]
     before_single = _answer_counts(original, "single")
     before_judge = _answer_counts(original, "judge")
+    before_single_by_language = _answer_counts_by_language(original, "single")
+    before_judge_by_language = _answer_counts_by_language(original, "judge")
 
-    counters: dict[str, int] = {key: 0 for key in KEYS}
+    # P3-4：位置轮转按 `language` 分桶 —— 全局均衡之外，每种语言的子集也各自均衡，
+    # 否则「按语言练 python」仍能靠全选 A 白拿多数题。`""`（通用）是普通一桶。
+    counters: dict[str, dict[str, int]] = {}
+
+    def bucket(row: dict[str, Any]) -> dict[str, int]:
+        return counters.setdefault(_language_of(row), {key: 0 for key in KEYS})
+
     skipped: list[str] = []
     multi_shuffled = 0
     replace: dict[str, dict[str, Any]] = {}
@@ -524,7 +848,7 @@ def apply(rows: Sequence[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[st
             if str(row.get("kind") or "") == "single":
                 answer = row.get("answer") or []
                 if len(answer) == 1:
-                    counters[str(answer[0])] += 1
+                    bucket(row)[str(answer[0])] += 1
             skipped.append(str(row.get("id") or ""))
             continue
         ordered = sorted(
@@ -537,12 +861,13 @@ def apply(rows: Sequence[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[st
         if str(row.get("kind") or "") == "single":
             answer_key = str((row.get("answer") or [""])[0])
             distractors = [opt for opt in ordered if str(opt["key"]) != answer_key]
-            position = min(KEYS, key=lambda key: counters[key])
+            slots_of_language = bucket(row)
+            position = min(KEYS, key=lambda key: slots_of_language[key])
             slots = [key for key in KEYS if key != position]
             mapping: dict[str, str] = {answer_key: position}
             for slot, opt in zip(slots, distractors):
                 mapping[str(opt["key"])] = slot
-            counters[position] += 1
+            slots_of_language[position] += 1
         else:
             mapping = {str(opt["key"]): KEYS[index] for index, opt in enumerate(ordered)}
             multi_shuffled += 1
@@ -564,11 +889,12 @@ def apply(rows: Sequence[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[st
             continue
         updated = dict(row)
         updated["prompt"] = item["statement"]
-        updated["answer"] = ["B"]
+        updated["answer"] = [str(item.get("answer") or "B")]
         updated["explanation"] = item["explanation"]
         replace[str(row.get("id") or "")] = updated
 
     result = [replace.get(str(row.get("id") or ""), row) for row in original]
+    result, length_rewrites = _apply_length_rewrites(result)
     after_single = _answer_counts(result, "single")
     after_judge = _answer_counts(result, "judge")
     metrics: dict[str, Any] = {
@@ -577,17 +903,26 @@ def apply(rows: Sequence[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[st
             "count": sum(after_single.values()),
             "before": before_single,
             "after": after_single,
+            "by_language": {
+                "before": before_single_by_language,
+                "after": _answer_counts_by_language(result, "single"),
+            },
         },
         "judge": {
             "count": sum(after_judge.values()),
             "before": before_judge,
             "after": after_judge,
+            "by_language": {
+                "before": before_judge_by_language,
+                "after": _answer_counts_by_language(result, "judge"),
+            },
             "flipped": len(JUDGE_FLIPS),
             "rows": [
                 {
                     "id": str(item["id"]),
                     "before": str(item["before"]),
                     "statement": str(item["statement"]),
+                    "answer": str(item.get("answer") or "B"),
                     "explanation": str(item["explanation"]),
                 }
                 for item in JUDGE_FLIPS
@@ -597,6 +932,8 @@ def apply(rows: Sequence[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[st
         "shuffled": len(replace) - len(JUDGE_FLIPS),
         "skipped": {"count": len(skipped), "ids": skipped},
         "length_ratio": _length_metrics(result),
+        # P3-2：40 条超长正确项的三态记账（`stale` 非空＝种子里该题的正确项被换过，门禁报红）。
+        "length_rewrites": length_rewrites,
         # 双校验：重写后的字母引用必须仍与 answer 自洽（错位=解析指向错项，必须红）。
         "refs_consistency": _refs_consistency(result),
     }
@@ -606,7 +943,26 @@ def apply(rows: Sequence[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[st
 def _percentages(counts: dict[str, int]) -> str:
     """把位置计数渲染成 `A 138（25.0%）` 这样的表格行单元格。"""
     total = sum(counts.values()) or 1
-    return " | ".join(f"{key} {counts[key]}（{counts[key] / total * 100:.1f}%）" for key in KEYS)
+    return " | ".join(f"{key} {counts.get(key, 0)}（{counts.get(key, 0) / total * 100:.1f}%）" for key in KEYS)
+
+
+def _language_table(section: dict[str, Any]) -> list[str]:
+    """按 `language` 分桶的位置 / 极性分布表（P3-4）：子集越界时一眼可见。"""
+    by_language = section.get("by_language") or {}
+    before = by_language.get("before") or {}
+    after = by_language.get("after") or {}
+    if not after:
+        return []
+    empty = {key: 0 for key in KEYS}
+    lines = [
+        "| 语言 | 阶段 | " + " | ".join(KEYS) + " |",
+        "| --- | --- | " + " | ".join("---" for _ in KEYS) + " |",
+    ]
+    for language in sorted(after):
+        label = _cell(language) if language else "（通用）"
+        lines.append(f"| {label} | 前 | {_percentages(before.get(language) or empty)} |")
+        lines.append(f"| {label} | 后 | {_percentages(after[language])} |")
+    return lines
 
 
 def _refs_section(metrics: dict[str, Any]) -> list[str]:
@@ -669,7 +1025,7 @@ def render_report(metrics: dict[str, Any]) -> str:
     judge_before = judge.get("before") or {}
     skipped_ids = list(skipped.get("ids") or [])
     lines: list[str] = [
-        "# r13 答案位置偏置修复报表（SHUFFLE-REPORT）",
+        "# r14 答案偏置收口报表（SHUFFLE-REPORT）",
         "",
         "> 本文件由 `python -X utf8 -m app.services.question_shuffle --write` 生成（"
         "`question_shuffle.render_report()`），"
@@ -690,6 +1046,16 @@ def render_report(metrics: dict[str, Any]) -> str:
         f"| 重算前（本次输入） | {_percentages(single_before)} |",
         f"| 重算后（落盘） | {_percentages(single_after)} |",
         "",
+    ]
+    by_language_lines = _language_table(single)
+    if by_language_lines:
+        lines += [
+            "按语言分桶（P3-4：轮转计数按 `language` 独立累加，子集也各自均衡）：",
+            "",
+        ]
+        lines += by_language_lines
+        lines.append("")
+    lines += [
         "- 口径：本表是本次 `build_seed()` 重算的**输入 / 输出**。输入 = 素材按原始顺序归一化后的"
         "行（偏置源）+ 已落盘的存量行（上一轮已打乱，因此拉低了打乱前的 A 占比）；输出 = 落盘 seed。"
         "两栏随同一份指标一起生成，干跑 `--report` 可复现同样的数字。",
@@ -706,20 +1072,33 @@ def render_report(metrics: dict[str, Any]) -> str:
         f"| 重算前（本次输入） | {_percentages(judge_before)} |",
         f"| 重算后（落盘） | {_percentages(judge_after)} |",
         "",
+    ]
+    judge_language_lines = _language_table(judge)
+    if judge_language_lines:
+        lines += [
+            "按语言分桶（P3-3/P3-4：双向翻转后，每种语言的判断题极性也各自落在 40%–60%）：",
+            "",
+        ]
+        lines += judge_language_lines
+        lines.append("")
+    lines += [
         "判断题**只改陈述、不动选项**（选项恒为 `A. 正确 / B. 错误`，顺序固定），"
         "极性靠下半张表里的绝对映射达成。本节「重算前」同样是本次流水线的输入"
         "（素材原序的判断题 + 已落盘存量），整库原始基线 A 107＝68.6% 见 §2 口径说明。",
         "",
         "## 4 判断题极性改写对照（原句 → 新句）",
         "",
-        "| # | id | 原句（基线，答案为「正确」） | 新句（改写后答案为「错误」） | 解析 |",
-        "| --- | --- | --- | --- | --- |",
+        "| # | id | 原句（改写前） | 新句（改写后） | 新句答案 | 解析 |",
+        "| --- | --- | --- | --- | --- | --- |",
     ]
     for index, item in enumerate(judge.get("rows") or [], start=1):
         cell = _cell
+        answer = str(item.get("answer") or "B")
         lines.append(
             f"| {index} | {cell(str(item.get('id') or ''))} | {cell(str(item.get('before') or ''))} "
-            f"| {cell(str(item.get('statement') or ''))} | {cell(str(item.get('explanation') or ''))} |"
+            f"| {cell(str(item.get('statement') or ''))} | "
+            f"{'正确（A）' if answer == 'A' else '错误（B）'} "
+            f"| {cell(str(item.get('explanation') or ''))} |"
         )
     lines += [
         "",
@@ -728,7 +1107,8 @@ def render_report(metrics: dict[str, Any]) -> str:
         f"- 样本：{int(ratio.get('sample') or 0)} 道（单选 + 多选）",
         f"- 中位比值：{ratio.get('median')}",
         f"- 2–3x 抽检清单：{int(ratio.get('watch_count') or 0)} 道",
-        f"- >3x 清单：{len(ratio.get('long') or [])} 道（**只出裁剪建议，不自动改写语义**）",
+        f"- >3x 清单：{len(ratio.get('long') or [])} 道（P3-2 起由 `LENGTH_REWRITES` 自动压缩，"
+        "门禁 `MAX_LONG_ANSWER_COUNT` 要求为 0）",
         "",
     ]
     long_items = ratio.get("long") or []
@@ -737,6 +1117,28 @@ def render_report(metrics: dict[str, Any]) -> str:
         lines.append("| --- | --- |")
         for item in long_items:
             lines.append(f"| {_cell(str(item.get('id') or ''))} | {item.get('ratio')} |")
+        lines.append("")
+    rewrites = metrics.get("length_rewrites") or {}
+    applied = list(rewrites.get("applied") or [])
+    already = list(rewrites.get("already") or [])
+    stale = list(rewrites.get("stale") or [])
+    lines += [
+        "### 5.1 正确项压缩改写（P3-2：只动正确项文本，不动选项顺序 / key / 解析）",
+        "",
+        f"- 表内条目：{len(LENGTH_REWRITES)} 条；本次改写 {len(applied)} 条、"
+        f"已是改写态 {len(already)} 条、基线不符（stale）{len(stale)} 条",
+        "",
+        "| id | 原文（压缩前） | 改写后 |",
+        "| --- | --- | --- |",
+    ]
+    for question_id in sorted(LENGTH_REWRITES):
+        item = LENGTH_REWRITES[question_id]
+        lines.append(
+            f"| {_cell(question_id)} | {_cell(str(item['before']))} | {_cell(str(item['after']))} |"
+        )
+    lines.append("")
+    if stale:
+        lines.append(f"stale（正确项既非 `before` 也非 `after`，必须人工复核）：{'、'.join(stale)}")
         lines.append("")
     lines += _refs_section(metrics)
     lines += [
@@ -763,14 +1165,17 @@ def render_report(metrics: dict[str, Any]) -> str:
         "```",
         "",
         "变红方向（常驻门禁 `test_r13_question_shuffle.py` 覆盖）：把全部单选答案改成 A、"
-        "清空 `JUDGE_FLIPS`、把 `answer` 挪出 `options` —— 位置分布 / 极性 / key 闭集三条断言各红。",
+        "清空 `JUDGE_FLIPS`、把 `answer` 挪出 `options`、把某道题的正确答案项改回超长原文 ——"
+        "位置分布 / 极性 / key 闭集 / 长度比 / 按语言分桶五组断言各红。",
         "",
         "## 9 运行时不受影响",
         "",
         "本模块是**离线工具**：运行时（`question_bank` / `exam` / `practice` / `proficiency`）"
         "永不 import 它；变换只落在被 git 追踪的 `seed/questions.json` 上，"
-        "序列化仍只经 `question_merge.dumps()` 一处。存量 `app.db` 因 `ON CONFLICT DO NOTHING` "
-        "不刷新（本需求已显式接受，见技术变更单 §4/§7）。",
+        "序列化仍只经 `question_merge.dumps()` 一处。"
+        "r14（P3-1）起 `question_bank.ensure_seeded()` 在启动时用 `repository.refresh_questions()` "
+        "把种子覆写到已存在的同 id 行，因此已部署的旧 `app.db` 也会收敛到本报表的分布；"
+        "历史 `question_attempts` / `runs.payload` 不受影响（判分只存 `correct`，卷面快照在 payload 里）。",
         "",
     ]
     return "\n".join(lines)

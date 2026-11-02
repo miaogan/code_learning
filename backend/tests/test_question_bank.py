@@ -99,6 +99,63 @@ def test_ensure_seeded_imports_every_time_and_stays_idempotent(tmp_db: Path) -> 
     assert question_bank.ensure_seeded() == expected, "再次 ensure 不得新增或改动（幂等）"
 
 
+def test_ensure_seeded_refreshes_stale_rows_on_startup(tmp_db: Path) -> None:
+    """r14 · P3-1：已部署库里的旧行（旧选项顺序 / 旧判断题答案）启动时被种子覆写。
+
+    模拟存量库：先导入一份改过 `fe-q1` 题干与答案的旧种子 → 插一条该题的历史作答 →
+    `ensure_seeded()`（真实种子）应把该行刷回种子内容，且历史作答逐条不变。
+    """
+    real_rows = _seed_rows()
+    real = {row["id"]: row for row in real_rows}["fe-q1"]
+
+    stale_rows = json.loads(json.dumps(real_rows, ensure_ascii=False))
+    for row in stale_rows:
+        if row["id"] == "fe-q1":
+            row["prompt"] = "旧库里的过期题干"
+            row["answer"] = ["D"]
+            break
+    question_bank.import_seed(_write_seed(tmp_db.parent, stale_rows))
+    assert repository.count_questions() == len(real_rows), "旧种子导入后行数应等于种子题量"
+
+    attempts = [
+        {
+            "id": "attempt-r14-1",
+            "question_id": "fe-q1",
+            "run_id": "run-r14-1",
+            "correct": 0,
+            "answered_at": "2026-11-01T00:00:00+00:00",
+        }
+    ]
+    assert repository.insert_attempts(attempts) == 1
+    before_attempts = repository.list_attempts()
+
+    assert question_bank.ensure_seeded() == len(real_rows), "覆写既有行不得改变行数"
+    stored = {row["id"]: row for row in repository.list_questions()}
+    assert stored["fe-q1"]["prompt"] == real["prompt"], "启动未把旧题干刷回种子"
+    assert stored["fe-q1"]["answer"] == real["answer"], "启动未把旧答案刷回种子"
+    assert repository.list_attempts() == before_attempts, "覆写题目行不得动历史作答"
+
+    assert question_bank.refresh_from_seed() == 0, "库内已与种子一致时刷新必须 0（幂等）"
+
+
+def test_refresh_questions_ignores_unknown_and_empty_rows(tmp_db: Path) -> None:
+    """r14 · P3-1：刷新只覆盖**已存在**的同 id 行 —— 未知 id 不新增，空列表直接 0。"""
+    question_bank.import_seed()
+    assert repository.refresh_questions([]) == 0, "空列表不得写库"
+    unknown = {
+        "id": "r14-unknown-1",
+        "direction": rules.DIRECTIONS[0],
+        "kind": "single",
+        "difficulty": rules.DIFFICULTIES[0],
+        "essentiality": rules.ESSENTIALITIES[0],
+        "prompt": "刷新不得新增题",
+        "options": ["甲", "乙", "丙", "丁"],
+        "answer": ["A"],
+    }
+    assert repository.refresh_questions([unknown]) == 0, "未知 id 不得被写成新行"
+    assert "r14-unknown-1" not in {row["id"] for row in repository.list_questions()}
+
+
 def test_seed_labels_are_within_closed_sets() -> None:
     """AC-3：种子的方向 / 难度 / 必备度 / kind 全部落在 `rules.py` 闭集内。"""
     rows = _seed_rows()

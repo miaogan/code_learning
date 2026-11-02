@@ -12,8 +12,9 @@
 - **r11 起每次启动都导入**（`ensure_seeded()`）：旧实现「仅空库导入」会让存量 `app.db`
   （含 r10 的 `skillcoach-data` 卷）永远拿不到新增的 180 题。幂等由主键 + `DO NOTHING` 保证，
   重复启动恒 0 新增 —— 这仍满足 r6 AC-1「重复导入不新增、既有行不被覆盖」。
-- **只补空列**：`ON CONFLICT DO NOTHING` 不会给存量行补 `language` / `explanation`，因此
-  `sync_new_columns()` 把这些列「只填空、不覆盖」地补上（SQL 在 `repository`）。
+- **r14 起启动还覆写既有行**（`refresh_from_seed()`）：`ON CONFLICT DO NOTHING` 只增不覆盖，
+  已部署库里的旧选项顺序 / 旧判断题极性永远刷不到；`refresh_questions()` 逐字段比对后只写差异行，
+  库内已一致时恒 0（P3-1）。历史 `question_attempts` 只存 `correct`，覆写题目行不影响既有判分。
 """
 
 from __future__ import annotations
@@ -83,7 +84,7 @@ def _row_of(question: dict[str, Any]) -> dict[str, Any]:
     """种子条目 → `repository.insert_question()` 入参：补默认难度 / 必备度，题干原样不加工。
 
     r11 起 `language` / `explanation` 随行写入：`language` 缺省空串（`""` 是「通用/算法题」的
-    合法闭集成员，不是「未填」），`explanation` 缺省空串（由 `sync_new_columns` 兜底补空列）。
+    合法闭集成员，不是「未填」），`explanation` 缺省空串（由 `refresh_from_seed` 随全字段覆写补齐）。
     """
     difficulty = str(question.get("difficulty") or "")
     return {
@@ -110,24 +111,26 @@ def import_seed(path: Path = SEED_PATH) -> int:
     return inserted
 
 
-def sync_new_columns(path: Path = SEED_PATH) -> int:
-    """把种子的 `language` / `explanation` 补到库内**空单元格**上，返回被补齐的行数。
+def refresh_from_seed(path: Path = SEED_PATH) -> int:
+    """把种子的**全字段**覆写到库内既有行，返回真正被改写的行数（r14 · P3-1）。
 
-    幂等真值：第二次调用返回 `0`（列已非空）；题面 / 选项 / 答案 / 难度 / 必备度一律不碰
-    （r6 AC-1「既有行不被覆盖」不回退）。SQL 只在 `repository.fill_empty_question_columns`。
+    与 `import_seed()` 的分工：导入只增不覆盖（AC-1），这里只覆盖已存在的同 id 行、绝不新增。
+    `ensure_seeded()` 在启动时调用它，让已部署的 `app.db`（旧选项顺序 / 旧判断题答案）也能
+    刷成当前种子。幂等真值：库内已与种子一致时返回 `0`。SQL 只在 `repository.refresh_questions`。
     """
-    return repository.fill_empty_question_columns(load_seed(path))
+    return repository.refresh_questions([_row_of(question) for question in load_seed(path)])
 
 
 def ensure_seeded() -> int:
-    """启动即幂等导入 + 补空列（r11 改口径），返回表内总行数。
+    """启动即幂等导入 + 覆写既有行（r11 导入口径 + r14 P3-1 存量刷新），返回表内总行数。
 
-    旧实现「仅在空库导入」会让存量库永远拿不到新增题；现在每次都跑：
-    `import_seed()` 靠 `ON CONFLICT(id) DO NOTHING` 保证重复启动 0 新增，
-    `sync_new_columns()` 只给存量行补空的 `language` / `explanation`。
+    旧实现「仅在空库导入」会让存量库永远拿不到新增题；r11 起每次都导入，但
+    `ON CONFLICT(id) DO NOTHING` 只增不覆盖，已部署库里 r13 的选项重排 / 判断题极性永远刷不到。
+    现在每次启动：`import_seed()` 补新增（重复启动 0 新增），`refresh_from_seed()` 覆写既有行
+    （库内已一致时 0 改写）。历史 `question_attempts` 只存 `correct`，不受覆写影响。
     """
     import_seed()
-    sync_new_columns()
+    refresh_from_seed()
     return repository.count_questions()
 
 

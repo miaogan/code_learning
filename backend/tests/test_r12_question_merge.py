@@ -33,15 +33,21 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = BACKEND_ROOT.parent
 NOTICE_PATH = REPO_ROOT / "docs" / "question-bank-staging" / "NOTICE-fe-interview.md"
 
-#: r13 基线（由 r12 的 r11 常量就地迁移，语义不变）：合并后**前 260 行**的序列化
+#: r14 基线（由 r13 就地迁移，语义不变）：合并后**前 260 行**的序列化
 #: 必须是这个长度（动过任何一行存量数据，这条就会红——「存量逐字节不变」的机器化）。
-R13_SEED_BYTES = 192073
+#: r14（P3-3）把 8 道存量判断题（ts/react/js/html/vue3 的 q17/q20）改写成真命题；
+#: r14（P3-2）又按 `LENGTH_REWRITES` 压缩了 23 道存量题（cs-q11 / cs-q13 / css-q2 /
+#: css-q5 / css-q7 / fe-q15 / html-q11 / html-q2 / java-q4·q7·q8·q9 / js-q7·q10 /
+#: react-q2·q4·q5·q6 / ts-q3·q5·q7 / vue3-q2·q6）正确项的措辞（语义不变、判分 key 不变）。
+#: 字节数因此由 r13 的 192073 → r14 的 191954 → 191135。
+R13_SEED_BYTES = 191135
 
 #: 存量 260 行序列化块的 sha256：**内容**级冻结。只钉字节数挡不住「等长改写」
 #: （QA D-1：改一个字、字节数不变），这里钉摘要才能让内容漂移真正变红。
-#: r13 的选项打乱与判断题陈述改写已落在这 260 行上（行序/行数/来源不变），故基线由
-#: r11 迁移到 r13：真要再动存量行，必须同时改这个常量并在任务夹留痕。
-R13_SEED_SHA256 = "9cc60b1bc3b3ff690cca5ee544f944a8810740d49d0670082d768644abbc9794"
+#: r13 的选项打乱与判断题陈述改写、r14 的双向极性调整（P3-3）与长答案改写（P3-2）
+#: 都已落在这 260 行上（行序/行数/来源不变），故基线由 r11 → r13 → r14 逐轮迁移：
+#: 真要再动存量行，必须同时改这个常量并在任务夹留痕。
+R13_SEED_SHA256 = "017e67770f2586b5e7e7d189de255d8a9c5a2208d4ab2df9987ffcee12aad4c7"
 
 #: 合并后的期望规模与来源分布（TECH-CHANGE §3.4 逐项）。门禁是唯一断言点，故允许字面量。
 EXPECTED_TOTAL = 779

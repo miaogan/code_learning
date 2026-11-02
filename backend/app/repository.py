@@ -420,6 +420,77 @@ def fill_empty_question_columns(rows: list[dict[str, Any]]) -> int:
     return filled
 
 
+_QUESTION_REFRESH = (
+    "UPDATE questions SET direction = ?, kind = ?, difficulty = ?, essentiality = ?, prompt = ?, "
+    "options = ?, answer = ?, source = ?, language = ?, explanation = ?, updated_at = ? "
+    "WHERE id = ?"
+)
+
+
+def _normalized_question(question: dict[str, Any]) -> dict[str, Any]:
+    """种子行 / 库行 → 可逐字段比对的扁平字典（JSON 列统一按序列化文本比，避免 list/dict 顺序噪声）。"""
+    return {
+        "direction": str(question.get("direction") or ""),
+        "kind": str(question.get("kind") or ""),
+        "difficulty": str(question.get("difficulty") or ""),
+        "essentiality": str(question.get("essentiality") or ""),
+        "prompt": str(question.get("prompt") or ""),
+        "options": _json_text(question.get("options")),
+        "answer": _json_text(question.get("answer")),
+        "source": str(question.get("source") or "seed"),
+        "language": str(question.get("language") or ""),
+        "explanation": str(question.get("explanation") or ""),
+    }
+
+
+def refresh_questions(rows: list[dict[str, Any]]) -> int:
+    """把种子行**覆写**到已存在的同 id 行，返回真正发生改写的行数（r14 · P3-1）。
+
+    与 `insert_question()` 的分工：导入只增不覆盖（AC-1），这里只覆盖**已存在**的行、绝不新增，
+    由 `question_bank.ensure_seeded()` 在启动时调用 —— 让已部署的 `app.db` 也能刷到当前种子
+    （选项顺序 / 判断题极性 / 答案）。幂等真值：库内已与种子逐字段一致时返回 `0` 且不写 `updated_at`。
+    历史 `question_attempts` 只存 `correct`（不存作答 key），覆写题目行不会让历史判分错位。
+    """
+    if not rows:
+        return 0
+    changed = 0
+    now = _now()
+    with connection() as conn:
+        existing = {str(row["id"]): _question_of(row) for row in conn.execute(_QUESTION_SELECT).fetchall()}
+        for question in rows:
+            question_id = str(question.get("id") or "").strip()
+            current = existing.get(question_id)
+            if current is None:
+                continue
+            expected = _normalized_question(question)
+            if _normalized_question(current) == expected:
+                continue
+            conn.execute(
+                _QUESTION_REFRESH,
+                (
+                    expected["direction"],
+                    expected["kind"],
+                    expected["difficulty"],
+                    expected["essentiality"],
+                    expected["prompt"],
+                    expected["options"],
+                    expected["answer"],
+                    expected["source"],
+                    expected["language"],
+                    expected["explanation"],
+                    now,
+                    question_id,
+                ),
+            )
+            changed += 1
+    return changed
+
+
+def refresh_question(question: dict[str, Any]) -> bool:
+    """单题版的 `refresh_questions()`：返回是否发生改写（不新增、无差异不写）。"""
+    return refresh_questions([question]) > 0
+
+
 def list_questions() -> list[dict[str, Any]]:
     """全表按 `id` 升序（排序口径单一来源，服务层不得二次排序）。"""
     with connection() as conn:
