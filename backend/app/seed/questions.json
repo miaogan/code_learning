@@ -4944,7 +4944,7 @@
     "difficulty": "challenge",
     "essentiality": "advanced",
     "language": "vue3",
-    "prompt": "设计一个支持多框架（React/Vue）接入、按需加载且不影响主线程的前端 SDK，以下哪种做法最符合参考答案要点？",
+    "prompt": "设计一个支持多框架（React/Vue）接入、按需加载且不影响主线程的前端 SDK，以下哪种做法最符合要求？",
     "options": [
       { "key": "A", "text": "核心用框架无关 TS，React/Vue 只做薄适配层，上报用 sendBeacon，重计算放 Web Worker" },
       { "key": "B", "text": "为 React 和 Vue 分别实现完整 SDK 逻辑，以保证各框架下的性能最优" },
@@ -4962,7 +4962,7 @@
     "difficulty": "challenge",
     "essentiality": "advanced",
     "language": "",
-    "prompt": "实现支持撤销/重做（undo/redo）的前端编辑器状态管理，要求内存可控且可序列化，以下哪种方案最符合参考答案要点？",
+    "prompt": "实现支持撤销/重做（undo/redo）的前端编辑器状态管理，要求内存可控且可序列化，以下哪种方案最符合要求？",
     "options": [
       { "key": "A", "text": "每次操作保存完整文档快照，undo/redo 直接切换快照" },
       { "key": "B", "text": "命令模式记录反向命令，或快照加结构共享（Immer patch），并限制历史深度、大文档用 diff/patch" },
@@ -5398,7 +5398,7 @@
     "difficulty": "challenge",
     "essentiality": "must_know",
     "language": "go",
-    "prompt": "用 Go 实现支持优雅关闭、限流、超时的 HTTP 服务并压测 QPS，以下哪项做法最符合参考答案要点？",
+    "prompt": "用 Go 实现支持优雅关闭、限流、超时的 HTTP 服务并压测 QPS，以下哪项做法最符合要求？",
     "options": [
       { "key": "A", "text": "优雅关闭直接调用 srv.Close() 强制断开所有连接；限流用固定窗口计数器；超时用 time.Sleep；压测用 ab 并忽略 pprof" },
       { "key": "B", "text": "优雅关闭使用 srv.Shutdown(ctx) 并监听 SIGTERM；限流用令牌桶中间件；超时用 context；压测用 wrk 但不调 GOMAXPROCS 和连接池" },
@@ -5714,7 +5714,7 @@
     "difficulty": "intermediate",
     "essentiality": "must_know",
     "language": "",
-    "prompt": "LLM 应用进行限流与成本控制时，以下哪项措施符合参考答案要点？",
+    "prompt": "LLM 应用进行限流与成本控制时，以下哪项措施符合要求？",
     "options": [
       { "key": "A", "text": "禁用缓存以避免不一致" },
       { "key": "B", "text": "仅通过增加服务器数量来应对高并发" },
@@ -5748,7 +5748,7 @@
     "difficulty": "intermediate",
     "essentiality": "must_know",
     "language": "css",
-    "prompt": "RAG 中处理长文档时，以下哪种做法符合参考答案要点？",
+    "prompt": "RAG 中处理长文档时，以下哪种做法符合要求？",
     "options": [
       { "key": "A", "text": "先检索粗粒度章节摘要，再定位细粒度块" },
       { "key": "B", "text": "将整个长文档直接塞入上下文" },
@@ -5756,7 +5756,7 @@
       { "key": "D", "text": "忽略文档结构，随机切分" }
     ],
     "answer": ["A"],
-    "explanation": "参考答案提到分层检索：先检索粗粒度（章节摘要）再定位细粒度块。选项 B 会超出上下文限制；选项 C 和 D 未利用分层与压缩策略，不符合参考答案要点。",
+    "explanation": "参考答案提到分层检索：先检索粗粒度（章节摘要）再定位细粒度块。选项 B 会超出上下文限制；选项 C 和 D 未利用分层与压缩策略，不符合参考要点。",
     "source": "local100"
   },
   {
@@ -5784,7 +5784,7 @@
     "difficulty": "intermediate",
     "essentiality": "must_know",
     "language": "",
-    "prompt": "当 LLM 输出结构化解析失败时，以下哪种兜底做法最符合参考答案要点？",
+    "prompt": "当 LLM 输出结构化解析失败时，以下哪种兜底做法最符合要求？",
     "options": [
       { "key": "A", "text": "直接返回原始文本给前端，由前端自行解析" },
       { "key": "B", "text": "忽略解析错误，使用空对象继续后续流程" },
@@ -5836,7 +5836,7 @@
     "difficulty": "challenge",
     "essentiality": "advanced",
     "language": "",
-    "prompt": "在设计多 Agent 协作系统（planner/worker/reviewer）时，关于消息传递与冲突仲裁，以下哪项做法最符合参考答案要点？",
+    "prompt": "在设计多 Agent 协作系统（planner/worker/reviewer）时，关于消息传递与冲突仲裁，以下哪项做法最符合要求？",
     "options": [
       { "key": "A", "text": "使用共享黑板或消息队列传递消息，消息中携带任务 ID 与状态；冲突由 planner 或投票/LLM 评委裁决，失败任务重派。" },
       { "key": "B", "text": "worker 之间直接点对点通信，无需任务 ID，冲突由最先完成的 worker 自行决定。" },
@@ -5854,7 +5854,7 @@
     "difficulty": "challenge",
     "essentiality": "advanced",
     "language": "",
-    "prompt": "关于向量检索与 BM25 混合检索，以下哪项描述最符合参考答案要点？",
+    "prompt": "关于向量检索与 BM25 混合检索，以下哪项描述最符合要求？",
     "options": [
       { "key": "A", "text": "向量检索补充语义匹配，BM25 补充精确术语/专有名词匹配，二者互补；可通过 RRF 或学习排序（reranker）加权融合。" },
       { "key": "B", "text": "BM25 能完全解决语义近但术语不同的问题，因此无需向量检索。" },
@@ -5888,7 +5888,7 @@
     "difficulty": "challenge",
     "essentiality": "advanced",
     "language": "",
-    "prompt": "关于 LLM 应用评测体系，以下哪项最符合参考答案要点？",
+    "prompt": "关于 LLM 应用评测体系，以下哪项最符合要求？",
     "options": [
       { "key": "A", "text": "离线固定数据集加自动指标做回归，在线 A/B 看采纳率、满意度与 token 成本，难例标注后入回归集" },
       { "key": "B", "text": "只需离线 benchmark，无需在线 A/B 和人工标注。" },
@@ -6326,7 +6326,7 @@
     "difficulty": "challenge",
     "essentiality": "advanced",
     "language": "",
-    "prompt": "在设计多数据中心（多活/单元化）方案时，关于数据一致性保证，以下哪项描述最符合参考答案要点？",
+    "prompt": "在设计多数据中心（多活/单元化）方案时，关于数据一致性保证，以下哪项描述最符合要求？",
     "options": [
       { "key": "A", "text": "单元化按 sharding key 将请求封闭在所属单元，跨单元少；全局数据用最终一致同步，强一致仅用于全局核心数据" },
       { "key": "B", "text": "全局数据采用两阶段提交保证强一致，其余数据无需对账" },
@@ -6344,7 +6344,7 @@
     "difficulty": "challenge",
     "essentiality": "advanced",
     "language": "",
-    "prompt": "设计可回滚的数据库变更流程时，以下哪项做法符合参考答案要点？",
+    "prompt": "设计可回滚的数据库变更流程时，以下哪项做法符合要求？",
     "options": [
       { "key": "A", "text": "使用 gh-ost/pt-osc 进行无锁变更，并按照先加字段、双写、切读、删旧的兼容性步骤执行" },
       { "key": "B", "text": "大变更一次性执行，避免分批带来的复杂性" },
@@ -6352,7 +6352,7 @@
       { "key": "D", "text": "直接使用 ALTER TABLE 加字段，锁表时间短无需担心" }
     ],
     "answer": ["A"],
-    "explanation": "参考答案要点：在线 DDL 使用 gh-ost/pt-osc 无锁变更，避免锁表；兼容性步骤为先加字段（向后兼容）→双写→切读→删旧；回滚时保留旧结构可快速回退，大变更分批。选项A正确描述了这些做法。选项D错误，直接 ALTER TABLE 可能锁表；选项C错误，应先双写切读再删旧，立即删除旧字段会破坏兼容性；选项B错误，大变更应分批。",
+    "explanation": "参考要点：在线 DDL 使用 gh-ost/pt-osc 无锁变更，避免锁表；兼容性步骤为先加字段（向后兼容）→双写→切读→删旧；回滚时保留旧结构可快速回退，大变更分批。选项A正确描述了这些做法。选项D错误，直接 ALTER TABLE 可能锁表；选项C错误，应先双写切读再删旧，立即删除旧字段会破坏兼容性；选项B错误，大变更应分批。",
     "source": "local100"
   },
   {
@@ -6368,7 +6368,7 @@
       { "key": "B", "text": "错误" }
     ],
     "answer": ["A"],
-    "explanation": "参考答案要点明确：一键回滚需保留上一个稳定版本，流量秒级切回；数据兼容需向前兼容。因此该陈述正确。若错误项则可能误解为回滚无需保留旧版本或数据无需兼容，这与要点矛盾。",
+    "explanation": "参考要点明确：一键回滚需保留上一个稳定版本，流量秒级切回；数据兼容需向前兼容。因此该陈述正确。若错误项则可能误解为回滚无需保留旧版本或数据无需兼容，这与要点矛盾。",
     "source": "local100"
   },
   {
@@ -6378,7 +6378,7 @@
     "difficulty": "challenge",
     "essentiality": "advanced",
     "language": "css",
-    "prompt": "在设计可观测的故障定位系统时，以下哪项做法符合参考答案要点？",
+    "prompt": "在设计可观测的故障定位系统时，以下哪项做法符合要求？",
     "options": [
       { "key": "A", "text": "仅依靠日志关键字搜索定位故障，无需 trace_id 关联" },
       { "key": "B", "text": "根因分析仅依赖人工经验，不结合拓扑依赖和指标异常关联" },
@@ -6386,7 +6386,7 @@
       { "key": "D", "text": "混沌工程仅在故障发生后用于复盘，不主动注入故障" }
     ],
     "answer": ["C"],
-    "explanation": "参考答案要点：trace_id 串联日志与指标，告警直接跳链路定位慢调用/错误源；根因分析结合拓扑依赖+指标异常关联；混沌工程主动注入故障验证韧性。选项C正确。选项A错误，仅日志搜索效率低且缺乏关联；选项B错误，根因需结合拓扑和指标；选项D错误，混沌工程应主动注入故障提前暴露问题。",
+    "explanation": "参考要点：trace_id 串联日志与指标，告警直接跳链路定位慢调用/错误源；根因分析结合拓扑依赖+指标异常关联；混沌工程主动注入故障验证韧性。选项C正确。选项A错误，仅日志搜索效率低且缺乏关联；选项B错误，根因需结合拓扑和指标；选项D错误，混沌工程应主动注入故障提前暴露问题。",
     "source": "local100"
   },
   {
@@ -7396,7 +7396,7 @@
     "difficulty": "challenge",
     "essentiality": "advanced",
     "language": "",
-    "prompt": "当前端收到后端返回的几十 MB 超大 JSON 导致解析卡顿时，以下哪种做法最不符合参考答案要点？",
+    "prompt": "当前端收到后端返回的几十 MB 超大 JSON 导致解析卡顿时，以下哪种做法最不符合要求？",
     "options": [
       { "key": "A", "text": "优先后端分页或游标，避免一次拉取全量数据" },
       { "key": "B", "text": "改用二进制/列式格式或压缩（gzip/brotli/NDJSON），并用 Web Worker 解析" },
@@ -7404,7 +7404,7 @@
       { "key": "D", "text": "使用流式 JSON 解析（如基于 ReadableStream 的分块解析）边读边处理" }
     ],
     "answer": ["C"],
-    "explanation": "参考答案要点包括后端分页、流式解析、二进制/压缩格式以及 Web Worker 解析。C 项在主线程一次性 JSON.parse 大 JSON 正是导致卡顿的常见原因，不符合优化方向。A、D、B 均为参考答案中的有效手段。",
+    "explanation": "参考要点包括后端分页、流式解析、二进制/压缩格式以及 Web Worker 解析。C 项在主线程一次性 JSON.parse 大 JSON 正是导致卡顿的常见原因，不符合优化方向。A、D、B 均为参考答案中的有效手段。",
     "source": "iq380"
   },
   {
@@ -7430,7 +7430,7 @@
     "difficulty": "challenge",
     "essentiality": "advanced",
     "language": "",
-    "prompt": "在 AI 对话前端中实现“边生成边渲染、可中断、可重新生成”的交互闭环，以下哪项做法最符合参考答案要点？",
+    "prompt": "在 AI 对话前端中实现“边生成边渲染、可中断、可重新生成”的交互闭环，以下哪项做法最符合要求？",
     "options": [
       { "key": "A", "text": "重新生成时直接并发发送多个请求，不处理消息状态和并发顺序" },
       { "key": "B", "text": "SSE/fetch-stream 累积 tokens 节流渲染，AbortController 中断保留已生成部分，状态机管理" },
@@ -7438,7 +7438,7 @@
       { "key": "D", "text": "一次性等待完整响应返回后再渲染，避免流式处理的复杂性" }
     ],
     "answer": ["B"],
-    "explanation": "参考答案要点包括流式累积 tokens 并节流渲染、用 AbortController 中断保留已生成部分、维护消息状态机（streaming/done/error/canceled）以及重新生成时重置状态并处理并发。B 项完整覆盖这些要点；D 项放弃流式渲染；C 项错误清空内容；A 项忽略状态与并发控制。",
+    "explanation": "参考要点包括流式累积 tokens 并节流渲染、用 AbortController 中断保留已生成部分、维护消息状态机（streaming/done/error/canceled）以及重新生成时重置状态并处理并发。B 项完整覆盖这些要点；D 项放弃流式渲染；C 项错误清空内容；A 项忽略状态与并发控制。",
     "source": "iq380"
   },
   {
@@ -8008,7 +8008,7 @@
     "difficulty": "challenge",
     "essentiality": "must_know",
     "language": "java",
-    "prompt": "针对低延迟服务进行 JVM 调优时，以下哪项做法符合参考答案要点？",
+    "prompt": "针对低延迟服务进行 JVM 调优时，以下哪项做法符合要求？",
     "options": [
       { "key": "A", "text": "使用 G1 时不需要关注 MaxGCPauseMillis 参数" },
       { "key": "B", "text": "关闭 GC 日志以减少日志输出对性能的影响" },
@@ -8870,7 +8870,7 @@
     "difficulty": "intermediate",
     "essentiality": "must_know",
     "language": "python",
-    "prompt": "在封装 LLM API 调用时，为了实现超时、重试和降级，以下哪种做法最符合参考答案要点？",
+    "prompt": "在封装 LLM API 调用时，为了实现超时、重试和降级，以下哪种做法最符合要求？",
     "options": [
       { "key": "A", "text": "使用 httpx 设置 timeout，用 tenacity 做指数退避重试，并加入熔断器（如 pybreaker）在持续失败时快速失败，主模型失败时切换备用模型或返回兜底话术。" },
       { "key": "B", "text": "使用 httpx 设置 timeout，用 tenacity 做指数退避重试，主模型失败时直接返回错误信息，不进行降级。" },
@@ -8878,7 +8878,7 @@
       { "key": "D", "text": "使用 requests 设置 timeout，用 retrying 库做固定间隔重试，主模型失败时直接抛出异常。" }
     ],
     "answer": ["A"],
-    "explanation": "参考答案要点明确指出：用 httpx（异步）设置 timeout，配 tenacity 做指数退避重试；加 circuit breaker（如 pybreaker）在持续失败时快速失败；降级时主模型失败切备用模型或返回兜底话术。选项 A 完整覆盖了这些要点。选项 D 使用 requests 和固定间隔重试，且没有降级；选项 C 无限重试且没有熔断；选项 B 缺少熔断和降级，均不符合要求。",
+    "explanation": "参考要点明确指出：用 httpx（异步）设置 timeout，配 tenacity 做指数退避重试；加 circuit breaker（如 pybreaker）在持续失败时快速失败；降级时主模型失败切备用模型或返回兜底话术。选项 A 完整覆盖了这些要点。选项 D 使用 requests 和固定间隔重试，且没有降级；选项 C 无限重试且没有熔断；选项 B 缺少熔断和降级，均不符合要求。",
     "source": "iq380"
   },
   {
@@ -8904,7 +8904,7 @@
     "difficulty": "intermediate",
     "essentiality": "must_know",
     "language": "python",
-    "prompt": "在 Python 中实现数据库读写分离与连接池管理，以下哪项做法符合参考答案要点？",
+    "prompt": "在 Python 中实现数据库读写分离与连接池管理，以下哪项做法符合要求？",
     "options": [
       { "key": "A", "text": "配置主从引擎，但读写都走从库，主库仅用于备份。" },
       { "key": "B", "text": "使用 SQLAlchemy 的绑定路由，但所有读操作也走主库，以避免从库延迟。" },
@@ -8912,7 +8912,7 @@
       { "key": "D", "text": "所有读写操作都走主库，仅通过增加连接池大小来提升性能。" }
     ],
     "answer": ["C"],
-    "explanation": "参考答案要点包括：配置主从引擎，按读/写选择 session/绑定；用 SQLAlchemy 的绑定路由或自定义 session 把写走主、读走从；连接池分别配置，从库可读多可放大 pool；注意从库延迟，强制一致性读走主库。选项 C 正确描述了这些做法。选项 D 没有实现读写分离；选项 B 虽然用了绑定路由但读也走主库，失去了读写分离的意义；选项 A 读写都走从库，主库仅备份，不符合常规读写分离设计。",
+    "explanation": "参考要点包括：配置主从引擎，按读/写选择 session/绑定；用 SQLAlchemy 的绑定路由或自定义 session 把写走主、读走从；连接池分别配置，从库可读多可放大 pool；注意从库延迟，强制一致性读走主库。选项 C 正确描述了这些做法。选项 D 没有实现读写分离；选项 B 虽然用了绑定路由但读也走主库，失去了读写分离的意义；选项 A 读写都走从库，主库仅备份，不符合常规读写分离设计。",
     "source": "iq380"
   },
   {
@@ -9482,7 +9482,7 @@
     "difficulty": "basic",
     "essentiality": "must_know",
     "language": "python",
-    "prompt": "在 Python 中优化数据库批量写入性能时，以下哪种做法最符合参考答案要点？",
+    "prompt": "在 Python 中优化数据库批量写入性能时，以下哪种做法最符合要求？",
     "options": [
       { "key": "A", "text": "使用 executemany 或 bulk insert 一次提交多行，减少往返" },
       { "key": "B", "text": "逐条执行 insert 并立即 commit，确保数据实时落盘" },
@@ -9516,7 +9516,7 @@
     "difficulty": "intermediate",
     "essentiality": "must_know",
     "language": "python",
-    "prompt": "关于 Python 接口缓存（Redis + 过期 + 防穿透）与数据库一致性，以下哪项符合参考答案要点？",
+    "prompt": "关于 Python 接口缓存（Redis + 过期 + 防穿透）与数据库一致性，以下哪项符合要求？",
     "options": [
       { "key": "A", "text": "读时先查 Redis，未命中查 DB 并回填，设 TTL 并加随机抖动防雪崩" },
       { "key": "B", "text": "写时先更新缓存再更新数据库，保证强一致" },
@@ -9534,7 +9534,7 @@
     "difficulty": "challenge",
     "essentiality": "advanced",
     "language": "python",
-    "prompt": "为 AI 推理服务做批处理（batching）提升吞吐时，以下哪种做法符合参考答案要点？",
+    "prompt": "为 AI 推理服务做批处理（batching）提升吞吐时，以下哪种做法符合要求？",
     "options": [
       { "key": "A", "text": "用队列加定时或阈值触发（如 10ms 或 8 条）组 batch，并控制最大 batch 防 OOM" },
       { "key": "B", "text": "每个请求立即单独推理，避免等待" },
@@ -10120,7 +10120,7 @@
       { "key": "D", "text": "只用普通 map 存 value，不记录过期时间，依赖 GC 自动回收过期项" }
     ],
     "answer": ["B"],
-    "explanation": "B 正确：map 配合 RWMutex 保存 value 与 expireAt，后台 goroutine 定期扫描删除过期项（或惰性删除），并设置最大条目防止无限增长，符合参考答案要点。D 错误：不记录过期时间，GC 无法识别逻辑过期，缓存会无限增长导致 OOM。A 错误：每次读写全量遍历开销大，且不设上限仍可能 OOM。C 错误：channel 缓冲区满会阻塞而非淘汰，且无 TTL 语义。",
+    "explanation": "B 正确：map 配合 RWMutex 保存 value 与 expireAt，后台 goroutine 定期扫描删除过期项（或惰性删除），并设置最大条目防止无限增长，符合参考要点。D 错误：不记录过期时间，GC 无法识别逻辑过期，缓存会无限增长导致 OOM。A 错误：每次读写全量遍历开销大，且不设上限仍可能 OOM。C 错误：channel 缓冲区满会阻塞而非淘汰，且无 TTL 语义。",
     "source": "iq380"
   },
   {
@@ -10936,7 +10936,7 @@
     "difficulty": "intermediate",
     "essentiality": "advanced",
     "language": "",
-    "prompt": "构建 RAG 评测集时，以下哪项做法最符合参考答案要点？",
+    "prompt": "构建 RAG 评测集时，以下哪项做法最符合要求？",
     "options": [
       { "key": "A", "text": "仅使用自动生成的 query，无需人工校验以节省成本。" },
       { "key": "B", "text": "从真实 query 日志抽样，标注期望答案与支撑文档，并覆盖多种问题类型。" },
@@ -10954,7 +10954,7 @@
     "difficulty": "intermediate",
     "essentiality": "must_know",
     "language": "",
-    "prompt": "关于 LLM 应用可观测性，以下哪项描述最符合参考答案要点？",
+    "prompt": "关于 LLM 应用可观测性，以下哪项描述最符合要求？",
     "options": [
       { "key": "A", "text": "异常发生时无法下钻到具体 chunk 或工具调用，只能查看整体错误率。" },
       { "key": "B", "text": "可观测性仅指日志收集，与指标和链路追踪无关。" },
@@ -10972,7 +10972,7 @@
     "difficulty": "intermediate",
     "essentiality": "must_know",
     "language": "",
-    "prompt": "对 LLM 调用做链路追踪并与现有 APM 打通，以下哪种做法符合参考答案要点？",
+    "prompt": "对 LLM 调用做链路追踪并与现有 APM 打通，以下哪种做法符合要求？",
     "options": [
       { "key": "A", "text": "仅在应用入口记录一个总 span，内部调用不细分。" },
       { "key": "B", "text": "使用自定义 trace_id 格式，不遵循 W3C traceparent，以避免与上游系统冲突。" },
@@ -11006,7 +11006,7 @@
     "difficulty": "intermediate",
     "essentiality": "must_know",
     "language": "",
-    "prompt": "关于 Guardrails（护栏）在 LLM 应用中的落地，以下哪项最符合参考答案要点？",
+    "prompt": "关于 Guardrails（护栏）在 LLM 应用中的落地，以下哪项最符合要求？",
     "options": [
       { "key": "A", "text": "输入端做注入检测与截断，输出端做结构化校验、PII 脱敏与违规拦截，规则+分类模型+LLM judge" },
       { "key": "B", "text": "护栏只需在输出端做内容安全过滤，输入端无需处理。" },
@@ -11024,7 +11024,7 @@
     "difficulty": "intermediate",
     "essentiality": "must_know",
     "language": "",
-    "prompt": "在 LLM 输出中处理 PII（个人敏感信息）脱敏时，以下哪项做法最符合参考答案要点？",
+    "prompt": "在 LLM 输出中处理 PII（个人敏感信息）脱敏时，以下哪项做法最符合要求？",
     "options": [
       { "key": "A", "text": "仅在输出时用正则替换手机号，日志和记忆不处理" },
       { "key": "B", "text": "将敏感信息加密后直接存入日志，便于审计" },
@@ -11042,7 +11042,7 @@
     "difficulty": "intermediate",
     "essentiality": "must_know",
     "language": "",
-    "prompt": "关于 RAG 中的查询改写（Query Rewriting）与多查询扩展，以下哪项描述符合参考答案要点？",
+    "prompt": "关于 RAG 中的查询改写（Query Rewriting）与多查询扩展，以下哪项描述符合要求？",
     "options": [
       { "key": "A", "text": "多查询扩展是指对同一查询生成多个角度的子查询分别检索再合并结果" },
       { "key": "B", "text": "查询改写会降低召回覆盖，因此不推荐使用" },
@@ -11076,7 +11076,7 @@
     "difficulty": "challenge",
     "essentiality": "advanced",
     "language": "",
-    "prompt": "在处理多模态 RAG（图文/表格/PDF）时，以下哪项做法符合参考答案要点？",
+    "prompt": "在处理多模态 RAG（图文/表格/PDF）时，以下哪项做法符合要求？",
     "options": [
       { "key": "A", "text": "多模态 RAG 只需处理文本，图像和表格无需特殊处理" },
       { "key": "B", "text": "图像仅用文本描述后向量化，不使用多模态 Embedding" },
@@ -11252,7 +11252,7 @@
     "difficulty": "challenge",
     "essentiality": "advanced",
     "language": "",
-    "prompt": "处理超长文档（如百页 PDF）的 RAG 切分与检索时，以下哪种做法符合参考答案要点？",
+    "prompt": "处理超长文档（如百页 PDF）的 RAG 切分与检索时，以下哪种做法符合要求？",
     "options": [
       { "key": "A", "text": "直接按固定长度切分，不保留章节信息" },
       { "key": "B", "text": "先章节摘要检索定位，再进入段落精细检索（两步检索）" },
@@ -11514,7 +11514,7 @@
     "difficulty": "intermediate",
     "essentiality": "must_know",
     "language": "",
-    "prompt": "在 RAG 系统中处理“时效性问答”（如“今天天气/最新股价”）时，以下哪种做法最符合参考答案要点？",
+    "prompt": "在 RAG 系统中处理“时效性问答”（如“今天天气/最新股价”）时，以下哪种做法最符合要求？",
     "options": [
       { "key": "A", "text": "实时数据必须走工具/API 获取，并给文档打时间 metadata，检索优先近期，超时效文档降级" },
       { "key": "B", "text": "回答中无需标注数据时间，只要内容相关即可" },
@@ -11532,7 +11532,7 @@
     "difficulty": "challenge",
     "essentiality": "advanced",
     "language": "",
-    "prompt": "关于用代码状态机实现 Agent 的“规划-执行-反思”循环，以下哪项描述与参考答案要点一致？",
+    "prompt": "关于用代码状态机实现 Agent 的“规划-执行-反思”循环，以下哪项描述与要求一致？",
     "options": [
       { "key": "A", "text": "状态转移条件可以随意设置，无需考虑完成、失败或超步数" },
       { "key": "B", "text": "使用隐式 Prompt 循环即可，无需显式状态" },
@@ -11540,7 +11540,7 @@
       { "key": "D", "text": "用显式状态（规划/执行/反思/完成）驱动循环，每步持久化支持恢复与人工介入，转移条件明确避免死循环" }
     ],
     "answer": ["D"],
-    "explanation": "参考答案要点包括：用显式状态（PLANNING/ACTING/REFLECTING/DONE）驱动循环；每步结果持久化，支持崩溃恢复与人工介入；状态转移条件明确（完成/失败/超步数），避免死循环；比纯 Prompt 隐式循环更可控、可观测、可测试。选项 D 正确概括了这些要点。选项 B 错误，因为参考答案强调显式状态；选项 C 错误，因为状态机实现更可控、可观测、可测试；选项 A 错误，因为状态转移条件必须明确以避免死循环。",
+    "explanation": "参考要点包括：用显式状态（PLANNING/ACTING/REFLECTING/DONE）驱动循环；每步结果持久化，支持崩溃恢复与人工介入；状态转移条件明确（完成/失败/超步数），避免死循环；比纯 Prompt 隐式循环更可控、可观测、可测试。选项 D 正确概括了这些要点。选项 B 错误，因为参考答案强调显式状态；选项 C 错误，因为状态机实现更可控、可观测、可测试；选项 A 错误，因为状态转移条件必须明确以避免死循环。",
     "source": "iq380"
   },
   {
@@ -11566,7 +11566,7 @@
     "difficulty": "challenge",
     "essentiality": "advanced",
     "language": "",
-    "prompt": "为防止 RAG/Agent 的“提示词越狱”导致输出违规内容，以下哪项措施最符合参考答案要点？",
+    "prompt": "为防止 RAG/Agent 的“提示词越狱”导致输出违规内容，以下哪项措施最符合要求？",
     "options": [
       { "key": "A", "text": "日志留痕会暴露用户隐私，因此不应记录异常模式" },
       { "key": "B", "text": "仅依赖系统指令约束即可，无需其他防护" },
@@ -11574,7 +11574,7 @@
       { "key": "D", "text": "输出前无需进行合规与敏感内容分类，只要输入过滤即可" }
     ],
     "answer": ["C"],
-    "explanation": "参考答案要点包括：多层防御（输入过滤 + 系统指令约束 + 输出护栏 + 分类拦截）；检测常见越狱模板（角色扮演/虚构场景套取）；输出前做合规与敏感内容分类，违规直接拦截；日志留痕，异常模式持续对抗升级。选项 C 完整涵盖了这些措施。选项 B 错误，因为仅靠系统指令约束不足；选项 D 错误，因为输出前必须做合规与敏感内容分类；选项 A 错误，因为日志留痕是持续对抗升级的必要手段，不应因隐私顾虑而放弃。",
+    "explanation": "参考要点包括：多层防御（输入过滤 + 系统指令约束 + 输出护栏 + 分类拦截）；检测常见越狱模板（角色扮演/虚构场景套取）；输出前做合规与敏感内容分类，违规直接拦截；日志留痕，异常模式持续对抗升级。选项 C 完整涵盖了这些措施。选项 B 错误，因为仅靠系统指令约束不足；选项 D 错误，因为输出前必须做合规与敏感内容分类；选项 A 错误，因为日志留痕是持续对抗升级的必要手段，不应因隐私顾虑而放弃。",
     "source": "iq380"
   },
   {
@@ -11584,7 +11584,7 @@
     "difficulty": "intermediate",
     "essentiality": "must_know",
     "language": "",
-    "prompt": "当 LLM 生成的结构化数据与后端 schema 不一致（字段缺失或类型错误）时，下列处理方式最符合参考答案要点的是？",
+    "prompt": "当 LLM 生成的结构化数据与后端 schema 不一致（字段缺失或类型错误）时，下列处理方式最符合要求的是？",
     "options": [
       { "key": "A", "text": "用 JSON Schema 约束格式并由后端校验，缺失字段给默认值或带反馈重试，失败进入有限次修复" },
       { "key": "B", "text": "完全信任模型输出，跳过任何校验直接入库" },
@@ -11618,7 +11618,7 @@
     "difficulty": "intermediate",
     "essentiality": "nice_to_know",
     "language": "",
-    "prompt": "为 LLM 应用建立成本看板并定位烧钱大户时，下列做法最符合参考答案要点的是？",
+    "prompt": "为 LLM 应用建立成本看板并定位烧钱大户时，下列做法最符合要求的是？",
     "options": [
       { "key": "A", "text": "只统计总支出，不区分模型、用户、功能或租户维度" },
       { "key": "B", "text": "按模型、用户、功能、租户维度统计 token 与费用，定位高成本来源并设预算告警与单请求上限" },
@@ -11776,7 +11776,7 @@
     "difficulty": "intermediate",
     "essentiality": "must_know",
     "language": "",
-    "prompt": "在 Kubernetes 中实现灰度发布（金丝雀）并安全放量，以下哪项做法最符合参考答案要点？",
+    "prompt": "在 Kubernetes 中实现灰度发布（金丝雀）并安全放量，以下哪项做法最符合要求？",
     "options": [
       { "key": "A", "text": "一次性将全部流量切换到新版本，观察日志后再决定是否回滚" },
       { "key": "B", "text": "按流量比例或特定用户标签路由小部分流量到新版本，监控核心指标无异常后逐步放量，并支持一键回滚" },
@@ -11810,7 +11810,7 @@
     "difficulty": "intermediate",
     "essentiality": "must_know",
     "language": "",
-    "prompt": "排查 Kubernetes Pod 一直处于 CrashLoopBackOff 状态时，以下哪项做法最符合参考答案要点？",
+    "prompt": "排查 Kubernetes Pod 一直处于 CrashLoopBackOff 状态时，以下哪项做法最符合要求？",
     "options": [
       { "key": "A", "text": "直接删除 Pod 并重新创建，忽略日志和事件" },
       { "key": "B", "text": "用 kubectl logs 与 describe 查退出原因，排查 OOM、依赖未就绪与探针误杀" },
@@ -11828,7 +11828,7 @@
     "difficulty": "intermediate",
     "essentiality": "must_know",
     "language": "",
-    "prompt": "关于 Kubernetes HPA（Horizontal Pod Autoscaler）的扩缩容依据和常见问题，以下哪项最符合参考答案要点？",
+    "prompt": "关于 Kubernetes HPA（Horizontal Pod Autoscaler）的扩缩容依据和常见问题，以下哪项最符合要求？",
     "options": [
       { "key": "A", "text": "HPA 只能基于 CPU 指标扩缩容，无法使用自定义或外部指标" },
       { "key": "B", "text": "HPA 默认基于 CPU，也可基于自定义/外部指标；常见坑包括指标无数据不扩、抖动导致频繁扩缩、冷启动慢以及需设置 min/max 边界" },
@@ -12056,7 +12056,7 @@
     "difficulty": "challenge",
     "essentiality": "must_know",
     "language": "",
-    "prompt": "关于容量规划（capacity planning），以下哪项做法最符合参考答案要点？",
+    "prompt": "关于容量规划（capacity planning），以下哪项做法最符合要求？",
     "options": [
       { "key": "A", "text": "仅根据当前流量确定实例数量，无需考虑增长率和压测结果" },
       { "key": "B", "text": "基于历史流量与增长率，结合压测确定单实例极限，并留出 30%~50% 余量应对突发与故障转移" },
@@ -12494,7 +12494,7 @@
     "difficulty": "intermediate",
     "essentiality": "must_know",
     "language": "",
-    "prompt": "在RAG服务中，关于召回质量与生成成本的权衡，以下哪项做法符合参考答案要点？",
+    "prompt": "在RAG服务中，关于召回质量与生成成本的权衡，以下哪项做法符合要求？",
     "options": [
       { "key": "A", "text": "为了节省成本，所有问题都使用固定的最小top-k" },
       { "key": "B", "text": "上下文压缩会降低信噪比，因此应避免使用" },
@@ -12826,7 +12826,7 @@
     "difficulty": "intermediate",
     "essentiality": "must_know",
     "language": "",
-    "prompt": "在设计评论/内容审核系统时，对于“不确定内容”的审核策略，以下哪项最符合参考答案要点？",
+    "prompt": "在设计评论/内容审核系统时，对于“不确定内容”的审核策略，以下哪项最符合要求？",
     "options": [
       { "key": "A", "text": "同步等待人工复核结果" },
       { "key": "B", "text": "直接通过，依赖用户举报" },
@@ -12834,7 +12834,7 @@
       { "key": "D", "text": "异步送模型/策略复审，延迟可见" }
     ],
     "answer": ["D"],
-    "explanation": "参考答案要点指出，不确定内容应异步送模型/策略复审，延迟可见。选项C直接拒绝会误伤正常内容；选项B直接通过会放过潜在违规；选项A同步等待人工复核会大幅增加延迟，不符合实时性要求。因此D正确。",
+    "explanation": "参考要点指出，不确定内容应异步送模型/策略复审，延迟可见。选项C直接拒绝会误伤正常内容；选项B直接通过会放过潜在违规；选项A同步等待人工复核会大幅增加延迟，不符合实时性要求。因此D正确。",
     "source": "iq380"
   },
   {
@@ -12844,7 +12844,7 @@
     "difficulty": "intermediate",
     "essentiality": "must_know",
     "language": "",
-    "prompt": "设计购物车系统时，关于库存校验的一致性策略，以下哪项符合参考答案要点？",
+    "prompt": "设计购物车系统时，关于库存校验的一致性策略，以下哪项符合要求？",
     "options": [
       { "key": "A", "text": "加购时强一致校验库存，结算时弱一致" },
       { "key": "B", "text": "加购可弱一致，结算时强一致校验库存" },
@@ -12852,7 +12852,7 @@
       { "key": "D", "text": "加购和结算都弱一致校验库存" }
     ],
     "answer": ["B"],
-    "explanation": "参考答案要点明确：库存校验在结算时强一致，加购可弱一致。加购时强一致会带来不必要的性能开销；结算时弱一致可能导致超卖。因此B正确，A、C、D均不符合要点。",
+    "explanation": "参考要点明确：库存校验在结算时强一致，加购可弱一致。加购时强一致会带来不必要的性能开销；结算时弱一致可能导致超卖。因此B正确，A、C、D均不符合要点。",
     "source": "iq380"
   },
   {
@@ -12868,7 +12868,7 @@
       { "key": "B", "text": "错误" }
     ],
     "answer": ["A"],
-    "explanation": "参考答案要点指出，补偿必须幂等，可重试。因为补偿操作可能因网络故障等原因被重复执行，幂等性确保多次执行结果一致，避免数据不一致。因此该陈述正确。",
+    "explanation": "参考要点指出，补偿必须幂等，可重试。因为补偿操作可能因网络故障等原因被重复执行，幂等性确保多次执行结果一致，避免数据不一致。因此该陈述正确。",
     "source": "iq380"
   },
   {
@@ -12886,7 +12886,7 @@
       { "key": "D", "text": "预加载模型、预热" }
     ],
     "answer": ["D"],
-    "explanation": "参考答案要点提到，预加载模型、预热可以避免首请求冷启动，从而降低首请求延迟。选项A增大批处理窗口可能增加延迟；选项B协议选择不直接解决冷启动；选项C增加GPU数量不直接解决冷启动问题。因此D正确。",
+    "explanation": "参考要点提到，预加载模型、预热可以避免首请求冷启动，从而降低首请求延迟。选项A增大批处理窗口可能增加延迟；选项B协议选择不直接解决冷启动；选项C增加GPU数量不直接解决冷启动问题。因此D正确。",
     "source": "iq380"
   },
   {
@@ -12896,7 +12896,7 @@
     "difficulty": "challenge",
     "essentiality": "must_know",
     "language": "",
-    "prompt": "在设计多区域（多活/容灾）架构时，关于数据同步与冲突解决，以下哪项做法最符合参考答案要点？",
+    "prompt": "在设计多区域（多活/容灾）架构时，关于数据同步与冲突解决，以下哪项做法最符合要求？",
     "options": [
       { "key": "A", "text": "所有写请求必须跨区强一致同步，确保任何时刻各区域数据完全一致" },
       { "key": "B", "text": "容灾切换时要求数据零延迟，因此不能接受任何数据延迟" },
@@ -12948,7 +12948,7 @@
     "difficulty": "intermediate",
     "essentiality": "nice_to_know",
     "language": "",
-    "prompt": "AI后端进行成本优化时，以下哪项措施符合参考答案要点？",
+    "prompt": "AI后端进行成本优化时，以下哪项措施符合要求？",
     "options": [
       { "key": "A", "text": "关闭批处理以降低GPU利用率" },
       { "key": "B", "text": "禁止使用量化技术，因为会降低精度" },
@@ -12966,7 +12966,7 @@
     "difficulty": "intermediate",
     "essentiality": "must_know",
     "language": "",
-    "prompt": "设计高写入、低查询延迟的实时监控指标后端时，以下哪项做法最符合参考答案要点？",
+    "prompt": "设计高写入、低查询延迟的实时监控指标后端时，以下哪项做法最符合要求？",
     "options": [
       { "key": "A", "text": "将所有原始数据永久保留，查询时实时计算所有聚合" },
       { "key": "B", "text": "使用关系型数据库单条插入并实时全表扫描聚合" },
@@ -12984,7 +12984,7 @@
     "difficulty": "intermediate",
     "essentiality": "must_know",
     "language": "",
-    "prompt": "设计防爬/反自动化系统时，以下哪项策略最符合参考答案要点？",
+    "prompt": "设计防爬/反自动化系统时，以下哪项策略最符合要求？",
     "options": [
       { "key": "A", "text": "对所有来自同一 IP 的请求一律封禁" },
       { "key": "B", "text": "完全放行所有请求，避免误伤真实用户" },
@@ -13002,7 +13002,7 @@
     "difficulty": "challenge",
     "essentiality": "advanced",
     "language": "",
-    "prompt": "设计 AI Agent 编排平台时，关于状态与恢复，以下哪项最符合参考答案要点？",
+    "prompt": "设计 AI Agent 编排平台时，关于状态与恢复，以下哪项最符合要求？",
     "options": [
       { "key": "A", "text": "任务状态仅保存在内存中，崩溃后重新开始" },
       { "key": "B", "text": "任务以状态机持久化，每一步结果落库，崩溃可从检查点续跑" },

@@ -39,7 +39,7 @@ REPORT_PATH = (
     _PROJECT_ROOT
     / "docs"
     / "teamflow"
-    / "20261102-r14-p3-closure"
+    / "20261102-r15-question-text-cleanup"
     / "SHUFFLE-REPORT.md"
 )
 
@@ -1025,7 +1025,7 @@ def render_report(metrics: dict[str, Any]) -> str:
     judge_before = judge.get("before") or {}
     skipped_ids = list(skipped.get("ids") or [])
     lines: list[str] = [
-        "# r14 答案偏置收口报表（SHUFFLE-REPORT）",
+        "# r15 答案偏置收口报表（SHUFFLE-REPORT）",
         "",
         "> 本文件由 `python -X utf8 -m app.services.question_shuffle --write` 生成（"
         "`question_shuffle.render_report()`），"

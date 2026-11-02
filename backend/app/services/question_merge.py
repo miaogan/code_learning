@@ -77,6 +77,14 @@ JUDGE_OPTIONS: tuple[dict[str, str], ...] = (
     {"key": "B", "text": "错误"},
 )
 
+#: 素材编辑用语 → 面向考生的表述（r15 收口 r12 D-2 的「参考答案要点」遗留）。
+#: 只做固定串整串替换、不做上下文推断：替换后不含原串即幂等（二次重算 0 差异）。
+#: 题干用「要求」避免出现「参考」字样干扰作答；解析用「参考要点」保留原指代关系。
+_TEXT_REWRITES: tuple[tuple[str, str, str], ...] = (
+    ("prompt", "参考答案要点", "要求"),
+    ("explanation", "参考答案要点", "参考要点"),
+)
+
 _PROJECT_ROOT = Path(__file__).resolve().parents[3]
 #: 素材目录（可复现输入）。缺文件即「换机 / CI 上无法重建种子」，直接报错而不是静默空跑。
 STAGING_DIR = _PROJECT_ROOT / "docs" / "question-bank-staging"
@@ -87,7 +95,7 @@ REPORT_PATH = (
     _PROJECT_ROOT
     / "docs"
     / "teamflow"
-    / "20261102-r14-p3-closure"
+    / "20261102-r15-question-text-cleanup"
     / "QUESTION-BANK-MERGE-REPORT.md"
 )
 
@@ -366,6 +374,21 @@ def merge_rows(
     return rows + kept, delta
 
 
+# --- 正文清理 ---------------------------------------------------------------
+def sanitize_text(row: dict[str, Any]) -> dict[str, Any]:
+    """把素材编辑用语替换成面向考生的表述（r15：只动 `_TEXT_REWRITES` 列出的字段）。
+
+    返回**新字典**、不就地修改入参：`build_seed()` 的存量行是磁盘读回的对象，
+    就地改会让「重算结果 vs 已提交 seed」的逐字节比对失去意义。替换后不含原串即幂等。
+    """
+    cleaned = dict(row)
+    for field, old, new in _TEXT_REWRITES:
+        value = str(cleaned.get(field) or "")
+        if old in value:
+            cleaned[field] = value.replace(old, new)
+    return cleaned
+
+
 # --- 组装 -------------------------------------------------------------------
 def build_seed(
     staging_dir: Path = STAGING_DIR, seed_path: Path = SEED_PATH
@@ -430,6 +453,8 @@ def build_seed(
     stats["total"] = _totals(stats)
     stats["existing"] = len(existing)
     stats["reimported"] = reimported
+    # 先清正文再打乱：两步互不依赖，固定顺序只是为了让「改了什么」可读。
+    merged = [sanitize_text(row) for row in merged]
     # 只在这条唯一重算路径上打乱：`--check` 与 `--write` 共用它，
     # 否则「重算 == 磁盘字节」不成立（拿未打乱的流水线比已打乱的 seed，恒红）。
     merged, shuffle_metrics = question_shuffle.apply(merged)
@@ -563,7 +588,7 @@ def render_report(rows: Sequence[dict[str, Any]], stats: dict[str, Any]) -> str:
     sources = Counter(str(row.get("source") or "seed") for row in rows)
 
     lines = [
-        "# 题库合并导入报表（r14 · 工具生成，勿手改）",
+        "# 题库合并导入报表（r15 · 工具生成，勿手改）",
         "",
         "命令：`cd backend && python -X utf8 -m app.services.question_merge --write`",
         "（重算 → 写 `backend/app/seed/questions.json` → 本报表；`--check` 用它做逐字节幂等比对）",

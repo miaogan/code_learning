@@ -568,3 +568,80 @@ def test_license_notice_present_when_third_party_source_in_seed() -> None:
     assert all(str(row["language"]) in ("html", "css", "js") for row in third_party), (
         "fe-interview 只覆盖前端三语言"
     )
+
+
+# --- ⑪ 正文元信息（r15） ------------------------------------------------------
+#: r12 合并素材时残留的**编辑用语**：题干以「以下哪种做法最符合参考答案要点？」收尾，
+#: 解析以「参考答案要点：」开头。它暴露的是出题过程而非考点，r15 起由
+#: `question_merge.sanitize_text()` 在流水线里清理，本段是常驻门禁（防素材重导入回潮）。
+META_PHRASE = "参考答案要点"
+
+#: 清理前后应命中的替换次数（occurrence 级：题干 45 + 解析 15，两者重叠 11 道）。
+#: 素材若重新导入，这个数变了就要同步复核并在任务夹留痕（与 EXPECTED_TOTAL 同理）。
+META_PHRASE_HITS = 60
+
+
+def test_sanitize_text_only_rewrites_meta_phrase() -> None:
+    """`sanitize_text()` 只替换 `_TEXT_REWRITES` 列出的字段与原串：返回新字典、不改入参、二次调用无变化。"""
+    row = _row(
+        "以下哪种做法最符合参考答案要点？",
+        explanation="参考答案要点：先读后写，再考虑加锁。",
+    )
+    snapshot = json.loads(json.dumps(row, ensure_ascii=False))
+    cleaned = qm.sanitize_text(row)
+    assert cleaned is not row, "必须返回新字典（就地改会让「重算 vs 已提交 seed」的比对失去意义）"
+    assert row == snapshot, "入参被就地修改"
+    assert cleaned == {
+        **snapshot,
+        "prompt": "以下哪种做法最符合要求？",
+        "explanation": "参考要点：先读后写，再考虑加锁。",
+    }, "除固定串外题干/解析必须逐字不动（替换不是改写）"
+    assert qm.sanitize_text(cleaned) == cleaned, "替换后不含原串，二次调用必须无变化（幂等）"
+
+    plain = _row("以下哪项是 Python 的不可变类型？")
+    assert qm.sanitize_text(plain) == plain, "不含该串的行必须零改动"
+    assert "source" in qm.sanitize_text(plain), "清理不得丢掉 `source` 等非正文键"
+
+
+def test_seed_text_has_no_staging_meta_phrase() -> None:
+    """落盘 seed 的题干/解析不得再含「参考答案要点」（r15 门禁：读磁盘、不读重算结果）。"""
+    rows = question_bank.load_seed()
+    offenders = [
+        (str(row["id"]), field)
+        for row in rows
+        for field in ("prompt", "explanation")
+        if META_PHRASE in str(row.get(field) or "")
+    ]
+    assert not offenders, f"题干/解析仍含素材编辑用语：{offenders[:5]}"
+
+
+def test_sanitize_text_only_touches_meta_phrase_in_real_data(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """真实数据对拍：seed 的题干/解析 = 未清理版本**只**做固定串替换（防止顺手改题）。
+
+    把 `sanitize_text()` 临时换成恒等函数再跑一次 `build_seed()`，与落盘 seed 逐题比正文。
+    只比 `prompt` / `explanation`：选项重排的定位哈希与题干文本相关，清理会改变分配结果，
+    比 `answer` / `options` 只会产生与本次清理无关的误红。
+    """
+    identity: Any = lambda row: row  # noqa: E731
+    monkeypatch.setattr(qm, "sanitize_text", identity)
+    uncleaned, _ = qm.build_seed()
+    rows = question_bank.load_seed()
+    assert [row["id"] for row in uncleaned] == [row["id"] for row in rows], (
+        "重算与落盘 seed 的题序/题量不一致：对拍前提不成立"
+    )
+
+    hits = 0
+    for before, after in zip(uncleaned, rows, strict=True):
+        for key in ("id", "direction", "kind", "difficulty", "essentiality", "language"):
+            assert after[key] == before[key], f"{before['id']} 的 {key} 被正文清理波及"
+        for field, old, new in qm._TEXT_REWRITES:
+            value = str(before[field])
+            hits += value.count(old)
+            assert str(after[field]) == value.replace(old, new), (
+                f"{before['id']} 的 {field} 与「只把 {old} 换成 {new}」不符（可能顺手改了题）"
+            )
+    assert hits == META_PHRASE_HITS, (
+        f"清理命中 {hits} 处，与 r15 核定的 {META_PHRASE_HITS} 处不符：素材已变，需重新复核口径"
+    )
