@@ -360,12 +360,11 @@ PAPER_SIZE_LADDER = {
 def test_turn_cap_derives_from_paper_size(
     tmp_db: Any, profile_factory: Any, fake_ai: Any, kinds: list[str]
 ) -> None:
-    """r8 D-4：轮次上限必须由**实际计划题量**派生，而不是写死标准卷的 8 + 4 = 12。
+    """r8 D-4/D-5：轮次上限必须由**实际计划题量**派生，且每场追问配额用满。
 
-    每轮都要求追问，把追问配额与轮次预算同时压到极限：一场会的发言数必须 ≤
-    `rules.max_turns(计划题量)`，且**计划正题一题不落**（计划比标准卷长时压缩的是追问，不是正题）。
-    修复前 9 题卷会走到 13 条（9 正题 + 4 追问 > 12＝上限），本用例即红；上限写死常量时
-    13 题卷同样变红。
+    每轮都要求追问，把追问配额与轮次预算同时压到极限：一场会的发言数必须恰为
+    `计划题量 + MAX_FOLLOW_UPS`，且**计划正题一题不落**。9 题卷因此是 13 条
+    （9 正题 + 4 追问）；r8 D-5 之前上限只取 `max(12, 9) = 12`，追问被压到 3 次，本用例即红。
     """
     profile = _seed_profile(profile_factory)
     fake_ai.responder = _responder(
@@ -379,11 +378,15 @@ def test_turn_cap_derives_from_paper_size(
     entries = payload["questions"]
     planned_prompts = {item["prompt"] for item in _plan_items(kinds)}
     assert {entry["prompt"] for entry in entries} >= planned_prompts, "计划正题必须全部问到"
+    assert len(turns) == plan_total + rules.MAX_FOLLOW_UPS, (
+        f"{plan_total} 题卷必须用满 {rules.MAX_FOLLOW_UPS} 次追问"
+        "（r8 D-5：9 题卷曾只给 3 次）"
+    )
     assert len(turns) <= rules.max_turns(plan_total), "发言数越过由题量派生的轮次上限"
     assert len(entries) <= rules.max_turns(plan_total)
     assert rules.max_turns(plan_total) >= plan_total, "上限不得把计划正题挤出去"
     follow_ups = sum(1 for entry in entries if entry["parent_id"])
-    assert follow_ups <= rules.MAX_FOLLOW_UPS
+    assert follow_ups == rules.MAX_FOLLOW_UPS
     assert payload["follow_up_count"] == follow_ups
     assert payload["current_id"] is None
     assert turns[-1].run_status == repository.RUN_COMPLETED

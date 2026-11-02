@@ -604,9 +604,10 @@ def test_interview_prompt_paper_feasible() -> None:
         [f"第 {index} 题：请说明做法、取舍与结果" for index in range(len(minimum_paper))],
     )
 
-    # 门禁 48（r8 D-4）：题量一改，**轮次上限必须同步派生**。上一轮把题量 8 → 9 时只改了
+    # 门禁 48（r8 D-4 / r20）：题量一改，**轮次上限必须同步派生**。上一轮把题量 8 → 9 时只改了
     # 提示词，轮次上限仍是标准卷的 8 + 4 = 12，于是 9 正题 + 4 追问走到第 13 条发言、且
-    # `quota.turns_left` 提前报 0 —— 本用例钉住「上限 ≥ 计划题量」「上限随题量增长」两条。
+    # `quota.turns_left` 提前报 0 —— 本用例钉住「上限 ≥ 计划题量」「上限随题量增长」两条；
+    # r20 再钉住「9 题卷开局追问额度必须仍为 4 次」（只取 max(12, 计划题量) 时它会掉到 3）。
     assert rules.max_turns(stated_total) >= stated_total, (
         f"轮次上限 {rules.max_turns(stated_total)} 装不下 {stated_total} 道计划正题（会溢出越界）"
     )
@@ -620,7 +621,10 @@ def test_interview_prompt_paper_feasible() -> None:
         f"开局额度不自洽：上限 {rules.max_turns(stated_total)} - 已问 1 ≠ "
         f"剩余正题 {stated_total - 1} + 可追问 {opener_follow_ups}"
     )
-    assert opener_follow_ups <= rules.MAX_FOLLOW_UPS
+    assert opener_follow_ups == rules.MAX_FOLLOW_UPS, (
+        f"开局只剩 {opener_follow_ups} 次追问（应为 {rules.MAX_FOLLOW_UPS}）："
+        "轮次上限又在压缩追问额度（r8 D-5 的类）"
+    )
 
 
 # --- r9：AI 供应商档位（门禁 49-52）---------------------------------------------------

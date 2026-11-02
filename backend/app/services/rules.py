@@ -44,9 +44,10 @@ DEFAULT_COMPANY_SIZE = "中型"
 
 #: 每场追问上限。
 MAX_FOLLOW_UPS = 4
-#: 轮次总预算（标准卷 = 正题下限 8 + 追问上限 4 = 12）。r8 D-4：它只是**标准卷**的预算，
-#: 本场口径必须经 `max_turns()` / `follow_ups_left()` 派生 —— 提示词题量改到 9 题后直接拿
-#: 它当上限会放出第 13 条发言（越界）；别再把它和「实际计划题量」直接比较。
+#: 标准卷轮次预算（正题下限 8 + 追问上限 4 = 12），同时充当 `max_turns()` 的下限。
+#: r8 D-4：本场口径必须经 `max_turns()` / `follow_ups_left()` 派生，别再拿它和本场发言数
+#: 直接比较（提示词题量已是 9 题，写死 12 会放不下第 13 条发言）。r20：派生口径改为
+#: `max(标准卷预算, 计划题量 + 追问上限)` —— 9 题卷 13 轮，追问 4 次仍可用满。
 MAX_INTERVIEW_TURNS = MIN_INTERVIEW_QUESTIONS + MAX_FOLLOW_UPS
 
 # --- 笔试 ---------------------------------------------------------------
@@ -202,20 +203,22 @@ def experience_band_of(years: float | None) -> str:
 
 
 def max_turns(planned_total: int) -> int:
-    """本场轮次上限：不小于标准预算 `MAX_INTERVIEW_TURNS`，也绝不把计划正题挤出上限。
+    """本场轮次上限 = max(标准卷预算 `MAX_INTERVIEW_TURNS`, 计划正题数 + 追问上限)。
 
-    r8 D-4：提示词题量 8 → 9 之后，再拿 `MAX_INTERVIEW_TURNS`（8 + 4 = 12）当一场会的上限
-    就会多出第 13 条发言。上限一律由**实际计划题量**派生：计划比标准卷长时先保证每道正题
-    问得到，追问额度随之压缩；这样「发言数 ≤ 上限」对任何题量都成立，而不是只在 8 题卷上成立。
+    r8 D-4：上限不能写死标准卷的 8 + 4 = 12，必须由**实际计划题量**派生，否则 9 题卷的
+    第 13 条发言越界。r20（关闭 r8 D-5）：只取 `max(12, 计划题量)` 同样不对 —— 9 题卷只剩
+    3 次追问，与「每场 4 次」的配额承诺不符。正解是给每道计划正题留位、再叠加完整追问预算：
+    8 题卷仍 12 轮，9 题卷 13 轮，13 题卷 17 轮，`follow_ups_left()` 因此不再压缩额度。
     """
-    return max(MAX_INTERVIEW_TURNS, planned_total)
+    return max(MAX_INTERVIEW_TURNS, planned_total + MAX_FOLLOW_UPS)
 
 
 def follow_ups_left(planned_total: int, asked: int, follow_up_count: int) -> int:
     """剩余追问额度 = min(配额余量, 轮次预算里没被**剩余计划正题**占用的机动轮次)。
 
     `asked` 是本场已提出的发言数（正题 + 追问）。先把「剩余正题」的轮次扣出来，追问就透支
-    不到正题 —— 这正是 D-4 越界的机制：12 轮预算先花掉 4 条追问，9 道正题只好排到第 13 条。
+    不到正题：上限按「计划题量 + 追问上限」派生后，本式恒等于 `MAX_FOLLOW_UPS - follow_up_count`
+    —— 每道计划正题各占一轮，机动轮次恰好留给 4 条追问（r20 关闭 D-5 的压缩问题）。
     """
     asked_plan = max(0, asked - follow_up_count)
     remaining_plan = max(0, planned_total - asked_plan)
