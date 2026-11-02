@@ -1216,4 +1216,100 @@ def test_r11_touched_paths_resolve() -> None:
     assert not missing, f"r11 改动面未落地（应为仓库根相对且文件存在）：{missing}"
 
 
+# ---------------------------------------------------------------------------
+# r12 · 题库素材合并（260 → 779）
+#
+# 三条门禁把 r12 的三条口头约定变成机器断言：
+# 1. 改动面逐条可解析 —— 任何一件没落地就点名，而不是等别的用例 FileNotFoundError；
+# 2. 离线合并工具**不得被运行时导入** —— 依赖单向：运行时 → rules/repository，
+#    工具 → rules/repository/question_bank；反向引用会让「离线、零 AI、零网络」失效，
+#    也会让一个只在 CI 里跑的工具意外变成启动路径的一部分；
+# 3. `source` 是**导入期**元数据，不得进 HTTP 契约 —— 前端不该看到它，契约也不该为它改版。
+# ---------------------------------------------------------------------------
+
+#: r12 改动面（仓库根相对）：6 个代码/数据文件 + 2 件任务夹产物（许可 NOTICE、导入报表）。
+R12_TOUCHED = (
+    "backend/app/services/question_merge.py",
+    "backend/app/repository.py",
+    "backend/app/seed/questions.json",
+    "backend/tests/test_r12_question_merge.py",
+    "backend/tests/test_question_bank_quality.py",
+    "backend/tests/test_engineering_gates.py",
+    "docs/question-bank-staging/NOTICE-fe-interview.md",
+    "docs/teamflow/20261102-r12-question-bank-merge/QUESTION-BANK-MERGE-REPORT.md",
+)
+
+#: 离线合并工具本身（不是运行时模块：门禁 2 的依据）。
+R12_MERGE_TOOL = "backend/app/services/question_merge.py"
+
+#: r12 来源枚举（`source` 列的业务取值；存量行缺省 `'seed'` 不在此列）。
+R12_SOURCES = ("tiji", "local100", "iq380", "fe-interview")
+
+
+def test_r12_touched_paths_resolve() -> None:
+    """r12 改动面按仓库根相对解析：代码、种子、两个测试文件、许可与报表产物。"""
+    mislabelled = [
+        rel for rel in R12_TOUCHED if not rel.startswith(("backend/", "frontend/", "docs/"))
+    ]
+    assert not mislabelled, f"R12_TOUCHED 路径必须带 backend/ 或 frontend/ 或 docs/ 前缀：{mislabelled}"
+    missing = [rel for rel in R12_TOUCHED if not (REPO_ROOT / rel).is_file()]
+    assert not missing, f"r12 改动面未落地（应为仓库根相对且文件存在）：{missing}"
+
+
+def test_r12_merge_tool_not_imported_by_runtime() -> None:
+    """合并工具只在离线跑：运行时不得 `import` 它（注释里提到名字可以，真引用不行）。"""
+    offenders: list[str] = []
+    for path in sorted(APP_DIR.rglob("*.py")):
+        relative = path.relative_to(REPO_ROOT).as_posix()
+        if relative == R12_MERGE_TOOL:
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                names = [alias.name for alias in node.names]
+            elif isinstance(node, ast.ImportFrom):
+                names = [node.module or "", *(alias.name for alias in node.names)]
+            else:
+                continue
+            if any("question_merge" in name for name in names):
+                offenders.append(f"{relative}:{node.lineno}")
+    assert not offenders, (
+        f"运行时模块 import 了离线合并工具（它会读 staging、写文件，绝不能进启动路径）：{offenders}"
+    )
+
+    tree = _r6_ast(R12_MERGE_TOOL)
+    imported: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.level:
+            imported.update(alias.name for alias in node.names)
+    assert imported == {"repository", "question_bank", "rules"}, (
+        "合并工具只允许依赖这三处（唯一 SQL 出口 / 种子读口径 / 闭集与方向归属），"
+        f"实际：{sorted(imported)}"
+    )
+
+
+def test_r12_source_not_in_http_contract() -> None:
+    """`source` 只住在库里：`schemas.py` 与 `types.ts` 都不得出现该字段，也不得泄漏来源枚举。"""
+    schemas_tree = _r6_ast("backend/app/schemas.py")
+    leaked = [
+        f"{node.name}.source"
+        for node in ast.walk(schemas_tree)
+        if isinstance(node, ast.ClassDef)
+        for item in node.body
+        if isinstance(item, ast.AnnAssign)
+        and isinstance(item.target, ast.Name)
+        and item.target.id == "source"
+    ]
+    assert not leaked, f"HTTP 契约泄漏了题库 `source` 字段：{leaked}"
+
+    schemas_text = (REPO_ROOT / "backend" / "app" / "schemas.py").read_text(encoding="utf-8")
+    types_ts = (FRONTEND / "src" / "api" / "types.ts").read_text(encoding="utf-8")
+    for text, label in ((schemas_text, "schemas.py"), (types_ts, "types.ts")):
+        assert not re.search(r"^\s*(?:readonly\s+)?source\??\s*:", text, re.M), (
+            f"{label} 出现 `source` 字段：题库来源是导入期元数据，不进契约（前端也不该依赖它）"
+        )
+        for token in R12_SOURCES:
+            assert token not in text, f"{label} 出现来源枚举值 {token!r}：契约不得为素材来源改版"
+
+
 

@@ -1,0 +1,550 @@
+[
+  {
+    "n": 1,
+    "language": "js",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "在 JavaScript 中，以下哪个表达式的 typeof 结果为 \"number\"？",
+    "options": [
+      {
+        "key": "A",
+        "text": "`typeof null`"
+      },
+      {
+        "key": "B",
+        "text": "`typeof []`"
+      },
+      {
+        "key": "C",
+        "text": "`typeof NaN`"
+      },
+      {
+        "key": "D",
+        "text": "`typeof undefined`"
+      }
+    ],
+    "answer": "C",
+    "explanation": "typeof NaN 返回 \"number\"，因为 NaN 是 \"Not-a-Number\" 的特殊数值类型；typeof null 返回 \"object\"（历史遗留缺陷）；typeof [] 返回 \"object\"（数组本质为对象）；typeof undefined 返回 \"undefined\"。"
+  },
+  {
+    "n": 2,
+    "language": "js",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "```js const a = [1, 2, 3]; const b = a.map(x => x * 2); ```",
+    "options": [
+      {
+        "key": "A",
+        "text": "[1, 2, 3]"
+      },
+      {
+        "key": "B",
+        "text": "[2, 4, 6]"
+      },
+      {
+        "key": "C",
+        "text": "[1, 2, 3, 2, 4, 6]"
+      },
+      {
+        "key": "D",
+        "text": "undefined"
+      }
+    ],
+    "answer": "A",
+    "explanation": "Array.prototype.map 返回新数组且不修改原数组，因此 a 保持 [1,2,3]，b 才是 [2,4,6]；B 误把新数组当成原数组被修改，C 误以为是 concat 拼接，D 误以为 map 无返回值。"
+  },
+  {
+    "n": 3,
+    "language": "ts",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "TypeScript 中，以下哪个类型表示\"可赋任意值且关闭类型检查\"？",
+    "options": [
+      {
+        "key": "A",
+        "text": "unknown"
+      },
+      {
+        "key": "B",
+        "text": "any"
+      },
+      {
+        "key": "C",
+        "text": "never"
+      },
+      {
+        "key": "D",
+        "text": "void"
+      }
+    ],
+    "answer": "B",
+    "explanation": "any 会关闭类型检查，可赋任意值并访问任意成员；unknown 仍需先收窄类型才能使用；never 表示永不出现的值（如抛异常的函数返回）；void 表示函数无返回值。混淆点在 unknown 与 any 的\"宽松\"差异。"
+  },
+  {
+    "n": 4,
+    "language": "css",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "在 CSS 中，以下哪个属性可隐藏元素且不占据任何布局空间？",
+    "options": [
+      {
+        "key": "A",
+        "text": "`visibility: hidden`"
+      },
+      {
+        "key": "B",
+        "text": "`display: none`"
+      },
+      {
+        "key": "C",
+        "text": "`opacity: 0`"
+      },
+      {
+        "key": "D",
+        "text": "`overflow: hidden`"
+      }
+    ],
+    "answer": "B",
+    "explanation": "display:none 使元素完全不渲染也不占据空间；visibility:hidden 仍保留布局空间；opacity:0 仍占空间且默认可交互；overflow:hidden 仅裁剪溢出内容而非隐藏元素本身。混淆在于三种\"看不见\"方式的差别。"
+  },
+  {
+    "n": 5,
+    "language": "html",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "nice_to_know",
+    "stem": "以下哪个 HTML 标签默认是块级（block）元素？",
+    "options": [
+      {
+        "key": "A",
+        "text": "`<span>`"
+      },
+      {
+        "key": "B",
+        "text": "`<a>`"
+      },
+      {
+        "key": "C",
+        "text": "`<div>`"
+      },
+      {
+        "key": "D",
+        "text": "`<img>`"
+      }
+    ],
+    "answer": "C",
+    "explanation": "div 默认 display:block 为块级元素；span 与 a 默认 inline（行内）；img 是 inline-block 的行内替换元素，并非块级。混淆点在于把行内或行内块元素误认为块级。"
+  },
+  {
+    "n": 6,
+    "language": "vue3",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "在 Vue3 的 `<script setup>` 中，普通变量如何成为响应式状态？",
+    "options": [
+      {
+        "key": "A",
+        "text": "用 `ref()` 或 `reactive()` 包裹"
+      },
+      {
+        "key": "B",
+        "text": "加 `@reactive` 装饰器"
+      },
+      {
+        "key": "C",
+        "text": "用 `data()` 返回"
+      },
+      {
+        "key": "D",
+        "text": "变量名以 `$` 开头"
+      }
+    ],
+    "answer": "A",
+    "explanation": "Vue3 组合式 API 通过 ref/reactive 创建响应式数据；@reactive 装饰器并不存在（是混淆来源）；data() 属于选项式 API 写法；$ 前缀不是响应式约定。干扰项混入了旧写法和臆造语法。"
+  },
+  {
+    "n": 7,
+    "language": "react",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "React 函数组件中，useEffect 的依赖数组传空数组 `[]` 时，回调会在何时执行？",
+    "options": [
+      {
+        "key": "A",
+        "text": "每次渲染后都执行"
+      },
+      {
+        "key": "B",
+        "text": "仅在组件首次挂载后执行一次"
+      },
+      {
+        "key": "C",
+        "text": "仅在组件卸载时执行"
+      },
+      {
+        "key": "D",
+        "text": "依赖变化时执行且首次也执行"
+      }
+    ],
+    "answer": "B",
+    "explanation": "空依赖数组表示无依赖，effect 只在挂载后执行一次；每次渲染后执行是\"不传依赖数组\"的默认行为；卸载时执行的是 effect 返回的清理函数。混淆点在于\"空数组\"与\"不传数组\"的差异。"
+  },
+  {
+    "n": 8,
+    "language": "js",
+    "direction": "前端",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "```js console.log(0.1 + 0.2 === 0.3); ```",
+    "options": [
+      {
+        "key": "A",
+        "text": "true"
+      },
+      {
+        "key": "B",
+        "text": "false"
+      },
+      {
+        "key": "C",
+        "text": "抛出异常"
+      },
+      {
+        "key": "D",
+        "text": "0.3"
+      }
+    ],
+    "answer": "B",
+    "explanation": "IEEE754 双精度浮点无法精确表示 0.1 与 0.2，相加结果为 0.30000000000000004，不等于 0.3，故输出 false；该表达式不抛异常，也不会返回 0.3。混淆来自日常十进制的直觉。"
+  },
+  {
+    "n": 9,
+    "language": "python",
+    "direction": "后端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "Python 中，以下哪个关键字用于捕获异常？",
+    "options": [
+      {
+        "key": "A",
+        "text": "catch"
+      },
+      {
+        "key": "B",
+        "text": "except"
+      },
+      {
+        "key": "C",
+        "text": "throw"
+      },
+      {
+        "key": "D",
+        "text": "finally"
+      }
+    ],
+    "answer": "B",
+    "explanation": "Python 用 except 子句捕获异常；catch 是 Java/C++ 等语言的关键字；抛出异常用 raise；finally 表示无论是否异常都执行清理，不负责捕获。混淆在于不同语言异常处理关键字的混用。"
+  },
+  {
+    "n": 10,
+    "language": "java",
+    "direction": "后端",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "Java 中，以下哪个是基本数据类型（primitive type）？",
+    "options": [
+      {
+        "key": "A",
+        "text": "String"
+      },
+      {
+        "key": "B",
+        "text": "Integer"
+      },
+      {
+        "key": "C",
+        "text": "int"
+      },
+      {
+        "key": "D",
+        "text": "Boolean"
+      }
+    ],
+    "answer": "C",
+    "explanation": "int 是 Java 八种基本类型之一；String 是引用类型；Integer 与 Boolean 是对应基本类型的包装类，同样属于引用类型。混淆点在于包装类与基本类型的区别。"
+  },
+  {
+    "n": 11,
+    "language": "go",
+    "direction": "后端",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "Go 语言中，短变量声明 `:=` 的使用前提是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "只能在函数外部使用"
+      },
+      {
+        "key": "B",
+        "text": "至少包含一个新变量且发生在函数内部"
+      },
+      {
+        "key": "C",
+        "text": "左侧变量必须全部是新声明的"
+      },
+      {
+        "key": "D",
+        "text": "只能在全局作用域使用"
+      }
+    ],
+    "answer": "B",
+    "explanation": ":= 只能出现在函数内部，且左侧至少有一个此前未声明的变量；它不能用于包级（函数外）作用域；也并不要求左侧变量全部为新声明（可用于部分新变量的多变量赋值）。混淆在于作用域与\"全为新变量\"的误解。"
+  },
+  {
+    "n": 12,
+    "language": null,
+    "direction": "算法与数据结构",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "在一个有 n 个元素的有序数组上进行二分查找，最坏情况下的时间复杂度是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "O(1)"
+      },
+      {
+        "key": "B",
+        "text": "O(log n)"
+      },
+      {
+        "key": "C",
+        "text": "O(n)"
+      },
+      {
+        "key": "D",
+        "text": "O(n log n)"
+      }
+    ],
+    "answer": "B",
+    "explanation": "二分查找每次将搜索区间折半，最多约 log2(n)+1 次比较即可定位或确认不存在，故最坏为 O(log n)；O(1) 是理想哈希查找，O(n) 是顺序查找，O(n log n) 通常是排序算法的复杂度。"
+  },
+  {
+    "n": 13,
+    "language": "js",
+    "direction": "前端",
+    "kind": "multiple",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "以下哪些 Array 方法会原地修改（mutate）原数组？",
+    "options": [
+      {
+        "key": "A",
+        "text": "`push`"
+      },
+      {
+        "key": "B",
+        "text": "`splice`"
+      },
+      {
+        "key": "C",
+        "text": "`concat`"
+      },
+      {
+        "key": "D",
+        "text": "`sort`"
+      }
+    ],
+    "answer": "A,B,D",
+    "explanation": "push 追加元素、splice 增删改、sort 排序都会直接修改原数组；concat 返回新数组且不改变原数组，是常见被误认为会修改原数组的方法。因此正确项为 A、B、D，C 为干扰项。"
+  },
+  {
+    "n": 14,
+    "language": null,
+    "direction": "计算机基础",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "以下哪些 HTTP 方法在语义上是幂等（idempotent）的？",
+    "options": [
+      {
+        "key": "A",
+        "text": "GET"
+      },
+      {
+        "key": "B",
+        "text": "POST"
+      },
+      {
+        "key": "C",
+        "text": "PUT"
+      },
+      {
+        "key": "D",
+        "text": "DELETE"
+      }
+    ],
+    "answer": "A,C,D",
+    "explanation": "HTTP 规范中 GET、PUT、DELETE 被定义为幂等（多次相同请求效果一致）；POST 语义用于创建资源，不保证幂等（重复提交可能产生多个资源）。因此正确项为 A、C、D，B 为干扰项。"
+  },
+  {
+    "n": 15,
+    "language": "python",
+    "direction": "后端",
+    "kind": "multiple",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "以下哪些是 Python 的可变（mutable）内置容器类型？",
+    "options": [
+      {
+        "key": "A",
+        "text": "list"
+      },
+      {
+        "key": "B",
+        "text": "tuple"
+      },
+      {
+        "key": "C",
+        "text": "dict"
+      },
+      {
+        "key": "D",
+        "text": "set"
+      }
+    ],
+    "answer": "A,C,D",
+    "explanation": "list、dict、set 均为可变类型，创建后可修改其内容；tuple 是不可变类型，创建后不能增删改元素。因此正确项为 A、C、D，B 是常见被误认为可变的干扰项。"
+  },
+  {
+    "n": 16,
+    "language": null,
+    "direction": "计算机基础",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "nice_to_know",
+    "stem": "关于 TCP 三次握手，以下说法正确的有？",
+    "options": [
+      {
+        "key": "A",
+        "text": "握手目的是让双方同步初始序列号（ISN）"
+      },
+      {
+        "key": "B",
+        "text": "第三次握手（ACK）报文可以携带应用数据"
+      },
+      {
+        "key": "C",
+        "text": "若第三次 ACK 丢失，服务端会重发 SYN-ACK"
+      },
+      {
+        "key": "D",
+        "text": "仅用两次握手即可可靠建立连接"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "三次握手用于双向同步 ISN（A 正确）；完成握手的 ACK 段允许携带数据（B 正确）；若第三次 ACK 丢失，服务端未收到会重发 SYN-ACK（C 正确）；两次握手无法防范历史连接等异常，不可靠（D 错误），故不选。"
+  },
+  {
+    "n": 17,
+    "language": "js",
+    "direction": "前端",
+    "kind": "judge",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "在 JavaScript 中，`==` 会比较值并允许隐式类型转换，而 `===` 要求类型与值都相等。",
+    "options": [
+      {
+        "key": "正确",
+        "text": "正确"
+      },
+      {
+        "key": "错误",
+        "text": "错误"
+      }
+    ],
+    "answer": "正确",
+    "explanation": "该陈述符合 ECMAScript 规范：`==` 在比较前做类型转换（如 '1'==1 为 true），`===` 严格比较类型与值（'1'===1 为 false）。这是无争议的语言定义，不依赖任何未说明前提。"
+  },
+  {
+    "n": 18,
+    "language": "ts",
+    "direction": "前端",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "TypeScript 编译生成的 JavaScript 在运行时仍保留 interface 声明以便进行类型检查。",
+    "options": [
+      {
+        "key": "正确",
+        "text": "正确"
+      },
+      {
+        "key": "错误",
+        "text": "错误"
+      }
+    ],
+    "answer": "错误",
+    "explanation": "interface 是纯编译期类型结构，编译后会被完全擦除，运行时不存在 interface；类型检查只在 tsc 编译阶段发生，不在运行时。该陈述与 TypeScript 的类型擦除机制相矛盾，故错误。"
+  },
+  {
+    "n": 19,
+    "language": null,
+    "direction": "算法与数据结构",
+    "kind": "judge",
+    "difficulty": "basic",
+    "essentiality": "nice_to_know",
+    "stem": "栈（stack）是一种后进先出（LIFO）的数据结构。",
+    "options": [
+      {
+        "key": "正确",
+        "text": "正确"
+      },
+      {
+        "key": "错误",
+        "text": "错误"
+      }
+    ],
+    "answer": "正确",
+    "explanation": "栈限制只能在一端进行插入（push）与删除（pop），最后压入的元素最先弹出，即后进先出 LIFO；它与队列的先进先出 FIFO 相对。这是数据结构的公认标准定义，无额外前提依赖。"
+  },
+  {
+    "n": 20,
+    "language": "vue3",
+    "direction": "前端",
+    "kind": "judge",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "Vue3 中 ref 用于基本类型、reactive 用于对象，二者在模板中访问时都需要手动写 `.value`。",
+    "options": [
+      {
+        "key": "正确",
+        "text": "正确"
+      },
+      {
+        "key": "错误",
+        "text": "错误"
+      }
+    ],
+    "answer": "错误",
+    "explanation": "在模板里访问 ref 会自动解包，无需写 .value；只有在 `<script>` 的 JS 逻辑中才需要用 .value 读取或修改。该陈述把\"脚本内\"与\"模板内\"的规则混为一谈，故错误。"
+  }
+]

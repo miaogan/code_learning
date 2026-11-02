@@ -1,0 +1,562 @@
+[
+  {
+    "source_title": "请描述一下cookies、sessionStorage和localStorage的区别？",
+    "kind": "single",
+    "stem": "关于 cookies、sessionStorage 和 localStorage 的区别，以下哪项描述是正确的？",
+    "options": [
+      {
+        "key": "A",
+        "text": "cookies 数据会自动随 HTTP 请求发送到服务器，而 sessionStorage 和 localStorage 仅保存在客户端"
+      },
+      {
+        "key": "B",
+        "text": "localStorage 的数据在浏览器关闭后会被清除，sessionStorage 的数据会长期保留"
+      },
+      {
+        "key": "C",
+        "text": "sessionStorage 和 localStorage 的存储容量通常比 cookies 小，因此更适合存少量数据"
+      },
+      {
+        "key": "D",
+        "text": "cookies 只能通过 JavaScript 读写，sessionStorage 和 localStorage 可由服务器直接设置"
+      }
+    ],
+    "answer": "A",
+    "explanation": "cookies 会通过 HTTP 请求头自动发送给同源服务器，而 sessionStorage 和 localStorage 是纯客户端存储，不会随请求发送。B 项说反了：localStorage 持久保留，sessionStorage 在会话结束（关闭标签页）后清除。C 项错误：Web Storage 容量通常远大于 cookies（约 5MB 对 4KB）。D 项错误：cookies 可由服务器通过 Set-Cookie 设置，Web Storage 只能由客户端脚本操作。",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "html"
+  },
+  {
+    "source_title": "HTML5的触屏事件与鼠标事件有什么区别？",
+    "kind": "single",
+    "stem": "关于 HTML5 触屏事件（如 touchstart、touchmove、touchend）与鼠标事件（如 mousedown、mousemove、mouseup）的区别，以下哪项描述是正确的？",
+    "options": [
+      {
+        "key": "A",
+        "text": "触屏事件可以同时处理多个触点，鼠标事件通常只对应单一指针"
+      },
+      {
+        "key": "B",
+        "text": "触屏事件在桌面浏览器中一定不会触发，鼠标事件在移动设备上一定不会触发"
+      },
+      {
+        "key": "C",
+        "text": "触屏事件对象不包含坐标信息，鼠标事件对象包含 clientX/clientY"
+      },
+      {
+        "key": "D",
+        "text": "触屏事件只能绑定在 document 上，鼠标事件只能绑定在具体元素上"
+      }
+    ],
+    "answer": "A",
+    "explanation": "触屏事件通过 touches、targetTouches、changedTouches 等列表支持多点触控，而传统鼠标事件一次只对应一个指针。B 项过于绝对：移动浏览器常模拟鼠标事件，桌面浏览器也可能触发触摸事件（如触摸屏笔记本）。C 项错误：触摸事件对象同样提供 clientX/clientY 等坐标。D 项错误：两类事件都可以绑定在任意元素或 document 上。",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "language": "html"
+  },
+  {
+    "source_title": "html5中的meta标签itemprop属性有什么作用？",
+    "kind": "single",
+    "stem": "HTML5 中 meta 标签的 itemprop 属性主要用于什么？",
+    "options": [
+      {
+        "key": "A",
+        "text": "为页面元素添加微数据（Microdata）属性，供搜索引擎等消费结构化信息"
+      },
+      {
+        "key": "B",
+        "text": "指定页面的字符编码，等价于 charset 属性"
+      },
+      {
+        "key": "C",
+        "text": "控制页面在移动设备上的视口缩放行为"
+      },
+      {
+        "key": "D",
+        "text": "设置页面的 HTTP 缓存策略"
+      }
+    ],
+    "answer": "A",
+    "explanation": "itemprop 是 HTML 微数据规范的一部分，用于在元素上声明结构化数据的属性名，常与 itemscope、itemtype 配合，帮助搜索引擎理解页面内容。B 项字符编码由 charset 属性指定；C 项视口行为由 name=\"viewport\" 的 content 控制；D 项缓存策略通常通过 HTTP 头或 http-equiv 设置，均与 itemprop 无关。",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "language": "html"
+  },
+  {
+    "source_title": "HTML与XHTML二者有不同",
+    "kind": "single",
+    "stem": "关于 HTML 与 XHTML 的区别，以下哪项描述是正确的？",
+    "options": [
+      {
+        "key": "A",
+        "text": "XHTML 要求文档必须是格式良好的 XML，标签必须正确闭合且区分大小写"
+      },
+      {
+        "key": "B",
+        "text": "HTML 要求所有标签必须闭合，而 XHTML 允许省略结束标签"
+      },
+      {
+        "key": "C",
+        "text": "XHTML 不区分标签大小写，HTML 严格区分标签大小写"
+      },
+      {
+        "key": "D",
+        "text": "HTML 文档必须使用 XML 声明开头，XHTML 不需要"
+      }
+    ],
+    "answer": "A",
+    "explanation": "XHTML 是 HTML 的 XML 应用，必须满足 XML 的格式良好要求：标签正确嵌套与闭合、元素和属性名区分大小写、属性值需加引号等。B 项说反了：HTML 允许某些结束标签省略，XHTML 不允许。C 项也反了：XHTML 区分大小写，HTML 标签名不区分大小写。D 项错误：XML 声明在 XHTML 中常见但并非必须，HTML 更不要求。",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "html"
+  },
+  {
+    "source_title": "你有使用过html5的rt标签吗？它有什么应用场景？",
+    "kind": "single",
+    "stem": "HTML5 中的 <rt> 标签的主要作用是什么？",
+    "options": [
+      {
+        "key": "A",
+        "text": "为东亚文字提供注音或解释，通常与 <ruby> 标签配合使用"
+      },
+      {
+        "key": "B",
+        "text": "定义文档中的 ruby 注释容器，用于包裹需要注音的文字"
+      },
+      {
+        "key": "C",
+        "text": "表示一段预格式化文本，保留空格和换行"
+      },
+      {
+        "key": "D",
+        "text": "定义文本的方向性，用于从右到左书写的语言"
+      }
+    ],
+    "answer": "A",
+    "explanation": "<rt> 标签用于为东亚文字（如中文、日文）提供注音或解释，通常作为 <ruby> 的子元素出现，显示在基础文字的上方或右侧。选项 B 描述的是 <ruby> 标签的作用；选项 C 是 <pre> 标签的功能；选项 D 是 <bdi> 或 dir 属性的作用。因此正确答案是 A。",
+    "difficulty": "basic",
+    "essentiality": "nice_to_know",
+    "language": "html"
+  },
+  {
+    "source_title": "精确获取页面元素位置的方式有哪些？",
+    "kind": "single",
+    "stem": "在浏览器中，要精确获取一个元素相对于视口的位置，最常用的方法是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "使用 element.getBoundingClientRect() 方法"
+      },
+      {
+        "key": "B",
+        "text": "使用 element.offsetTop 和 element.offsetLeft 属性"
+      },
+      {
+        "key": "C",
+        "text": "使用 element.clientWidth 和 element.clientHeight 属性"
+      },
+      {
+        "key": "D",
+        "text": "使用 element.scrollTop 和 element.scrollLeft 属性"
+      }
+    ],
+    "answer": "A",
+    "explanation": "getBoundingClientRect() 返回元素相对于视口的位置信息，包括 top、right、bottom、left、width、height 等，精度较高且考虑滚动和变换。offsetTop/offsetLeft 是相对于定位父元素的位置，不是视口；clientWidth/clientHeight 是元素内部尺寸；scrollTop/scrollLeft 是滚动偏移量。因此 A 是最精确获取视口位置的方式。",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "language": "html"
+  },
+  {
+    "source_title": "html标签中的lang属性有什么作用？",
+    "kind": "single",
+    "stem": "HTML 标签中的 lang 属性的主要作用是什么？",
+    "options": [
+      {
+        "key": "A",
+        "text": "指定元素内容的自然语言，辅助屏幕阅读器、搜索引擎和浏览器进行语言处理"
+      },
+      {
+        "key": "B",
+        "text": "设置元素内文字的字体样式，确保使用正确的语言字体"
+      },
+      {
+        "key": "C",
+        "text": "声明文档的字符编码，确保浏览器正确解析文字"
+      },
+      {
+        "key": "D",
+        "text": "控制元素文本的书写方向，如从左到右或从右到左"
+      }
+    ],
+    "answer": "A",
+    "explanation": "lang 属性用于声明元素内容的自然语言（如 en、zh-CN），帮助屏幕阅读器选择正确的发音、搜索引擎识别语言、浏览器进行拼写检查等。选项 B 错误，字体样式由 CSS 控制；选项 C 错误，字符编码由 <meta charset> 声明；选项 D 错误，书写方向由 dir 属性控制。因此正确答案是 A。",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "html"
+  },
+  {
+    "source_title": "请解释下Sass中的嵌套规则是什么？",
+    "kind": "single",
+    "stem": "Sass 中的嵌套规则允许你做什么？",
+    "options": [
+      {
+        "key": "A",
+        "text": "将选择器嵌套在其他选择器内部，生成对应的后代选择器 CSS"
+      },
+      {
+        "key": "B",
+        "text": "在 CSS 规则内部直接编写 JavaScript 逻辑"
+      },
+      {
+        "key": "C",
+        "text": "将多个 CSS 文件合并为一个文件"
+      },
+      {
+        "key": "D",
+        "text": "定义可复用的变量和混合宏"
+      }
+    ],
+    "answer": "A",
+    "explanation": "Sass 的嵌套规则允许将子选择器写在父选择器内部，编译后会生成后代选择器（如 .parent .child），使样式结构更清晰。选项 B 错误，Sass 是 CSS 预处理器，不执行 JavaScript；选项 C 是 @import 的功能；选项 D 是变量和 mixin 的功能。因此正确答案是 A。",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "css"
+  },
+  {
+    "source_title": "CSS3中的transition是否可以过渡opacity和display？",
+    "kind": "single",
+    "stem": "关于 CSS3 transition 对 opacity 和 display 的过渡效果，以下说法正确的是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "opacity 和 display 都可以被 transition 平滑过渡"
+      },
+      {
+        "key": "B",
+        "text": "opacity 可以被 transition 过渡，display 不能被 transition 过渡"
+      },
+      {
+        "key": "C",
+        "text": "display 可以被 transition 过渡，opacity 不能被 transition 过渡"
+      },
+      {
+        "key": "D",
+        "text": "opacity 和 display 都不能被 transition 过渡"
+      }
+    ],
+    "answer": "B",
+    "explanation": "opacity 是数值型属性，属于可插值的动画属性，因此 transition 可以对其做平滑过渡。display 是离散型属性，其值（如 none 与 block）之间没有中间插值状态，所以 transition 不会产生渐变效果；常见做法是配合 visibility 或使用 @starting-style 等技巧实现显隐动画。因此 B 正确，A、C、D 均错误。",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "css"
+  },
+  {
+    "source_title": "在Sass中Mixin有什么应用场景？",
+    "kind": "single",
+    "stem": "在 Sass 中，Mixin 最典型的应用场景是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "定义一组可复用的样式声明，并可通过参数传入不同值"
+      },
+      {
+        "key": "B",
+        "text": "定义变量并保存颜色、字体等常量值"
+      },
+      {
+        "key": "C",
+        "text": "通过继承选择器来复用已有样式规则"
+      },
+      {
+        "key": "D",
+        "text": "在样式表中执行条件判断和循环控制"
+      }
+    ],
+    "answer": "A",
+    "explanation": "Mixin 用于封装一组可复用的样式声明，并支持参数和默认值，适合处理需要传入不同值的重复样式（如圆角、阴影、媒体查询等）。B 是变量的用途；C 是 @extend 的用途；D 是控制指令（@if、@for 等）的用途。因此 A 正确。",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "css"
+  },
+  {
+    "source_title": "相邻兄弟选择器、后代选择器和子选择器三者有什么区别？",
+    "kind": "single",
+    "stem": "关于 CSS 中相邻兄弟选择器（+）、后代选择器（空格）和子选择器（>）的区别，以下说法正确的是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "相邻兄弟选择器匹配同一父元素下紧邻的后一个兄弟元素；后代选择器匹配所有层级的后代元素；子选择器只匹配直接子元素"
+      },
+      {
+        "key": "B",
+        "text": "相邻兄弟选择器匹配同一父元素下所有兄弟元素；后代选择器匹配直接子元素；子选择器匹配所有层级的后代元素"
+      },
+      {
+        "key": "C",
+        "text": "相邻兄弟选择器匹配前一个兄弟元素；后代选择器匹配直接子元素；子选择器匹配所有层级的后代元素"
+      },
+      {
+        "key": "D",
+        "text": "相邻兄弟选择器匹配所有相邻元素；后代选择器匹配所有层级的后代元素；子选择器匹配直接子元素"
+      }
+    ],
+    "answer": "A",
+    "explanation": "相邻兄弟选择器（+）只匹配紧跟在指定元素后的一个同级兄弟元素；后代选择器（空格）匹配指定元素内部任意层级的后代元素；子选择器（>）只匹配指定元素的直接子元素。B 把相邻兄弟说成所有兄弟、把后代和子选择器说反；C 说成前一个兄弟且混淆后代与子选择器；D 说成所有相邻元素。因此 A 正确。",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "css"
+  },
+  {
+    "source_title": "说下background-color:transparent和opacity:0的区别是什么？",
+    "kind": "single",
+    "stem": "关于 background-color: transparent 和 opacity: 0 的区别，以下说法正确的是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "两者都只让背景透明，元素内容仍然可见"
+      },
+      {
+        "key": "B",
+        "text": "background-color: transparent 只让背景透明，元素内容仍可见；opacity: 0 让整个元素（包括内容和背景）完全透明，但元素仍占据布局空间"
+      },
+      {
+        "key": "C",
+        "text": "background-color: transparent 会让整个元素消失且不占布局空间；opacity: 0 只让背景透明"
+      },
+      {
+        "key": "D",
+        "text": "两者都会让元素完全透明且不占据布局空间"
+      }
+    ],
+    "answer": "B",
+    "explanation": "background-color: transparent 仅将背景色设为透明，元素的内容、边框等仍然可见；opacity: 0 则使整个元素（包括背景、内容、边框）完全透明，但元素仍参与布局并占据空间。A 错误，因为 opacity: 0 会让内容也透明；C 错误，因为 background-color: transparent 不会让元素消失，opacity: 0 也不只影响背景；D 错误，因为两者都不会让元素脱离布局。因此 B 正确。",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "css"
+  },
+  {
+    "source_title": "在页面中的应该使用奇数还是偶数的字体？为什么呢？",
+    "kind": "single",
+    "stem": "在网页设计中，关于正文字体大小的选择，以下哪种说法是常见的最佳实践？",
+    "options": [
+      {
+        "key": "A",
+        "text": "使用偶数像素值，因为偶数能被2整除，渲染更清晰"
+      },
+      {
+        "key": "B",
+        "text": "使用奇数像素值，因为奇数在视网膜屏幕上显示更锐利"
+      },
+      {
+        "key": "C",
+        "text": "使用偶数像素值，因为浏览器默认字体大小是偶数"
+      },
+      {
+        "key": "D",
+        "text": "字体大小应优先使用相对单位（如rem、em），而非纠结奇偶像素值"
+      }
+    ],
+    "answer": "D",
+    "explanation": "现代网页设计推荐使用相对单位（如rem、em）来设置字体大小，以实现更好的可访问性和响应式布局。奇偶像素值并无科学依据影响渲染清晰度或屏幕显示效果，浏览器默认字体大小也非固定偶数。因此D是正确实践，其他选项均为常见误解。",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "css"
+  },
+  {
+    "source_title": "img标签是行内元素，为什么却能设置宽高？",
+    "kind": "single",
+    "stem": "img标签在HTML中默认是行内元素，但它可以设置width和height属性，主要原因是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "img是替换元素，具有内在尺寸，因此可以设置宽高"
+      },
+      {
+        "key": "B",
+        "text": "img实际上是行内块元素，浏览器默认将其display设为inline-block"
+      },
+      {
+        "key": "C",
+        "text": "img的宽高设置是通过CSS的transform缩放实现的"
+      },
+      {
+        "key": "D",
+        "text": "img是行内元素，但HTML规范允许行内元素设置宽高"
+      }
+    ],
+    "answer": "A",
+    "explanation": "img属于替换元素（replaced element），其内容由外部资源决定，具有内在尺寸（intrinsic dimensions），因此可以设置width和height。行内元素通常无法设置宽高，但替换元素例外。B错误，img默认display为inline；C错误，宽高直接生效而非transform；D错误，行内元素一般不能设置宽高。",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "language": "css"
+  },
+  {
+    "source_title": "哈希表的原理是什么？",
+    "kind": "single",
+    "stem": "哈希表（Hash Table）实现快速查找的核心原理是什么？",
+    "options": [
+      {
+        "key": "A",
+        "text": "通过哈希函数将键映射到数组索引，实现平均O(1)时间复杂度的查找"
+      },
+      {
+        "key": "B",
+        "text": "通过将键排序后使用二分查找，实现O(log n)时间复杂度的查找"
+      },
+      {
+        "key": "C",
+        "text": "通过构建平衡二叉搜索树，实现O(log n)时间复杂度的查找"
+      },
+      {
+        "key": "D",
+        "text": "通过遍历所有键进行线性比较，实现O(n)时间复杂度的查找"
+      }
+    ],
+    "answer": "A",
+    "explanation": "哈希表使用哈希函数将键映射到数组中的位置，理想情况下每个键对应唯一索引，从而平均O(1)时间完成插入、删除和查找。B描述的是排序数组加二分查找；C描述的是平衡树；D是线性查找。三者均不是哈希表的原理。",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "js"
+  },
+  {
+    "source_title": "getElementById和querySelector方法的区别是什么？",
+    "kind": "single",
+    "stem": "关于document.getElementById和document.querySelector方法的区别，以下说法正确的是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "getElementById只能通过id查找，返回元素；querySelector接受CSS选择器，返回第一个匹配元素"
+      },
+      {
+        "key": "B",
+        "text": "getElementById返回所有匹配id的元素集合，querySelector返回第一个匹配元素"
+      },
+      {
+        "key": "C",
+        "text": "getElementById和querySelector都只能通过id查找，但querySelector性能更好"
+      },
+      {
+        "key": "D",
+        "text": "getElementById返回第一个匹配元素，querySelector返回所有匹配元素集合"
+      }
+    ],
+    "answer": "A",
+    "explanation": "getElementById专门用于通过id属性查找单个元素，返回Element或null；querySelector接受任意CSS选择器，返回文档中第一个匹配的元素。B错误，getElementById返回单个元素；C错误，querySelector支持多种选择器；D错误，querySelector返回第一个匹配元素而非集合。",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "js"
+  },
+  {
+    "source_title": "请举例说明JSON.stringify()有哪些特性？",
+    "kind": "single",
+    "stem": "关于 JSON.stringify() 的行为，下列哪一项描述是正确的？",
+    "options": [
+      {
+        "key": "A",
+        "text": "对象中值为 undefined 的属性在序列化时会被直接忽略"
+      },
+      {
+        "key": "B",
+        "text": "对象中值为 undefined 的属性会被序列化为 null"
+      },
+      {
+        "key": "C",
+        "text": "对象中值为 undefined 的属性会抛出 TypeError"
+      },
+      {
+        "key": "D",
+        "text": "对象中值为 undefined 的属性会被序列化为字符串 \"undefined\""
+      }
+    ],
+    "answer": "A",
+    "explanation": "JSON.stringify() 序列化对象时，值为 undefined 的属性会被跳过，不会出现在结果字符串中；若 undefined 出现在数组中则会被转成 null。B 项混淆了数组与对象的行为，C、D 项均不符合规范。",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "language": "js"
+  },
+  {
+    "source_title": "module、export、import分别有什么作用？",
+    "kind": "single",
+    "stem": "在 ES Module 中，module、export、import 三个关键字/对象的作用，下列哪项描述是正确的？",
+    "options": [
+      {
+        "key": "A",
+        "text": "module 是 ES Module 规范中用于声明模块的必需关键字"
+      },
+      {
+        "key": "B",
+        "text": "export 用于导出模块成员，import 用于导入其他模块导出的成员"
+      },
+      {
+        "key": "C",
+        "text": "import 用于导出模块成员，export 用于导入其他模块导出的成员"
+      },
+      {
+        "key": "D",
+        "text": "module、export、import 三者都只能用于 Node.js 的 CommonJS 模块"
+      }
+    ],
+    "answer": "B",
+    "explanation": "ES Module 使用 export 导出变量、函数或类，使用 import 导入其他模块的导出成员；module 并不是 ES Module 的关键字（CommonJS 中才有 module.exports）。A 项误把 module 当作 ES Module 关键字，C 项方向颠倒，D 项混淆了模块体系。",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "js"
+  },
+  {
+    "source_title": "let和const的区别是什么",
+    "kind": "single",
+    "stem": "关于 let 和 const 声明变量的区别，下列哪项描述是正确的？",
+    "options": [
+      {
+        "key": "A",
+        "text": "let 声明的变量必须初始化，const 声明的变量可以不初始化"
+      },
+      {
+        "key": "B",
+        "text": "const 声明的变量必须在声明时初始化，且之后不能重新赋值"
+      },
+      {
+        "key": "C",
+        "text": "let 声明的变量不能重新赋值，const 声明的变量可以重新赋值"
+      },
+      {
+        "key": "D",
+        "text": "let 和 const 都支持变量提升并在声明前访问"
+      }
+    ],
+    "answer": "B",
+    "explanation": "const 声明时必须初始化，且绑定不可重新赋值（但对象内部属性仍可修改）；let 声明可以不初始化，之后可以重新赋值。A、C 项把两者特性说反，D 项错误：let/const 存在暂时性死区，声明前访问会报错。",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "js"
+  },
+  {
+    "source_title": "什么是散列函数？它有什么特征？",
+    "kind": "single",
+    "stem": "关于散列函数（哈希函数）的特征，下列哪项描述是正确的？",
+    "options": [
+      {
+        "key": "A",
+        "text": "散列函数必须保证不同输入一定得到不同输出"
+      },
+      {
+        "key": "B",
+        "text": "散列函数可以把任意长度的输入映射为固定长度的输出"
+      },
+      {
+        "key": "C",
+        "text": "散列函数的输出长度会随输入长度增加而增加"
+      },
+      {
+        "key": "D",
+        "text": "散列函数必须可逆，能够从散列值还原原始输入"
+      }
+    ],
+    "answer": "B",
+    "explanation": "散列函数将任意长度的输入映射为固定长度的输出，且同一输入结果稳定；不同输入可能产生相同散列值（哈希冲突），因此 A 项“一定不同”错误；输出长度固定，C 项错误；散列函数通常不可逆，D 项错误。",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "js"
+  }
+]

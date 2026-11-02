@@ -256,3 +256,65 @@ def test_generated_bank_has_no_ai_placeholder(bank_rows: list[dict[str, Any]]) -
         prompt = str(row["prompt"])
         for marker in markers:
             assert marker not in prompt, f"{row['id']} 题干含占位文案 {marker!r}"
+
+
+# ---------------------------------------------------------------------------
+# r12 · 题库素材合并（260 → 779）—— **只追加**，上面 r11 的断言一字不改
+#
+# 为什么零处改基数：r11 的题量类断言全部收敛在「前缀子集」（`fe-/be-/al-/cs-` 存量 +
+# 九个语言前缀）或按 `len(bank_rows)` 动态推导，本批新前缀（`tiji-` / `l100-` / `iq380-` /
+# `fei-`）不在任何前缀集合里，因此合并后 r11 的配额断言照旧成立（TECH-CHANGE §5「0 处需改」）。
+# 这里只加三条**新口径**：来源枚举与计数、合并后总量、通用方向恒空 language。
+# ---------------------------------------------------------------------------
+
+#: r12 新增来源闭集（与 `question_merge.SOURCES` 同一口径；门禁是唯一断言点故写字面量）。
+R12_SOURCES = ("tiji", "local100", "iq380", "fe-interview")
+#: 每来源条数：`seed` 是存量 260 行（种子不写 `source`，读侧缺省 `'seed'`）。
+R12_SOURCE_COUNTS = {
+    "seed": 260,
+    "tiji": 20,
+    "local100": 100,
+    "iq380": 379,
+    "fe-interview": 20,
+}
+#: 合并后总量（= 存量 260 + 本批 519）。
+R12_TOTAL = 779
+
+
+def test_r12_source_enum_and_per_source_counts(bank_rows: list[dict[str, Any]]) -> None:
+    """r12：来源只允许「存量缺省 seed + 本批 4 个」，且每来源条数与素材一一对应。"""
+    counts = Counter(str(row.get("source") or "seed") for row in bank_rows)
+    assert dict(counts) == R12_SOURCE_COUNTS, f"来源分布不符：{dict(counts)}"
+    assert set(counts) <= {"seed", *R12_SOURCES}, "出现了未登记的来源"
+    for row in bank_rows:
+        source = str(row.get("source") or "seed")
+        if source == "seed":
+            assert str(row["id"]).startswith(LEGACY_PREFIXES + tuple(NEW_ID_LANGUAGE)), (
+                f"{row['id']} 缺 source 却不是 r11 已知前缀：来源不明（可能是合并时漏写）"
+            )
+
+
+def test_r12_total_after_merge_is_779(bank_rows: list[dict[str, Any]]) -> None:
+    """r12：合并后总量恰 779（260 存量 + 519 新增），且 519 道全是客观题。"""
+    assert len(bank_rows) == R12_TOTAL, f"题库总量 {len(bank_rows)} ≠ {R12_TOTAL}"
+    merged = [row for row in bank_rows if str(row.get("source") or "") in R12_SOURCES]
+    assert len(merged) == R12_TOTAL - R12_SOURCE_COUNTS["seed"]
+    assert all(str(row["kind"]) in rules.OBJECTIVE_KINDS for row in merged), (
+        "本批素材全为客观题，出现 text 说明归一化越界放行了"
+    )
+    assert len(_new_rows(bank_rows)) == len(NEW_ID_LANGUAGE) * LANGUAGE_QUOTA, (
+        "r11 的 180 道语言题不得被合并逻辑吞掉（id 前缀判定口径不变）"
+    )
+
+
+def test_r12_generic_directions_stay_language_free(bank_rows: list[dict[str, Any]]) -> None:
+    """r12：算法与数据结构 / 计算机基础 恒 `language == ""`（方向纠正不得把语言引进来）。"""
+    language_directions = set(rules.LANGUAGE_DIRECTION.values())
+    generic = [name for name in rules.DIRECTIONS if name not in language_directions]
+    assert generic, "通用方向必须由 rules 派生，不得在此另写一份"
+    for direction in generic:
+        rows = [row for row in bank_rows if str(row["direction"]) == direction]
+        assert len(rows) >= MIN_GENERIC_PER_DIRECTION, f"{direction} 题量 {len(rows)} < 20"
+        offenders = [row["id"] for row in rows if str(row.get("language") or "")]
+        assert not offenders, f"{direction} 应恒为通用题（language 空串），越界：{offenders}"
+

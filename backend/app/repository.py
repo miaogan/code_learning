@@ -10,9 +10,12 @@
 
 import json
 import sqlite3
+from collections.abc import Sequence
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
+from .config import get_settings
 from .db import connection
 from .schemas import Profile, Report, ResumeMeta, TimelineEvent
 
@@ -429,6 +432,42 @@ def count_questions() -> int:
     with connection() as conn:
         row = conn.execute("SELECT COUNT(*) AS total FROM questions").fetchone()
     return 0 if row is None else int(row["total"])
+
+
+#: r12 整源剔除的唯一删除口径（占位符按来源个数拼，SQL 骨架仍是常量）：
+#: 按 `source` 删而不是按 id 前缀 / 逐条 id —— 存量 260 行是 `'seed'`，永远不会被误伤；
+#: 没跑过 `question_merge --write` 的库删 0 行，天然幂等。
+_QUESTION_DELETE_BY_SOURCE = "DELETE FROM questions WHERE source IN ({placeholders})"
+
+
+class DatabaseNotInitialized(RuntimeError):
+    """库文件不存在 / 为 0 字节（尚未 `init_db()`）：离线运维命令无从执行，由调用方翻中文提示。"""
+
+
+def _db_file() -> Path:
+    """库文件落点：唯一来源 `config.db_path`，与 `db.connection()` 同一口径。"""
+    return Path(get_settings().db_path)
+
+
+def delete_questions_by_source(sources: Sequence[str]) -> int:
+    """按来源批量删除题库行，返回实际删除条数（幂等：再跑一次删 0 行）。
+
+    `source` 的写入点只有离线工具 `question_merge`（存量行不写，读侧缺省 `'seed'`），
+    读取点只有 `question_bank._row_of()`；离线工具不自己写 SQL 是因为
+    `tests/test_engineering_gates.py::test_sql_only_through_repository` 把本文件定为唯一出口。
+    空输入直接返回 0（不打扰库、也不生成非法占位符）；库还没建好时抛
+    `DatabaseNotInitialized`，而不是让 `sqlite3.connect()` 顺手留下一个 0 字节文件。
+    """
+    unique = list(dict.fromkeys(str(source) for source in sources if str(source)))
+    if not unique:
+        return 0
+    db_file = _db_file()
+    if not db_file.is_file() or db_file.stat().st_size == 0:
+        raise DatabaseNotInitialized(f"库 {db_file.name} 不存在或为 0 字节（尚未初始化）")
+    placeholders = ", ".join("?" for _ in unique)
+    with connection() as conn:
+        cursor = conn.execute(_QUESTION_DELETE_BY_SOURCE.format(placeholders=placeholders), unique)
+    return max(cursor.rowcount, 0)
 
 
 _ATTEMPT_INSERT = (
