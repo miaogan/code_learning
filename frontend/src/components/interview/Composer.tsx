@@ -55,9 +55,13 @@ export function Composer({
     }
   }
 
+  // 字数计数与上限提示（r5 O-2）：`maxLength` 会静默截断，必须让用户看得到「已写多少 / 上限多少」。
+  const chars = value.length
   const metaText = readonly
     ? '本场面试已结束 · 仅供回看'
-    : `Ctrl/Cmd + Enter 提交 · 已用 ${seconds}s`
+    : `Ctrl/Cmd + Enter 提交 · 已用 ${seconds}s · ${chars}/${MAX_ANSWER_CHARS} 字${
+        chars >= MAX_ANSWER_CHARS ? '（已达上限）' : ''
+      }`
 
   return (
     <div className={`sc-iq-composer${readonly ? ' is-readonly' : ''}`}>

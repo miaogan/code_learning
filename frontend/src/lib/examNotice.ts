@@ -11,6 +11,26 @@
  * （L6 全库兜底时尤其不能说谎）；旧 payload / 刷新后的会话缺该字段也走这条静默路径。
  */
 export function filteredNotice(count: number | null | undefined): string | null {
-  if (typeof count !== 'number' || !Number.isFinite(count) || count <= 0) return null
+  if (!isPositiveCount(count)) return null
   return `本次已过滤 ${count} 道你已熟练掌握的题`
+}
+
+/** 正数判定：`filteredNotice` 与 `proficiencyRuleHint` 共用同一静默口径（含 `NaN` / `±Infinity`）。 */
+function isPositiveCount(count: number | null | undefined): count is number {
+  return typeof count === 'number' && Number.isFinite(count) && count > 0
+}
+
+/**
+ * 熟练过滤的**规则说明**（r6 D-7 / D-9 收口，2026-11-02 · r19）：解释「为什么被过滤、怎样回流」，
+ * 以及「为什么卷面里仍会出现已熟练的题」（兜底会为保持卷面结构把个别熟练题放回）。
+ *
+ * 只与 `filteredNotice` 同一开关：`N <= 0` / 缺失时返回 `null`，调用方不挂载节点——
+ * L6 全库兜底时不能凭空解释一条不存在的过滤事实。
+ *
+ * **不写具体阈值**（30 天 / 答对 2 次 / 近 3 卷只住在后端 `config.Settings`）：前端硬编码数字
+ * 会在阈值调整后变成假话；这里只描述规则方向，数字以服务端行为为准。
+ */
+export function proficiencyRuleHint(count: number | null | undefined): string | null {
+  if (!isPositiveCount(count)) return null
+  return '近期多次答对的题会暂时跳过，不再算作熟练后自动回流；个别熟练题可能因卷面结构重新出现'
 }

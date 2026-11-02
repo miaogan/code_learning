@@ -350,6 +350,7 @@ export default function InterviewPage() {
   } else {
     content = (
       <div className="sc-iq-col">
+        <p className="sc-iq-meta">本场尚未开始 · 配置后开始对话</p>
         <InterviewSetupForm
           draft={draft}
           sources={sources}

@@ -115,14 +115,25 @@ export function languageChips(): { value: PracticeLanguageFilter; label: string 
   ]
 }
 
-/** 方向 chip 组：四方向 + 全部（方向闭集与后端 `rules.DIRECTIONS` 同源）。 */
+/**
+ * 方向闭集与展示顺序（与后端 `rules.DIRECTIONS` 同源，类型取契约镜像）。
+ * `satisfies Record<...>` 是编译期门禁：契约新增方向而此处漏项即 typecheck 红，
+ * 不会出现「新方向静默缺 chip」。
+ */
+const DIRECTION_LABEL = {
+  前端: '前端',
+  后端: '后端',
+  算法与数据结构: '算法与数据结构',
+  计算机基础: '计算机基础',
+} satisfies Record<Exclude<PracticeDirectionFilter, 'all'>, string>
+
+/** 方向 chip 组：四方向 + 全部（唯一来源是 `DIRECTION_LABEL`，不在函数内重复字面量）。 */
 export function directionChips(): { value: PracticeDirectionFilter; label: string }[] {
   return [
     { value: 'all', label: '全部' },
-    { value: '前端', label: '前端' },
-    { value: '后端', label: '后端' },
-    { value: '算法与数据结构', label: '算法与数据结构' },
-    { value: '计算机基础', label: '计算机基础' },
+    ...(Object.keys(DIRECTION_LABEL) as Exclude<PracticeDirectionFilter, 'all'>[]).map(
+      (direction) => ({ value: direction, label: DIRECTION_LABEL[direction] }),
+    ),
   ]
 }
 

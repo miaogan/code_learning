@@ -11,7 +11,7 @@ import { EmptyState } from '../components/ui/EmptyState'
 import { InlineError } from '../components/ui/InlineError'
 import { PhaseLoader } from '../components/ui/PhaseLoader'
 import { RingProgress } from '../components/ui/RingProgress'
-import { filteredNotice } from '../lib/examNotice'
+import { filteredNotice, proficiencyRuleHint } from '../lib/examNotice'
 import { formatElapsed } from '../lib/format'
 import { useAsync } from '../lib/useAsync'
 
@@ -98,6 +98,8 @@ export default function ExamPage() {
    * 只在 `lib/examNotice.ts` 一处定义，本页只取结果、**不再比较/改写**。
    */
   const notice = run ? filteredNotice(run.filtered_count) : null
+  /** D-7 / D-9：与 notice 同一开关的规则说明（N=0 时同样不挂载）。 */
+  const noticeHint = run ? proficiencyRuleHint(run.filtered_count) : null
 
   const startExam = async () => {
     if (!profile) return
@@ -247,6 +249,7 @@ export default function ExamPage() {
               <Chip label="熟练过滤" />
               {' '}
               <span>{notice}</span>
+              {noticeHint ? <span>{`· ${noticeHint}`}</span> : null}
             </span>
           ) : null}
 
@@ -326,6 +329,15 @@ export default function ExamPage() {
       {view === 'submitted' && run && result ? (
         <>
           <ExamResultPanel result={result} questions={run.questions} />
+
+          {/* D-8：复核时回看本卷的过滤事实（只复显事实，不回放规则说明，避免抢走 40px 总分的焦点）。 */}
+          {notice ? (
+            <span className="sc-meta-line">
+              <Chip label="熟练过滤" />
+              {' '}
+              <span>{notice}</span>
+            </span>
+          ) : null}
 
           {run.questions.map((question, slot) => (
             <ExamQuestionCard

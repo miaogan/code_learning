@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { filteredNotice } from '../lib/examNotice'
+import { filteredNotice, proficiencyRuleHint } from '../lib/examNotice'
 
 /**
  * AC-12：`filtered_count` 的一行透明度文案。
@@ -41,5 +41,34 @@ describe('filteredNotice', () => {
     for (const count of [2, 7, 12]) {
       expect(filteredNotice(count)).toBe(`本次已过滤 ${count}${suffix}`)
     }
+  })
+})
+
+/**
+ * r6 D-7 / D-9：过滤规则说明（r19）。
+ * 断言语义：只在信息行已挂载（N>0）时给出；文案必须同时回答「为什么被过滤 / 怎样回流」
+ * 与「为什么卷面里仍会出现熟练题」，且**不得写死阈值**（阈值只住后端 `config.Settings`）。
+ */
+describe('proficiencyRuleHint', () => {
+  it('正数：返回规则说明，含「回流」与「卷面结构」两个归因', () => {
+    const hint = proficiencyRuleHint(3)
+    expect(hint).toBe(
+      '近期多次答对的题会暂时跳过，不再算作熟练后自动回流；个别熟练题可能因卷面结构重新出现',
+    )
+    expect(hint).toContain('回流')
+    expect(hint).toContain('卷面结构')
+  })
+
+  it('与 filteredNotice 同一静默口径：0 / 负数 / 缺失 / 非有限数一律 null', () => {
+    expect(proficiencyRuleHint(0)).toBeNull()
+    expect(proficiencyRuleHint(-3)).toBeNull()
+    expect(proficiencyRuleHint(null)).toBeNull()
+    expect(proficiencyRuleHint(undefined)).toBeNull()
+    expect(proficiencyRuleHint(Number.NaN)).toBeNull()
+    expect(proficiencyRuleHint(Number.POSITIVE_INFINITY)).toBeNull()
+  })
+
+  it('不写死阈值（不含数字）：避免前端副本与后端可调配置漂移', () => {
+    expect(proficiencyRuleHint(80)).not.toMatch(/\d/)
   })
 })

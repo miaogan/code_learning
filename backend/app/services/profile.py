@@ -147,8 +147,7 @@ def _summary_payload(summary: ProfileMergeSummary) -> dict[str, Any]:
 def _with_summary(profile: Profile, summary: ProfileMergeSummary) -> ProfileWithMerge:
     """组装响应：画像本体 + 一次性 `merge_summary`（不落库、不进 GET 契约）。"""
     payload = profile.model_dump()
-    if "merge_summary" in getattr(ProfileWithMerge, "model_fields", {}):
-        payload["merge_summary"] = _summary_payload(summary)
+    payload["merge_summary"] = _summary_payload(summary)
     return ProfileWithMerge.model_validate(payload)
 
 

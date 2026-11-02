@@ -99,6 +99,8 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
 | `src/components/ui/*` | 通用件（无业务语义） | 只接 props，不 import `api` |
 | `src/pages/*` | 页面装配、状态机（idle/loading/error/empty/success） | 只经 `api/client.ts` 取数 |
 | `src/lib/format.ts` | 数值/时长/字数格式化，保证 mono + tabular | 分数永远 ≤3 字符（DESIGN §0.7 第 2 条） |
+| `src/lib/practice.ts` | 练习页业务文案与纯逻辑唯一出处；方向 chip 由 `DIRECTION_LABEL` 派生 | `satisfies Record<Exclude<PracticeDirectionFilter,'all'>, string>`，新增方向漏项即 typecheck 红 |
+| `src/components/exam/PromptBody.tsx` | 题面围栏（代码块/表格）渲染唯一出口 | 题卡与错题本共用，禁止各自解析 |
 
 ### 3.2 后端模块
 
@@ -176,6 +178,41 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
 - `settings`（4 项：`target_role` / `years_experience` / `market` / `company_size`）**只进 payload、绝不写回 `profiles`**（临时设定不污染长期资产）；每轮提示词由 `rules.py` 纯映射注入。
 - `status` 不进 payload —— 权威在 `runs.status`（`running` / `completed`）。
 - 向后兼容：旧 payload 缺 `settings`/`parent_id`/`plan`/`current_id` 逐字段降级（`null` / `null` / `[]` / 首个未答 id）；历史与报告投影读不到设定 → `interview_settings: null`，前端显示「未记录设定」。
+
+#### 3.4.2 题库 id 前缀与 `source` 口径（r16 定稿）
+
+外部素材（`docs/question-bank-staging/`）并入 seed 时，id 由 `question_merge.ID_PREFIX` 按「来源 + 源内原序（1 起，`%03d`）」生成；
+**四前缀与来源一一对应、不得改名**（改名会让 `--rollback` 与已部署库的既有行分叉）：
+
+| `source` | 种子 id 前缀 | 示例 | 素材 | 许可留痕 |
+| --- | --- | --- | --- | --- |
+| `tiji` | `tiji-` | `tiji-001` | `01-题集20.json`（20 道） | 自建，见 `PROVENANCE.md` |
+| `local100` | `l100-` | `l100-001` | `02-本地100题.json`（100 道） | 自建，见 `PROVENANCE.md` |
+| `iq380` | `iq380-` | `iq380-001` | `03-七方向379题.json`（379 道） | 自建，见 `PROVENANCE.md` |
+| `fe-interview` | `fei-` | `fei-001` | `04-fe-interview20.json`（20 道，MIT） | `NOTICE-fe-interview.md` |
+
+- `iq380-` **刻意不用 `iq-`**：面试发言 id 同为 `iq-{序号}`（`runs.payload.questions[].id`），同名不同域，
+  数据不撞但 grep / 日志会混淆，故加宽前缀。
+- 存量 260 道不写 `source`（读侧缺省 `seed`）；`source` 进种子与 `questions` 列，**不进 HTTP 契约**（`schemas.py` / `types.ts` 零改动）。
+- 素材留痕统一在 `docs/question-bank-staging/`：自建三源看 `PROVENANCE.md`，MIT 源看 `NOTICE-fe-interview.md`。
+- **历史笔误更正**：`docs/teamflow/20261102-r12-question-bank-merge/TECH-CHANGE.md` §3.2 写 `iq-NNN`，与实现（`iq380-`）不符；
+  r12 任务夹为历史产物不可改，**以实现代码与本表为准**（r16 收口，见 `docs/teamflow/20261102-r16-d4-d6-closure/ACCEPTANCE.md`）。
+
+#### 3.4.3 题库共享口径（练习 vs 笔试，r17 补记）
+
+练习（`/practice`）与笔试（`/exam`）**共用同一个题库**：共享在「数据与判分」层，差异只在「取题与卷面约束」层。
+
+| 层 | 共享 / 刻意不同 | 事实 |
+| --- | --- | --- |
+| 数据源 | 共享 | 两者都读 `questions` 表，唯一导入源是 `backend/app/seed/questions.json`（幂等导入） |
+| 判分 | 共享 | 全库唯一客观题判分函数 `exam.grade_objective()`（集合相等），练习只调用不重写 |
+| 作答记录 | 共享 | 都写 `question_attempts`，`source` 列区分 `exam` / `practice`（`run_id=practice:<session>` 命名空间） |
+| 熟练度 | 共享 | 阈值只在 `config.py`；练习答对同样计入滑动窗口（「练熟即不再考」是有意口径） |
+| 取题池 | 刻意不同 | 练习只收客观题 `kind ∈ {single, multiple, judge}`；笔试还收 `text` |
+| 卷面结构 | 刻意不同 | 笔试受 10–12 题 / 客观 ≥8 / 挑战 ≤20% / 方向 ≥2 的结构闸门与 L1–L6 阶梯；练习无卷面闸门，只有筛选与题量 |
+| 抽样 | 刻意不同 | 笔试从「可考池 − 熟练 − 近 3 卷」抽题；练习按用户筛选直接从池内取，可重复练同一题 |
+
+理由：两者需要同一套「题面 / 答案 / 判分 / 熟练度」事实，但「卷面必须像一场考试」是笔试独有的产品约束；把结构闸门搬进练习会让「按语言筛 20 道」不可达。
 
 ### 3.5 上传解析契约（AC-1）
 
@@ -259,11 +296,14 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
 | 课程清单 25 门 + `/api/courses` | `backend/app/seed/courses.json`、`services/courses.py` |
 | 画像生成（AC-2 端到端） | `services/profile.py`、`routers/profile.py`（生成 / 读取 / 逐条编辑）、`pages/ProfilePage.tsx` 五维卡 + 溯源 |
 | 双测评（AC-3/AC-4 端到端） | `services/{interview,exam}.py`、`routers/{interview,exam}.py`、`pages/{InterviewPage,ExamPage}.tsx` |
+| 面试对话流（r5 · 多轮追问 + 4 项设定） | `services/interview.py`（会话引擎）+ `services/rules.py`（设定闭集 / `experience_band_of` / `is_follow_up_allowed`）+ `routers/interview.py`（3 路由）+ `pages/InterviewPage.tsx` 与 `components/interview/*`（7 态 + 气泡组件） |
+| 题库组卷与选池 | `services/exam_selector.py`（`rank_pool` / `build_paper` / L1–L6 阶梯，结构闸门唯一实现） |
 | 诊断报告 + 课程匹配（AC-5/AC-6） | `services/diagnosis.py`、`routers/report.py`（含 `GET /markdown`）、`pages/ReportPage.tsx` |
 | 历史与趋势（AC-9/AC-10） | `services/history.py`、`routers/history.py`、`pages/HistoryPage.tsx`；r3 起含长期记忆聚合 |
-| 题库种子 779 道（r12 起） | `backend/app/seed/questions.json`（r6 起退为**唯一导入源**，运行时由 `questions` 表承载；r11 起每次启动幂等导入，r14 起启动同时覆写既有行差异） |
+| 题库种子 779 道（r12 起） | `backend/app/seed/questions.json`（r6 起退为**唯一导入源**，运行时由 `questions` 表承载；r11 起每次启动幂等导入，r14 起启动同时覆写既有行差异）；素材输入与留痕在 `docs/question-bank-staging/`（`PROVENANCE.md` + `NOTICE-fe-interview.md`），id 前缀口径见 §3.4.2 |
 | pydantic 契约模型（画像 5 维度 / 题目 / 报告 / 课程） | `backend/app/schemas.py` |
-| 后端测试 13 文件（pytest 零网络） | `backend/tests/*.py` |
+| 后端测试 31 文件（pytest 零网络） | `backend/tests/*.py` |
+| 容器化交付（r10） | `docker-compose.yml`、`backend/Dockerfile`、`frontend/Dockerfile`、`frontend/nginx.conf`、`docker.env.example`、任务夹 `docs/teamflow/20261101-r10-docker-compose-deploy/DEPLOY.md`；`WEB_PORT=8080` 单端口对外、SQLite 落 `skillcoach-data` 卷 |
 | 前端 `package-lock.json` + 已装依赖 | `frontend/package-lock.json`、`frontend/node_modules/` |
 | CI 双 job | `.github/workflows/ci.yml` |
 | AGENTS.md + memory.md + README | 仓库根与 `docs/teamflow/` |
@@ -272,17 +312,26 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
 
 | 项 | 现状 | 归属 |
 | --- | --- | --- |
-| **r5 面试对话流（n=20261101-r5-interview-chat-config）** | 契约 v2 已落盘（`schemas.py` / `types.ts` / `client.ts`：3 条面试路由 + 会话模型）；**会话引擎、7 态页面与 6 个气泡组件、r5 测试套件仍待落地** | T2–T7；最终门禁以 QA 报告为准 |
 | 真实 PDF / DOCX 解析实测 | 代码已写，但本机缺 `pypdf` / `python-docx`，**未用真实文件验证**（单测走 stub） | 装依赖后 |
 | 后端 ruff lint 实跑 | **未执行**：全局 Python 无 `ruff`（`No module named ruff`），后端 lint 由 `tests/test_engineering_gates.py` + 人工复审覆盖 | 验收前补跑 |
 | CI 实跑 | workflow 已写，**未在 GitHub 上真跑过** | 验收前 |
-| Docker 打包 / 一键启动脚本 | 未做（README 为三步手动流程） | 后续 |
 
 ---
 
 ## 8. 下游交接（谁在哪填哪）
 
 - **M1–M5 已全部交付**（画像 / 双测评 / 报告 / 历史与趋势），各里程碑的模块与页面清单见 §7.1；本文件不再保留「待填」交接清单。
-- **r5 面试对话流（进行中）**：`services/interview.py`（会话引擎：`fill_settings` / `calibration_of` / `validate_questions` / `validate_session` / `create_run` / `score_answer` / `load_session`）、`services/rules.py`（4 项配置闭集 + `experience_band_of` + `is_follow_up_allowed`）、`routers/interview.py`（3 路由）、`pages/InterviewPage.tsx` + `components/interview/*`（7 态 + 6 气泡组件）、`RunSummary` / `Report` 投影字段。契约与 payload 不变量见 §3.3 / §3.4.1；完整技术方案见任务夹 `docs/teamflow/20261101-r5-interview-chat-config/TECHNICAL.md`。
+- **r5 面试对话流已交付（2026-11-01）**：`services/interview.py`（`fill_settings` / `calibration_of` / `validate_questions` / `validate_session` / `create_run` / `score_answer` / `load_session`）、`services/rules.py`（4 项设定闭集 + `experience_band_of` + `is_follow_up_allowed`）、`routers/interview.py`（3 路由）、`pages/InterviewPage.tsx` + `components/interview/*`（7 态 + 气泡组件）、`RunSummary` / `Report` 投影字段；契约与 payload 不变量见 §3.3 / §3.4.1，技术方案见任务夹 `docs/teamflow/20261101-r5-interview-chat-config/TECHNICAL.md`。
 - **统一约束（不许破）**：所有新组件复用 `tokens.css`；所有新端点返回 `AppError` envelope 与中文 message；所有改字段同步 `frontend/src/api/types.ts` ↔ `backend/app/schemas.py`；新增尺寸必须回写 DESIGN §0.7 的推导。
-- **统一约束（不许破）**：所有新组件复用 `tokens.css`；所有新端点返回 `AppError` envelope 与中文 message；所有改字段同步 `frontend/src/api/types.ts` ↔ `backend/app/schemas.py`；新增尺寸必须回写 DESIGN §0.7 的推导。
+
+### 8.1 历史任务夹的偏差补记（产物不可改，以实现为准）
+
+任务夹 `docs/teamflow/<yyyyMMdd-rN-slug>/` **建后不可变**；历史文档与实现不一致时，只在本节补记，不回改任务夹。
+
+| 来源 | 历史文档写法 | 实现真相 |
+| --- | --- | --- |
+| r5 `TECHNICAL.md:186` | `is_follow_up_allowed(kind, follow_up_count, total_questions)`（3 参） | `is_follow_up_allowed(kind, follow_up_count, asked, planned_total)`（4 参，`services/rules.py:226`）：r8 起以「不挤占剩余正题轮次」替代「answered+1 ≤ 12」 |
+| r5 `TECHNICAL.md:302` | 调用处同记 3 参 | 同上；调用方 `services/interview.py` 已传 4 参 |
+| r11 `TECHNICAL.md` | 未记 `exam_selector._prefer_kind_diversity()` 与 `PromptBody.tsx` | 二者已落盘：题型覆盖是取题策略（见 `services/exam_selector.py` 模块 docstring）；`components/exam/PromptBody.tsx` 是题面围栏渲染唯一出口（题卡与错题本共用）；练习与笔试的共享口径见 §3.4.3 |
+| r11 `QA-REPORT.md` | 缺 AC-16 要求的「练习 vs 笔试共用同一题库」说明段 | 已按不可变约定补记在 §3.4.3（r17 收口） |
+| r12 `TECH-CHANGE.md` §3.2 | id 前缀写 `iq-NNN` | 实现取 `iq380-`（避开面试发言 `iq-` 域），见 §3.4.2 |
