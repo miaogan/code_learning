@@ -21,6 +21,12 @@ copy .env.example .env                              # macOS/Linux: cp .env.examp
 .venv/Scripts/python -m uvicorn app.main:app --reload --port 8000
 # 探活：curl http://127.0.0.1:8000/health  →  {"status":"ok",...}
 
+# 1.5) 建号（r23：不开放注册，账号由管理员创建，返回一次性初始密码）
+.venv/Scripts/python -m app.admin_cli create-user --email me@example.com --name 我 --mode own
+#   其他管理命令：set-mode（own/shared）、disable（--undo 启用）、reset-password（旧会话立即失效）、list
+#   存量数据（r23 之前的数据都在 user_id='default'）：建号时加 --id default 直接接管，
+#   或对已有账号执行 adopt-default --email me@example.com 把旧数据改挂过去
+
 # 2) 前端（另开终端）
 cd frontend
 npm install
@@ -47,6 +53,7 @@ docker compose ps        # backend 的 STATUS 应带 (healthy)
 ```
 
 - **换端口**：把 `docker.env.example` 复制成仓库根 `.env`，改 `WEB_PORT=8080`，再 `docker compose up -d`。
+- **建号（r23）**：`docker compose exec backend python -m app.admin_cli create-user --email me@example.com --mode own`（容器内执行，数据落在同名卷）。
 - **停止**：`docker compose down`（**保留**数据卷）；`docker compose down -v` 会连数据一起删。
 - **排障与运维**（lmstudio 本地档、备份恢复、502 / 413 / 504 排查）：见 [DEPLOY.md](./docs/teamflow/20261101-r10-docker-compose-deploy/DEPLOY.md)。
 
@@ -84,11 +91,12 @@ backend/    FastAPI + SQLite（app/routers、app/services、app/seed）
 docs/teamflow/   架构总览、产品记忆、每需求一个任务夹
 ```
 
-## 安全边界（AC-8）
+## 安全边界（AC-8 / r23）
 
-- 模型 Key 只出现在 `backend/.env`；前端只有一个可配项 `VITE_API_BASE`，源码与构建产物中检索不到任何 Key。
+- 模型 Key 只出现在 `backend/.env`（内置 Key）；用户自带 Key 以 Fernet 密文存库，接口只回显后 4 位。
 - 上传的简历**不落原文件**，只存抽取后的正文；错误响应不含路径、堆栈与模型端点。
-- 首版单用户、无鉴权，仅建议本地或内网运行。
+- r23 起登录后才能使用：服务端会话 + HttpOnly Cookie（`sc_session`），6 张业务表按 `user_id` 隔离，
+  跨用户按 id 取数一律 404；不开放注册，账号由管理员用 `app.admin_cli` 创建。
 
 ## 验收速览
 

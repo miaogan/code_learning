@@ -411,7 +411,17 @@ def test_style_baseline_append_only() -> None:
     取代 r6 的 `test_style_baseline_untouched`（原断言是「这两个文件不得出现在 git status」，
     与 AC-16 直接互斥）。语义在这里是**更强**而不是更松：新增整段照样通过，但只要出现一行
     删除/修改就立即失败。TECHNICAL r7 §8.2 的升格理由见任务夹。
+
+    r22 例外（任务夹 `docs/teamflow/20261103-r22-mobile-shell/TECH-CHANGE.md` 已列明）：
+    安全区与视口高度必须改写既有声明，`env()` 在无刘海/手势条设备上取 0，计算结果与 r21
+    基线一致；`100dvh` 只作为第二行回退、首行保留原值。仅放行下面这 4 行字面量。
     """
+    r22_allowed = {
+        "-  height: var(--topbar-h);",
+        "-  padding: 0 var(--sp-6);",
+        "-  min-height: calc(100vh - var(--topbar-h));",
+        "-  padding: var(--sp-3);",
+    }
     proc = subprocess.run(
         ["git", "diff", "--unified=0", "--", "frontend/src/styles/tokens.css",
          "frontend/src/styles/base.css"],
@@ -425,7 +435,7 @@ def test_style_baseline_append_only() -> None:
     removed = [
         line
         for line in proc.stdout.splitlines()
-        if line.startswith("-") and not line.startswith("---")
+        if line.startswith("-") and not line.startswith("---") and line not in r22_allowed
     ]
     assert not removed, f"样式基座出现删除/修改行：{removed[:5]}"
 

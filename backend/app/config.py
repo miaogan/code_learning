@@ -64,6 +64,8 @@ _NUMERIC_ENV_FIELDS: tuple[str, ...] = (
     "ai_max_retries",
     "ai_deepseek_timeout_s",
     "ai_lmstudio_timeout_s",
+    "login_max_failures",
+    "login_lockout_minutes",
 )
 
 
@@ -154,6 +156,21 @@ class Settings(BaseSettings):
     db_path: str = "app.db"
     max_upload_mb: int = 10
     cors_origins: str = "http://127.0.0.1:5173,http://localhost:5173"
+
+    # --- r23 登录 / 多用户 / 用户自带 AI Key ---------------------------------
+    #: 会话 Cookie 是否带 `Secure`：开发走 http 时必须 false，生产 https 置 true。
+    cookie_secure: bool = False
+    #: 会话有效期（天）。
+    session_days: int = 30
+    #: 加密用户 API Key 的主密钥（`openssl rand -hex 32`）。为空时禁止保存用户 Key。
+    secret_key: str = ""
+    #: 内置（shared）Key 每用户每日 AI 调用上限。
+    shared_ai_daily_limit: int = 20
+    #: 同一邮箱在窗口期内允许的登录失败次数；达到后锁定 `login_lockout_minutes`。
+    #: 0 = 关闭限流（仅供排障，生产不建议关）。
+    login_max_failures: int = 5
+    #: 登录失败窗口 / 锁定时长（分钟）。
+    login_lockout_minutes: int = 15
 
     # --- 熟练度与近卷去重（r6，可环境变量覆盖） ------------------------------
     #: 熟练度滑动窗口天数：`answered_at >= now - window` 内的作答才算数（含边界）。

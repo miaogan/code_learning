@@ -608,3 +608,61 @@ export interface PracticeWrongBook {
   items: PracticeWrongItem[]
   total: number
 }
+
+// ===== r23 登录 / 多用户 / 用户自带 AI Key（与 backend/app/schemas.py 逐字段一致）=====
+
+/** Key 来源：`own` = 用户自己在设置页填的（全能力）；`shared` = 管理员同意的内置 Key（仅轻量 + 每日配额）。 */
+export type KeyMode = 'own' | 'shared'
+/** 当前用户可用的 AI 档位：`full` 全能力 / `light` 仅轻量能力 / `none` 不可用。 */
+export type AiCapability = 'full' | 'light' | 'none'
+/** JSON 模式闭集（与后端同名字段一致）。 */
+export type JsonMode = 'json_object' | 'none'
+
+export interface Me {
+  id: string
+  email: string
+  display_name: string
+  role: string
+  key_mode: KeyMode
+  ai_capability: AiCapability
+  ai_base_url: string
+  ai_model: string
+  ai_json_mode: JsonMode
+  /** 只回显后 4 位；空串表示未配置。 */
+  ai_masked_key: string
+  ai_updated_at: string
+  /** 内置 Key 今日已用 / 每日上限；非 `shared` 恒 0（上限 0 表示不限次数）。 */
+  ai_quota_used: number
+  ai_quota_limit: number
+}
+
+export interface LoginRequest {
+  email: string
+  password: string
+}
+
+export interface AiSettingsRequest {
+  base_url: string
+  model: string
+  /** 空串 = 保留已存 Key（不改动）。 */
+  api_key: string
+  json_mode: JsonMode
+}
+
+export interface AiTestRequest {
+  base_url: string
+  model: string
+  api_key: string
+  json_mode: JsonMode
+}
+
+export interface AiTestResult {
+  ok: boolean
+  message: string
+}
+
+export interface PasswordChangeRequest {
+  old_password: string
+  new_password: string
+}
+

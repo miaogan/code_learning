@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import type { RunKind, RunSummary } from '../../api/types'
 import { formatScore } from '../../lib/format'
 import { settingsLine } from '../interview/chatModel'
@@ -138,6 +139,16 @@ export function TrendTable({ rows }: TrendTableProps) {
               <p className="sc-meta-line">
                 对比 <Delta delta={delta} />
               </p>
+              {/* 面试记录可回放（InterviewPage 已支持 ?run_id= 恢复；笔试暂无回放能力）。 */}
+              {row.kind === 'interview' ? (
+                <Link
+                  className="sc-meta-line"
+                  to={`/interview?run_id=${encodeURIComponent(row.id)}`}
+                  aria-label={`回放 ${formatWhen(row.created_at)} 的模拟面试`}
+                >
+                  回放本场 →
+                </Link>
+              ) : null}
             </div>
           )
         })}
@@ -166,6 +177,14 @@ export function TrendTable({ rows }: TrendTableProps) {
                 <div className="sc-td-kind">
                   <Chip label={KIND_LABEL[row.kind]} tone="direction" />
                   {settings === null ? null : <span className="sc-td-settings">{settings}</span>}
+                  {row.kind === 'interview' ? (
+                    <Link
+                      to={`/interview?run_id=${encodeURIComponent(row.id)}`}
+                      aria-label={`回放 ${formatWhen(row.created_at)} 的模拟面试`}
+                    >
+                      回放本场 →
+                    </Link>
+                  ) : null}
                 </div>
               </td>
               <td className="sc-mono">{formatWhen(row.created_at)}</td>

@@ -139,3 +139,12 @@ export function polishHref(focusKey: string, section: PolishSection, anchorText:
   }
   return `/polish?${parts.join('&')}`
 }
+
+/**
+ * 目标岗位入口：把岗位带进润色页的目标岗位输入框（只预填，不触发分析）。
+ * 空岗位 / 只有空白时退回裸 `/polish`，避免生成 `?role=` 这种空参数。
+ */
+export function polishRoleHref(targetRole: string | null | undefined): string {
+  const role = targetRole == null ? '' : targetRole.trim()
+  return role === '' ? '/polish' : `/polish?role=${encodeURIComponent(role)}`
+}

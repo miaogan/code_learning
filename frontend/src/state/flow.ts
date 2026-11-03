@@ -7,12 +7,17 @@ export interface FlowState {
   hasReport: boolean
 }
 
-const STORAGE_KEY = 'sc.flow'
+const STORAGE_PREFIX = 'sc.flow'
 const EMPTY: FlowState = { hasResume: false, hasProfile: false, hasReport: false }
 
-function load(): FlowState {
+/** r23：同一台机器多人用时，进度必须按账号分开存，否则退出后下一个人看到上一个人的对勾。 */
+function keyFor(userId: string | null): string {
+  return userId === null ? STORAGE_PREFIX : `${STORAGE_PREFIX}.${userId}`
+}
+
+function readStorage(key: string): FlowState {
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY)
+    const raw = window.localStorage.getItem(key)
     if (!raw) return EMPTY
     const parsed = JSON.parse(raw) as Partial<FlowState>
     return {
@@ -25,7 +30,8 @@ function load(): FlowState {
   }
 }
 
-let current: FlowState = load()
+let storageKey = keyFor(null)
+let current: FlowState = readStorage(storageKey)
 const listeners = new Set<() => void>()
 
 function subscribe(listener: () => void): () => void {
@@ -37,6 +43,18 @@ function snapshot(): FlowState {
   return current
 }
 
+/**
+ * 登录态变化时调用（r23）：切到该用户自己的进度键并通知订阅者。
+ * 登出传 `null` 回到匿名基线；同一用户重复调用直接返回，不发多余通知。
+ */
+export function bindFlowToUser(userId: string | null): void {
+  const nextKey = keyFor(userId)
+  if (nextKey === storageKey) return
+  storageKey = nextKey
+  current = readStorage(storageKey)
+  listeners.forEach((listener) => listener())
+}
+
 export function getFlowState(): FlowState {
   return current
 }
@@ -44,7 +62,7 @@ export function getFlowState(): FlowState {
 export function setFlow(patch: Partial<FlowState>): void {
   current = { ...current, ...patch }
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(current))
+    window.localStorage.setItem(storageKey, JSON.stringify(current))
   } catch {
     /* 存储不可用时静默降级，后端数据仍是权威 */
   }

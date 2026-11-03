@@ -198,3 +198,11 @@
      等固定高推导引用，全局改会在 390 宽下连锁破坏粘性输入区。 */
   --touch-min: 44px;
 }
+
+/* ---------- r22 · 移动端表单字号（append-only；推导见 docs/teamflow/20261103-r22-mobile-shell/TECH-CHANGE.md） ---------- */
+:root {
+  /* 16px = iOS Safari 聚焦输入控件不自动放大的下限（<16 会整页放大）。
+     只在 <1024 断点内用于 textarea/input；行高仍走 --lh-body，
+     故既有固定高（--iq-composer-h 156 / --textarea-min-h 128）的推导不受影响。 */
+  --fs-input-mobile: 16px;
+}

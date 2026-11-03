@@ -1,14 +1,21 @@
-import { Route, Routes, useLocation } from 'react-router-dom'
+import { useEffect } from 'react'
+import { Link, Route, Routes, useLocation } from 'react-router-dom'
+import { AiKeyBanner } from './components/ui/AiKeyBanner'
+import { Button } from './components/ui/Button'
 import { Stepper, type StepItem, type StepState } from './components/ui/Stepper'
 import { ToolNav } from './components/ui/ToolNav'
 import ExamPage from './pages/ExamPage'
 import HistoryPage from './pages/HistoryPage'
 import InterviewPage from './pages/InterviewPage'
+import LoginPage from './pages/LoginPage'
 import PolishPage from './pages/PolishPage'
 import PracticePage from './pages/PracticePage'
 import ProfilePage from './pages/ProfilePage'
 import ReportPage from './pages/ReportPage'
+import SettingsPage from './pages/SettingsPage'
 import UploadPage from './pages/UploadPage'
+import { logout, startAuth, useAuth } from './state/auth'
+import { dismissKeyRequired } from './state/aiGate'
 import { useFlowState } from './state/flow'
 
 const STEP_BASE = [
@@ -24,12 +31,24 @@ const TOOL_ITEMS = [
   { key: 'practice', label: '练习', to: '/practice' },
   { key: 'history', label: '成绩趋势', to: '/history' },
   { key: 'polish', label: '简历润色', to: '/polish' },
+  { key: 'settings', label: '设置', to: '/settings' },
 ]
 
 /** 全局壳：顶栏 56 + 侧栏 240（<1024 收为顶部横向步骤条），主区 max 1080。 */
 export default function App() {
   const { pathname } = useLocation()
   const flow = useFlowState()
+  const auth = useAuth()
+
+  // 启动时拉一次 /api/me（store 内部有 StrictMode 守卫，不会重复请求）。
+  useEffect(() => {
+    void startAuth()
+  }, [])
+
+  // 登出 / 被踢回登录页时清掉 AI 能力提示，避免下次登录看到上一轮的旧横幅。
+  useEffect(() => {
+    if (auth.me === null) dismissKeyRequired()
+  }, [auth.me])
 
   const isDone = (key: string): boolean => {
     if (key === 'upload') return flow.hasResume
@@ -45,6 +64,16 @@ export default function App() {
     return { key: step.key, label: step.label, to: step.to, state }
   })
 
+  if (auth.status === 'loading') {
+    return <p className="sc-boot">正在加载…</p>
+  }
+
+  if (auth.me === null) {
+    return <LoginPage />
+  }
+
+  const me = auth.me
+
   return (
     <>
       <header className="sc-topbar">
@@ -52,7 +81,15 @@ export default function App() {
           <span className="sc-brand-mark" aria-hidden="true" />
           <span className="sc-brand-name">Skill Coach</span>
         </div>
-        <span className="sc-storage">本地存储 · 数据只保存在这台机器</span>
+        <div className="sc-topbar-right">
+          <span className="sc-storage">数据按账号隔离保存</span>
+          <Link className="sc-topbar-link" to="/settings" title="账号与 AI 设置">
+            {me.display_name}
+          </Link>
+          <Button variant="ghost" size="sm" onClick={() => void logout()}>
+            退出
+          </Button>
+        </div>
       </header>
 
       <div className="sc-shell">
@@ -70,6 +107,7 @@ export default function App() {
             <ToolNav items={TOOL_ITEMS} orientation="horizontal" />
           </div>
           <div className="sc-page">
+            <AiKeyBanner />
             <Routes>
               <Route path="/" element={<UploadPage />} />
               <Route path="/profile" element={<ProfilePage />} />
@@ -79,6 +117,7 @@ export default function App() {
               <Route path="/history" element={<HistoryPage />} />
               <Route path="/polish" element={<PolishPage />} />
               <Route path="/practice" element={<PracticePage />} />
+              <Route path="/settings" element={<SettingsPage />} />
             </Routes>
           </div>
         </main>

@@ -375,6 +375,13 @@ def _prune_cache(now: float) -> None:
         _POLISH_CACHE.pop(polish_id, None)
 
 
+def _cache_key(polish_id: str) -> str:
+    """缓存键按用户命名空间隔离：拿到别人的 `polish_id` 也取不回建议集（r23）。"""
+    from ..context import get_current_user_id
+
+    return f"{get_current_user_id()}:{polish_id}"
+
+
 def remember_suggestions(
     resume_id: str,
     target_role: str | None,
@@ -388,7 +395,7 @@ def remember_suggestions(
         oldest = next(iter(_POLISH_CACHE))
         _POLISH_CACHE.pop(oldest, None)
     polish_id = f"pg-{uuid.uuid4().hex[:16]}"
-    _POLISH_CACHE[polish_id] = _CachedPolish(
+    _POLISH_CACHE[_cache_key(polish_id)] = _CachedPolish(
         polish_id=polish_id,
         resume_id=resume_id,
         target_role=target_role,
@@ -401,11 +408,12 @@ def remember_suggestions(
 
 def recall_suggestions(polish_id: str) -> _CachedPolish | None:
     """取回一次建议集；未命中或已过 TTL 一律 `None`（调用方据此重跑并标 `regenerated`）。"""
-    cached = _POLISH_CACHE.get(polish_id)
+    key = _cache_key(polish_id)
+    cached = _POLISH_CACHE.get(key)
     if cached is None:
         return None
     if time.monotonic() - cached.created_at > _CACHE_TTL_S:
-        _POLISH_CACHE.pop(polish_id, None)
+        _POLISH_CACHE.pop(key, None)
         return None
     return cached
 

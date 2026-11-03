@@ -19,6 +19,7 @@ import { Chip } from '../components/ui/Chip'
 import { EmptyState } from '../components/ui/EmptyState'
 import { InlineError } from '../components/ui/InlineError'
 import { PhaseLoader } from '../components/ui/PhaseLoader'
+import { polishRoleHref } from '../lib/coach'
 import { joinMeta, textOrEmpty } from '../lib/profileText'
 import { useAsync } from '../lib/useAsync'
 
@@ -722,6 +723,12 @@ export default function ProfilePage() {
                 </Link>
                 <Link className="sc-btn sc-btn--secondary" to="/exam">
                   改为笔试
+                </Link>
+                <Link
+                  className="sc-btn sc-btn--secondary"
+                  to={polishRoleHref(profile.target_role)}
+                >
+                  润色简历
                 </Link>
                 <Link className="sc-btn sc-btn--secondary" to="/">
                   重新上传简历

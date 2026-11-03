@@ -295,6 +295,7 @@ export default function InterviewPage() {
           <>
             <p className="sc-iq-readonly">本场面试已结束 · 输入区已关闭</p>
             <SessionSummary
+              runId={session.run_id}
               questions={session.questions}
               settings={session.settings}
               onRestart={restart}

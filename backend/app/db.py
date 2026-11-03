@@ -22,6 +22,7 @@ from .config import get_settings
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS documents (
     id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL DEFAULT 'default',
     file_name TEXT NOT NULL,
     mime TEXT NOT NULL,
     chars INTEGER NOT NULL,
@@ -32,6 +33,7 @@ CREATE TABLE IF NOT EXISTS documents (
 
 CREATE TABLE IF NOT EXISTS profiles (
     id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL DEFAULT 'default',
     document_id TEXT NOT NULL,
     payload TEXT NOT NULL,
     created_at TEXT NOT NULL,
@@ -40,6 +42,7 @@ CREATE TABLE IF NOT EXISTS profiles (
 
 CREATE TABLE IF NOT EXISTS runs (
     id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL DEFAULT 'default',
     kind TEXT NOT NULL,
     profile_id TEXT NOT NULL,
     payload TEXT NOT NULL,
@@ -49,6 +52,7 @@ CREATE TABLE IF NOT EXISTS runs (
 
 CREATE TABLE IF NOT EXISTS reports (
     id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL DEFAULT 'default',
     payload TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
@@ -62,6 +66,7 @@ CREATE INDEX IF NOT EXISTS idx_reports_created ON reports (created_at);
 -- 显式索引让「既有库 / 半升级状态」也一定唯一（CREATE TABLE IF NOT EXISTS 不会补约束）。
 CREATE TABLE IF NOT EXISTS timeline_events (
     id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL DEFAULT 'default',
     type TEXT NOT NULL,
     ref_id TEXT NOT NULL,
     occurred_at TEXT NOT NULL,
@@ -98,6 +103,7 @@ CREATE TABLE IF NOT EXISTS questions (
 -- r11 追加 source：'exam' | 'practice'（读侧一律以列为准，`practice:<session>` 前缀只作命名空间）。
 CREATE TABLE IF NOT EXISTS question_attempts (
     id          TEXT PRIMARY KEY,
+    user_id     TEXT NOT NULL DEFAULT 'default',
     question_id TEXT NOT NULL,
     run_id      TEXT NOT NULL,
     correct     INTEGER NOT NULL,  -- 0/1
@@ -120,6 +126,63 @@ CREATE INDEX IF NOT EXISTS idx_questions_lang_pool ON questions (language, direc
 -- r11 练习事件按 run 聚合（错题本 / 会话统计）需要 run_id 索引。
 CREATE INDEX IF NOT EXISTS idx_attempts_question ON question_attempts (question_id, answered_at);
 CREATE INDEX IF NOT EXISTS idx_attempts_run      ON question_attempts (run_id);
+"""
+
+#: r23 认证与多用户：三张新表。`users.key_mode ∈ own|shared`；`ai_api_key_enc` 只存密文。
+R23_SCHEMA = """
+CREATE TABLE IF NOT EXISTS users (
+    id              TEXT PRIMARY KEY,
+    email           TEXT NOT NULL UNIQUE,
+    password_hash   TEXT NOT NULL,
+    display_name    TEXT NOT NULL,
+    role            TEXT NOT NULL DEFAULT 'member',
+    key_mode        TEXT NOT NULL DEFAULT 'own',   -- own | shared
+    ai_base_url     TEXT NOT NULL DEFAULT '',
+    ai_model        TEXT NOT NULL DEFAULT '',
+    ai_api_key_enc  TEXT NOT NULL DEFAULT '',
+    ai_json_mode    TEXT NOT NULL DEFAULT 'json_object',
+    ai_updated_at   TEXT NOT NULL DEFAULT '',
+    disabled        INTEGER NOT NULL DEFAULT 0,
+    created_at      TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+    token_hash  TEXT PRIMARY KEY,   -- SHA-256(明文 token)，明文只在 Cookie 里
+    user_id     TEXT NOT NULL,
+    created_at  TEXT NOT NULL,
+    expires_at  TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions (user_id);
+
+CREATE TABLE IF NOT EXISTS ai_usage (
+    id          TEXT PRIMARY KEY,
+    user_id     TEXT NOT NULL,
+    day         TEXT NOT NULL,      -- YYYY-MM-DD（UTC）
+    created_at  TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_usage_user_day ON ai_usage (user_id, day);
+"""
+
+#: r23 存量 6 表补 `user_id`（DEFAULT 'default' 即回填旧数据）。
+_R23_ADDED_COLUMNS: tuple[tuple[str, str, str], ...] = (
+    ("documents", "user_id", "TEXT NOT NULL DEFAULT 'default'"),
+    ("profiles", "user_id", "TEXT NOT NULL DEFAULT 'default'"),
+    ("runs", "user_id", "TEXT NOT NULL DEFAULT 'default'"),
+    ("reports", "user_id", "TEXT NOT NULL DEFAULT 'default'"),
+    ("timeline_events", "user_id", "TEXT NOT NULL DEFAULT 'default'"),
+    ("question_attempts", "user_id", "TEXT NOT NULL DEFAULT 'default'"),
+)
+
+#: r23 隔离索引：必须在补列之后建（引用 `user_id`）。读写口径按 (user_id, 时间) 过滤。
+R23_INDEXES = """
+CREATE INDEX IF NOT EXISTS idx_documents_user      ON documents (user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_profiles_user       ON profiles (user_id, updated_at);
+CREATE INDEX IF NOT EXISTS idx_runs_user_kind      ON runs (user_id, kind, created_at);
+CREATE INDEX IF NOT EXISTS idx_reports_user        ON reports (user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_timeline_user       ON timeline_events (user_id, occurred_at);
+CREATE INDEX IF NOT EXISTS idx_attempts_user       ON question_attempts (user_id, answered_at);
 """
 
 #: r11 追加列的唯一清单（表, 列, 列定义）：`_ensure_r11_columns()` 与单测共用同一份，
@@ -155,8 +218,19 @@ def _ensure_r11_columns(conn: sqlite3.Connection) -> None:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
 
 
+def _ensure_r23_columns(conn: sqlite3.Connection) -> None:
+    """存量 6 表补 `user_id`（幂等）：DEFAULT 'default' 让旧数据自然归到默认用户。"""
+    for table, column, ddl in _R23_ADDED_COLUMNS:
+        existing = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
+        if column not in existing:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
+
+
 def init_db() -> None:
     with connection() as conn:
         conn.executescript(SCHEMA)          # 1. 建表（新库即含新列）
         _ensure_r11_columns(conn)           # 2. 存量库补列（幂等）
-        conn.executescript(SCHEMA_INDEXES)  # 3. 建索引（引用步骤 2 补出的列）
+        conn.executescript(R23_SCHEMA)      # 3. r23 认证 / 会话 / 配额表
+        _ensure_r23_columns(conn)           # 4. 存量 6 表补 user_id（幂等）
+        conn.executescript(SCHEMA_INDEXES)  # 5. 建索引（引用补出的列）
+        conn.executescript(R23_INDEXES)     # 6. r23 隔离索引

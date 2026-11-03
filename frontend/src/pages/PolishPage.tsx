@@ -72,6 +72,23 @@ function phaseOf(elapsed: number, steps: number[]): number {
   return 2
 }
 
+/** 上传完成卡跳转时带的标记：只用来改引导文案，绝不用来自动发起 AI 调用。 */
+function cameFromUpload(state: unknown): boolean {
+  return (
+    typeof state === 'object' &&
+    state !== null &&
+    (state as { fromUpload?: unknown }).fromUpload === true
+  )
+}
+
+/** `?role=`：报告/画像跳转时带的目标岗位，只用来预填输入框（空串视为未带）。 */
+function roleFromUrl(search: string): string | null {
+  const raw = new URLSearchParams(search).get('role')
+  if (raw === null) return null
+  const value = raw.trim()
+  return value === '' ? null : value
+}
+
 /** 本地预览：已采纳替换、忽略/待处理保留原句。文本一律取自服务端建议的逐字映射，零裁剪零拼接。 */
 function buildPreview(suggestions: PolishSuggestion[], states: Record<string, SuggestionState>): string {
   const ordered = inResumeOrder(suggestions)
@@ -92,7 +109,8 @@ export default function PolishPage() {
   const profileAsync = useAsync((signal) => api.latestProfile(signal), [])
   const profile = profileAsync.data
   const navigate = useNavigate()
-  const { pathname, search } = useLocation()
+  const { pathname, search, state } = useLocation()
+  const fromUpload = cameFromUpload(state)
 
   const [session, setSession] = useState<PolishSession | null>(null)
   const [states, setStates] = useState<Record<string, SuggestionState>>({})
@@ -130,12 +148,19 @@ export default function PolishPage() {
     }
   }, [])
 
-  // 目标岗位输入默认回显画像岗位（只回填一次，不覆盖用户输入）
+  // 目标岗位输入默认回显：`?role=`（从报告/画像带着上下文来）优先，否则用画像岗位；只回填一次
   useEffect(() => {
-    if (profileInitializedRef.current || profile === null) return
+    if (profileInitializedRef.current) return
+    const fromUrl = roleFromUrl(search)
+    if (fromUrl !== null) {
+      profileInitializedRef.current = true
+      setRoleInput(fromUrl)
+      return
+    }
+    if (profile === null) return
     profileInitializedRef.current = true
     setRoleInput(profile.target_role ?? '')
-  }, [profile])
+  }, [profile, search])
 
   // 宽窄屏：<1320 单栏，成稿区折叠为按钮（DESIGN §0.5-7）
   useEffect(() => {
@@ -408,8 +433,9 @@ export default function PolishPage() {
               <Card>
                 <div className="sc-polish-guide">
                   <p className="sc-polish-guide-text">
-                    点「开始分析」后，AI 会读一遍简历正文，逐条给出「原句 → 建议句 → 为什么这么改」，
-                    并按目标岗位调整措辞。整段分析约 10–20 秒，建议可以重跑，成本可控。
+                    {fromUpload
+                      ? '这份简历刚上传并已生成画像。点「开始分析」后，AI 会读一遍简历正文，逐条给出「原句 → 建议句 → 为什么这么改」，并按目标岗位调整措辞。整段分析约 10–20 秒，不会自动开始。'
+                      : '点「开始分析」后，AI 会读一遍简历正文，逐条给出「原句 → 建议句 → 为什么这么改」，并按目标岗位调整措辞。整段分析约 10–20 秒，建议可以重跑，成本可控。'}
                   </p>
                   <div className="sc-btn-row">
                     <Button onClick={() => void analyze(roleInput)}>开始分析</Button>

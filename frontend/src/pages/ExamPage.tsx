@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { ApiError, api } from '../api/client'
 import type { ExamResult, ExamRun } from '../api/types'
 import { ExamQuestionCard } from '../components/exam/ExamQuestionCard'
@@ -7,6 +7,7 @@ import { ExamResultPanel } from '../components/exam/ExamResultPanel'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { Chip } from '../components/ui/Chip'
+import { ConfirmModal } from '../components/ui/ConfirmModal'
 import { EmptyState } from '../components/ui/EmptyState'
 import { InlineError } from '../components/ui/InlineError'
 import { PhaseLoader } from '../components/ui/PhaseLoader'
@@ -38,6 +39,8 @@ function isAnswered(value: string[] | string | undefined): boolean {
  */
 export default function ExamPage() {
   const profileAsync = useAsync((signal) => api.latestProfile(signal), [])
+  const { pathname } = useLocation()
+  const navigate = useNavigate()
 
   const [stage, setStage] = useState<Stage>('idle')
   const [run, setRun] = useState<ExamRun | null>(null)
@@ -46,6 +49,7 @@ export default function ExamPage() {
   const [createError, setCreateError] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [pendingLeave, setPendingLeave] = useState<string | null>(null)
   const [createElapsed, setCreateElapsed] = useState(0)
   const [runElapsed, setRunElapsed] = useState(0)
 
@@ -100,6 +104,41 @@ export default function ExamPage() {
   const notice = run ? filteredNotice(run.filtered_count) : null
   /** D-7 / D-9：与 notice 同一开关的规则说明（N=0 时同样不挂载）。 */
   const noticeHint = run ? proficiencyRuleHint(run.filtered_count) : null
+  const hasAnyAnswer = answeredCount > 0
+
+  // 作答中离开保护：刷新/关闭走浏览器原生提示，站内链接先确认 —— 作答只在本页 state，
+  // 离开即丢失（面试有服务端会话可续答，笔试没有）。与润色页「生成中离开保护」同一套写法。
+  useEffect(() => {
+    if (stage !== 'running' || !hasAnyAnswer) {
+      setPendingLeave(null)
+      return
+    }
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    const onClickCapture = (event: MouseEvent) => {
+      const target = event.target instanceof Element ? event.target.closest('a[href]') : null
+      if (!target) return
+      const href = target.getAttribute('href')
+      if (!href || href.startsWith('#') || /^[a-z]+:/i.test(href) || href === pathname) return
+      event.preventDefault()
+      event.stopPropagation()
+      setPendingLeave(href)
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    document.addEventListener('click', onClickCapture, true)
+    return () => {
+      window.removeEventListener('beforeunload', onBeforeUnload)
+      document.removeEventListener('click', onClickCapture, true)
+    }
+  }, [stage, hasAnyAnswer, pathname])
+
+  const confirmLeave = () => {
+    const href = pendingLeave
+    setPendingLeave(null)
+    if (href !== null) navigate(href)
+  }
 
   const startExam = async () => {
     if (!profile) return
@@ -351,7 +390,10 @@ export default function ExamPage() {
           ))}
 
           <div className="sc-btn-row">
-            <Link className="sc-btn sc-btn--primary" to="/report">
+            <Link
+              className="sc-btn sc-btn--primary"
+              to={`/report?run_ids=${encodeURIComponent(run.run_id)}`}
+            >
               生成诊断报告
             </Link>
             <Button variant="secondary" onClick={() => void startExam()}>
@@ -360,6 +402,16 @@ export default function ExamPage() {
           </div>
         </>
       ) : null}
+
+      <ConfirmModal
+        open={pendingLeave !== null}
+        title="离开会丢失本次作答"
+        message={`已答 ${answeredCount} / ${total} 题。刷新或离开后，本卷的选择将无法恢复。`}
+        confirmLabel="仍然离开"
+        cancelLabel="留在本页"
+        onConfirm={confirmLeave}
+        onCancel={() => setPendingLeave(null)}
+      />
     </section>
   )
 }

@@ -15,6 +15,8 @@ const KIND_LABEL: Record<QuestionKind, string> = {
 }
 
 export interface SessionSummaryProps {
+  /** 本场 run id：报告入口据此只汇总这一场，避免混入无关旧场次。 */
+  runId: string
   questions: InterviewSessionQuestion[]
   /** 仅用于「重开一场」的语义提示；本场设定文本的唯一格式化入口是 SettingsBar.settingsLine */
   settings: InterviewSettings | null
@@ -25,7 +27,7 @@ export interface SessionSummaryProps {
  * 结束态汇总块（DESIGN §2.4）：56 环均分 + 分类均分 + 双 CTA。
  * 均分环沿用 `scoreRingState` 三档色且环内有数字（颜色永不单独承载信息）。
  */
-export function SessionSummary({ questions, settings, onRestart }: SessionSummaryProps) {
+export function SessionSummary({ runId, questions, settings, onRestart }: SessionSummaryProps) {
   const scores = questions
     .map((question) => question.score)
     .filter((score): score is number => typeof score === 'number')
@@ -67,7 +69,10 @@ export function SessionSummary({ questions, settings, onRestart }: SessionSummar
       <p className="sc-iq-summary-note">短板与课程由诊断报告统一给出。</p>
 
       <div className="sc-iq-summary-actions">
-        <Link className="sc-btn sc-btn--primary" to="/report">
+        <Link
+          className="sc-btn sc-btn--primary"
+          to={`/report?run_ids=${encodeURIComponent(runId)}`}
+        >
           去看诊断报告
         </Link>
         <Button variant="secondary" onClick={onRestart}>

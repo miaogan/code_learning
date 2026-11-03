@@ -11,6 +11,8 @@ from pydantic import (
     model_validator,
 )
 
+from .config import JsonMode
+
 Severity = Literal["high", "medium", "low"]
 CourseLevel = Literal["入门", "进阶"]
 RunKind = Literal["interview", "exam"]
@@ -696,3 +698,63 @@ class ErrorBody(BaseModel):
     code: str
     message: str
     retryable: bool
+
+
+# --- r23 登录 / 用户 / 自带 AI Key --------------------------------------------
+
+#: 用户 Key 的来源模式：`own` = 自己填 Key；`shared` = 管理员同意的内置 Key。
+KeyMode = Literal["own", "shared"]
+#: 当前用户可用的 AI 能力：`full` 全开 / `light` 仅轻量 / `none` 不可用。
+AiCapability = Literal["full", "light", "none"]
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str = Field(min_length=1)
+
+
+class MeResponse(BaseModel):
+    """当前用户 + AI 状态；`ai_masked_key` 只含后 4 位，绝不含明文。"""
+
+    id: str
+    email: str
+    display_name: str
+    role: str
+    key_mode: KeyMode
+    ai_capability: AiCapability
+    ai_base_url: str = ""
+    ai_model: str = ""
+    ai_json_mode: str = "json_object"
+    ai_masked_key: str = ""
+    ai_updated_at: str = ""
+    #: 内置 Key 今日已用 / 每日上限；非 `shared` 恒 0（上限 0 表示不限次数）。
+    ai_quota_used: int = 0
+    ai_quota_limit: int = 0
+
+
+class AiSettingsRequest(BaseModel):
+    """保存自带 Key：`api_key` 缺省（空）表示「沿用已保存的 Key」。"""
+
+    base_url: str
+    model: str
+    api_key: str = ""
+    json_mode: JsonMode = "json_object"
+
+
+class AiTestRequest(BaseModel):
+    """测试连接：字段全可选，缺省用已保存的配置。"""
+
+    base_url: str = ""
+    model: str = ""
+    api_key: str = ""
+    json_mode: JsonMode = "json_object"
+
+
+class AiTestResult(BaseModel):
+    ok: bool
+    message: str
+
+
+class PasswordChangeRequest(BaseModel):
+    old_password: str = Field(min_length=1)
+    new_password: str = Field(min_length=1)

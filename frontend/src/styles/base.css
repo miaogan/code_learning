@@ -48,8 +48,10 @@ a {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: var(--topbar-h);
-  padding: 0 var(--sp-6);
+  /* 刘海/状态栏安全区：viewport-fit=cover 时 env 非 0，高度与上内边距同步让位；
+     无刘海设备 env=0，尺寸与 r21 基线完全一致。 */
+  height: calc(var(--topbar-h) + env(safe-area-inset-top));
+  padding: env(safe-area-inset-top) var(--sp-6) 0;
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border-subtle);
 }
@@ -81,7 +83,10 @@ a {
 
 .sc-shell {
   display: flex;
-  min-height: calc(100vh - var(--topbar-h));
+  /* 100vh 在移动浏览器取「地址栏收起后的最大视口」→ 短页面多出一截滚动；
+     第二行用 dvh 跟随当前可视高度（不支持的浏览器保留首行，行为同 r21）。 */
+  min-height: calc(100vh - var(--topbar-h) - env(safe-area-inset-top));
+  min-height: calc(100dvh - var(--topbar-h) - env(safe-area-inset-top));
 }
 
 .sc-sidebar {
@@ -2713,7 +2718,8 @@ input:not([type='radio']):not([type='checkbox']):not([type='file']):disabled {
   flex-direction: column;
   gap: var(--sp-2);
   min-height: var(--iq-composer-h);
-  padding: var(--sp-3);
+  /* 手势条安全区：env=0 时仍为 12×2 的既有推导；有手势条时只加在底部，不压缩内容 */
+  padding: var(--sp-3) var(--sp-3) calc(var(--sp-3) + env(safe-area-inset-bottom));
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-12);
@@ -3793,6 +3799,12 @@ input:not([type='radio']):not([type='checkbox']):not([type='file']):disabled {
     align-items: center;
     gap: var(--sp-2);
     padding: var(--sp-1) var(--sp-4);
+    /* 长页滚动时导航跟着顶栏一起留在视口内（r22）：吸在顶栏正下方，
+       滚动容器自身仍可横滑（sticky 与 overflow-x 不冲突）。 */
+    position: sticky;
+    top: calc(var(--topbar-h) + env(safe-area-inset-top));
+    z-index: 9;
+    background: var(--bg-surface);
     overflow-x: auto;
     overscroll-behavior-x: contain;
     /* 顶部条自带底分割线，与顶栏分出区域；滚动条隐藏（触屏靠手势滑） */
@@ -3842,6 +3854,196 @@ input:not([type='radio']):not([type='checkbox']):not([type='file']):disabled {
     clip-path: none;
     white-space: nowrap;
     text-overflow: clip;
+  }
+
+  /* iOS Safari 对 <16px 的输入控件聚焦时自动放大整页（r22）：移动断点统一抬到 16。
+     行高仍取 --lh-body，textarea 的 min-height 固定值不随之变化。 */
+  textarea,
+  input:not([type='radio']):not([type='checkbox']):not([type='file']) {
+    font-size: var(--fs-input-mobile);
+  }
+}
+
+/* ---------- r22 · ≤640：时间线改堆叠 + 取消内层滚动（移动端不再「框里框」） ---------- */
+@media (max-width: 640px) {
+  /* 528 高内层滚动区在手机上会困住手势（overscroll-behavior: contain），
+     改为整页滚动：去掉高度上限与滚动容器，事件直接排在页面流里。 */
+  .sc-tl-scroll,
+  .sc-tl-list {
+    max-height: none;
+    overflow-y: visible;
+    overscroll-behavior: auto;
+    padding: var(--sp-3) 0;
+  }
+
+  /* 时间列 120 固定 + 按钮 auto 在同排会挤掉正文（390 下正文仅 ~150）：
+     时间与展开按钮占上行、正文独占下行。 */
+  .sc-tl-event {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'time toggle'
+      'main main';
+  }
+}
+
+/* ---------- r23 · 登录页 / 设置页 / 顶栏用户区（append-only；只用 token） ---------- */
+.sc-boot {
+  padding: var(--sp-9) var(--sp-6);
+  text-align: center;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--text-tertiary);
+}
+
+.sc-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+
+.sc-topbar-link {
+  max-width: 160px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.sc-topbar-link:hover {
+  color: var(--accent-hover);
+}
+
+.sc-auth {
+  display: flex;
+  justify-content: center;
+  padding: var(--sp-9) var(--sp-6);
+}
+
+.sc-auth-card {
+  width: 100%;
+  max-width: 400px;
+  padding: var(--sp-7);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-12);
+  box-shadow: var(--elev-1);
+}
+
+.sc-auth-note {
+  margin: var(--sp-5) 0 0;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--text-tertiary);
+}
+
+.sc-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.sc-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.sc-field-label {
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--text-secondary);
+}
+
+.sc-field-hint {
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+}
+
+/* select 未纳入全局原生控件口径（r23 首次使用），按同一套尺寸补齐 */
+.sc-form select {
+  width: 100%;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-8);
+  background: var(--bg-inset);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+
+.sc-form select:hover {
+  border-color: var(--border-strong);
+}
+
+.sc-form select:focus {
+  border-color: var(--accent);
+}
+
+.sc-settings-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+}
+
+.sc-settings-title {
+  margin: 0 0 var(--sp-4);
+  font-size: var(--fs-card);
+  line-height: var(--lh-card);
+  font-weight: 600;
+}
+
+.sc-kv {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: var(--sp-2) var(--sp-4);
+  margin: 0;
+}
+
+.sc-kv dt {
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--text-tertiary);
+}
+
+.sc-kv dd {
+  margin: 0;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--text-primary);
+}
+
+.sc-settings-hint {
+  margin: var(--sp-4) 0 0;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--text-tertiary);
+}
+
+.sc-settings-ok {
+  margin: 0;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--success);
+}
+
+@media (max-width: 640px) {
+  /* 390 宽下顶栏放不下「数据按账号隔离保存 + 用户名 + 退出」三件套 */
+  .sc-storage {
+    display: none;
+  }
+
+  .sc-auth {
+    padding: var(--sp-7) var(--sp-4);
+  }
+
+  .sc-auth-card {
+    padding: var(--sp-5);
   }
 }
 

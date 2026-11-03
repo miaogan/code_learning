@@ -6,12 +6,13 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 
+from ..deps import current_user
 from ..schemas import RunSummary
 from ..services.history import DEFAULT_LIMIT, MAX_LIMIT, MIN_LIMIT, list_history
 
-router = APIRouter(prefix="/api", tags=["history"])
+router = APIRouter(prefix="/api", tags=["history"], dependencies=[Depends(current_user)])
 
 
 @router.get(

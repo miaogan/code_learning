@@ -6,12 +6,13 @@
 - 错误一律经 `AppError` → 统一 envelope（404 画像/试卷不存在、400 题库不足或重复提交）。
 """
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from ..deps import current_user
 from ..schemas import ExamAnswers, ExamCreateRequest, ExamResult, ExamRun
 from ..services import exam as exam_service
 
-router = APIRouter(prefix="/api/exams", tags=["exam"])
+router = APIRouter(prefix="/api/exams", tags=["exam"], dependencies=[Depends(current_user)])
 
 
 @router.post("", response_model=ExamRun, summary="依据画像出 ≥10 道笔试题（不含答案）")

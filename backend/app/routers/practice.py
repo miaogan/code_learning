@@ -9,8 +9,9 @@
 - 响应模型 `Practice*` 保证题单/统计/错题本永不含 `answer`，答案只在 `/answer` 回显。
 """
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from ..deps import current_user
 from ..schemas import (
     PracticeAnswerRequest,
     PracticeAnswerResult,
@@ -26,7 +27,7 @@ from ..schemas import (
 )
 from ..services import practice as practice_service
 
-router = APIRouter(prefix="/api/practice", tags=["practice"])
+router = APIRouter(prefix="/api/practice", tags=["practice"], dependencies=[Depends(current_user)])
 
 
 @router.post("/paper", response_model=PracticePaper, summary="按筛选出一份练习题单（不含答案）")

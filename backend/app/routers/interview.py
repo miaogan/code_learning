@@ -10,8 +10,9 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from ..deps import CurrentUser, current_user
 from ..schemas import (
     AnswerRequest,
     InterviewCreateRequest,
@@ -19,16 +20,20 @@ from ..schemas import (
     InterviewSession,
     InterviewTurn,
 )
+from ..services import user_ai
 from ..services.interview import create_run as create_interview_run
 from ..services.interview import load_session
 from ..services.interview import score_answer as score_interview_answer
 
-router = APIRouter(prefix="/api/interviews", tags=["interview"])
+router = APIRouter(
+    prefix="/api/interviews", tags=["interview"], dependencies=[Depends(current_user)]
+)
 
 
 @router.post("", response_model=InterviewRun, summary="补全设定并开局（只投放第 1 条发言）")
-async def create_run(payload: InterviewCreateRequest) -> InterviewRun:
-    return await create_interview_run(payload.profile_id, payload.settings)
+async def create_run(payload: InterviewCreateRequest, user: CurrentUser) -> InterviewRun:
+    client = user_ai.client_for(user, "heavy")
+    return await create_interview_run(payload.profile_id, payload.settings, client=client)
 
 
 @router.post(
@@ -36,8 +41,11 @@ async def create_run(payload: InterviewCreateRequest) -> InterviewRun:
     response_model=InterviewTurn,
     summary="提交当前发言作答，同轮返回评分与下一条发言",
 )
-async def submit_answer(run_id: str, payload: AnswerRequest) -> InterviewTurn:
-    return await score_interview_answer(run_id, payload.question_id, payload.answer)
+async def submit_answer(
+    run_id: str, payload: AnswerRequest, user: CurrentUser
+) -> InterviewTurn:
+    client = user_ai.client_for(user, "heavy")
+    return await score_interview_answer(run_id, payload.question_id, payload.answer, client=client)
 
 
 @router.get(

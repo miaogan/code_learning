@@ -10,12 +10,14 @@
 
 import json
 import sqlite3
+import uuid
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from .config import get_settings
+from .context import DEFAULT_USER_ID, get_current_user_id
 from .db import connection
 from .schemas import Profile, Report, ResumeMeta, TimelineEvent
 
@@ -25,6 +27,11 @@ RUN_COMPLETED = "completed"
 
 def _now() -> str:
     return datetime.now(UTC).isoformat()
+
+
+def _uid() -> str:
+    """当前用户 id（`deps.current_user` 写入 ContextVar；默认 `'default'` 供 CLI / 存量数据）。"""
+    return get_current_user_id()
 
 
 def _row_payload(row: sqlite3.Row) -> dict[str, Any]:
@@ -55,10 +62,12 @@ def insert_document(meta: ResumeMeta, text: str, *, mime: str = "application/oct
     """
     with connection() as conn:
         conn.execute(
-            "INSERT INTO documents (id, file_name, mime, chars, sections, text, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO documents "
+            "(id, user_id, file_name, mime, chars, sections, text, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 meta.resume_id,
+                _uid(),
                 meta.file_name,
                 mime,
                 meta.chars,
@@ -77,7 +86,8 @@ def get_document(document_id: str) -> dict[str, Any] | None:
     """
     with connection() as conn:
         row = conn.execute(
-            "SELECT text, file_name, created_at FROM documents WHERE id = ?", (document_id,)
+            "SELECT text, file_name, created_at FROM documents WHERE id = ? AND user_id = ?",
+            (document_id, _uid()),
         ).fetchone()
     if row is None:
         return None
@@ -96,9 +106,10 @@ def get_document_text(document_id: str) -> str | None:
 # --- profiles ------------------------------------------------------------
 
 _PROFILE_UPSERT = (
-    "INSERT INTO profiles (id, document_id, payload, created_at, updated_at) "
-    "VALUES (?, ?, ?, ?, ?) "
-    "ON CONFLICT(id) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at"
+    "INSERT INTO profiles (id, user_id, document_id, payload, created_at, updated_at) "
+    "VALUES (?, ?, ?, ?, ?, ?) "
+    "ON CONFLICT(id) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at "
+    "WHERE profiles.user_id = excluded.user_id"
 )
 
 
@@ -109,6 +120,7 @@ def insert_profile(profile: Profile) -> None:
             _PROFILE_UPSERT,
             (
                 profile.id,
+                _uid(),
                 profile.resume_id,
                 profile.model_dump_json(),
                 now,
@@ -128,14 +140,17 @@ def _profile_of(row: sqlite3.Row) -> Profile:
 
 def get_profile(profile_id: str) -> Profile | None:
     with connection() as conn:
-        row = conn.execute("SELECT payload FROM profiles WHERE id = ?", (profile_id,)).fetchone()
+        row = conn.execute(
+            "SELECT payload FROM profiles WHERE id = ? AND user_id = ?", (profile_id, _uid())
+        ).fetchone()
     return None if row is None else _profile_of(row)
 
 
 def latest_profile() -> Profile | None:
     with connection() as conn:
         row = conn.execute(
-            "SELECT payload FROM profiles ORDER BY updated_at DESC LIMIT 1"
+            "SELECT payload FROM profiles WHERE user_id = ? ORDER BY updated_at DESC LIMIT 1",
+            (_uid(),),
         ).fetchone()
     return None if row is None else _profile_of(row)
 
@@ -146,10 +161,11 @@ def latest_profile() -> Profile | None:
 def insert_run(run_id: str, kind: str, profile_id: str, payload: dict[str, Any]) -> None:
     with connection() as conn:
         conn.execute(
-            "INSERT INTO runs (id, kind, profile_id, payload, status, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO runs (id, user_id, kind, profile_id, payload, status, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
             (
                 run_id,
+                _uid(),
                 kind,
                 profile_id,
                 json.dumps(payload, ensure_ascii=False),
@@ -162,8 +178,9 @@ def insert_run(run_id: str, kind: str, profile_id: str, payload: dict[str, Any])
 def get_run(run_id: str) -> dict[str, Any] | None:
     with connection() as conn:
         row = conn.execute(
-            "SELECT id, kind, profile_id, payload, status, created_at FROM runs WHERE id = ?",
-            (run_id,),
+            "SELECT id, kind, profile_id, payload, status, created_at FROM runs "
+            "WHERE id = ? AND user_id = ?",
+            (run_id, _uid()),
         ).fetchone()
     return None if row is None else _run_dict(row)
 
@@ -171,21 +188,21 @@ def get_run(run_id: str) -> dict[str, Any] | None:
 def save_run(run_id: str, payload: dict[str, Any], status: str) -> None:
     with connection() as conn:
         conn.execute(
-            "UPDATE runs SET payload = ?, status = ? WHERE id = ?",
-            (json.dumps(payload, ensure_ascii=False), status, run_id),
+            "UPDATE runs SET payload = ?, status = ? WHERE id = ? AND user_id = ?",
+            (json.dumps(payload, ensure_ascii=False), status, run_id, _uid()),
         )
 
 
 def list_runs(kind: str | None = None, limit: int = 20) -> list[dict[str, Any]]:
     """按创建时间倒序（报告与历史页都依赖这个顺序，调用方不得二次排序）。"""
-    sql = "SELECT id, kind, profile_id, payload, status, created_at FROM runs"
+    sql = "SELECT id, kind, profile_id, payload, status, created_at FROM runs WHERE user_id = ?"
     params: tuple[Any, ...]
     if kind is None:
         sql += " ORDER BY created_at DESC LIMIT ?"
-        params = (limit,)
+        params = (_uid(), limit)
     else:
-        sql += " WHERE kind = ? ORDER BY created_at DESC LIMIT ?"
-        params = (kind, limit)
+        sql += " AND kind = ? ORDER BY created_at DESC LIMIT ?"
+        params = (_uid(), kind, limit)
     with connection() as conn:
         rows = conn.execute(sql, params).fetchall()
     return [_run_dict(row) for row in rows]
@@ -197,8 +214,8 @@ def list_runs(kind: str | None = None, limit: int = 20) -> list[dict[str, Any]]:
 def insert_report(report: Report) -> None:
     with connection() as conn:
         conn.execute(
-            "INSERT INTO reports (id, payload, created_at) VALUES (?, ?, ?)",
-            (report.id, report.model_dump_json(), report.generated_at or _now()),
+            "INSERT INTO reports (id, user_id, payload, created_at) VALUES (?, ?, ?, ?)",
+            (report.id, _uid(), report.model_dump_json(), report.generated_at or _now()),
         )
 
 
@@ -208,14 +225,17 @@ def _report_of(row: sqlite3.Row) -> Report:
 
 def get_report(report_id: str) -> Report | None:
     with connection() as conn:
-        row = conn.execute("SELECT payload FROM reports WHERE id = ?", (report_id,)).fetchone()
+        row = conn.execute(
+            "SELECT payload FROM reports WHERE id = ? AND user_id = ?", (report_id, _uid())
+        ).fetchone()
     return None if row is None else _report_of(row)
 
 
 def latest_report() -> Report | None:
     with connection() as conn:
         row = conn.execute(
-            "SELECT payload FROM reports ORDER BY created_at DESC LIMIT 1"
+            "SELECT payload FROM reports WHERE user_id = ? ORDER BY created_at DESC LIMIT 1",
+            (_uid(),),
         ).fetchone()
     return None if row is None else _report_of(row)
 
@@ -223,8 +243,8 @@ def latest_report() -> Report | None:
 # --- timeline ------------------------------------------------------------
 
 _TIMELINE_INSERT = (
-    "INSERT INTO timeline_events (id, type, ref_id, occurred_at, payload, created_at) "
-    "VALUES (?, ?, ?, ?, ?, ?) "
+    "INSERT INTO timeline_events (id, user_id, type, ref_id, occurred_at, payload, created_at) "
+    "VALUES (?, ?, ?, ?, ?, ?, ?) "
     "ON CONFLICT(type, ref_id) DO NOTHING"
 )
 
@@ -240,6 +260,7 @@ def insert_timeline_event(event: TimelineEvent) -> bool:
             _TIMELINE_INSERT,
             (
                 event.id,
+                _uid(),
                 event.type,
                 event.ref_id,
                 event.occurred_at,
@@ -257,22 +278,22 @@ def _timeline_of(row: sqlite3.Row) -> TimelineEvent:
 def get_timeline_event(event_type: str, ref_id: str) -> TimelineEvent | None:
     with connection() as conn:
         row = conn.execute(
-            "SELECT payload FROM timeline_events WHERE type = ? AND ref_id = ?",
-            (event_type, ref_id),
+            "SELECT payload FROM timeline_events WHERE type = ? AND ref_id = ? AND user_id = ?",
+            (event_type, ref_id, _uid()),
         ).fetchone()
     return None if row is None else _timeline_of(row)
 
 
 def list_timeline_events(limit: int = 20, event_type: str | None = None) -> list[TimelineEvent]:
     """时间线**唯一排序点**（`occurred_at DESC, created_at DESC`）：服务层与前端不得二次排序。"""
-    sql = "SELECT payload FROM timeline_events"
+    sql = "SELECT payload FROM timeline_events WHERE user_id = ?"
     params: tuple[Any, ...]
     if event_type is None:
         sql += " ORDER BY occurred_at DESC, created_at DESC LIMIT ?"
-        params = (limit,)
+        params = (_uid(), limit)
     else:
-        sql += " WHERE type = ? ORDER BY occurred_at DESC, created_at DESC LIMIT ?"
-        params = (event_type, limit)
+        sql += " AND type = ? ORDER BY occurred_at DESC, created_at DESC LIMIT ?"
+        params = (_uid(), event_type, limit)
     with connection() as conn:
         rows = conn.execute(sql, params).fetchall()
     return [_timeline_of(row) for row in rows]
@@ -288,9 +309,9 @@ def previous_timeline_event(
     with connection() as conn:
         row = conn.execute(
             "SELECT payload FROM timeline_events "
-            "WHERE type = ? AND occurred_at < ? AND id != ? "
+            "WHERE user_id = ? AND type = ? AND occurred_at < ? AND id != ? "
             "ORDER BY occurred_at DESC, created_at DESC LIMIT 1",
-            (event_type, before, exclude_id),
+            (_uid(), event_type, before, exclude_id),
         ).fetchone()
     return None if row is None else _timeline_of(row)
 
@@ -542,8 +563,9 @@ def delete_questions_by_source(sources: Sequence[str]) -> int:
 
 
 _ATTEMPT_INSERT = (
-    "INSERT INTO question_attempts (id, question_id, run_id, correct, answered_at, created_at, source) "
-    "VALUES (?, ?, ?, ?, ?, ?, ?) "
+    "INSERT INTO question_attempts (id, user_id, question_id, run_id, correct, answered_at, "
+    "created_at, source) "
+    "VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
     "ON CONFLICT(question_id, run_id) DO NOTHING"
 )
 
@@ -564,6 +586,7 @@ def insert_attempts(rows: list[dict[str, Any]]) -> int:
                 _ATTEMPT_INSERT,
                 (
                     row["id"],
+                    _uid(),
                     row["question_id"],
                     row["run_id"],
                     int(row.get("correct") or 0),
@@ -581,7 +604,9 @@ def list_attempts() -> list[dict[str, Any]]:
     with connection() as conn:
         rows = conn.execute(
             "SELECT id, question_id, run_id, correct, answered_at, created_at, source "
-            "FROM question_attempts ORDER BY answered_at ASC, created_at ASC, id ASC"
+            "FROM question_attempts WHERE user_id = ? "
+            "ORDER BY answered_at ASC, created_at ASC, id ASC",
+            (_uid(),),
         ).fetchall()
     return [
         {
@@ -605,7 +630,8 @@ def count_practiced_questions() -> int:
     """
     with connection() as conn:
         row = conn.execute(
-            "SELECT COUNT(DISTINCT question_id) AS total FROM question_attempts"
+            "SELECT COUNT(DISTINCT question_id) AS total FROM question_attempts WHERE user_id = ?",
+            (_uid(),),
         ).fetchone()
     return 0 if row is None else int(row["total"])
 
@@ -620,8 +646,9 @@ def list_recent_exam_question_ids(limit: int) -> list[set[str]]:
         return []
     with connection() as conn:
         rows = conn.execute(
-            "SELECT payload FROM runs WHERE kind = 'exam' ORDER BY created_at DESC LIMIT ?",
-            (limit,),
+            "SELECT payload FROM runs WHERE user_id = ? AND kind = 'exam' "
+            "ORDER BY created_at DESC LIMIT ?",
+            (_uid(), limit),
         ).fetchall()
     papers: list[set[str]] = []
     for row in rows:
@@ -634,3 +661,208 @@ def list_recent_exam_question_ids(limit: int) -> list[set[str]]:
             }
         )
     return papers
+
+
+# --- users / sessions / ai_usage（r23 认证与多用户） --------------------------
+
+_USER_SELECT = (
+    "SELECT id, email, password_hash, display_name, role, key_mode, ai_base_url, ai_model, "
+    "ai_api_key_enc, ai_json_mode, ai_updated_at, disabled, created_at FROM users"
+)
+
+
+def _user_dict(row: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "id": row["id"],
+        "email": row["email"],
+        "password_hash": row["password_hash"],
+        "display_name": row["display_name"],
+        "role": row["role"],
+        "key_mode": row["key_mode"],
+        "ai_base_url": row["ai_base_url"],
+        "ai_model": row["ai_model"],
+        "ai_api_key_enc": row["ai_api_key_enc"],
+        "ai_json_mode": row["ai_json_mode"],
+        "ai_updated_at": row["ai_updated_at"],
+        "disabled": bool(row["disabled"]),
+        "created_at": row["created_at"],
+    }
+
+
+def create_user(
+    *,
+    user_id: str,
+    email: str,
+    password_hash: str,
+    display_name: str,
+    role: str = "member",
+    key_mode: str = "own",
+) -> None:
+    with connection() as conn:
+        conn.execute(
+            "INSERT INTO users "
+            "(id, email, password_hash, display_name, role, key_mode, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (user_id, email, password_hash, display_name, role, key_mode, _now()),
+        )
+
+
+def get_user_by_email(email: str) -> dict[str, Any] | None:
+    with connection() as conn:
+        row = conn.execute(_USER_SELECT + " WHERE email = ?", (email,)).fetchone()
+    return None if row is None else _user_dict(row)
+
+
+def get_user_by_id(user_id: str) -> dict[str, Any] | None:
+    with connection() as conn:
+        row = conn.execute(_USER_SELECT + " WHERE id = ?", (user_id,)).fetchone()
+    return None if row is None else _user_dict(row)
+
+
+def list_users() -> list[dict[str, Any]]:
+    with connection() as conn:
+        rows = conn.execute(_USER_SELECT + " ORDER BY created_at ASC").fetchall()
+    return [_user_dict(row) for row in rows]
+
+
+def update_user_password(user_id: str, password_hash: str) -> None:
+    with connection() as conn:
+        conn.execute(
+            "UPDATE users SET password_hash = ? WHERE id = ?", (password_hash, user_id)
+        )
+
+
+def update_user_ai(
+    user_id: str,
+    *,
+    base_url: str,
+    model: str,
+    api_key_enc: str,
+    json_mode: str,
+    updated_at: str,
+) -> None:
+    with connection() as conn:
+        conn.execute(
+            "UPDATE users SET ai_base_url = ?, ai_model = ?, ai_api_key_enc = ?, "
+            "ai_json_mode = ?, ai_updated_at = ? WHERE id = ?",
+            (base_url, model, api_key_enc, json_mode, updated_at, user_id),
+        )
+
+
+def update_user_key_mode(user_id: str, key_mode: str) -> None:
+    with connection() as conn:
+        conn.execute("UPDATE users SET key_mode = ? WHERE id = ?", (key_mode, user_id))
+
+
+def clear_user_ai_key(user_id: str) -> None:
+    """清除自带 Key：保留 Base URL / 模型便于重新填写，能力随之降为 `none`。"""
+    with connection() as conn:
+        conn.execute(
+            "UPDATE users SET ai_api_key_enc = '', ai_updated_at = '' WHERE id = ?",
+            (user_id,),
+        )
+
+
+def set_user_disabled(user_id: str, disabled: bool) -> None:
+    with connection() as conn:
+        conn.execute(
+            "UPDATE users SET disabled = ? WHERE id = ?", (1 if disabled else 0, user_id)
+        )
+
+
+def delete_expired_sessions() -> int:
+    """批量清理已过期会话（r23 收口）：登录时顺带执行，避免 sessions 表无限累积。"""
+    with connection() as conn:
+        cursor = conn.execute("DELETE FROM sessions WHERE expires_at <= ?", (_now(),))
+        return max(cursor.rowcount, 0)
+
+
+def create_session(*, token_hash: str, user_id: str, expires_at: str) -> None:
+    delete_expired_sessions()
+    with connection() as conn:
+        conn.execute(
+            "INSERT INTO sessions (token_hash, user_id, created_at, expires_at) "
+            "VALUES (?, ?, ?, ?)",
+            (token_hash, user_id, _now(), expires_at),
+        )
+
+
+def get_session(token_hash: str) -> dict[str, Any] | None:
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT token_hash, user_id, created_at, expires_at FROM sessions WHERE token_hash = ?",
+            (token_hash,),
+        ).fetchone()
+    if row is None:
+        return None
+    return {
+        "token_hash": row["token_hash"],
+        "user_id": row["user_id"],
+        "created_at": row["created_at"],
+        "expires_at": row["expires_at"],
+    }
+
+
+def delete_session(token_hash: str) -> None:
+    with connection() as conn:
+        conn.execute("DELETE FROM sessions WHERE token_hash = ?", (token_hash,))
+
+
+def delete_user_sessions(user_id: str) -> None:
+    with connection() as conn:
+        conn.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
+
+
+def delete_other_sessions(user_id: str, keep_token_hash: str) -> None:
+    """自助改密后只保留当前这台设备的会话，其他设备的会话立即失效。"""
+    with connection() as conn:
+        conn.execute(
+            "DELETE FROM sessions WHERE user_id = ? AND token_hash <> ?",
+            (user_id, keep_token_hash),
+        )
+
+
+def count_ai_usage(user_id: str, day: str) -> int:
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) AS total FROM ai_usage WHERE user_id = ? AND day = ?",
+            (user_id, day),
+        ).fetchone()
+    return 0 if row is None else int(row["total"])
+
+
+def record_ai_usage(user_id: str, day: str) -> None:
+    with connection() as conn:
+        conn.execute(
+            "INSERT INTO ai_usage (id, user_id, day, created_at) VALUES (?, ?, ?, ?)",
+            (uuid.uuid4().hex, user_id, day, _now()),
+        )
+
+
+# --- 存量数据归属迁移（r23 收口） -------------------------------------------
+
+_USER_DATA_TABLES = (
+    "documents",
+    "profiles",
+    "runs",
+    "reports",
+    "timeline_events",
+    "question_attempts",
+)
+
+
+def adopt_default_data(user_id: str) -> dict[str, int]:
+    """把 r23 之前的单用户数据（`user_id='default'`）整体改挂到指定账号。
+
+    返回各表迁移行数；目标 id 不得为空或 `default`。业务 id 全局唯一，
+    整行改 `user_id` 不会产生主键冲突。
+    """
+    migrated: dict[str, int] = {}
+    with connection() as conn:
+        for table in _USER_DATA_TABLES:
+            cursor = conn.execute(
+                f"UPDATE {table} SET user_id = ? WHERE user_id = ?",
+                (user_id, DEFAULT_USER_ID),
+            )
+            migrated[table] = max(cursor.rowcount, 0)
+    return migrated

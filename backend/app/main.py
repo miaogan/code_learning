@@ -2,6 +2,7 @@
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from urllib.parse import urlparse
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -11,8 +12,16 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .config import get_settings
 from .db import init_db
-from .errors import HTTP_ERROR, NOT_FOUND, VALIDATION_ERROR, AppError
+from .errors import (
+    FORBIDDEN,
+    HTTP_ERROR,
+    METHOD_NOT_ALLOWED,
+    NOT_FOUND,
+    VALIDATION_ERROR,
+    AppError,
+)
 from .routers import (
+    auth,
     courses,
     exam,
     history,
@@ -49,9 +58,30 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origin_list,
+        allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    @app.middleware("http")
+    async def origin_guard(request: Request, call_next):
+        """非安全方法做同源校验：有 Origin 且既不同源、又不在白名单 → 403。
+
+        Cookie 认证已带 `SameSite=Lax`，这一层是纵深防御（也覆盖未来放开跨站 CORS 的场景）。
+        """
+        if request.method not in ("GET", "HEAD", "OPTIONS"):
+            origin = request.headers.get("origin")
+            if origin:
+                host = request.headers.get("host", "")
+                same_host = urlparse(origin).netloc == host
+                if not same_host and origin not in settings.cors_origin_list:
+                    return JSONResponse(
+                        status_code=403,
+                        content=AppError(
+                            FORBIDDEN, "请求来源不被允许", status=403
+                        ).to_body(),
+                    )
+        return await call_next(request)
 
     @app.exception_handler(AppError)
     async def handle_app_error(_request: Request, exc: AppError) -> JSONResponse:
@@ -61,13 +91,19 @@ def create_app() -> FastAPI:
     async def handle_http_error(
         _request: Request, exc: StarletteHTTPException
     ) -> JSONResponse:
-        is_missing = exc.status_code == 404
+        # 框架级 405 默认是英文 detail；这里统一成中文 envelope，其余状态保持透传。
+        if exc.status_code == 405:
+            code, message = METHOD_NOT_ALLOWED, "该接口不支持此请求方法"
+        elif exc.status_code == 404:
+            code, message = NOT_FOUND, "请求的资源不存在"
+        else:
+            code, message = HTTP_ERROR, str(exc.detail)
         return JSONResponse(
             status_code=exc.status_code,
             content={
                 "error": {
-                    "code": NOT_FOUND if is_missing else HTTP_ERROR,
-                    "message": "请求的资源不存在" if is_missing else str(exc.detail),
+                    "code": code,
+                    "message": message,
                     "retryable": False,
                 }
             },
@@ -88,6 +124,7 @@ def create_app() -> FastAPI:
             },
         )
 
+    app.include_router(auth.router)
     app.include_router(resume.router)
     app.include_router(profile.router)
     app.include_router(interview.router)

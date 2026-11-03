@@ -17,13 +17,15 @@ from typing import Any
 from uuid import uuid4
 
 import pytest
-from fastapi.testclient import TestClient
-
+from app import repository
+from app.auth import COOKIE_NAME, hash_password, new_session_token, session_expiry
 from app.config import get_settings
 from app.db import init_db
 from app.main import app
 from app.schemas import Evidence, Profile, ProfileProject, ProfileSkill, SkillStatus
+from app.services import user_ai
 from app.services.ai import AIClient
+from fastapi.testclient import TestClient
 
 SEED_PATH = Path(__file__).resolve().parent.parent / "app" / "seed" / "questions.json"
 
@@ -225,10 +227,50 @@ def tmp_db(monkeypatch: pytest.MonkeyPatch, neutral_ai_env: None) -> Iterator[Pa
         db_file.unlink(missing_ok=True)
 
 
+#: 测试登录用户：固定 id = `DEFAULT_USER_ID`，让「服务层无认证上下文时写入的默认归属」
+#: 与路由层登录用户一致（用例里绕过 repository 的直接 SQL 插入同样归它所有）。
+TEST_USER_ID = "default"
+TEST_USER_EMAIL = "member@example.com"
+TEST_USER_PASSWORD = "test-password-123"
+TEST_USER_KEY = "sk-test-not-a-real-secret"
+TEST_SECRET_KEY = "test-secret-key-for-r23"
+
+
 @pytest.fixture()
-def client(tmp_db: Path) -> Iterator[TestClient]:
-    """与生产同一份 `app`（含 lifespan），只是数据库是临时的。"""
+def auth_user(tmp_db: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
+    """建一个「own 模式 + 已存 Key」的登录用户：路由用例无需自己处理 AI 闸门。"""
+    monkeypatch.setenv("SECRET_KEY", TEST_SECRET_KEY)
+    get_settings.cache_clear()
+    repository.create_user(
+        user_id=TEST_USER_ID,
+        email=TEST_USER_EMAIL,
+        password_hash=hash_password(TEST_USER_PASSWORD),
+        display_name="测试用户",
+        role="member",
+        key_mode="own",
+    )
+    repository.update_user_ai(
+        TEST_USER_ID,
+        base_url="https://api.example.test/v1",
+        model="test-model",
+        api_key_enc=user_ai.encrypt_key(TEST_USER_KEY),
+        json_mode="json_object",
+        updated_at="2026-11-03T00:00:00+00:00",
+    )
+    user = repository.get_user_by_id(TEST_USER_ID)
+    assert user is not None
+    return user
+
+
+@pytest.fixture()
+def client(tmp_db: Path, auth_user: dict[str, Any]) -> Iterator[TestClient]:
+    """与生产同一份 `app`（含 lifespan），数据库是临时的，且已带上登录会话 Cookie。"""
+    raw, digest = new_session_token()
+    repository.create_session(
+        token_hash=digest, user_id=TEST_USER_ID, expires_at=session_expiry()
+    )
     with TestClient(app) as test_client:
+        test_client.cookies.set(COOKIE_NAME, raw)
         yield test_client
 
 

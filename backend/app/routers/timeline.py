@@ -6,12 +6,13 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 
+from ..deps import current_user
 from ..schemas import TimelineEvent
 from ..services.timeline import DEFAULT_LIMIT, MAX_LIMIT, MIN_LIMIT, list_timeline
 
-router = APIRouter(prefix="/api", tags=["timeline"])
+router = APIRouter(prefix="/api", tags=["timeline"], dependencies=[Depends(current_user)])
 
 
 @router.get(

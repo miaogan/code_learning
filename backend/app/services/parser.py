@@ -40,18 +40,21 @@ class ParsedResume:
     sections: int
 
 
+def max_upload_bytes() -> int:
+    """上传体积上限（字节）：路由层只用它给读取设硬边界，体积校验仍在本模块发生一次。"""
+    return get_settings().max_upload_mb * 1024 * 1024
+
+
 def parse_resume(file_name: str, raw: bytes) -> ParsedResume:
-    settings = get_settings()
     suffix = _suffix_of(file_name)
     if suffix not in SUPPORTED_SUFFIXES:
         raise AppError(UNSUPPORTED_TYPE, "仅支持 PDF / DOCX / TXT 文件", status=415)
     if not raw:
         raise AppError(EMPTY_FILE, "文件内容为空，请换一份", status=400)
-    limit_bytes = settings.max_upload_mb * 1024 * 1024
-    if len(raw) > limit_bytes:
+    if len(raw) > max_upload_bytes():
         raise AppError(
             FILE_TOO_LARGE,
-            f"文件超过 {settings.max_upload_mb}MB，请压缩或分卷",
+            f"文件超过 {get_settings().max_upload_mb}MB，请压缩或分卷",
             status=413,
         )
 

@@ -1,4 +1,7 @@
 import type {
+  AiSettingsRequest,
+  AiTestRequest,
+  AiTestResult,
   AnswerRequest,
   ApiErrorBody,
   Course,
@@ -11,6 +14,9 @@ import type {
   InterviewRun,
   InterviewSession,
   InterviewTurn,
+  LoginRequest,
+  Me,
+  PasswordChangeRequest,
   Profile,
   ProfilePatch,
   ProfileWithMerge,
@@ -31,6 +37,7 @@ import type {
   RunSummary,
   TimelineEvent,
 } from './types'
+import { reportKeyRequired } from '../state/aiGate'
 
 /** 练习统计查询参数（r11）：与题单同口径，但**不带 limit**（命中数不受题量截断）。 */
 export type PracticeStatsParams = Pick<
@@ -61,6 +68,15 @@ function isErrorBody(value: unknown): value is ApiErrorBody {
   return typeof body === 'object' && body !== null && typeof (body as Record<string, unknown>).code === 'string'
 }
 
+type UnauthorizedHandler = () => void
+
+/** 登录态 store 注册的唯一钩子：任何请求拿到 401 即通知（会话过期/被停用后立刻回登录页）。 */
+let unauthorizedHandler: UnauthorizedHandler | null = null
+
+export function setUnauthorizedHandler(handler: UnauthorizedHandler | null): void {
+  unauthorizedHandler = handler
+}
+
 async function rawRequest(path: string, init: RequestInit = {}): Promise<Response> {
   let response: Response
   try {
@@ -79,7 +95,11 @@ async function rawRequest(path: string, init: RequestInit = {}): Promise<Respons
     } catch {
       body = null
     }
+    // 401 先通知登录态再抛错：页面层不必各自判断「我是不是被踢下线了」。
+    if (response.status === 401) unauthorizedHandler?.()
     if (isErrorBody(body)) {
+      // AI 能力不足（403）由壳层统一给「去设置」入口，页面无需逐处实现。
+      if (body.error.code === 'AI_KEY_REQUIRED') reportKeyRequired(body.error.message)
       throw new ApiError(body.error.code, body.error.message, response.status, body.error.retryable)
     }
     throw new ApiError('HTTP_ERROR', `服务返回异常（HTTP ${response.status}）`, response.status, true)
@@ -91,6 +111,11 @@ async function rawRequest(path: string, init: RequestInit = {}): Promise<Respons
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await rawRequest(path, init)
   return (await response.json()) as T
+}
+
+/** 204 无正文（登出 / 改密）：与 request 共用错误映射，成功时不解析 JSON。 */
+async function requestEmpty(path: string, init: RequestInit = {}): Promise<void> {
+  await rawRequest(path, init)
 }
 
 /** 非 JSON 响应（Markdown 导出）：与 request 共用错误映射，成功时返回原始文本。 */
@@ -119,6 +144,32 @@ function queryString(params: Record<string, string | number | undefined>): strin
 
 export const api = {
   health: (): Promise<Health> => request<Health>('/health'),
+
+  /* ---------- r23 登录态与个人设置 ---------- */
+
+  /** 当前用户：未登录时后端回 401（由 setUnauthorizedHandler 统一处理）。 */
+  me: (signal?: AbortSignal): Promise<Me> => request<Me>('/api/me', { signal }),
+
+  /** 登录：成功后服务端种 HttpOnly 会话 Cookie，前端拿不到 token（也不该拿）。 */
+  login: (payload: LoginRequest): Promise<Me> =>
+    request<Me>('/api/auth/login', jsonInit('POST', payload)),
+
+  logout: (): Promise<void> => requestEmpty('/api/auth/logout', { method: 'POST' }),
+
+  /** 保存自带 Key：`api_key` 为空表示沿用已存密文，响应只回 `****后4位`。 */
+  saveAiSettings: (payload: AiSettingsRequest): Promise<Me> =>
+    request<Me>('/api/me/ai', jsonInit('PUT', payload)),
+
+  /** 清除已保存的 Key（保留 Base URL / 模型）：此后高消耗场景不可用。 */
+  clearAiSettings: (): Promise<Me> =>
+    request<Me>('/api/me/ai', { method: 'DELETE' }),
+
+  /** 测试连接：优先用本表单填写的 Key，留空则回落到已存密文。 */
+  testAiSettings: (payload: AiTestRequest): Promise<AiTestResult> =>
+    request<AiTestResult>('/api/me/ai/test', jsonInit('POST', payload)),
+
+  changePassword: (payload: PasswordChangeRequest): Promise<void> =>
+    requestEmpty('/api/me/password', jsonInit('PATCH', payload)),
 
   uploadResume: async (file: File, signal?: AbortSignal): Promise<ResumeMeta> => {
     const form = new FormData()

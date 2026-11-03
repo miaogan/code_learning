@@ -59,7 +59,7 @@ def test_unknown_path_returns_error_envelope() -> None:
     assert response.json()["error"]["code"] == "NOT_FOUND"
 
 
-def test_missing_body_answers_validation_error_envelope() -> None:
+def test_missing_body_answers_validation_error_envelope(client: TestClient) -> None:
     """缺请求体走统一 envelope（ARCHITECTURE §3.3）。
 
     脚手架期此处断言的是「501 NOT_IMPLEMENTED」占位；5 个占位路由接通后（TECHNICAL §2），

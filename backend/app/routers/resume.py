@@ -8,11 +8,11 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, File, UploadFile
+from fastapi import APIRouter, Depends, File, UploadFile
 
 from .. import repository
-from ..config import get_settings
-from ..errors import FILE_TOO_LARGE, NOT_FOUND, VALIDATION_ERROR, AppError
+from ..deps import CurrentUser, current_user
+from ..errors import NOT_FOUND, VALIDATION_ERROR, AppError
 from ..schemas import (
     PolishFullRequest,
     PolishFullResponse,
@@ -21,30 +21,21 @@ from ..schemas import (
     Profile,
     ResumeMeta,
 )
-from ..services import resume_polish
-from ..services.parser import parse_resume
+from ..services import resume_polish, user_ai
+from ..services.parser import max_upload_bytes, parse_resume
 
-router = APIRouter(prefix="/api/resumes", tags=["resume"])
+router = APIRouter(prefix="/api/resumes", tags=["resume"], dependencies=[Depends(current_user)])
 
 #: 临时目标岗位的长度上限（超过按参数不合法拒绝，避免把超长串带进提示词）。
 MAX_TARGET_ROLE_CHARS = 40
 
 
-
 @router.post("", response_model=ResumeMeta, summary="上传简历并抽取正文（PDF / DOCX / TXT）")
 async def upload_resume(
-    file: Annotated[UploadFile, File(description="简历文件，≤10MB")],
+    file: Annotated[UploadFile, File(description="简历文件（PDF / DOCX / TXT，体积上限可配置）")],
 ) -> ResumeMeta:
-    settings = get_settings()
-    limit_bytes = settings.max_upload_mb * 1024 * 1024
-    raw = await file.read(limit_bytes + 1)
-    if len(raw) > limit_bytes:
-        raise AppError(
-            FILE_TOO_LARGE,
-            f"文件超过 {settings.max_upload_mb}MB，请压缩或分卷",
-            status=413,
-        )
-
+    # 只多读 1 字节用于「是否超限」判断；体积校验的唯一出口在 services.parser。
+    raw = await file.read(max_upload_bytes() + 1)
     parsed = parse_resume(file.filename or "", raw)
     resume_id = uuid.uuid4().hex
     file_name = file.filename or "resume"
@@ -107,6 +98,7 @@ def _resolve_target_role(payload_role: str | None, profile: Profile | None) -> s
 )
 async def polish_resume(
     resume_id: str,
+    user: CurrentUser,
     payload: PolishRequest | None = None,
 ) -> PolishResponse:
     text, file_name = _load_resume(resume_id)
@@ -115,7 +107,10 @@ async def polish_resume(
         payload.target_role if payload is not None else None, profile
     )
 
-    suggestions = await resume_polish.build_suggestions(text, profile, target_role)
+    client = user_ai.client_for(user, "light")
+    suggestions = await resume_polish.build_suggestions(
+        text, profile, target_role, client=client
+    )
     kept, dropped = resume_polish.validate_suggestions(
         suggestions, text, profile, target_role=target_role
     )
@@ -139,6 +134,7 @@ async def polish_resume(
 )
 async def polish_full(
     resume_id: str,
+    user: CurrentUser,
     payload: PolishFullRequest | None = None,
 ) -> PolishFullResponse:
     text, _ = _load_resume(resume_id)
@@ -159,7 +155,11 @@ async def polish_full(
         regenerated = False
     else:
         target_role = _resolve_target_role(requested_role, profile)
-        built = await resume_polish.build_suggestions(text, profile, target_role)
+        # 只有真正调模型时才过重活闸门：命中缓存复用建议集不需要 AI，也不消耗配额。
+        client = user_ai.client_for(user, "heavy")
+        built = await resume_polish.build_suggestions(
+            text, profile, target_role, client=client
+        )
         suggestions, dropped = resume_polish.validate_suggestions(
             built, text, profile, target_role=target_role
         )

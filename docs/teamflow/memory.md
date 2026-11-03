@@ -30,10 +30,14 @@
 - 一次性升级说明（2026-10-31 · r3 上线须知）：`timeline_events` 由 `backend/app/db.py` 的 `CREATE TABLE IF NOT EXISTS` 随 `init_db()` 自建，**没有迁移脚本、不删旧库、无需手工建表**；`ProfileSkill` / `ProfileProject` 新增 `source_quotes` / `status`，旧画像里只有单条 `source_quote` 的记录由 pydantic validator 自动回填（读旧数据不报错、首次写入后转多证据）；历史 runs / documents **不回填**为时间线事件（时间线只记本版本起的新事件，空态文案「历史数据从本版本起记录」）；润色建议缓存是**进程内**的（重启即失效，`/full` 会重跑并如实标 `regenerated: true`），采纳/临时岗位/成稿一律不入库。
 - 验证命令：前端 `npm run typecheck` / `npm run lint` / `npm test` / `npm run build`；后端 `python -m pytest -q` / `python -m ruff check app tests`；探活 `GET /health`。
 
-- 公网自用访问约定（2026-11-02 · r21 落定）：自用形态 = **本机 compose + 内网穿透**（cloudflared quick tunnel 暴露本机 `${WEB_PORT:-8080}`），后端与 SQLite 仍只在本机、数据不出本地，**不把后端起在云上**；链路是 手机 → Cloudflare 边缘(HTTPS) → 隧道 → nginx → dist + 同源反代 `/api`。三条硬约束：①**公网暴露必须有 Basic Auth**（`frontend/nginx.conf` server 层 `auth_basic` + `auth_basic_user_file /etc/nginx/.htpasswd`，密码文件 `frontend/.htpasswd` 只在本地由 `scripts/gen-htpasswd.sh` 用 `openssl passwd -apr1` 生成、`.gitignore` 与 `frontend/.dockerignore` 双向排除、compose 只读挂载；文件缺失时 docker 会创建同名空目录导致 nginx 起不来，**这是刻意的失败而非静默放行**）；②**必须 HTTPS**，`navigator.clipboard` 只在 secure context 可用，http 公网地址下报告页「复制 Markdown」必失败；③本机 compose **命令名是 `docker-compose`（v1 形式，实测 v5.6.1）**，没有 `docker compose` 插件形式，文档不得写成插件写法。隧道层知识：Cloudflare 免费隧道边缘约 100s 超时，当前云端 DeepSeek 档（`AI_TIMEOUT_S=20` + 报告最多 2 处 AI 调用、其中一处 `asyncio.gather` 并行 ⇒ 最坏 ≈80s）**仍在阈值内、故不做任务化**；若切回本地 LM Studio 档（单次画像实测 201–224s）必撞超时，那时必须先做 202 + 轮询，或改 frp 直连自建 VPS（无 CDN 超时）。迁云后续：compose 双容器 + 命名卷 `skillcoach-data` + 同源反代可直接迁移，只需换域名与卷备份恢复，前端零改动。详见 `docs/teamflow/20261102-r21-public-tunnel-auth/DEPLOY-PUBLIC.md`。
+- 公网自用访问约定（2026-11-02 · r21 落定，其中 Basic Auth 部分**已被 r23 取代**）：自用形态 = **本机 compose + 内网穿透**（cloudflared quick tunnel 暴露本机 `${WEB_PORT:-8080}`），后端与 SQLite 仍只在本机、数据不出本地，**不把后端起在云上**；链路是 手机 → Cloudflare 边缘(HTTPS) → 隧道 → nginx → dist + 同源反代 `/api`。三条硬约束：①**公网暴露必须有鉴权**——r21 用 nginx Basic Auth，**r23 起由产品级登录（服务端会话 + HttpOnly Cookie）取代**，`frontend/nginx.conf` 的 `auth_basic` 两行与 compose 的 `.htpasswd` 挂载均已移除（回滚到 r21 需同时恢复两者；`scripts/gen-htpasswd.sh` 仅作回滚备用）；②**必须 HTTPS**，`navigator.clipboard` 只在 secure context 可用，http 公网地址下报告页「复制 Markdown」必失败；③本机 compose **命令名是 `docker-compose`（v1 形式，实测 v5.6.1）**，没有 `docker compose` 插件形式，文档不得写成插件写法。隧道层知识：Cloudflare 免费隧道边缘约 100s 超时，当前云端 DeepSeek 档（`AI_TIMEOUT_S=20` + 报告最多 2 处 AI 调用、其中一处 `asyncio.gather` 并行 ⇒ 最坏 ≈80s）**仍在阈值内、故不做任务化**；若切回本地 LM Studio 档（单次画像实测 201–224s）必撞超时，那时必须先做 202 + 轮询，或改 frp 直连自建 VPS（无 CDN 超时）。迁云后续：compose 双容器 + 命名卷 `skillcoach-data` + 同源反代可直接迁移，只需换域名与卷备份恢复，前端零改动。详见 `docs/teamflow/20261102-r21-public-tunnel-auth/DEPLOY-PUBLIC.md`。
+
+- 产品级登录与多用户约定（2026-11-03 · r23 落定）：**不开放注册**，账号由管理员用 `backend/app/admin_cli.py`（`create-user` / `set-mode` / `disable` / `reset-password` / `list`）创建；登录态＝服务端会话 + HttpOnly Cookie `sc_session`（库里只存 token 的 SHA-256 摘要，`scrypt` 存密码），**不做 JWT、不把 token 交给前端**；撤掉 nginx 层 `auth_basic`（r21 的公网 Basic Auth 由产品级登录取代，隧道暴露口径仍按 r21 DEPLOY-PUBLIC）。数据隔离：`documents/profiles/runs/reports/timeline_events/question_attempts` 六张业务表带 `user_id`，`repository.py` 全部读写按当前用户过滤，跨用户按 id 取数一律 404（不暴露存在性）；当前用户由 **async** `deps.current_user` 写入 `ContextVar`（sync 依赖跑线程池写不回端点上下文），路由统一用 `CurrentUser` 别名（`Annotated` + `Depends`，规避 ruff B008）。AI Key 走 `app/services/user_ai.py` 单一出口：`own`＝用户自带 Key（Fernet 密文存库、响应只回 `****后4位`，能力 `full`）、`shared`＝管理员同意用内置 Key（恒 `light` + `SHARED_AI_DAILY_LIMIT` 每日配额）、`own` 未配 Key ⇒ `none`，**heavy（一键成稿 / 模拟面试 / 诊断报告）必须 403 `AI_KEY_REQUIRED`**，light（画像生成 / 润色建议）可用；`SECRET_KEY` 缺失时保存 Key 返回 503 `AI_KEY_STORE_UNAVAILABLE`。前端 `state/auth.ts` 为登录态唯一 store（`onUnauthorized` 401 统一回登录页），进度标记 localStorage 键按用户分区 `sc.flow.<userId>`。**收口补充（2026-11-03）**：`GET /api/me` 回传内置 Key 今日用量 `ai_quota_used` / 上限 `ai_quota_limit`（非 `shared` 恒 0，上限 0 = 不限）；`DELETE /api/me/ai` 清除自带 Key（只清密文与时间戳、保留 Base URL/模型，能力降 `none`，`key_mode` 不回切 shared）；存量数据归属由 `admin_cli create-user --id default`（接管 `user_id='default'` 旧数据）或 `adopt-default --email`（把旧数据改挂到已有账号）处理。CLI 新参数与接口已同步见 ARCHITECTURE §3.8。
 
 ## 已知待办（下一批）
 
+- [x] **r23 P2 批次已收口**（2026-11-03，见 `docs/teamflow/20261103-r23-auth-multiuser/ACCEPTANCE.md` §6 B 段）：①登录限流/防爆破——`services/login_guard.py` 按邮箱滑动窗口计数，达 `LOGIN_MAX_FAILURES`（默认 5）后锁 `LOGIN_LOCKOUT_MINUTES`（默认 15 分钟），超限返回 429 `AUTH_RATE_LIMITED`，成功登录清零，「邮箱不存在 / 密码错误」统一记失败以防枚举；内存实现（单进程 uvicorn 可接受，多进程前换共享存储）。②过期会话批量清理——`repository.delete_expired_sessions()` 在每次 `create_session` 登录时执行 `DELETE FROM sessions WHERE expires_at <= now`，无需调度器。③`AI_KEY_REQUIRED` 全局「去设置」入口——`api/client.ts` 统一上报到 `state/aiGate.ts`，壳层 `AiKeyBanner` 渲染横幅（覆盖所有 AI 端点，复用 `sc-inline-error` 样式），登出与保存/清除 Key 后自动收起。
+- [ ] r23 仍留 P2（不阻断）：①一次性登录链接替代管理员口令分发（需邮件基础设施，暂不做）；②真实环境人工补测。`/login?next=` 回跳已确认由 App 内联登录页天然满足（URL 不变、登录后同路由立即渲染），无需新增代码。
 - [x] M2–M5 全部落地（2026-10-31 · 0.1.0 · 验收见 `docs/teamflow/20261031-r1-dev-skill-coach/ACCEPTANCE.md`）：画像五维 + `source_quote` 溯源与编辑、面试 ≥8 题逐题评分（`SCORING_TIMEOUT_S=14`）、笔试 ≥10 题客观 ≥8 本地判分、报告 3–5 条短板带证据 + 课程兜底 + Markdown 同源导出、历史趋势与刷新持久化。种子题库 12 题/方向（`backend/app/seed/questions.json`），课程 25 门（入门 14）。
 - [x] **R-1（P0 子项，验收返工项）已关闭**（2026-10-31 · r2 验收通过，见 `docs/teamflow/20261031-r2-ac5-copy-markdown/ACCEPTANCE.md`）：AC-5「一键复制为 Markdown 文本」已补齐——`复制 Markdown` 按钮（导出 .md 左侧、secondary/40 高、忙态防重复）+ `navigator.clipboard.writeText(await api.reportMarkdown(id))` 零变换（字节相等 103B）+ 成功 Toast（2s / 右下 24 / `--elev-2`）+ 失败页内 `InlineError`（三条失败路径实测）+ `check_copy_markdown.mjs` 7 条断言全 PASS（HEAD 负向自检 5 FAIL 有效）；门禁 typecheck/lint 0 error、pytest 73 全绿。检查器按约定落 `logs/teamflow/<runId>/scripts/`（gitignored，host 归档，不常驻仓库）。
 - [x] **架构文档尾巴已关闭**（2026-11-02 · r17，见 `docs/teamflow/20261102-r17-doc-tail-closure/ACCEPTANCE.md`）：`ARCHITECTURE.md` §7.2 删除过时的 r5 行与「Docker 未做」行（后者与 r10 交付相反，移入 §7.1 并指向 r10 任务夹）、§8 的 r5 条改「已交付（2026-11-01）」、删掉逐字重复的第二条「统一约束」；顺带把 §7.1「后端测试 13 文件」更正为实测 31 个。
@@ -48,6 +52,31 @@
 - [ ] 25 门种子课程外链需人工点检一次（当前只校验数量与方向覆盖）。
 - [x] **r3 遗留 4 条已立项闭合**（2026-11-01 · 任务夹 `docs/teamflow/20261101-r4-r3-acceptance-closure/`）：r3 判定「⚠️ 有条件通过」，本需求把 R-1（润色页「原版」Tab 改为渲染 `documents.text` 整篇正文，按 DESIGN §240，走补契约 `resume_text` 而非降级设计）、D-2（导出文件名取简历原名，契约补 `file_name`，无文件名回退日期格式）、D-3（删 `profile_merge.py` 的 `CONTRACT_READY` 死分支与四个双份模型）、D-4（合并摘要条补「查看历史能力项」入口）四条已于 2026-11-01 全部闭合并**通过验收**（判定「✅ 通过」，见该任务夹 `ACCEPTANCE.md`），不做任何新功能。R-2（仓库根 `nul`）已由 host 手动删除并确认目录干净，不再处理。**本轮新发现 2 条 P3（不阻断，留后续清理）**：①**已关闭**（2026-11-02 · r18，见 `docs/teamflow/20261102-r18-p3-code-closure/ACCEPTANCE.md`）`backend/app/services/profile.py` 的 `_with_summary()` 恒真 `model_fields` 判断已删除（`ProfileWithMerge` 恒有 `merge_summary`，删后响应逐字段等价）；②仍开放：DESIGN（r3）§0.5-4 摘要条 48 高推导需按 border-box 的 1px 边框补偿回写（实现取 `calc(var(--sp-1) - 1px)`）。
 - [x] r3 的两处取舍已由验收定稿（2026-10-31）：①AC-7「能力项不足」只落 payload `tech_fallback`、暂不加 InterviewPage/ExamPage 页面提示（接受，页面提示留后续需求）；②润色建议缓存保持**进程内**（接受，`/full` 如实标 `regenerated: true`，满足 AC-10「采纳/临时岗位不入库」边界；跨重启复用需另立需求并先评估该边界）。
+
+## 待决策清单（2026-11-03 统一规整）
+
+> 把散落在各需求验收里的开放项收敛到一处；每项标「需谁拍板 / 选项 / 建议 / 成本」。默认**不擅自开工**，拍板后再进任务夹。
+
+### A. 产品/业务决策（需产品拍板）
+
+1. **一次性登录链接**（替代管理员口令分发）：需邮件投递基础设施。选项：①不做（管理员线下发临时密码，现状）；②接 SMTP/第三方邮件服务 + 一次性 token 表；③改用**邀请码**（管理员生成短码，无邮件依赖）。建议：先 ③ 或维持 ①，邮件方案留独立需求。
+2. **题库近重复阈值 0.62 → 0.60**：0.60 只会多去重 1–2 道（实测最近一对 0.61）。建议：保持 0.62，避免误删有效题；除非用户明确要求「更狠去重」。
+3. **本地 LM Studio 档与公网隧道**：本地单次画像实测 201–224s，会撞 Cloudflare 免费隧道约 100s 超时。选项：①维持云端 DeepSeek 档（现状）；②做「202 + 轮询」异步任务化；③改 frp 直连自建 VPS。建议：维持 ①；要用本地档先立异步任务化需求。
+4. **提示词是否优化本地小模型产出**：memory 已定「不靠改提示词抬本地小模型产出」。若仍想提升，属独立产品需求（需先定义验收口径）。建议：维持不改。
+
+### B. 工程收口（低风险，可批量做；需确认即执行）
+
+5. ✅ **上传上限校验收敛到 `services/parser.py` 单源**（已做，2026-11-03）：新增 `parser.max_upload_bytes()`，路由只按它截断读取，体积校验仅在 `parse_resume` 一处；`test_resume_guard.py::test_oversize_file_is_rejected_by_parser` 锁定。
+6. ✅ **框架级 405 文案中文化**（已做，2026-11-03）：错误码闭集新增 `METHOD_NOT_ALLOWED`，`main.py` 的 `StarletteHTTPException` handler 统一输出中文 envelope；`test_routes.py::test_method_not_allowed_is_localized` 锁定。
+7. ✅ **r3 DESIGN §0.5-4 摘要条 48 高推导**（已做，2026-11-03）：按「任务夹建后不可变」约定，偏差补记在 `ARCHITECTURE.md` §8.1（`has-action` 态 `calc(var(--sp-1) - 1px)` 仍守 48 总高），不回改 r3 任务夹。
+8. ✅ **O-4 lint 阈值留痕**（已做，2026-11-03）：`ARCHITECTURE.md` §8.1 已记 `--max-warnings 28` 为基线，下调须随清理同步改脚本。
+9. **多进程部署前的限流存储**：`login_guard` 为进程内存实现（单进程 uvicorn 可接受）。选项：①维持内存（现状）；②换 SQLite 表 / Redis。建议：维持 ①，多进程化时再改（只改模块内部）。
+
+### C. 验证类（需真实环境或人工投入）
+
+10. **25 门种子课程外链点检**：当前只校验数量与方向覆盖。建议：写一次性 HEAD 检查脚本（结果落 `logs/teamflow/`），失败链接人工换源；不常驻仓库。
+11. **真实环境人工补测**（r1/r5/r23 合并清单）：浏览器视觉/动效、真机 390px 与软键盘遮挡、真实 PDF/DOCX 解析、配真实 Key 的端到端计时（画像 ≤30s / 单题 ≤15s / 判分 10s / 报告 ≤5 分钟）、r5 配置影响出题冒烟、登录限流与 Cookie 在 HTTPS 隧道下的真机验证。建议：交付前集中一轮，产出验收记录。
+12. **r23 上线切流验证**：真实 compose + 隧道下确认「未登录即登录页、登录后可访问、`/api` 同源反代正常、撤 htpasswd 后无 401 循环」。建议：并入第 11 项。
 
 ## 说明
 

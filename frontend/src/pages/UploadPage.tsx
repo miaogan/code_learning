@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ChangeEvent, DragEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { ApiError, api } from '../api/client'
 import type { ProfileMergeSummary, ResumeMeta } from '../api/types'
 import { mergeSummaryText } from '../components/profile/MergeSummaryBar'
@@ -11,6 +11,7 @@ import { InlineError } from '../components/ui/InlineError'
 import { PhaseLoader } from '../components/ui/PhaseLoader'
 import { RingProgress } from '../components/ui/RingProgress'
 import { formatChars } from '../lib/format'
+import { useAsync } from '../lib/useAsync'
 import { setFlow } from '../state/flow'
 
 const MAX_BYTES = 10 * 1024 * 1024
@@ -59,6 +60,17 @@ export default function UploadPage() {
   const [failure, setFailure] = useState<Failure | null>(null)
   const [uploadSec, setUploadSec] = useState(0)
   const [profileSec, setProfileSec] = useState(0)
+
+  // 回访识别：已有画像的用户（换设备/重新登录后）不必再传一份简历，首页给「继续」入口。
+  // 没有画像时接口报 PROFILE_MISSING，这里按「新用户」处理，不显示任何错误。
+  const savedProfileAsync = useAsync((signal) => api.latestProfile(signal), [])
+  const saved = savedProfileAsync.status === 'success' ? savedProfileAsync.data : null
+
+  // 服务端已有画像 → 把步骤条对勾补齐（对勾原本只来自本机 localStorage）。
+  useEffect(() => {
+    if (saved === null) return
+    setFlow({ hasResume: true, hasProfile: true })
+  }, [saved])
 
   useEffect(() => {
     if (phase !== 'uploading' && phase !== 'profiling') return
@@ -178,14 +190,47 @@ export default function UploadPage() {
     navigate('/profile', merge === null ? undefined : { state: { merge } })
   }
 
+  /** 进润色页只带「刚上传」标记：润色页据此改引导文案，绝不据此自动调 AI。 */
+  const toPolish = () => {
+    navigate('/polish', { state: { fromUpload: true } })
+  }
+
   const busy = phase === 'uploading' || phase === 'profiling'
 
   return (
     <section>
       <header className="sc-page-header">
-        <h1 className="sc-page-title">上传简历，建立你的技术画像</h1>
-        <p className="sc-page-sub">一次闭环：画像 → 面试 / 笔试 → 短板报告 → 课程</p>
+        <h1 className="sc-page-title">
+          {saved === null ? '上传简历，建立你的技术画像' : '继续你的技术画像'}
+        </h1>
+        <p className="sc-page-sub">
+          {saved === null
+            ? '一次闭环：画像 → 面试 / 笔试 → 短板报告 → 课程'
+            : '也可以上传新版简历：自动合并，保留原有能力与证据'}
+        </p>
       </header>
+
+      {phase === 'idle' && saved !== null ? (
+        <Card>
+          <div className="sc-upload-summary">
+            <p className="sc-meta-line">你已有一份技术画像</p>
+            <p className="sc-summary-meta">
+              {`目标岗位 ${saved.target_role ?? '未填写'} · 技能 ${saved.skills.length} 项 · 项目 ${saved.projects.length} 个`}
+            </p>
+            <div className="sc-btn-row">
+              <Link className="sc-btn sc-btn--primary" to="/profile">
+                查看画像
+              </Link>
+              <Link className="sc-btn sc-btn--secondary" to="/interview">
+                模拟面试
+              </Link>
+              <Link className="sc-btn sc-btn--secondary" to="/report">
+                诊断报告
+              </Link>
+            </div>
+          </div>
+        </Card>
+      ) : null}
 
       <button
         type="button"
@@ -303,7 +348,10 @@ export default function UploadPage() {
 
               <div className="sc-actions">
                 <Button onClick={toProfile}>查看画像</Button>
-                <Button variant="secondary" onClick={reset}>
+                <Button variant="secondary" onClick={toPolish}>
+                  继续润色这份简历
+                </Button>
+                <Button variant="ghost" onClick={reset}>
                   重新上传
                 </Button>
               </div>

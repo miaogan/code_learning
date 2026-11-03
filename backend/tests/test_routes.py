@@ -76,6 +76,15 @@ def test_latest_profile_404_when_empty(
     _assert_error(response.json(), "NOT_FOUND", assert_chinese)
 
 
+def test_method_not_allowed_is_localized(
+    client: TestClient, assert_chinese: Callable[[str], None]
+) -> None:
+    """框架级 405 不再直出英文 detail，统一成中文 envelope。"""
+    response = client.put("/health")
+    assert response.status_code == 405
+    _assert_error(response.json(), "METHOD_NOT_ALLOWED", assert_chinese)
+
+
 def test_generate_profile_unknown_resume_404(
     client: TestClient, assert_chinese: Callable[[str], None]
 ) -> None:

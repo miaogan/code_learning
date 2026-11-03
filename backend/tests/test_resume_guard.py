@@ -1,13 +1,8 @@
-"""上传守卫（AC-1）：白名单 / 空文件 / 失败不写库。"""
-
-from collections.abc import Iterator
-from pathlib import Path
-
-import pytest
-from fastapi.testclient import TestClient
+"""上传守卫（AC-1）：白名单 / 空文件 / 体积上限 / 失败不写库。"""
 
 from app.config import get_settings
-from app.main import app
+from fastapi.testclient import TestClient
+from pytest import MonkeyPatch
 
 RESUME_TEXT = (
     "教育经历\n2019-2023 计算机科学与技术\n"
@@ -15,20 +10,6 @@ RESUME_TEXT = (
     "项目经历\n组件库与性能优化\n"
     "技能\nReact TypeScript Python SQLite"
 )
-
-
-DB_FILE = Path(__file__).resolve().parent.parent / ".test-scaffold.db"
-
-
-@pytest.fixture()
-def client(monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
-    monkeypatch.setenv("DB_PATH", str(DB_FILE))
-    get_settings.cache_clear()
-    DB_FILE.unlink(missing_ok=True)
-    with TestClient(app) as test_client:
-        yield test_client
-    get_settings.cache_clear()
-    DB_FILE.unlink(missing_ok=True)
 
 
 def test_txt_upload_returns_metadata(client: TestClient) -> None:
@@ -65,3 +46,23 @@ def test_blank_file_never_creates_profile(client: TestClient) -> None:
     latest = client.get("/api/profiles/latest")
     assert latest.status_code == 404
     assert latest.json()["error"]["code"] == "NOT_FOUND"
+
+
+def test_oversize_file_is_rejected_by_parser(
+    client: TestClient, monkeypatch: MonkeyPatch
+) -> None:
+    """体积校验单源在 services.parser：路由只按 max_upload_bytes() 截断读取。"""
+    monkeypatch.setenv("MAX_UPLOAD_MB", "1")
+    get_settings.cache_clear()
+    try:
+        response = client.post(
+            "/api/resumes",
+            files={"file": ("big.txt", b"a" * (1024 * 1024 + 1), "text/plain")},
+        )
+        assert response.status_code == 413
+        error = response.json()["error"]
+        assert error["code"] == "FILE_TOO_LARGE"
+        assert "1MB" in error["message"]
+    finally:
+        monkeypatch.delenv("MAX_UPLOAD_MB")
+        get_settings.cache_clear()

@@ -1,11 +1,12 @@
 """精选课程清单路由（AC-6）：服务端单一 JSON 清单。"""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from ..deps import current_user
 from ..schemas import Course
 from ..services import courses
 
-router = APIRouter(prefix="/api/courses", tags=["courses"])
+router = APIRouter(prefix="/api/courses", tags=["courses"], dependencies=[Depends(current_user)])
 
 
 @router.get("", response_model=list[Course], summary="读取精选基础课程清单")

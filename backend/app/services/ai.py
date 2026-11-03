@@ -36,9 +36,10 @@ def _response_format(mode: str) -> dict[str, Any] | None:
 
 
 class AIClient:
-    def __init__(self, settings: Settings | None = None) -> None:
+    def __init__(self, settings: Settings | None = None, *, runtime: AiRuntime | None = None) -> None:
         #: 构造即快照：一次请求内 模型 / 超时 / JSON 模式 / 重试口径一致，不在 `_chat` 里现读配置。
-        self._runtime: AiRuntime = (settings or get_settings()).resolve_ai()
+        #: r23：显式 `runtime`（用户自己的 Key）优先，否则回落到服务端配置解析。
+        self._runtime: AiRuntime = runtime or (settings or get_settings()).resolve_ai()
 
     async def complete_model(
         self,
@@ -74,6 +75,10 @@ class AIClient:
             status=502,
             retryable=True,
         ) from last_error
+
+    async def ping(self) -> None:
+        """最小连通性探测（设置页「测试连接」）：只验证端点 / Key / 模型可用。"""
+        await self._chat("你是 API 连通性检测助手。", "请只回复 OK 两个字母。")
 
     async def _chat(self, system: str, user: str, timeout_s: float | None = None) -> str:
         runtime = self._runtime
@@ -115,9 +120,12 @@ class AIClient:
                 AI_UNAVAILABLE, "AI 服务暂时不可用，请稍后重试", status=503, retryable=True
             )
         if response.status_code >= 400:
-            raise AppError(
-                AI_UNAVAILABLE, "AI 调用被拒绝，请检查服务端账号与额度", status=502, retryable=False
+            message = (
+                "AI 调用被拒绝，请检查你在设置页填写的 API Key 与额度"
+                if runtime.provider == "user"
+                else "AI 调用被拒绝，请检查服务端账号与额度"
             )
+            raise AppError(AI_UNAVAILABLE, message, status=502, retryable=False)
         try:
             return str(response.json()["choices"][0]["message"]["content"])
         except (KeyError, IndexError, TypeError, ValueError) as exc:

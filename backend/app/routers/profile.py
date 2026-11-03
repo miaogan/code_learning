@@ -13,15 +13,17 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from .. import repository
+from ..deps import CurrentUser, current_user
 from ..errors import NOT_FOUND, AppError
 from ..schemas import Profile, ProfilePatch, ProfileWithMerge
+from ..services import user_ai
 from ..services.profile import generate_profile
 from ..services.profile_merge import backfill_evidence
 
-router = APIRouter(prefix="/api", tags=["profile"])
+router = APIRouter(prefix="/api", tags=["profile"], dependencies=[Depends(current_user)])
 
 
 def _document_meta(document_id: str) -> dict[str, Any]:
@@ -51,16 +53,18 @@ def read_latest_profile() -> Profile:
     response_model=ProfileWithMerge,
     summary="依据简历生成或合并画像",
 )
-async def create_profile(resume_id: str) -> ProfileWithMerge:
+async def create_profile(resume_id: str, user: CurrentUser) -> ProfileWithMerge:
     text = repository.get_document_text(resume_id)
     if text is None:
         raise AppError(NOT_FOUND, "没有找到这份简历，请重新上传后再生成画像", status=404)
     meta = _document_meta(resume_id)
+    client = user_ai.client_for(user, "light")
     return await generate_profile(
         resume_id,
         text,
         file_name=str(meta.get("file_name") or ""),
         captured_at=str(meta.get("created_at") or ""),
+        client=client,
     )
 
 

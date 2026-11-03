@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useLocation } from 'react-router-dom'
 import { ApiError, api } from '../api/client'
 import type { Report } from '../api/types'
 import { scoreRingState } from '../components/interview/ScoreBadge'
@@ -13,6 +13,7 @@ import { InlineError } from '../components/ui/InlineError'
 import { PhaseLoader } from '../components/ui/PhaseLoader'
 import { RingProgress } from '../components/ui/RingProgress'
 import { Toast } from '../components/ui/Toast'
+import { polishRoleHref } from '../lib/coach'
 import { formatScore } from '../lib/format'
 import { useAsync } from '../lib/useAsync'
 
@@ -45,6 +46,20 @@ function markdownFileName(report: Report): string {
 
 function errorMessage(error: unknown, fallback: string): string {
   return error instanceof ApiError && error.message ? error.message : fallback
+}
+
+/**
+ * `?run_ids=a,b` → 显式测评 id 列表；未带参数返回 `null`（保持「读最近一份报告」的旧语义）。
+ * 从面试/笔试结果页进来时用它把报告锁定在本场，而不是服务端默认的「最近一批」。
+ */
+function runIdsOf(search: string): string[] | null {
+  const raw = new URLSearchParams(search).get('run_ids')
+  if (raw === null) return null
+  const ids = raw
+    .split(',')
+    .map((item) => item.trim())
+    .filter((item) => item !== '')
+  return ids.length === 0 ? null : ids
 }
 
 /** 复制失败的中文原因：浏览器拒绝/不支持剪贴板时引导用户走「导出 .md」。 */
@@ -80,6 +95,14 @@ export default function ReportPage() {
   const [elapsed, setElapsed] = useState(0)
 
   const mountedRef = useRef(true)
+  const generatingRef = useRef(false)
+  const autoStartRef = useRef('')
+
+  // `?run_ids=`：从面试/笔试结果页进入时把报告锁定在本场；缺省仍是「读最近一份报告」。
+  const { search } = useLocation()
+  const requestedRunIds = useMemo(() => runIdsOf(search), [search])
+  const requestedKey = requestedRunIds === null ? '' : requestedRunIds.join(',')
+  const requested = requestedRunIds !== null
 
   // StrictMode 会挂载→卸载→再挂载：effect 体里重新置 true，避免开发态下 setState 全被守卫吞掉
   useEffect(() => {
@@ -101,10 +124,15 @@ export default function ReportPage() {
   const profilePending = profileAsync.status !== 'success' && profileAsync.status !== 'error'
   const firstLoad =
     (reportAsync.status === 'loading' && report === null) || (reportMissing && profilePending)
+  /** 带 ?run_ids= 进来：本场报告还没出来（生成中/尚未开始）。 */
+  const requestPending = requested && generated === null && generateError === null
+  /** 带 ?run_ids= 进来但本场生成失败（此时不能退回展示旧报告，否则会张冠李戴）。 */
+  const requestFailed = requested && generated === null && generateError !== null
   const generatePhase = elapsed < PHASE_STEP_S[0] ? 0 : elapsed < PHASE_STEP_S[1] ? 1 : 2
 
-  const generateReport = async () => {
-    if (generating) return
+  const generateReport = useCallback(async (runIds: string[] | null = null) => {
+    if (generatingRef.current) return
+    generatingRef.current = true
     setGenerating(true)
     setGenerateError(null)
     setExportError(null)
@@ -112,16 +140,31 @@ export default function ReportPage() {
     setToast(null)
     setElapsed(0)
     try {
-      // 不传 run_ids：服务端默认合并最近一批测评记录（前端不猜哪些记录该进报告）
-      const fresh = await api.generateReport({})
+      // 传 run_ids：只汇总本场；不传：服务端默认合并最近一批测评记录（前端不猜哪些记录该进报告）
+      const fresh = await api.generateReport(
+        runIds === null || runIds.length === 0 ? {} : { run_ids: runIds },
+      )
       if (!mountedRef.current) return
       setGenerated(fresh)
     } catch (error) {
       if (!mountedRef.current) return
       setGenerateError(errorMessage(error, '生成失败，请稍后重试；已有报告不会被覆盖'))
     } finally {
+      generatingRef.current = false
       if (mountedRef.current) setGenerating(false)
     }
+  }, [])
+
+  // 带 ?run_ids= 进入时自动生成本场报告：同一组 id 只跑一次，失败后由用户点「重试」。
+  useEffect(() => {
+    if (requestedKey === '' || autoStartRef.current === requestedKey) return
+    autoStartRef.current = requestedKey
+    void generateReport(requestedRunIds)
+  }, [requestedKey, requestedRunIds, generateReport])
+
+  /** 重新生成沿用当前入口的 id 集：带 ?run_ids= 时仍是本场，不会退回「最近一批」。 */
+  const regenerate = () => {
+    void generateReport(requestedRunIds)
   }
 
   const exportMarkdown = async () => {
@@ -188,26 +231,37 @@ export default function ReportPage() {
         本场设定条（AC-12 / DESIGN §2.6）：取参与本报告的最新面试设定，置于页头之下、正文之上。
         `interview_settings` 为 null（报告只含笔试 / 旧记录）→ 整行不渲染，不出现空条或「暂无」占位。
       */}
-      {report?.interview_settings ? <SettingsBar settings={report.interview_settings} /> : null}
+      {report?.interview_settings && !requestPending && !requestFailed ? (
+        <SettingsBar settings={report.interview_settings} />
+      ) : null}
 
       <div className="sc-profile-dim">
         {generating ? (
           <PhaseLoader
-            title="正在生成诊断报告"
+            title={requested ? '正在生成本场诊断报告' : '正在生成诊断报告'}
             phases={GENERATE_PHASES}
             active={generatePhase}
             elapsedSec={elapsed}
           />
         ) : null}
 
-        {!generating && firstLoad ? (
+        {/* 首帧先于 effect：带 ?run_ids= 时也显示「生成本场报告」，绝不闪出旧的最近报告。 */}
+        {!generating && requestPending ? (
+          <PhaseLoader title="正在生成本场诊断报告" phases={GENERATE_PHASES} active={0} />
+        ) : null}
+
+        {!generating && !requested && firstLoad ? (
           <PhaseLoader title="正在读取最近一份诊断报告" phases={['读取已有报告']} active={0} />
         ) : null}
 
-        {!generating && !firstLoad && report ? (
+        {!generating && requestFailed ? (
+          <InlineError message={generateError ?? ''} onRetry={regenerate} retryLabel="重新生成" />
+        ) : null}
+
+        {!generating && !firstLoad && !requestPending && !requestFailed && report ? (
           <div className="sc-profile-dim">
             {generateError ? (
-              <InlineError message={generateError} onRetry={generateReport} retryLabel="重新生成" />
+              <InlineError message={generateError} onRetry={regenerate} retryLabel="重新生成" />
             ) : null}
             {exportError ? (
               <InlineError message={exportError} onRetry={exportMarkdown} retryLabel="重新导出" />
@@ -250,7 +304,9 @@ export default function ReportPage() {
 
               <div className="sc-btn-row">
                 <p className="sc-meta-line">
-                  {`生成于 ${formatGeneratedAt(report.generated_at)} · 覆盖 ${report.run_ids.length} 次测评`}
+                  {`生成于 ${formatGeneratedAt(report.generated_at)} · ${
+                    requested ? '本场报告' : '最近一批测评'
+                  } · 覆盖 ${report.run_ids.length} 次测评`}
                 </p>
               </div>
 
@@ -261,7 +317,7 @@ export default function ReportPage() {
                 <Button variant="primary" onClick={exportMarkdown} loading={exporting}>
                   导出 .md
                 </Button>
-                <Button variant="secondary" onClick={generateReport} disabled={exporting}>
+                <Button variant="secondary" onClick={regenerate} disabled={exporting}>
                   重新生成
                 </Button>
               </div>
@@ -269,7 +325,10 @@ export default function ReportPage() {
               {/* 润色入口：只在既有按钮行之后追加，复制/导出/重生成的顺序与文案零改动（AC-14 不回归） */}
               <div className="sc-btn-row sc-report-polish">
                 <p className="sc-meta-line">让简历更贴近这个目标岗位</p>
-                <Link className="sc-btn sc-btn--secondary is-sm" to="/polish">
+                <Link
+                  className="sc-btn sc-btn--secondary is-sm"
+                  to={polishRoleHref(report.role_fit?.target_role ?? null)}
+                >
                   润色简历
                 </Link>
               </div>
@@ -290,7 +349,7 @@ export default function ReportPage() {
           </div>
         ) : null}
 
-        {!generating && !firstLoad && report === null && profileMissing ? (
+        {!generating && !firstLoad && !requested && report === null && profileMissing ? (
           <EmptyState
             reason="诊断报告要先有一份画像：上传简历后会自动解析技能与项目，再去做模拟面试或笔试，这里才会产出带证据的短板清单。"
             actionLabel="上传简历"
@@ -300,6 +359,7 @@ export default function ReportPage() {
 
         {!generating &&
         !firstLoad &&
+        !requested &&
         report === null &&
         !profileMissing &&
         profileAsync.error !== null ? (
@@ -308,18 +368,19 @@ export default function ReportPage() {
 
         {!generating &&
         !firstLoad &&
+        !requested &&
         report === null &&
         !profileMissing &&
         profileAsync.error === null &&
         reportMissing ? (
           <div className="sc-profile-dim">
             {generateError ? (
-              <InlineError message={generateError} onRetry={generateReport} retryLabel="重试" />
+              <InlineError message={generateError} onRetry={regenerate} retryLabel="重试" />
             ) : null}
             <EmptyState
               reason="还没有诊断报告：完成一轮面试或笔试后，这里会给出 3–5 条带题目证据的短板，按严重度排序并直连基础课程。"
               actionLabel="生成诊断报告"
-              onAction={generateReport}
+              onAction={regenerate}
             />
             <div className="sc-btn-row">
               <p className="sc-meta-line">还没有作答记录？先完成一次测评</p>
@@ -335,6 +396,7 @@ export default function ReportPage() {
 
         {!generating &&
         !firstLoad &&
+        !requested &&
         report === null &&
         !profileMissing &&
         profileAsync.error === null &&

@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # 生成/更新公网 Basic Auth 密码文件（frontend/.htpasswd，不入库、不进镜像）。
 #
+# 注意（r23 起）：产品级登录已取代 nginx Basic Auth，compose 不再挂载该文件。
+# 本脚本仅供回滚到 r21 公网 Basic Auth 时使用，日常部署不需要运行。
+#
 # 用法：
 #   scripts/gen-htpasswd.sh                    # 默认用户 skillcoach，随机密码
 #   scripts/gen-htpasswd.sh owner MyPass123    # 指定用户与密码

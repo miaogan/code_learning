@@ -57,10 +57,11 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
 │     ├─ api/types.ts                 # 与后端 schema 同构的 TS 类型（snake_case）*
 │     ├─ lib/format.ts               # 分数 / 用时 / 字数格式化（mono 数值统一入口）*
 │     ├─ state/flow.ts               # 步骤进度标记（localStorage，useSyncExternalStore）*
+│     ├─ state/aiGate.ts             # AI 能力不足（403 AI_KEY_REQUIRED）全局提示，壳层横幅消费 *
 │     ├─ styles/tokens.css           # DESIGN §0.2–0.4 全量 token *
 │     ├─ styles/base.css             # reset + 壳布局 + 组件类（`.sc-*`）*
 │     ├─ components/ui/              # 通用件：Button / Card / Chip / RingProgress /
-│     │                                Stepper / PhaseLoader / InlineError / EmptyState *
+│     │                                Stepper / PhaseLoader / InlineError / EmptyState / AiKeyBanner *
 │     ├─ pages/                      # 6 页：Upload / Profile / Interview / Exam / Report / History *
 │     └─ test/format.test.ts         # vitest 单测（格式化函数）*
 └─ backend/                           # FastAPI 服务
@@ -95,6 +96,7 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
 | `src/api/client.ts` | 唯一 HTTP 出口：base 解析、JSON、错误 envelope → `ApiError` | 页面与组件**禁止**直接 `fetch` |
 | `src/api/types.ts` | 契约类型（字段名与后端一致，snake_case） | 改字段必须同步 `backend/app/schemas.py` |
 | `src/state/flow.ts` | `hasResume / hasProfile / hasReport` 三标记 + 订阅 | 仅作步骤门禁提示；**后端为权威** |
+| `src/state/aiGate.ts` | `AI_KEY_REQUIRED` 提示状态（client 上报、`AiKeyBanner` 消费） | 仅存文案，不做跳转；跳转由横幅按钮负责 |
 | `src/styles/tokens.css` | DESIGN §0.2–0.4 全部变量 | 禁止组件内写裸色值 / 裸 px 尺寸 |
 | `src/components/ui/*` | 通用件（无业务语义） | 只接 props，不 import `api` |
 | `src/pages/*` | 页面装配、状态机（idle/loading/error/empty/success） | 只经 `api/client.ts` 取数 |
@@ -150,7 +152,7 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
 { "error": { "code": "FILE_TOO_LARGE", "message": "文件超过 10MB，请压缩或分卷", "retryable": false } }
 ```
 
-`code` 闭集（`app/errors.py` 常量）：`EMPTY_FILE` `ENCRYPTED_PDF` `FILE_TOO_LARGE` `UNSUPPORTED_TYPE` `PARSE_FAILED` `AI_UNAVAILABLE` `AI_SCHEMA_INVALID` `NOT_IMPLEMENTED` `NOT_FOUND` `VALIDATION_ERROR`。**message 一律中文**，且不含文件绝对路径、堆栈、模型端点或 key。
+`code` 闭集（`app/errors.py` 常量）：`EMPTY_FILE` `ENCRYPTED_PDF` `FILE_TOO_LARGE` `UNSUPPORTED_TYPE` `PARSE_FAILED` `AI_UNAVAILABLE` `AI_SCHEMA_INVALID` `NOT_IMPLEMENTED` `NOT_FOUND` `VALIDATION_ERROR` `HTTP_ERROR`（其它框架级状态透传）`METHOD_NOT_ALLOWED`（框架级 405 中文 envelope），r23 增 `AUTH_REQUIRED` `AUTH_INVALID` `AUTH_DISABLED` `AUTH_RATE_LIMITED`（HTTP 429，登录失败达阈值后锁定）`PASSWORD_INVALID` `FORBIDDEN` `AI_KEY_REQUIRED` `AI_QUOTA_EXCEEDED` `AI_KEY_STORE_UNAVAILABLE`。**message 一律中文**，且不含文件绝对路径、堆栈、模型端点或 key。
 
 ### 3.4 数据模型（SQLite，`backend/app.db`）
 
@@ -165,6 +167,9 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
 | `question_attempts` | `id TEXT PK, question_id, run_id, correct INT(0/1), answered_at, created_at`，`UNIQUE(question_id, run_id)` | r6 客观题作答事件：熟练度判定的唯一事实源（简答不计分故永不写入） |
 
 > 共 **7 张表**（r1 的 4 张 + r3 的 `timeline_events` + r6 的 `questions` / `question_attempts`）。DDL 只有 `app/db.py` 一处出处，SQL 只有 `app/repository.py` 一处出口。
+>
+> r23 追加 `users` / `sessions` / `ai_usage` 三张表，并给上表 6 张业务表（除共享题库 `questions`）各加
+> `user_id TEXT NOT NULL DEFAULT 'default'`；存量行由 `ADD COLUMN ... DEFAULT` 直接回填为 `default`。见 §3.8。
 
 约定：时间为 ISO-8601 UTC 字符串；payload 存 JSON 文本，读写两侧过 pydantic 模型；`init_db()` 只用 `CREATE TABLE IF NOT EXISTS`，字段变更需在 `memory.md` 记录一次性升级说明（不做迁移框架）。
 
@@ -229,6 +234,33 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
 - 步骤门禁：`state/flow.ts` 的 localStorage 标记只用于「侧栏对勾 + 提示先完成上一步」；**刷新后的真实数据以 `GET /api/profiles/latest`、`GET /api/reports/latest` 为准**（避免标记与库不一致）。
 - 未上传简历时直达 `/profile` `/interview` `/exam` `/report`：目标页渲染 `EmptyState`（原因句 + 主按钮「上传简历」），**不重定向、不白屏**（DESIGN §4.3）。
 - 前端不出现任何 Key / 端点 / 模型名（AC-8）；`.env.example` 只给 `VITE_API_BASE`。
+- r23 起 `flow.ts` 的键是 `sc.flow.<userId>`（`bindFlowToUser()` 随登录态切换命名空间），登出回匿名基线。
+
+### 3.8 登录、会话与多用户隔离（r23）
+
+| 路径 | 职责 |
+| --- | --- |
+| `app/auth.py` | `scrypt` 密码哈希 / 校验、会话 token（库里只存 SHA-256 摘要）、Cookie 读写（`sc_session`，HttpOnly + SameSite=Lax） |
+| `app/context.py` | `ContextVar` 承载当前 `user_id`（缺省 `'default'`） |
+| `app/deps.py` | **async** 依赖 `current_user`（sync 依赖跑线程池，ContextVar 写不回端点上下文）；类型别名 `CurrentUser = Annotated[...]` 规避 ruff B008 |
+| `app/services/user_ai.py` | per-user AI 单一出口：能力分级 `full \| light \| none`、内置 Key 每日配额、Fernet 加密存取 Key |
+| `app/admin_cli.py` | 管理员建号（`--id` 可指定，如 `default` 接管存量）/ 切 Key 模式 / 停用 / 重置密码 / 列表 / `adopt-default` 存量改挂（不开放注册的唯一入口） |
+
+- 隔离口径：`repository.py` 全部读写 SQL 带 `user_id` 条件；按 id 取数查不到即 404（不暴露跨用户存在性）。
+- 能力分级：light = 画像生成 + 润色建议；heavy = 一键成稿 / 模拟面试（开局与每题）/ 诊断报告；笔试 / 练习 / 题库 / 时间线 / 历史 / 课程零 AI 不受限。
+- `own` 未配 Key ⇒ `none`，heavy 直接 403 `AI_KEY_REQUIRED`（`retryable=false`）；`shared` 恒 `light` 且受 `SHARED_AI_DAILY_LIMIT` 约束（超限 429 `AI_QUOTA_EXCEEDED`）。
+- Key 明文只进 `Fernet` 密文列，所有响应只回 `****后4位`；`SECRET_KEY` 为空时保存 Key 返回 503 `AI_KEY_STORE_UNAVAILABLE`。
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| POST | `/api/auth/login` | `{email,password}` → 设 Cookie + `MeResponse` |
+| POST | `/api/auth/logout` | 204，清 Cookie |
+| GET | `/api/me` | 当前用户 + `ai_capability` + `ai_masked_key` + 内置配额 `ai_quota_used` / `ai_quota_limit` |
+| PUT | `/api/me/ai` | 保存/沿用 Key（`api_key` 缺省=不改） |
+| DELETE | `/api/me/ai` | 清除自带 Key（保留 Base URL/模型），能力降 `none` |
+| POST | `/api/me/ai/test` | 用表单/已存 Key 做一次最小调用 → `{ok,message}` |
+| PATCH | `/api/me/password` | 204；旧会话全部失效 |
+
 
 ---
 
@@ -335,3 +367,5 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
 | r11 `TECHNICAL.md` | 未记 `exam_selector._prefer_kind_diversity()` 与 `PromptBody.tsx` | 二者已落盘：题型覆盖是取题策略（见 `services/exam_selector.py` 模块 docstring）；`components/exam/PromptBody.tsx` 是题面围栏渲染唯一出口（题卡与错题本共用）；练习与笔试的共享口径见 §3.4.3 |
 | r11 `QA-REPORT.md` | 缺 AC-16 要求的「练习 vs 笔试共用同一题库」说明段 | 已按不可变约定补记在 §3.4.3（r17 收口） |
 | r12 `TECH-CHANGE.md` §3.2 | id 前缀写 `iq-NNN` | 实现取 `iq380-`（避开面试发言 `iq-` 域），见 §3.4.2 |
+| r3 `DESIGN.md` §0.5-4 | 摘要条 48 高按 `2px 边框 + 12px×2 内边距 + 22px 行高` 推导 | 常规态一致；`has-action` 态为容纳 40 高按钮，上下内边距取 `calc(var(--sp-1) - 1px)`（3px），即 `2 + 3×2 + 40 = 48`，在 border-box 下总高仍守 48（`styles/base.css` `.sc-merge-bar.has-action`） |
+| r5 `TECHNICAL.md` | 未声明前端 lint 的「警告阈值」 | `frontend/package.json` 的 `npm run lint` 固定 `eslint . --max-warnings 28`：存量 28 条警告为基线，新增任何警告即门禁失败；下调基线须随代码清理同步改脚本，不写回历史任务夹 |

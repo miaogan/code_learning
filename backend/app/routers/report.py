@@ -4,22 +4,28 @@
 `markdown` 是同一份报告的文本投影（AC-9「导出与页面一致」靠它同源）。
 """
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.responses import PlainTextResponse
 
 from .. import repository
+from ..deps import CurrentUser, current_user
 from ..errors import NOT_FOUND, AppError
 from ..schemas import Report, ReportGenerateRequest
+from ..services import user_ai
 from ..services.diagnosis import build_report
 from ..services.markdown import to_markdown
 
-router = APIRouter(prefix="/api/reports", tags=["report"])
+router = APIRouter(prefix="/api/reports", tags=["report"], dependencies=[Depends(current_user)])
 
 
 @router.post("/generate", response_model=Report, summary="合并测评结果生成短板报告")
-async def generate_report(payload: ReportGenerateRequest | None = None) -> Report:
+async def generate_report(
+    user: CurrentUser,
+    payload: ReportGenerateRequest | None = None,
+) -> Report:
     body = payload or ReportGenerateRequest()
-    return await build_report(body.run_ids)
+    client = user_ai.client_for(user, "heavy")
+    return await build_report(body.run_ids, client=client)
 
 
 @router.get("/latest", response_model=Report, summary="读取最近一份诊断报告")
