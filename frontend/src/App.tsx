@@ -63,6 +63,11 @@ export default function App() {
         <main className="sc-main">
           <div className="sc-topstepper">
             <Stepper steps={steps} orientation="horizontal" />
+            {/* r21：<1024 侧栏 display:none，而 ToolNav 此前只渲染在侧栏内 —— 手机上
+                「练习 / 成绩趋势 / 简历润色」三个工具页没有任何入口。这里复用同一份
+                TOOL_ITEMS 渲染横向工具条（组件早已支持 orientation="horizontal"）；
+                桌面由 `@media (min-width:1024px) { .sc-topstepper: display:none }` 隐藏本容器。 */}
+            <ToolNav items={TOOL_ITEMS} orientation="horizontal" />
           </div>
           <div className="sc-page">
             <Routes>

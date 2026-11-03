@@ -42,6 +42,10 @@ backend/tests/.tmp/
 .env.*
 !.env.example
 
+# 公网 Basic Auth 密码文件（内网穿透暴露端口后的唯一鉴权闸门）：绝不入库，
+# 本地用 scripts/gen-htpasswd.sh 生成；compose 运行时挂载进 nginx 容器
+frontend/.htpasswd
+
 # 编辑器与系统
 .vscode/
 .idea/

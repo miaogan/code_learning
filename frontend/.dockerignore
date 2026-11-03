@@ -19,3 +19,6 @@ coverage/
 # 本机环境配置不应进入镜像构建上下文（生产走同源反代，不需要 VITE_API_BASE）
 .env
 .env.*
+
+# 公网 Basic Auth 密码文件：运行时由 compose 挂载，绝不烤进镜像
+.htpasswd

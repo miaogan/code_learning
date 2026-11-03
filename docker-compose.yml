@@ -59,6 +59,11 @@ services:
     restart: unless-stopped
     ports:
       - '${WEB_PORT:-8080}:80'
+    volumes:
+      # 公网 Basic Auth 密码文件（r21）：只读挂载，不入库、不进镜像。
+      # 前置：先跑 scripts/gen-htpasswd.sh 生成 frontend/.htpasswd —— 文件缺失时 docker
+      # 会把它创建成同名空目录，nginx 启动即报错（不会静默放行）。该文件在 .gitignore 内。
+      - ./frontend/.htpasswd:/etc/nginx/.htpasswd:ro
     depends_on:
       backend:
         # 等 backend 真正 /health 通过再起前端：探针未过时 nginx 反代上去必是 502。

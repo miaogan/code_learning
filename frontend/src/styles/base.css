@@ -3780,3 +3780,68 @@ input:not([type='radio']):not([type='checkbox']):not([type='file']):disabled {
   }
 }
 
+/* ---------- r21 · <1024 顶部导航：可滑动的完整文字导航 + 44 触控 ---------- */
+/* 两处实测缺陷要一起修：
+   ① 侧栏在 <1024 是 display:none，而 ToolNav（练习/成绩趋势/简历润色）此前只渲染在
+      侧栏内 ⇒ 手机上三个工具页完全没有入口（不是尺寸问题，是缺失功能）；
+   ② 顶部步骤条按 DESIGN §1.2 只留 5 个圆点，每项高 16 —— 看不到步骤名、也点不准。
+   做法：Stepper 与 ToolNav(horizontal) 同排放进 .sc-topstepper，整条横向滚动；
+   文字全部显示，每项 44 高（--touch-min）。桌面规则不改（本段只在 <1024 生效）。 */
+@media (max-width: 1023px) {
+  .sc-topstepper {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    padding: var(--sp-1) var(--sp-4);
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    /* 顶部条自带底分割线，与顶栏分出区域；滚动条隐藏（触屏靠手势滑） */
+    border-bottom: 1px solid var(--border-hair);
+    scrollbar-width: none;
+  }
+
+  .sc-topstepper::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* 两段导航都不许被压缩，否则圆点和文字会被挤没 */
+  .sc-topstepper > .sc-stepper,
+  .sc-topstepper > .sc-toolnav,
+  .sc-stepper.is-horizontal .sc-step,
+  .sc-toolnav.is-horizontal .sc-toolnav-item {
+    flex: none;
+  }
+
+  /* 工具条并入同一条滚动行：去掉它自身的边线与内边距，避免出现两条分割线 */
+  .sc-topstepper .sc-toolnav.is-horizontal {
+    margin: 0;
+    padding: 0;
+    border-bottom: none;
+  }
+
+  /* 44 触控：整项（含文字区）都可点，不再只有 16 高的圆点 */
+  .sc-stepper.is-horizontal,
+  .sc-toolnav.is-horizontal,
+  .sc-stepper.is-horizontal .sc-step,
+  .sc-toolnav.is-horizontal .sc-toolnav-item {
+    height: var(--touch-min);
+    min-height: var(--touch-min);
+  }
+
+  .sc-stepper.is-horizontal .sc-step,
+  .sc-toolnav.is-horizontal .sc-toolnav-item {
+    padding: 0 var(--sp-3);
+  }
+
+  /* 恢复步骤文字：只留圆点的口径在手机上不可用（看不到自己在哪一步） */
+  .sc-stepper.is-horizontal .sc-step-label {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
+    white-space: nowrap;
+    text-overflow: clip;
+  }
+}
+
