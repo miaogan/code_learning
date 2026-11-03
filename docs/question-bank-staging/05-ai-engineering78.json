@@ -1,0 +1,2152 @@
+[
+  {
+    "n": 1,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "zero-shot、one-shot、few-shot 提示的核心区别在于？",
+    "options": [
+      {
+        "key": "A",
+        "text": "是否提供示例：zero 无示例、one 给 1 个、few 给多个示例"
+      },
+      {
+        "key": "B",
+        "text": "模型参数量不同"
+      },
+      {
+        "key": "C",
+        "text": "仅在微调时才使用"
+      },
+      {
+        "key": "D",
+        "text": "只影响生成速度"
+      }
+    ],
+    "answer": "A",
+    "explanation": "三者指推理时是否提供任务示例；示例能显著提升复杂任务的遵循度与格式一致性。"
+  },
+  {
+    "n": 2,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "下列哪些属于常见的高级 Prompt 技巧？",
+    "options": [
+      {
+        "key": "A",
+        "text": "Chain-of-Thought（思维链）"
+      },
+      {
+        "key": "B",
+        "text": "角色设定（system persona）"
+      },
+      {
+        "key": "C",
+        "text": "少样本示例（few-shot）"
+      },
+      {
+        "key": "D",
+        "text": "增大 max_tokens 即可提升推理"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "CoT、角色设定、少样本都是经典提升技巧；增大 max_tokens 只是放宽输出长度，不属于提示技巧。"
+  },
+  {
+    "n": 3,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "Chain-of-Thought（思维链）提示的主要作用是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "让模型分步推理，降低复杂任务出错率"
+      },
+      {
+        "key": "B",
+        "text": "加快 token 生成速度"
+      },
+      {
+        "key": "C",
+        "text": "减少上下文长度"
+      },
+      {
+        "key": "D",
+        "text": "强制模型只输出 JSON"
+      }
+    ],
+    "answer": "A",
+    "explanation": "CoT 引导模型显式写出中间推理步骤，把复杂问题拆解为可验证子步骤，显著提升算术/逻辑/多跳推理准确率。"
+  },
+  {
+    "n": 4,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "系统提示（System Prompt）与用户提示（User Prompt）的主要区别是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "系统提示设定角色/规则/边界，用户提示承载具体任务"
+      },
+      {
+        "key": "B",
+        "text": "两者完全等价"
+      },
+      {
+        "key": "C",
+        "text": "系统提示只在微调时有效"
+      },
+      {
+        "key": "D",
+        "text": "用户提示优先级更低"
+      }
+    ],
+    "answer": "A",
+    "explanation": "系统提示在对话最前定义模型身份与全局规则；用户提示是每轮具体请求，系统提示通常优先级最高。"
+  },
+  {
+    "n": 5,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "judge",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "Prompt 越长，模型输出质量一定越高。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "错误",
+    "explanation": "提示过长会引入噪声、稀释关键指令、挤占上下文，反而可能降低质量；质量取决于清晰度与结构。"
+  },
+  {
+    "n": 6,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "面对 Prompt 注入攻击，下列哪种做法是有效的缓解手段？",
+    "options": [
+      {
+        "key": "A",
+        "text": "隔离并标注不可信外部内容，并对输出做约束与护栏"
+      },
+      {
+        "key": "B",
+        "text": "把外部文本直接拼进系统提示以提升相关性"
+      },
+      {
+        "key": "C",
+        "text": "完全禁止任何用户输入"
+      },
+      {
+        "key": "D",
+        "text": "仅依赖增大 temperature"
+      }
+    ],
+    "answer": "A",
+    "explanation": "注入靠“劫持指令”生效；隔离不可信内容、标注来源、输出约束与最小权限工具授权是核心防线。"
+  },
+  {
+    "n": 7,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "结构化输出（JSON Mode / Function Calling）在应用开发中的核心价值是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "让模型产出可被程序直接解析的确定格式"
+      },
+      {
+        "key": "B",
+        "text": "提升模型参数规模"
+      },
+      {
+        "key": "C",
+        "text": "缩短上下文窗口"
+      },
+      {
+        "key": "D",
+        "text": "替代所有自然语言交互"
+      }
+    ],
+    "answer": "A",
+    "explanation": "结构化输出避免脆弱的正则抽取，是 LLM 接入下游逻辑、数据落库与工具调用的关键接口。"
+  },
+  {
+    "n": 8,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "关于“好的 Prompt”，下列说法正确的有？",
+    "options": [
+      {
+        "key": "A",
+        "text": "指令清晰、目标明确"
+      },
+      {
+        "key": "B",
+        "text": "给出必要格式与约束"
+      },
+      {
+        "key": "C",
+        "text": "复杂任务可配示例"
+      },
+      {
+        "key": "D",
+        "text": "越长越好、信息越堆越多越稳"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "清晰指令、格式约束与适度示例是高质量提示的共性；冗长堆砌反而稀释信号。"
+  },
+  {
+    "n": 9,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "调用 LLM API 时，temperature 参数主要控制什么？",
+    "options": [
+      {
+        "key": "A",
+        "text": "输出的随机性/多样性"
+      },
+      {
+        "key": "B",
+        "text": "最大输出长度"
+      },
+      {
+        "key": "C",
+        "text": "输入 token 上限"
+      },
+      {
+        "key": "D",
+        "text": "计费单价"
+      }
+    ],
+    "answer": "A",
+    "explanation": "temperature 越高输出越随机多样，越低越确定保守；0 适合需要稳定性的任务。"
+  },
+  {
+    "n": 10,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "关于 LLM 的 token，下列说法正确的是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "token 是模型处理文本的最小单位，计费与限流通常按 token 计"
+      },
+      {
+        "key": "B",
+        "text": "一个汉字固定等于一个 token"
+      },
+      {
+        "key": "C",
+        "text": "token 只统计输出不计输入"
+      },
+      {
+        "key": "D",
+        "text": "token 数量与字符数永远相等"
+      }
+    ],
+    "answer": "A",
+    "explanation": "token 是分词后的最小单元，API 一般按输入+输出 token 计费并设总量上限。"
+  },
+  {
+    "n": 11,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "什么是流式输出（streaming）？为什么聊天应用普遍使用它？",
+    "options": [
+      {
+        "key": "A",
+        "text": "逐 token 返回，降低首字延迟、提升交互体验"
+      },
+      {
+        "key": "B",
+        "text": "一次性返回完整结果以节省带宽"
+      },
+      {
+        "key": "C",
+        "text": "仅用于离线批处理"
+      },
+      {
+        "key": "D",
+        "text": "会显著降低生成质量"
+      }
+    ],
+    "answer": "A",
+    "explanation": "流式让服务端边生成边推送，首字时间（TTFT）大幅缩短；底层常基于 SSE 或 WebSocket。"
+  },
+  {
+    "n": 12,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "max_tokens 参数限制的是单次请求中模型生成的最大输出 token 数。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "正确",
+    "explanation": "以 OpenAI 等主流 API 为例，max_tokens 指 completion 上限；输入长度另由模型上下文窗口约束。"
+  },
+  {
+    "n": 13,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "应用层处理 LLM 速率限制（rate limit）的正确做法包括？",
+    "options": [
+      {
+        "key": "A",
+        "text": "指数退避+抖动重试"
+      },
+      {
+        "key": "B",
+        "text": "并发限流（令牌桶/信号量）"
+      },
+      {
+        "key": "C",
+        "text": "对可幂等请求才重试"
+      },
+      {
+        "key": "D",
+        "text": "忽略限流直接高频请求"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "限流需退避重试、并发控制与幂等判断；对不可幂等请求重试可能放大副作用。"
+  },
+  {
+    "n": 14,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "什么是上下文窗口（context window）？超出会发生什么？",
+    "options": [
+      {
+        "key": "A",
+        "text": "模型单次能处理的最大 token 数；超出会被截断或报错"
+      },
+      {
+        "key": "B",
+        "text": "用户界面的宽度"
+      },
+      {
+        "key": "C",
+        "text": "训练数据集大小"
+      },
+      {
+        "key": "D",
+        "text": "每次会话的固定费用"
+      }
+    ],
+    "answer": "A",
+    "explanation": "上下文窗口是输入+输出 token 的总容量上限；超出时旧内容被截断或请求被拒，需靠截断/摘要/外部记忆解决。"
+  },
+  {
+    "n": 15,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "关于 top_p 与 temperature，下列说法正确的有？",
+    "options": [
+      {
+        "key": "A",
+        "text": "top_p 按累积概率截断候选词集（核采样）"
+      },
+      {
+        "key": "B",
+        "text": "temperature 缩放 logits 改变分布"
+      },
+      {
+        "key": "C",
+        "text": "两者通常不必同时拉到极高"
+      },
+      {
+        "key": "D",
+        "text": "top_p 控制最大输出长度"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "top_p 是核采样阈值，temperature 是分布温度；输出长度由 max_tokens 控制。"
+  },
+  {
+    "n": 16,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "temperature=0 时，同一 prompt 多次调用结果一定完全一致。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "错误",
+    "explanation": "即便 temperature=0，部分实现仍存在非确定性（并行采样、量化、服务端负载），只能说高度可复现。"
+  },
+  {
+    "n": 17,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "LLM 调用缓存在哪些场景适用？",
+    "options": [
+      {
+        "key": "A",
+        "text": "幂等且结果稳定的请求"
+      },
+      {
+        "key": "B",
+        "text": "对时效性不敏感的知识问答"
+      },
+      {
+        "key": "C",
+        "text": "含用户私有/实时数据的请求"
+      },
+      {
+        "key": "D",
+        "text": "模板化生成"
+      }
+    ],
+    "answer": "A,B,D",
+    "explanation": "缓存适合稳定、非实时、可幂等的内容；含私有/实时数据的请求禁止缓存以防串味与越权。"
+  },
+  {
+    "n": 18,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "什么是 Embedding（嵌入向量）？它如何表示语义？",
+    "options": [
+      {
+        "key": "A",
+        "text": "把文本映射为稠密向量，语义相近的文本向量距离更近"
+      },
+      {
+        "key": "B",
+        "text": "把文本按字符编码成 ASCII"
+      },
+      {
+        "key": "C",
+        "text": "仅用于图像压缩"
+      },
+      {
+        "key": "D",
+        "text": "与词袋模型完全相同"
+      }
+    ],
+    "answer": "A",
+    "explanation": "Embedding 把文本投影到高维连续空间，语义相似的样本在空间中邻近，支持基于距离的语义检索。"
+  },
+  {
+    "n": 19,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "常见的向量相似度度量包括？",
+    "options": [
+      {
+        "key": "A",
+        "text": "余弦相似度"
+      },
+      {
+        "key": "B",
+        "text": "点积"
+      },
+      {
+        "key": "C",
+        "text": "欧氏距离"
+      },
+      {
+        "key": "D",
+        "text": "词频差"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "余弦衡量方向一致性、点积衡量方向与幅度、欧氏衡量绝对距离；选哪种取决于是否归一化及是否关注模长。"
+  },
+  {
+    "n": 20,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "judge",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "Embedding 维度越高，语义表示一定越好。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "错误",
+    "explanation": "维度需与训练任务匹配；过高易过拟合且浪费算力，更关键的是模型质量与对齐方式。"
+  },
+  {
+    "n": 21,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "向量数据库相比传统关系型数据库的核心差异是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "原生支持近似最近邻（ANN）检索而非精确等值/范围查询"
+      },
+      {
+        "key": "B",
+        "text": "不支持任何索引"
+      },
+      {
+        "key": "C",
+        "text": "只能存储字符串"
+      },
+      {
+        "key": "D",
+        "text": "完全不支持事务"
+      }
+    ],
+    "answer": "A",
+    "explanation": "向量库针对高维向量的相似性搜索做了专用索引（HNSW、IVF 等）；传统关系库擅长结构化查询。"
+  },
+  {
+    "n": 22,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "下列哪些是主流向量数据库/方案及其适用场景？",
+    "options": [
+      {
+        "key": "A",
+        "text": "Milvus/Qdrant/Weaviate 适合自建大规模检索"
+      },
+      {
+        "key": "B",
+        "text": "Pinecone 是托管 Serverless 方案，运维省心"
+      },
+      {
+        "key": "C",
+        "text": "pgvector 适合已用 Postgres、复用事务与 SQL 的中小场景"
+      },
+      {
+        "key": "D",
+        "text": "向量数据库不能和 SQL 共存，必须彻底替换关系库"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "方案各有侧重；pgvector 等证明向量能力可内嵌于关系库，并非非此即彼。"
+  },
+  {
+    "n": 23,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "为什么大规模向量检索普遍采用 ANN（近似最近邻）而非精确 KNN？",
+    "options": [
+      {
+        "key": "A",
+        "text": "精确 KNN 随数据量超线性变慢，ANN 以可接受精度损失换数量级加速"
+      },
+      {
+        "key": "B",
+        "text": "ANN 结果永远比 KNN 更准"
+      },
+      {
+        "key": "C",
+        "text": "KNN 无法并行"
+      },
+      {
+        "key": "D",
+        "text": "ANN 不需要任何索引"
+      }
+    ],
+    "answer": "A",
+    "explanation": "精确 KNN 在亿级向量下开销不可接受；ANN（HNSW、IVF-PQ）通过图/聚类索引快速逼近 Top-K，是 RAG 在线检索基石。"
+  },
+  {
+    "n": 24,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "关于 HNSW 索引，下列说法正确的有？",
+    "options": [
+      {
+        "key": "A",
+        "text": "分层可导航小世界图，查询从稀疏顶层贪心下降到底层精搜"
+      },
+      {
+        "key": "B",
+        "text": "召回高、查询快"
+      },
+      {
+        "key": "C",
+        "text": "建图内存占用大、写入/删除较贵"
+      },
+      {
+        "key": "D",
+        "text": "是一种精确最近邻算法，结果零误差"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "HNSW 用图索引换取速度与召回，代价是内存与写放大；它仍是近似而非精确算法。"
+  },
+  {
+    "n": 25,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "stem": "向量检索只能用于文本，不能用于图像或音频。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "错误",
+    "explanation": "多模态嵌入模型（如 CLIP）能把图像/音频编码到同一向量空间，同样可做相似检索与跨模态搜索。"
+  },
+  {
+    "n": 26,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "对向量做 L2 归一化后，余弦相似度等价于？",
+    "options": [
+      {
+        "key": "A",
+        "text": "点积"
+      },
+      {
+        "key": "B",
+        "text": "欧氏距离平方的一半"
+      },
+      {
+        "key": "C",
+        "text": "曼哈顿距离"
+      },
+      {
+        "key": "D",
+        "text": "汉明距离"
+      }
+    ],
+    "answer": "A",
+    "explanation": "归一化后向量模长为 1，余弦相似度 = 两向量点积；这也是很多向量库要求先 normalize 再只用点积加速的原因。"
+  },
+  {
+    "n": 27,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "RAG（检索增强生成）主要解决了 LLM 的哪些问题？",
+    "options": [
+      {
+        "key": "A",
+        "text": "知识滞后、幻觉、私有数据不可达"
+      },
+      {
+        "key": "B",
+        "text": "模型参数量不足"
+      },
+      {
+        "key": "C",
+        "text": "训练速度慢"
+      },
+      {
+        "key": "D",
+        "text": "仅解决中文支持"
+      }
+    ],
+    "answer": "A",
+    "explanation": "RAG 在生成前先检索权威/私有文档注入上下文，缓解知识截止、减少无依据幻觉，并让模型用到私域数据。"
+  },
+  {
+    "n": 28,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "标准 RAG 流程通常包含哪些阶段？",
+    "options": [
+      {
+        "key": "A",
+        "text": "检索（retrieval）"
+      },
+      {
+        "key": "B",
+        "text": "增强（augmentation，拼入上下文）"
+      },
+      {
+        "key": "C",
+        "text": "生成（generation）"
+      },
+      {
+        "key": "D",
+        "text": "模型重新训练"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "RAG 是推理期流程：检索→拼入提示增强→交给 LLM 生成；不涉及训练/微调。"
+  },
+  {
+    "n": 29,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "关于文档切分（chunking），下列说法正确的有？",
+    "options": [
+      {
+        "key": "A",
+        "text": "固定长度切分实现简单但可能割裂语义"
+      },
+      {
+        "key": "B",
+        "text": "按标题/语义递归切分更友好"
+      },
+      {
+        "key": "C",
+        "text": "滑动窗口重叠可缓解边界割裂"
+      },
+      {
+        "key": "D",
+        "text": "切得越大越好，越多上下文越准"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "粒度太小丢上下文、太大引噪声；重叠可缓解边界问题，但都需结合检索器与任务调节。"
+  },
+  {
+    "n": 30,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "RAG 中检索到的文档越多，最终答案一定越准确。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "错误",
+    "explanation": "过多无关片段会稀释关键信号、挤占上下文并放大噪声，反而降低质量；需配合重排与相关性阈值。"
+  },
+  {
+    "n": 31,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "Advanced RAG 相对 Naive RAG 常用的优化手段包括？",
+    "options": [
+      {
+        "key": "A",
+        "text": "查询改写/扩展"
+      },
+      {
+        "key": "B",
+        "text": "混合检索（向量+关键词）"
+      },
+      {
+        "key": "C",
+        "text": "重排序（rerank）"
+      },
+      {
+        "key": "D",
+        "text": "上下文压缩"
+      }
+    ],
+    "answer": "A,B,C,D",
+    "explanation": "从检索前后两头优化：query 侧改写、召回侧混合、精排侧 rerank、送入侧压缩，全面提升相关性与信噪比。"
+  },
+  {
+    "n": 32,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "RAG 中的重排序（rerank）用于解决什么问题？",
+    "options": [
+      {
+        "key": "A",
+        "text": "对初召回结果按相关性二次精排，提升送入 LLM 的片段质量"
+      },
+      {
+        "key": "B",
+        "text": "压缩模型参数量"
+      },
+      {
+        "key": "C",
+        "text": "替代向量数据库"
+      },
+      {
+        "key": "D",
+        "text": "仅用于图像生成"
+      }
+    ],
+    "answer": "A",
+    "explanation": "向量召回侧重速度、精度有限；rerank 模型（如 cross-encoder）对 query-doc 联合打分，精排出 top 片段。"
+  },
+  {
+    "n": 33,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "混合检索（hybrid search）相比纯向量检索的优势是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "结合语义向量与关键词（BM25）互补，兼顾意图与精确匹配"
+      },
+      {
+        "key": "B",
+        "text": "检索速度一定更慢不可用"
+      },
+      {
+        "key": "C",
+        "text": "完全不需要向量"
+      },
+      {
+        "key": "D",
+        "text": "只能用于英文"
+      }
+    ],
+    "answer": "A",
+    "explanation": "向量擅长语义泛化但弱于专名/编号精确匹配；BM25 反之。混合检索用 RRF 等融合两者，适合含术语的知识库。"
+  },
+  {
+    "n": 34,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "评估 RAG 检索质量常用的指标包括？",
+    "options": [
+      {
+        "key": "A",
+        "text": "Hit Rate（命中率）"
+      },
+      {
+        "key": "B",
+        "text": "MRR（平均倒数排名）"
+      },
+      {
+        "key": "C",
+        "text": "NDCG"
+      },
+      {
+        "key": "D",
+        "text": "模型显存占用"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "离线可用命中率、MRR、NDCG 衡量片段相关性；显存占用不是检索质量指标。"
+  },
+  {
+    "n": 35,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "RAG 中知识库没有答案时，较稳妥的做法是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "检索得分低于阈值时提示模型明确拒答，避免强行编造"
+      },
+      {
+        "key": "B",
+        "text": "无论如何都要生成一个答案"
+      },
+      {
+        "key": "C",
+        "text": "直接返回随机片段"
+      },
+      {
+        "key": "D",
+        "text": "关闭检索只用模型参数记忆"
+      }
+    ],
+    "answer": "A",
+    "explanation": "阈值/相关性兜底让模型“知之为知之”；强行编造会放大幻觉，是 RAG 落地常见坑。"
+  },
+  {
+    "n": 36,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "judge",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "RAG 必须依赖向量数据库，不能用传统数据库做检索。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "错误",
+    "explanation": "RAG 本质是“检索+生成”，检索可用关键词、SQL、图谱或混合方案；向量库只是常见的语义检索实现。"
+  },
+  {
+    "n": 37,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "nice_to_know",
+    "stem": "GraphRAG 相比传统 RAG 更擅长的场景是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "跨文档的全局归纳与主题总结"
+      },
+      {
+        "key": "B",
+        "text": "回答需要聚合大量文档的宏观问题"
+      },
+      {
+        "key": "C",
+        "text": "单一片段内的精确事实抽取"
+      },
+      {
+        "key": "D",
+        "text": "完全取代向量检索"
+      }
+    ],
+    "answer": "A,B",
+    "explanation": "GraphRAG 先抽取实体/关系构建知识图谱，擅长全局归纳；局部事实抽取仍可由传统 RAG 完成，二者可互补。"
+  },
+  {
+    "n": 38,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "RAG 的上下文压缩（context compression）技术包括？",
+    "options": [
+      {
+        "key": "A",
+        "text": "用 LLM 对小片段摘要后再拼接"
+      },
+      {
+        "key": "B",
+        "text": "只保留与 query 最相关的句子（extractive）"
+      },
+      {
+        "key": "C",
+        "text": "rerank 后仅截取 top"
+      },
+      {
+        "key": "D",
+        "text": "把整个知识库原样塞入上下文"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "压缩聚焦关键证据、减少冗余与噪声；原样全塞会撑爆窗口并稀释信号。"
+  },
+  {
+    "n": 39,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "什么是 Function Calling（函数调用）？它与普通文本生成的区别？",
+    "options": [
+      {
+        "key": "A",
+        "text": "模型输出结构化“调用某函数的请求”，由应用执行后回传结果"
+      },
+      {
+        "key": "B",
+        "text": "模型直接在内部运行代码"
+      },
+      {
+        "key": "C",
+        "text": "仅用于翻译"
+      },
+      {
+        "key": "D",
+        "text": "等价于微调"
+      }
+    ],
+    "answer": "A",
+    "explanation": "模型生成符合 schema 的工具调用请求，由宿主程序调用真实 API 并把结果喂回模型继续推理。"
+  },
+  {
+    "n": 40,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "关于工具描述（schema）的重要性，下列说法正确的有？",
+    "options": [
+      {
+        "key": "A",
+        "text": "清晰的描述帮助模型正确选工具"
+      },
+      {
+        "key": "B",
+        "text": "参数类型与约束需明确"
+      },
+      {
+        "key": "C",
+        "text": "模糊缺失会导致选错工具或参数错误"
+      },
+      {
+        "key": "D",
+        "text": "schema 可有可无，模型能猜"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "schema 是模型理解工具能力的唯一依据；模糊会导致选错或产出非法参数。"
+  },
+  {
+    "n": 41,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "Function Calling 返回的结果就是工具已执行完毕的返回值。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "错误",
+    "explanation": "模型只返回“调用请求”，真正执行由应用负责；若未实现对应工具或不校验，模型拿不到真实结果。"
+  },
+  {
+    "n": 42,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "多个工具并行/串行调用时，保证结果正确聚合的做法包括？",
+    "options": [
+      {
+        "key": "A",
+        "text": "用唯一 call_id 关联调用与结果"
+      },
+      {
+        "key": "B",
+        "text": "对写库/发消息等副作用工具谨慎并行"
+      },
+      {
+        "key": "C",
+        "text": "串行需等待上一步结果再决定下一步"
+      },
+      {
+        "key": "D",
+        "text": "所有工具必须一次性并行才高效"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "配对与顺序控制是关键；有副作用的工具并行需事务与幂等，不能盲目并发。"
+  },
+  {
+    "n": 43,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "为何要对工具入参做严格的 JSON Schema 校验？",
+    "options": [
+      {
+        "key": "A",
+        "text": "在进业务前拦截越界/缺字段/类型错误，避免脏数据进入外部系统"
+      },
+      {
+        "key": "B",
+        "text": "仅为美观"
+      },
+      {
+        "key": "C",
+        "text": "提高模型参数量"
+      },
+      {
+        "key": "D",
+        "text": "减少提示长度"
+      }
+    ],
+    "answer": "A",
+    "explanation": "模型可能生成非法参数；严格校验能返回修正提示让模型重试，避免故障扩散。"
+  },
+  {
+    "n": 44,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "什么是 AI Agent？它与单次 LLM 调用的核心区别？",
+    "options": [
+      {
+        "key": "A",
+        "text": "Agent 能自主规划、调用工具、迭代反思以完成多步目标"
+      },
+      {
+        "key": "B",
+        "text": "Agent 不需要大模型"
+      },
+      {
+        "key": "C",
+        "text": "两者完全相同"
+      },
+      {
+        "key": "D",
+        "text": "Agent 只能做文本分类"
+      }
+    ],
+    "answer": "A",
+    "explanation": "Agent 在 LLM 之上加规划、工具使用与记忆回路，能分解任务、执行动作并据反馈调整。"
+  },
+  {
+    "n": 45,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "ReAct 范式（Reason + Act）指的是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "交替进行“思考理由”与“执行动作”，再观察结果继续"
+      },
+      {
+        "key": "B",
+        "text": "只做推理不做动作"
+      },
+      {
+        "key": "C",
+        "text": "只做动作不思考"
+      },
+      {
+        "key": "D",
+        "text": "一种数据库事务模型"
+      }
+    ],
+    "answer": "A",
+    "explanation": "ReAct 让模型输出 Thought→Action→Observation 循环，把推理与行动交织，提升可控性与可解释性。"
+  },
+  {
+    "n": 46,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "Agent 的“规划 / 记忆 / 工具”三大能力分别解决什么？",
+    "options": [
+      {
+        "key": "A",
+        "text": "规划：把目标拆成可执行步骤"
+      },
+      {
+        "key": "B",
+        "text": "记忆：保存与复用历史上下文"
+      },
+      {
+        "key": "C",
+        "text": "工具：连接外部系统与实时数据"
+      },
+      {
+        "key": "D",
+        "text": "三者都只用于训练模型"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "规划决定“做什么”，记忆解决“记得什么”，工具解决“能动手做什么”。"
+  },
+  {
+    "n": 47,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "Agent 应该是完全自主循环的，不该有任何人工介入。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "错误",
+    "explanation": "高风险动作（删数据、发消息、支付）通常需要 human-in-the-loop 确认；可控性比“全自动”更重要。"
+  },
+  {
+    "n": 48,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "关于 Agent 的短期/长期记忆设计，下列合理的做法有？",
+    "options": [
+      {
+        "key": "A",
+        "text": "短期用对话历史+滑动窗口/摘要控制上下文"
+      },
+      {
+        "key": "B",
+        "text": "长期用向量库存经验与用户画像"
+      },
+      {
+        "key": "C",
+        "text": "需去重与遗忘策略避免矛盾"
+      },
+      {
+        "key": "D",
+        "text": "记忆越长越好，永不清理"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "记忆需有边界：短期控窗口、长期可检索、并做去重与遗忘以防上下文膨胀与矛盾。"
+  },
+  {
+    "n": 49,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "多 Agent 协作的常见编排模式包括？",
+    "options": [
+      {
+        "key": "A",
+        "text": "主管-工人（manager-worker）"
+      },
+      {
+        "key": "B",
+        "text": "辩论/评审（critic）"
+      },
+      {
+        "key": "C",
+        "text": "流水线（pipeline）"
+      },
+      {
+        "key": "D",
+        "text": "共享黑板（blackboard）"
+      }
+    ],
+    "answer": "A,B,C,D",
+    "explanation": "多种模式各有侧重；关键在角色边界、消息协议与冲突解决，避免无限协商。"
+  },
+  {
+    "n": 50,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "Agent 循环中避免无限循环与失控的手段包括？",
+    "options": [
+      {
+        "key": "A",
+        "text": "设最大步数/最大 token 预算"
+      },
+      {
+        "key": "B",
+        "text": "检测重复动作与无进展并提前终止"
+      },
+      {
+        "key": "C",
+        "text": "工具失败上限与兜底"
+      },
+      {
+        "key": "D",
+        "text": "完全不设任何上限以求最优"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "必须有步数/预算护栏、停滞检测与失败上限，否则易陷入失控循环。"
+  },
+  {
+    "n": 51,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "Agent 可观测性（tracing）为什么重要？",
+    "options": [
+      {
+        "key": "A",
+        "text": "能回放每一步思考/工具/结果，便于调试、评估与成本控制"
+      },
+      {
+        "key": "B",
+        "text": "仅用于美化界面"
+      },
+      {
+        "key": "C",
+        "text": "会降低模型能力"
+      },
+      {
+        "key": "D",
+        "text": "只在训练时需要"
+      }
+    ],
+    "answer": "A",
+    "explanation": "Agent 决策链路长且非确定，tracing 记录完整轨迹，是定位错误与优化 prompt/工具设计的必备能力。"
+  },
+  {
+    "n": 52,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "Agent 的“反思（reflection）”机制的价值包括？",
+    "options": [
+      {
+        "key": "A",
+        "text": "生成后自我批评/评估"
+      },
+      {
+        "key": "B",
+        "text": "发现错误再迭代改进"
+      },
+      {
+        "key": "C",
+        "text": "把“生成-评价-修正”闭环化"
+      },
+      {
+        "key": "D",
+        "text": "让模型一次就百分百正确"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "反思将自我评审闭环化，显著提升复杂任务最终质量，但无法保证一次正确。"
+  },
+  {
+    "n": 53,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "Agent 调用工具失败时，应直接抛出异常并终止整个流程。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "错误",
+    "explanation": "健壮 Agent 应捕获失败、把错误回传模型让其重试或换策略，仅在超出重试/预算上限时才优雅终止。"
+  },
+  {
+    "n": 54,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "Agent 的护栏（guardrails）与安全控制包括？",
+    "options": [
+      {
+        "key": "A",
+        "text": "输入校验与注入防护"
+      },
+      {
+        "key": "B",
+        "text": "输出格式与内容审核"
+      },
+      {
+        "key": "C",
+        "text": "工具调用白名单与权限最小化"
+      },
+      {
+        "key": "D",
+        "text": "敏感动作人工确认与成本上限"
+      }
+    ],
+    "answer": "A,B,C,D",
+    "explanation": "护栏在输入/输出/工具层设约束，防止越权与有害行为，是生产落地的底线。"
+  },
+  {
+    "n": 55,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "评估 LLM 应用质量可用的指标包括？",
+    "options": [
+      {
+        "key": "A",
+        "text": "任务准确率与 Faithfulness（忠实度）"
+      },
+      {
+        "key": "B",
+        "text": "Answer Relevancy（答案相关性）"
+      },
+      {
+        "key": "C",
+        "text": "线上采纳率/重试率/会话完成率"
+      },
+      {
+        "key": "D",
+        "text": "仅看模型参数量"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "需离线（准确率/忠实度/相关性）与在线（采纳率/成本/延迟）结合；参数量不是质量指标。"
+  },
+  {
+    "n": 56,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "LLM-as-a-Judge（用模型当裁判）的主要风险是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "裁判模型本身有偏差、易被长文本位置效应影响"
+      },
+      {
+        "key": "B",
+        "text": "完全客观无风险"
+      },
+      {
+        "key": "C",
+        "text": "只能用于训练不能评测"
+      },
+      {
+        "key": "D",
+        "text": "成本为零"
+      }
+    ],
+    "answer": "A",
+    "explanation": "模型裁判存在偏好/位置偏差与自赞倾向；应校准、双人对照、关键项人工抽检。"
+  },
+  {
+    "n": 57,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "nice_to_know",
+    "stem": "RAGAS 等框架通常从哪些维度评估 RAG？",
+    "options": [
+      {
+        "key": "A",
+        "text": "Context Precision / Recall（检索质量）"
+      },
+      {
+        "key": "B",
+        "text": "Faithfulness（答案是否忠于上下文）"
+      },
+      {
+        "key": "C",
+        "text": "Answer Relevancy（答案相关性）"
+      },
+      {
+        "key": "D",
+        "text": "仅评估生成速度"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "RAGAS 把端到端 RAG 拆成可定位瓶颈的子指标：检索质量与答案忠实/相关。"
+  },
+  {
+    "n": 58,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "人工评估不可扩展，所以 LLM 应用完全不需要人工评估。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "错误",
+    "explanation": "人工评估虽贵但仍是金标准，尤其用于校准自动指标、发现长尾与安全风险；应“自动筛劣+人工抽评”。"
+  },
+  {
+    "n": 59,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "关于大模型幻觉（hallucination），下列说法正确的是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "指生成看似合理但无依据的内容，RAG 可缓解但不保证消除"
+      },
+      {
+        "key": "B",
+        "text": "只发生在翻译场景"
+      },
+      {
+        "key": "C",
+        "text": "RAG 能 100% 消除幻觉"
+      },
+      {
+        "key": "D",
+        "text": "是数据库术语"
+      }
+    ],
+    "answer": "A",
+    "explanation": "幻觉源于概率生成与知识缺口；RAG 通过注入证据降低概率，但检索不全/模型仍可能编造。"
+  },
+  {
+    "n": 60,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "降低 LLM 应用延迟与成本的手段包括？",
+    "options": [
+      {
+        "key": "A",
+        "text": "缓存高频请求"
+      },
+      {
+        "key": "B",
+        "text": "模型路由（简单任务用小模型）"
+      },
+      {
+        "key": "C",
+        "text": "提示精简与上下文压缩"
+      },
+      {
+        "key": "D",
+        "text": "增大 max_tokens 提升质量"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "缓存、路由、压缩与流式是降本提速主力；盲目增大 max_tokens 只增成本。"
+  },
+  {
+    "n": 61,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "nice_to_know",
+    "stem": "什么是模型路由（model routing）/ 级联（cascade）？",
+    "options": [
+      {
+        "key": "A",
+        "text": "用轻量模型先判难度，简单请求直接答、难的才升级大模型"
+      },
+      {
+        "key": "B",
+        "text": "把请求随机分发到任意模型"
+      },
+      {
+        "key": "C",
+        "text": "仅用于离线训练"
+      },
+      {
+        "key": "D",
+        "text": "等于微调"
+      }
+    ],
+    "answer": "A",
+    "explanation": "路由/级联以低成本模型覆盖多数简单请求，仅在置信度低时调用更强（更贵）模型，质量近似下显著降本。"
+  },
+  {
+    "n": 62,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "stem": "小模型永远无法替代大模型完成任何任务。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "错误",
+    "explanation": "经蒸馏/微调的小模型在大量垂直任务上已可媲美大模型且更快更省；并非“永远”，应依任务选型。"
+  },
+  {
+    "n": 63,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "生产环境为 LLM 调用设计降级与兜底的做法包括？",
+    "options": [
+      {
+        "key": "A",
+        "text": "主模型超时/限流则切备用或更小模型"
+      },
+      {
+        "key": "B",
+        "text": "关键路径用缓存/规则兜底"
+      },
+      {
+        "key": "C",
+        "text": "返回友好错误而非崩溃"
+      },
+      {
+        "key": "D",
+        "text": "记录失败指标告警"
+      }
+    ],
+    "answer": "A,B,C,D",
+    "explanation": "多层次降级保障可用性：换模型、缓存兜底、友好错误与告警，避免雪崩。"
+  },
+  {
+    "n": 64,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "nice_to_know",
+    "stem": "多模态模型是指？",
+    "options": [
+      {
+        "key": "A",
+        "text": "能同时理解和/或生成文本、图像、音频等多种模态的模型"
+      },
+      {
+        "key": "B",
+        "text": "只能处理文本"
+      },
+      {
+        "key": "C",
+        "text": "仅用于视频压缩"
+      },
+      {
+        "key": "D",
+        "text": "等同于传统 OCR"
+      }
+    ],
+    "answer": "A",
+    "explanation": "多模态模型统一处理多种感官数据，如视觉-语言模型可图文互理解，支撑看图问答等应用。"
+  },
+  {
+    "n": 65,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "stem": "关于多模态检索（如图文检索），下列说法正确的有？",
+    "options": [
+      {
+        "key": "A",
+        "text": "用多模态嵌入把图像与文本编码到同一向量空间"
+      },
+      {
+        "key": "B",
+        "text": "文本 query 可直接检索相关图片或图注"
+      },
+      {
+        "key": "C",
+        "text": "常用于商品、文档图表、知识库配图检索"
+      },
+      {
+        "key": "D",
+        "text": "只能在纯文本空间内检索"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "多模态嵌入让跨模态语义对齐，支持以文搜图、以图搜文等检索增强场景。"
+  },
+  {
+    "n": 66,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "judge",
+    "difficulty": "basic",
+    "essentiality": "nice_to_know",
+    "stem": "多模态模型只能接受图像和文本，不能处理音频。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "错误",
+    "explanation": "不少模型已支持音频（语音转写、音频理解）甚至视频；模态支持取决于具体架构与训练数据。"
+  },
+  {
+    "n": 67,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "stem": "Transformer 的核心机制是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "自注意力（Self-Attention），并行建模序列中任意两位置依赖"
+      },
+      {
+        "key": "B",
+        "text": "循环单元逐个处理"
+      },
+      {
+        "key": "C",
+        "text": "卷积滑动窗口"
+      },
+      {
+        "key": "D",
+        "text": "单纯的词袋叠加"
+      }
+    ],
+    "answer": "A",
+    "explanation": "Transformer 用自注意力替代 RNN 的时序递推，实现全局并行依赖建模，是现代 LLM 的骨架。"
+  },
+  {
+    "n": 68,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "nice_to_know",
+    "stem": "多头注意力（Multi-Head Attention）的作用是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "在不同子空间并行捕捉多种语义/语法关系，丰富表示"
+      },
+      {
+        "key": "B",
+        "text": "减少参数量到零"
+      },
+      {
+        "key": "C",
+        "text": "只在解码器使用"
+      },
+      {
+        "key": "D",
+        "text": "等价于单层感知机"
+      }
+    ],
+    "answer": "A",
+    "explanation": "多个注意力头各自关注不同关系（句法、指代、距离等），拼接后线性融合，使模型同时捕获多样化依赖。"
+  },
+  {
+    "n": 69,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "stem": "为什么 Transformer 需要位置编码（Positional Encoding）？",
+    "options": [
+      {
+        "key": "A",
+        "text": "自注意力本身无序，需显式注入 token 位置信息"
+      },
+      {
+        "key": "B",
+        "text": "为了压缩模型"
+      },
+      {
+        "key": "C",
+        "text": "仅在微调时需要"
+      },
+      {
+        "key": "D",
+        "text": "用于图像分类"
+      }
+    ],
+    "answer": "A",
+    "explanation": "注意力对顺序不敏感，加入位置编码让模型感知词序，否则“猫追狗”与“狗追猫”无法区分。"
+  },
+  {
+    "n": 70,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "stem": "预训练（pretraining）与微调（fine-tuning）的区别是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "预训练学通用表示，微调在特定任务数据上适配"
+      },
+      {
+        "key": "B",
+        "text": "两者完全一样"
+      },
+      {
+        "key": "C",
+        "text": "微调先于预训练"
+      },
+      {
+        "key": "D",
+        "text": "预训练只用于图像"
+      }
+    ],
+    "answer": "A",
+    "explanation": "预训练习得广泛语言/世界知识；微调用小规模标注数据把通用能力迁移到下游任务。"
+  },
+  {
+    "n": 71,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "nice_to_know",
+    "stem": "LoRA / QLoRA 微调的核心思想是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "冻结原权重，向注意力/线性层注入低秩可训练矩阵，仅训少量参数"
+      },
+      {
+        "key": "B",
+        "text": "重新训练整个模型全部参数"
+      },
+      {
+        "key": "C",
+        "text": "仅改变输入分词"
+      },
+      {
+        "key": "D",
+        "text": "等于提示工程"
+      }
+    ],
+    "answer": "A",
+    "explanation": "LoRA 以低秩矩阵适配任务，省显存易切换；QLoRA 再叠加 4-bit 量化，把大模型微调压到单卡消费级 GPU。"
+  },
+  {
+    "n": 72,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "nice_to_know",
+    "stem": "RLHF（基于人类反馈的强化学习）用于？",
+    "options": [
+      {
+        "key": "A",
+        "text": "用奖励模型+强化学习最大化人类偏好，对齐有用/诚实/无害"
+      },
+      {
+        "key": "B",
+        "text": "仅加速推理"
+      },
+      {
+        "key": "C",
+        "text": "替代分词器"
+      },
+      {
+        "key": "D",
+        "text": "等同于数据增强"
+      }
+    ],
+    "answer": "A",
+    "explanation": "RLHF 先用人工偏好训练奖励模型，再以 PPO 等微调策略模型，使输出更符合人类偏好，是 ChatGPT 类对齐关键。"
+  },
+  {
+    "n": 73,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "stem": "微调一定比 Prompt Engineering 效果更好。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "错误",
+    "explanation": "视任务与数据而定：多数场景提示工程+检索已足够灵活；仅当需固化领域风格/低成本高并发时微调才显优势。"
+  },
+  {
+    "n": 74,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "nice_to_know",
+    "stem": "模型量化（quantization）主要影响什么？",
+    "options": [
+      {
+        "key": "A",
+        "text": "用更低精度表示权重，降低显存与推理成本，可能轻微损精度"
+      },
+      {
+        "key": "B",
+        "text": "只改变训练速度"
+      },
+      {
+        "key": "C",
+        "text": "提升模型参数量"
+      },
+      {
+        "key": "D",
+        "text": "与推理无关"
+      }
+    ],
+    "answer": "A",
+    "explanation": "量化把权重压到更低比特，显著节省显存、加速推理，常伴可接受的质量折损，是部署端侧/单卡的关键。"
+  },
+  {
+    "n": 75,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "nice_to_know",
+    "stem": "知识蒸馏（knowledge distillation）是指？",
+    "options": [
+      {
+        "key": "A",
+        "text": "用大模型（教师）的输出/软标签训练小模型（学生）以迁移能力"
+      },
+      {
+        "key": "B",
+        "text": "把模型拆成多份分布式训练"
+      },
+      {
+        "key": "C",
+        "text": "仅用于数据清洗"
+      },
+      {
+        "key": "D",
+        "text": "等同于剪枝"
+      }
+    ],
+    "answer": "A",
+    "explanation": "蒸馏让小模型模仿大模型的软概率分布（含暗知识），在远小体积下逼近大模型表现，常用于端侧与降本。"
+  },
+  {
+    "n": 76,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "nice_to_know",
+    "stem": "注意力中的 KV Cache 如何降低自回归推理成本？",
+    "options": [
+      {
+        "key": "A",
+        "text": "缓存历史 K/V，避免重复计算，将每步复杂度从 O(n²) 降到 O(n)"
+      },
+      {
+        "key": "B",
+        "text": "增加每步计算量"
+      },
+      {
+        "key": "C",
+        "text": "只在训练时使用"
+      },
+      {
+        "key": "D",
+        "text": "与上下文长度无关"
+      }
+    ],
+    "answer": "A",
+    "explanation": "解码时每步要对所有已生成 token 的 K/V 做注意力；KV Cache 复用历史，是长序列推理提速与省算的关键。"
+  },
+  {
+    "n": 77,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "nice_to_know",
+    "stem": "关于大模型的“涌现能力（emergent abilities）”，下列说法合理的有？",
+    "options": [
+      {
+        "key": "A",
+        "text": "某些能力在规模/数据跨过阈值后才突然出现"
+      },
+      {
+        "key": "B",
+        "text": "小模型也可能具备部分能力，并非绝对二分"
+      },
+      {
+        "key": "C",
+        "text": "存在“看似涌现实为平滑”的学术争议"
+      },
+      {
+        "key": "D",
+        "text": "规模越大一定线性越好，毫无争议"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "涌现指能力在阈值后突现的现象，但度量与“是否真涌现”仍有争议；并非规模越大越好这么简单。"
+  },
+  {
+    "n": 78,
+    "language": "",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "nice_to_know",
+    "stem": "关于 Self-Attention 的计算步骤，下列说法正确的有？",
+    "options": [
+      {
+        "key": "A",
+        "text": "由 token 映射出 Query/Key/Value 三向量"
+      },
+      {
+        "key": "B",
+        "text": "用 Q 与 K 点积并缩放后 softmax 得注意力权重"
+      },
+      {
+        "key": "C",
+        "text": "权重对 V 加权求和得到上下文表示"
+      },
+      {
+        "key": "D",
+        "text": "无需任何矩阵运算，纯查表完成"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "Self-Attention 经 Q/K/V 投影、缩放点积、softmax 与加权 V 求和，全靠线性变换与归一化完成。"
+  }
+]

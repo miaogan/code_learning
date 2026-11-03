@@ -198,5 +198,45 @@
     "level": "进阶",
     "url": "https://developers.google.com/tech-writing",
     "why": "文档与表达是简历项目深挖的加分项"
+  },
+  {
+    "id": "ai-llm-app",
+    "title": "OpenAI 官方文档 · 构建应用（RAG / 函数调用）",
+    "direction": "AI 工程",
+    "level": "入门",
+    "url": "https://platform.openai.com/docs/guides/function-calling",
+    "why": "以函数调用与检索增强为主线，覆盖 AI 全栈最常用能力"
+  },
+  {
+    "id": "ai-langchain",
+    "title": "LangChain 中文文档 · 快速上手",
+    "direction": "AI 工程",
+    "level": "入门",
+    "url": "https://python.langchain.com/docs/get_started/introduction",
+    "why": "Agent 与链式编排的事实标准，笔试常考组件边界"
+  },
+  {
+    "id": "ai-rag",
+    "title": "向量检索与 RAG 实践（Pinecone 学习中心）",
+    "direction": "AI 工程",
+    "level": "进阶",
+    "url": "https://www.pinecone.io/learn/retrieval-augmented-generation/",
+    "why": "把检索质量、分块与重排讲透，是 RAG 落地的关键"
+  },
+  {
+    "id": "ai-agent",
+    "title": "Anthropic · 构建高效 Agent",
+    "direction": "AI 工程",
+    "level": "进阶",
+    "url": "https://www.anthropic.com/engineering/building-effective-agents",
+    "why": "工作流与自主 Agent 的边界与编排范式，Agent 设计必读"
+  },
+  {
+    "id": "ai-eval",
+    "title": "LLM 评估与可观测（LangSmith / RAGAS）",
+    "direction": "AI 工程",
+    "level": "进阶",
+    "url": "https://docs.ragas.io/",
+    "why": "AI 应用不能只靠手测，评估体系是高级工程师分水岭"
   }
 ]

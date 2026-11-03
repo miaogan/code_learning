@@ -66,6 +66,24 @@ DIRECTION_KEYWORDS: tuple[tuple[str, ...], ...] = (
     ),
     ("算法", "数据结构", "复杂度", "动态规划", "leetcode", "红黑树", "堆"),
     ("操作系统", "网络", "linux", "git", "编译", "内存", "进程", "线程"),
+    (
+        "ai",
+        "rag",
+        "agent",
+        "llm",
+        "大模型",
+        "embedding",
+        "向量",
+        "prompt",
+        "提示词",
+        "检索增强",
+        "微调",
+        "多模态",
+        "langchain",
+        "智能体",
+        "function calling",
+        "工具调用",
+    ),
 )
 
 

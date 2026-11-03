@@ -76,12 +76,12 @@
     "language": "",
     "prompt": "用 let 在 for 循环块内声明的变量，在循环块之外直接访问会怎样？",
     "options": [
-      { "key": "A", "text": "得到 undefined" },
-      { "key": "B", "text": "正常访问到循环结束时的值" },
-      { "key": "C", "text": "抛出 ReferenceError（不在作用域内）" },
+      { "key": "A", "text": "抛出 ReferenceError（不在作用域内）" },
+      { "key": "B", "text": "得到 undefined" },
+      { "key": "C", "text": "正常访问到循环结束时的值" },
       { "key": "D", "text": "自动升级为全局变量" }
     ],
-    "answer": ["C"],
+    "answer": ["A"],
     "explanation": "let 声明是块级作用域，离开 for 循环块后变量不存在，访问会抛 ReferenceError；它不会被提升为全局变量，也不是 undefined。"
   },
   {
@@ -334,11 +334,11 @@
     "prompt": "HTTP 状态码 401 与 403 的核心区别是？",
     "options": [
       { "key": "A", "text": "401 用于缓存，403 用于重定向" },
-      { "key": "B", "text": "401 未认证，403 已认证但无权限" },
-      { "key": "C", "text": "401 服务端错误，403 客户端错误" },
+      { "key": "B", "text": "401 服务端错误，403 客户端错误" },
+      { "key": "C", "text": "401 未认证，403 已认证但无权限" },
       { "key": "D", "text": "两个完全等价" }
     ],
-    "answer": ["B"],
+    "answer": ["C"],
     "explanation": "401 表示未认证或凭证无效，403 表示已认证但没有访问权限；两者都不是服务端错误，也不能互换使用。"
   },
   {
@@ -352,10 +352,10 @@
     "options": [
       { "key": "A", "text": "减少写入的数据量" },
       { "key": "B", "text": "自动进行事务隔离" },
-      { "key": "C", "text": "压缩表存储空间" },
-      { "key": "D", "text": "加快按索引列的检索" }
+      { "key": "C", "text": "加快按索引列的检索" },
+      { "key": "D", "text": "压缩表存储空间" }
     ],
-    "answer": ["D"],
+    "answer": ["C"],
     "explanation": "索引是额外的有序数据结构，用存储与写入代价换取按索引列快速定位；它不减少写入量，也不负责隔离与压缩。"
   },
   {
@@ -384,12 +384,12 @@
     "language": "",
     "prompt": "HTTP 状态码 201 表示？",
     "options": [
-      { "key": "A", "text": "请求成功且已创建了新资源" },
-      { "key": "B", "text": "资源已被永久重定向" },
+      { "key": "A", "text": "资源已被永久重定向" },
+      { "key": "B", "text": "请求成功且已创建了新资源" },
       { "key": "C", "text": "服务端发生未预期错误" },
       { "key": "D", "text": "请求成功但没有响应内容" }
     ],
-    "answer": ["A"],
+    "answer": ["B"],
     "explanation": "201 Created 表示请求成功且服务端已创建新资源，常配合 POST；200 是有响应体，204 是无内容，301 是永久重定向。"
   },
   {
@@ -401,13 +401,13 @@
     "language": "",
     "prompt": "数据库事务的「原子性（Atomicity）」含义是？",
     "options": [
-      { "key": "A", "text": "事务内的操作要么全部生效，要么全部不生效" },
-      { "key": "B", "text": "事务提交后结果永久保存" },
+      { "key": "A", "text": "事务提交后结果永久保存" },
+      { "key": "B", "text": "事务内的操作要么全部生效，要么全部不生效" },
       { "key": "C", "text": "多个事务之间互不干扰" },
       { "key": "D", "text": "事务必须严格按提交顺序执行" }
     ],
-    "answer": ["A"],
-    "explanation": "原子性指事务内的操作要么全部提交要么全部回滚；选项 C 是隔离性，B 是持久性，D 不是 ACID 的要求。"
+    "answer": ["B"],
+    "explanation": "原子性指事务内的操作要么全部提交要么全部回滚；选项 C 是隔离性，A 是持久性，D 不是 ACID 的要求。"
   },
   {
     "id": "be-q6",
@@ -436,11 +436,11 @@
     "prompt": "FastAPI 中给 POST 接口声明 JSON 请求体，最推荐的做法是？",
     "options": [
       { "key": "A", "text": "在函数体内手动调用 request.json() 解析" },
-      { "key": "B", "text": "用 Pydantic 模型作为参数类型标注，由框架解析与校验" },
-      { "key": "C", "text": "把每个字段写成普通函数参数" },
-      { "key": "D", "text": "用单个字符串参数接收整个 JSON" }
+      { "key": "B", "text": "把每个字段写成普通函数参数" },
+      { "key": "C", "text": "用单个字符串参数接收整个 JSON" },
+      { "key": "D", "text": "用 Pydantic 模型作为参数类型标注，由框架解析与校验" }
     ],
-    "answer": ["B"],
+    "answer": ["D"],
     "explanation": "用 Pydantic 模型做类型标注后，FastAPI 会自动解析请求体、校验字段并生成文档；手动解析会丢掉校验与错误提示。"
   },
   {
@@ -469,12 +469,12 @@
     "language": "",
     "prompt": "关于 SQLite，下列说法最准确的是？",
     "options": [
-      { "key": "A", "text": "无独立服务进程、单文件存储，适合单机读多写少的场景" },
-      { "key": "B", "text": "天生是分布式强一致集群数据库" },
-      { "key": "C", "text": "采用多版本并发控制，支持海量并发写入" },
-      { "key": "D", "text": "只能用于移动端，不能用于服务端" }
+      { "key": "A", "text": "天生是分布式强一致集群数据库" },
+      { "key": "B", "text": "采用多版本并发控制，支持海量并发写入" },
+      { "key": "C", "text": "只能用于移动端，不能用于服务端" },
+      { "key": "D", "text": "无独立服务进程、单文件存储，适合单机读多写少的场景" }
     ],
-    "answer": ["A"],
+    "answer": ["D"],
     "explanation": "SQLite 以库形式嵌进进程，单文件存储、无需服务端，适合单机与嵌入式场景；它不是分布式集群，写入并发能力有限。"
   },
   {
@@ -486,12 +486,12 @@
     "language": "",
     "prompt": "关于 HTTP GET 与 POST，下列说法正确的是？",
     "options": [
-      { "key": "A", "text": "GET 请求必须携带请求体" },
-      { "key": "B", "text": "POST 天然幂等，重复提交结果一致" },
-      { "key": "C", "text": "GET 语义是读取资源、通常可缓存且不应产生副作用" },
+      { "key": "A", "text": "GET 语义是读取资源、通常可缓存且不应产生副作用" },
+      { "key": "B", "text": "GET 请求必须携带请求体" },
+      { "key": "C", "text": "POST 天然幂等，重复提交结果一致" },
       { "key": "D", "text": "GET 不能使用查询参数" }
     ],
-    "answer": ["C"],
+    "answer": ["A"],
     "explanation": "GET 用于读取、可缓存、不应有副作用，查询参数放在 URL 上；POST 通常不幂等，重复提交可能创建多条数据。"
   },
   {
@@ -539,10 +539,10 @@
     "options": [
       { "key": "A", "text": "已认证但权限不足" },
       { "key": "B", "text": "请求的资源不存在" },
-      { "key": "C", "text": "服务端处理请求时发生了未预期的错误" },
-      { "key": "D", "text": "客户端请求格式错误" }
+      { "key": "C", "text": "客户端请求格式错误" },
+      { "key": "D", "text": "服务端处理请求时发生了未预期的错误" }
     ],
-    "answer": ["C"],
+    "answer": ["D"],
     "explanation": "500 表示服务端在处理请求时发生未预期错误；400 是请求格式错误，404 是资源不存在，403 是无权限。"
   },
   {
@@ -605,12 +605,12 @@
     "language": "",
     "prompt": "SQL 中 WHERE 与 HAVING 的区别是？",
     "options": [
-      { "key": "A", "text": "HAVING 只能用于非聚合列" },
-      { "key": "B", "text": "WHERE 只能出现在聚合查询里" },
-      { "key": "C", "text": "两者完全等价，可以随意替换" },
-      { "key": "D", "text": "WHERE 在分组前过滤行，HAVING 在分组后过滤分组" }
+      { "key": "A", "text": "WHERE 在分组前过滤行，HAVING 在分组后过滤分组" },
+      { "key": "B", "text": "HAVING 只能用于非聚合列" },
+      { "key": "C", "text": "WHERE 只能出现在聚合查询里" },
+      { "key": "D", "text": "两者完全等价，可以随意替换" }
     ],
-    "answer": ["D"],
+    "answer": ["A"],
     "explanation": "WHERE 在分组前过滤原始行、不能用聚合函数；HAVING 在 GROUP BY 之后过滤分组结果，可以引用聚合值。"
   },
   {
@@ -659,11 +659,11 @@
     "prompt": "在一个已排序数组中二分查找的时间复杂度是？",
     "options": [
       { "key": "A", "text": "O(n log n)" },
-      { "key": "B", "text": "O(log n)" },
-      { "key": "C", "text": "O(n)" },
+      { "key": "B", "text": "O(n)" },
+      { "key": "C", "text": "O(log n)" },
       { "key": "D", "text": "O(1)" }
     ],
-    "answer": ["B"],
+    "answer": ["C"],
     "explanation": "二分查找每次折半排除一半区间，比较次数与 log2(n) 成正比，因此时间复杂度是 O(log n)；前提是数组已经有序。"
   },
   {
@@ -675,12 +675,12 @@
     "language": "",
     "prompt": "栈这种数据结构的特点是？",
     "options": [
-      { "key": "A", "text": "后进先出" },
-      { "key": "B", "text": "随机访问" },
-      { "key": "C", "text": "按优先级出队" },
+      { "key": "A", "text": "随机访问" },
+      { "key": "B", "text": "按优先级出队" },
+      { "key": "C", "text": "后进先出" },
       { "key": "D", "text": "先进先出" }
     ],
-    "answer": ["A"],
+    "answer": ["C"],
     "explanation": "栈只在一端（栈顶）进出，后进先出（LIFO）；先进先出是队列，按优先级出队是优先队列。"
   },
   {
@@ -710,11 +710,11 @@
     "prompt": "队列（Queue）的核心操作特点是？",
     "options": [
       { "key": "A", "text": "支持按下标随机访问" },
-      { "key": "B", "text": "总是按优先级最高者出队" },
-      { "key": "C", "text": "后进先出（LIFO）" },
-      { "key": "D", "text": "先进先出（FIFO）" }
+      { "key": "B", "text": "先进先出（FIFO）" },
+      { "key": "C", "text": "总是按优先级最高者出队" },
+      { "key": "D", "text": "后进先出（LIFO）" }
     ],
-    "answer": ["D"],
+    "answer": ["B"],
     "explanation": "队列一端入队、另一端出队，先进先出；后进先出是栈，按优先级出队是优先队列或堆。"
   },
   {
@@ -728,10 +728,10 @@
     "options": [
       { "key": "A", "text": "O(n)" },
       { "key": "B", "text": "O(log n)" },
-      { "key": "C", "text": "O(n log n)" },
-      { "key": "D", "text": "O(n^2) 且无法避免" }
+      { "key": "C", "text": "O(n^2) 且无法避免" },
+      { "key": "D", "text": "O(n log n)" }
     ],
-    "answer": ["C"],
+    "answer": ["D"],
     "explanation": "快排平均每层划分 O(n)、共 log n 层，平均 O(n log n)；最坏情况（每次划分极不均衡）会退化到 O(n^2)。"
   },
   {
@@ -745,10 +745,10 @@
     "options": [
       { "key": "A", "text": "编译期直接报错" },
       { "key": "B", "text": "运行时自动转换为循环" },
-      { "key": "C", "text": "无限递归，最终栈溢出" },
-      { "key": "D", "text": "函数返回 null" }
+      { "key": "C", "text": "函数返回 null" },
+      { "key": "D", "text": "无限递归，最终栈溢出" }
     ],
-    "answer": ["C"],
+    "answer": ["D"],
     "explanation": "缺少基线条件时递归永不终止，调用栈不断加深，最终栈溢出（Python 抛 RecursionError，其他语言是 StackOverflow）。"
   },
   {
@@ -777,12 +777,12 @@
     "language": "",
     "prompt": "对二叉搜索树（BST）做中序遍历，得到的键序列是？",
     "options": [
-      { "key": "A", "text": "降序序列" },
-      { "key": "B", "text": "按层顺序" },
-      { "key": "C", "text": "随机顺序" },
-      { "key": "D", "text": "升序序列" }
+      { "key": "A", "text": "升序序列" },
+      { "key": "B", "text": "降序序列" },
+      { "key": "C", "text": "按层顺序" },
+      { "key": "D", "text": "随机顺序" }
     ],
-    "answer": ["D"],
+    "answer": ["A"],
     "explanation": "BST 满足左子树键小于根、右子树键大于根，中序遍历按「左-根-右」访问，因此输出升序序列。"
   },
   {
@@ -813,10 +813,10 @@
     "options": [
       { "key": "A", "text": "分治法不允许使用递归" },
       { "key": "B", "text": "动态规划不需要定义状态" },
-      { "key": "C", "text": "动态规划只能求最短路径" },
-      { "key": "D", "text": "动态规划的子问题存在重叠，可缓存结果避免重复计算" }
+      { "key": "C", "text": "动态规划的子问题存在重叠，可缓存结果避免重复计算" },
+      { "key": "D", "text": "动态规划只能求最短路径" }
     ],
-    "answer": ["D"],
+    "answer": ["C"],
     "explanation": "动态规划要求子问题重叠并可用状态缓存（记忆化或递推表），分治的子问题通常互相独立、不必缓存。"
   },
   {
@@ -864,10 +864,10 @@
     "options": [
       { "key": "A", "text": "O(1)" },
       { "key": "B", "text": "O(n log n)" },
-      { "key": "C", "text": "O(log n)" },
-      { "key": "D", "text": "O(n)" }
+      { "key": "C", "text": "O(n)" },
+      { "key": "D", "text": "O(log n)" }
     ],
-    "answer": ["C"],
+    "answer": ["D"],
     "explanation": "取堆顶只需读一次是 O(1)，但删除后要把末尾元素放到堆顶并下沉调整，调整路径长度是树高 O(log n)，所以删除整体是 O(log n)。"
   },
   {
@@ -931,11 +931,11 @@
     "prompt": "数据规模很大且要求排序结果稳定时，下列哪种算法更合适？",
     "options": [
       { "key": "A", "text": "选择排序" },
-      { "key": "B", "text": "快速排序" },
-      { "key": "C", "text": "堆排序" },
-      { "key": "D", "text": "归并排序" }
+      { "key": "B", "text": "归并排序" },
+      { "key": "C", "text": "快速排序" },
+      { "key": "D", "text": "堆排序" }
     ],
-    "answer": ["D"],
+    "answer": ["B"],
     "explanation": "归并排序稳定且最坏也是 O(n log n)，适合大数据量；快排与堆排不稳定，选择排序虽然稳定但复杂度 O(n^2)，规模大时不可用。"
   },
   {
@@ -985,10 +985,10 @@
     "options": [
       { "key": "A", "text": "git merge" },
       { "key": "B", "text": "git rebase" },
-      { "key": "C", "text": "git checkout -b" },
-      { "key": "D", "text": "git branch" }
+      { "key": "C", "text": "git branch" },
+      { "key": "D", "text": "git checkout -b" }
     ],
-    "answer": ["C"],
+    "answer": ["D"],
     "explanation": "git checkout -b <name> 创建并立即切换分支；git branch 只创建或列出分支，git merge 与 git rebase 是合并历史。"
   },
   {
@@ -1001,11 +1001,11 @@
     "prompt": "操作系统中的进程与线程，最准确的描述是？",
     "options": [
       { "key": "A", "text": "线程切换成本高于进程切换" },
-      { "key": "B", "text": "进程之间天然共享内存" },
-      { "key": "C", "text": "进程是资源分配单位，线程是调度单位" },
+      { "key": "B", "text": "进程是资源分配单位，线程是调度单位" },
+      { "key": "C", "text": "进程之间天然共享内存" },
       { "key": "D", "text": "线程拥有独立地址空间" }
     ],
-    "answer": ["C"],
+    "answer": ["B"],
     "explanation": "进程是资源分配单位、拥有独立地址空间，线程是 CPU 调度单位并与同进程内其他线程共享地址空间，因此线程切换成本低于进程切换。"
   },
   {
@@ -1053,10 +1053,10 @@
     "options": [
       { "key": "A", "text": "减少磁盘容量的占用" },
       { "key": "B", "text": "提高 CPU 主频" },
-      { "key": "C", "text": "让每个进程拥有独立地址空间，并可用磁盘扩展可用内存" },
-      { "key": "D", "text": "彻底消除内存碎片" }
+      { "key": "C", "text": "彻底消除内存碎片" },
+      { "key": "D", "text": "让每个进程拥有独立地址空间，并可用磁盘扩展可用内存" }
     ],
-    "answer": ["C"],
+    "answer": ["D"],
     "explanation": "虚拟内存为每个进程提供独立地址空间，并按页在物理内存与磁盘之间换入换出，从而突破物理内存限制；它不提高主频，也不能消除碎片。"
   },
   {
@@ -1070,10 +1070,10 @@
     "options": [
       { "key": "A", "text": "彻底禁止浏览器缓存" },
       { "key": "B", "text": "对传输内容做压缩" },
-      { "key": "C", "text": "在传输层用 TLS 加密内容并校验服务端身份" },
-      { "key": "D", "text": "让请求速度更快" }
+      { "key": "C", "text": "让请求速度更快" },
+      { "key": "D", "text": "在传输层用 TLS 加密内容并校验服务端身份" }
     ],
-    "answer": ["C"],
+    "answer": ["D"],
     "explanation": "HTTPS 在传输层用 TLS 加密数据并通过证书校验服务端身份，防窃听与中间人攻击；加密带来的握手开销会让它略慢于 HTTP。"
   },
   {
@@ -1086,11 +1086,11 @@
     "prompt": "DNS 的主要作用是？",
     "options": [
       { "key": "A", "text": "为设备分配 MAC 地址" },
-      { "key": "B", "text": "缓存 HTTP 响应体" },
-      { "key": "C", "text": "加密网页传输内容" },
-      { "key": "D", "text": "把域名解析成 IP 地址" }
+      { "key": "B", "text": "把域名解析成 IP 地址" },
+      { "key": "C", "text": "缓存 HTTP 响应体" },
+      { "key": "D", "text": "加密网页传输内容" }
     ],
-    "answer": ["D"],
+    "answer": ["B"],
     "explanation": "DNS 负责域名到 IP 的解析，让用户用域名访问服务；加密由 TLS 负责，MAC 地址由网卡与 ARP 决定。"
   },
   {
@@ -1119,12 +1119,12 @@
     "language": "",
     "prompt": "Linux shell 中竖线 | 的作用是？",
     "options": [
-      { "key": "A", "text": "把输出重定向写入文件" },
-      { "key": "B", "text": "表示逻辑与，两命令都要成功" },
-      { "key": "C", "text": "并行执行前后两个命令" },
-      { "key": "D", "text": "把前一个命令的标准输出作为后一个命令的标准输入" }
+      { "key": "A", "text": "把前一个命令的标准输出作为后一个命令的标准输入" },
+      { "key": "B", "text": "把输出重定向写入文件" },
+      { "key": "C", "text": "表示逻辑与，两命令都要成功" },
+      { "key": "D", "text": "并行执行前后两个命令" }
     ],
-    "answer": ["D"],
+    "answer": ["A"],
     "explanation": "管道把前一个命令的 stdout 接到后一个命令的 stdin；重定向是 > 或 >>，逻辑与是 &&，并行执行用 &。"
   },
   {
@@ -1188,11 +1188,11 @@
     "prompt": "进程上下文切换时需要保存并恢复的主要是？",
     "options": [
       { "key": "A", "text": "只需要保存文件路径字符串" },
-      { "key": "B", "text": "CPU 寄存器、程序计数器与地址空间等状态" },
-      { "key": "C", "text": "只保存磁盘缓存内容" },
+      { "key": "B", "text": "只保存磁盘缓存内容" },
+      { "key": "C", "text": "CPU 寄存器、程序计数器与地址空间等状态" },
       { "key": "D", "text": "只保存当前屏幕画面" }
     ],
-    "answer": ["B"],
+    "answer": ["C"],
     "explanation": "上下文切换要保存 CPU 寄存器、程序计数器等执行现场以及页表等地址空间相关状态，恢复时再载入，否则进程无法从中断点继续执行。"
   },
   {
@@ -4910,13 +4910,13 @@
     "language": "",
     "prompt": "关于 refresh token 的旋转（rotation）与吊销策略，以下哪项做法能有效防止重放攻击？",
     "options": [
-      { "key": "A", "text": "每次使用 refresh token 换取新 token 时，使旧的 refresh token 失效，并在服务端存储 token 版本或指纹" },
-      { "key": "B", "text": "仅使用黑名单吊销 token，不进行旋转" },
-      { "key": "C", "text": "refresh token 长期有效，且不记录使用情况" },
-      { "key": "D", "text": "将 refresh token 直接存储在客户端 localStorage 中，不设置任何过期时间" }
+      { "key": "A", "text": "仅使用黑名单吊销 token，不进行旋转" },
+      { "key": "B", "text": "refresh token 长期有效，且不记录使用情况" },
+      { "key": "C", "text": "将 refresh token 直接存储在客户端 localStorage 中，不设置任何过期时间" },
+      { "key": "D", "text": "每次使用 refresh token 换取新 token 时，使旧的 refresh token 失效，并在服务端存储 token 版本或指纹" }
     ],
-    "answer": ["A"],
-    "explanation": "A 项正确描述了 rotation 的核心：每次刷新后旧 refresh token 失效，服务端通过版本或指纹记录状态，从而防止重放。C 项长期有效且不记录使用情况会增大重放风险。D 项将 refresh token 长期存于 localStorage 且无过期时间，一旦泄露可被无限重放。B 项仅靠黑名单吊销而不旋转，无法在 token 被盗后及时阻断重放。",
+    "answer": ["D"],
+    "explanation": "D 项正确描述了 rotation 的核心：每次刷新后旧 refresh token 失效，服务端通过版本或指纹记录状态，从而防止重放。B 项长期有效且不记录使用情况会增大重放风险。C 项将 refresh token 长期存于 localStorage 且无过期时间，一旦泄露可被无限重放。A 项仅靠黑名单吊销而不旋转，无法在 token 被盗后及时阻断重放。",
     "source": "local100"
   },
   {
@@ -5000,10 +5000,10 @@
     "options": [
       { "key": "A", "text": "每次请求随机分配分组" },
       { "key": "B", "text": "按用户设备型号顺序分配" },
-      { "key": "C", "text": "由客户端本地存储随机数决定" },
-      { "key": "D", "text": "基于用户 ID 的稳定 hash 映射到分组" }
+      { "key": "C", "text": "基于用户 ID 的稳定 hash 映射到分组" },
+      { "key": "D", "text": "由客户端本地存储随机数决定" }
     ],
-    "answer": ["D"],
+    "answer": ["C"],
     "explanation": "稳定 hash（如对用户 ID 做 hash）能保证同一用户每次计算得到相同分组，满足实验一致性要求。随机分配会导致同一用户在不同会话进入不同组，破坏实验有效性；按设备型号顺序分配不具备随机性且可能引入偏差；本地随机数同样无法保证跨会话稳定。",
     "source": "local100"
   },
@@ -5068,13 +5068,13 @@
     "language": "",
     "prompt": "关于前端构建产物实现按需注入与灰度（feature flag + runtime config）且不影响首屏，以下哪项描述是正确的？",
     "options": [
-      { "key": "A", "text": "为了不影响首屏，应将所有 flag 判定逻辑放在异步分包中执行。" },
-      { "key": "B", "text": "feature flag 配置需要打包时注入，以便运行时决定功能开闭。" },
-      { "key": "C", "text": "使用 <link rel=prefetch> 可以预热并立即执行新功能代码。" },
-      { "key": "D", "text": "灰度时按用户分桶拉取不同的 runtime config，新功能通过动态 import 懒加载。" }
+      { "key": "A", "text": "灰度时按用户分桶拉取不同的 runtime config，新功能通过动态 import 懒加载。" },
+      { "key": "B", "text": "为了不影响首屏，应将所有 flag 判定逻辑放在异步分包中执行。" },
+      { "key": "C", "text": "feature flag 配置需要打包时注入，以便运行时决定功能开闭。" },
+      { "key": "D", "text": "使用 <link rel=prefetch> 可以预热并立即执行新功能代码。" }
     ],
-    "answer": ["D"],
-    "explanation": "D 正确：灰度通过用户分桶获取不同 runtime config，新功能用动态 import 懒加载，避免影响首屏。B 错误：feature flag 应远端下发，运行时决定，避免重新打包。A 错误：flag 判定应在入口轻量完成，重逻辑才分包异步。C 错误：prefetch 是预热资源，不会立即执行。",
+    "answer": ["A"],
+    "explanation": "A 正确：灰度通过用户分桶获取不同 runtime config，新功能用动态 import 懒加载，避免影响首屏。C 错误：feature flag 应远端下发，运行时决定，避免重新打包。B 错误：flag 判定应在入口轻量完成，重逻辑才分包异步。D 错误：prefetch 是预热资源，不会立即执行。",
     "source": "local100"
   },
   {
@@ -5105,12 +5105,12 @@
     "prompt": "关于 REST、gRPC 和 GraphQL 的适用场景，以下哪项描述是正确的？",
     "options": [
       { "key": "A", "text": "REST 基于 HTTP/2 和 Protobuf，适合内部服务间高吞吐通信。" },
-      { "key": "B", "text": "gRPC 易调试、缓存友好，适合对外公开 API。" },
-      { "key": "C", "text": "GraphQL 天然解决 N+1 问题，无需额外治理。" },
-      { "key": "D", "text": "GraphQL 适合聚合多源且字段多变的 BFF 层，但需治理缓存和 N+1 问题。" }
+      { "key": "B", "text": "GraphQL 适合聚合多源且字段多变的 BFF 层，但需治理缓存和 N+1 问题。" },
+      { "key": "C", "text": "gRPC 易调试、缓存友好，适合对外公开 API。" },
+      { "key": "D", "text": "GraphQL 天然解决 N+1 问题，无需额外治理。" }
     ],
-    "answer": ["D"],
-    "explanation": "D 正确：GraphQL 允许前端按需取字段，适合聚合多源、字段多变的 BFF 层，但缓存和 N+1 需额外治理。A 错误：gRPC 才基于 HTTP/2+Protobuf。B 错误：REST 易调试、缓存友好，适合对外公开。C 错误：GraphQL 可能引发 N+1，需治理。",
+    "answer": ["B"],
+    "explanation": "B 正确：GraphQL 允许前端按需取字段，适合聚合多源、字段多变的 BFF 层，但缓存和 N+1 需额外治理。A 错误：gRPC 才基于 HTTP/2+Protobuf。C 错误：REST 易调试、缓存友好，适合对外公开。D 错误：GraphQL 可能引发 N+1，需治理。",
     "source": "local100"
   },
   {
@@ -5139,11 +5139,11 @@
     "prompt": "在 Redis 中，需要频繁独立更新用户对象的单个字段（如仅修改昵称），同时希望节省序列化开销并支持部分读取，最适合使用哪种数据结构？",
     "options": [
       { "key": "A", "text": "Set" },
-      { "key": "B", "text": "List" },
-      { "key": "C", "text": "String" },
-      { "key": "D", "text": "Hash" }
+      { "key": "B", "text": "Hash" },
+      { "key": "C", "text": "List" },
+      { "key": "D", "text": "String" }
     ],
-    "answer": ["D"],
+    "answer": ["B"],
     "explanation": "Hash 结构允许对对象字段进行独立更新，无需整体序列化/反序列化，且支持部分读取，非常适合字段频繁单独修改的场景。String 适合整存整取的 JSON 对象或计数器，但整体读写大对象时更省内存/更快；List 和 Set 不适合存储对象字段。",
     "source": "local100"
   },
@@ -5156,13 +5156,13 @@
     "language": "",
     "prompt": "关于 HTTP 方法的幂等性，以下说法正确的是？",
     "options": [
-      { "key": "A", "text": "所有 HTTP 方法都是幂等的" },
-      { "key": "B", "text": "GET、PUT、DELETE 在语义上是幂等的，POST 不保证幂等" },
+      { "key": "A", "text": "GET、PUT、DELETE 在语义上是幂等的，POST 不保证幂等" },
+      { "key": "B", "text": "所有 HTTP 方法都是幂等的" },
       { "key": "C", "text": "PUT 和 DELETE 不是幂等的" },
       { "key": "D", "text": "POST 是幂等的，GET 不是" }
     ],
-    "answer": ["B"],
-    "explanation": "幂等性指同一请求执行一次与多次效果相同。根据 HTTP 语义，GET、PUT、DELETE 是幂等的，而 POST 通常不保证幂等。因此 B 正确；A 错误，因为 POST 不幂等；D 错误，GET 是幂等的而 POST 不是；C 错误，PUT 和 DELETE 是幂等的。",
+    "answer": ["A"],
+    "explanation": "幂等性指同一请求执行一次与多次效果相同。根据 HTTP 语义，GET、PUT、DELETE 是幂等的，而 POST 通常不保证幂等。因此 A 正确；B 错误，因为 POST 不幂等；D 错误，GET 是幂等的而 POST 不是；C 错误，PUT 和 DELETE 是幂等的。",
     "source": "local100"
   },
   {
@@ -5278,13 +5278,13 @@
     "language": "",
     "prompt": "在设计短链系统时，关于发号器与存储分片，以下哪项做法最符合常见实践？",
     "options": [
-      { "key": "A", "text": "使用雪花算法、号段模式或 Redis INCR 生成唯一 ID，再通过 base62 编码得到短码" },
-      { "key": "B", "text": "短码生成后仅存入 Redis，不持久化到数据库" },
+      { "key": "A", "text": "短码生成后仅存入 Redis，不持久化到数据库" },
+      { "key": "B", "text": "使用雪花算法、号段模式或 Redis INCR 生成唯一 ID，再通过 base62 编码得到短码" },
       { "key": "C", "text": "所有短链数据存放在单库单表中，通过短码前缀进行分表" },
       { "key": "D", "text": "直接对长链做 MD5 哈希并取前 6 位作为短码，无需发号器" }
     ],
-    "answer": ["A"],
-    "explanation": "短链系统通常需要唯一发号器来生成短码，雪花算法、号段模式和 Redis INCR 都是常见方案，再经 base62 编码缩短。D 项直接哈希可能冲突且无法保证唯一；C 项单库单表无法扩展，前缀分表并非标准做法；B 项仅存 Redis 会丢失数据，数据库兜底是必要的。",
+    "answer": ["B"],
+    "explanation": "短链系统通常需要唯一发号器来生成短码，雪花算法、号段模式和 Redis INCR 都是常见方案，再经 base62 编码缩短。D 项直接哈希可能冲突且无法保证唯一；C 项单库单表无法扩展，前缀分表并非标准做法；A 项仅存 Redis 会丢失数据，数据库兜底是必要的。",
     "source": "local100"
   },
   {
@@ -5298,11 +5298,11 @@
     "options": [
       { "key": "A", "text": "仅依靠 broker 的单副本存储，消费者处理完立即删除消息" },
       { "key": "B", "text": "生产者发送后不等待确认，消费者自动提交 offset" },
-      { "key": "C", "text": "生产者设置 acks=all 并重试，broker 配置副本，消费者手动 ack 后再提交" },
-      { "key": "D", "text": "生产者批量发送，消费者批量拉取并自动确认" }
+      { "key": "C", "text": "生产者批量发送，消费者批量拉取并自动确认" },
+      { "key": "D", "text": "生产者设置 acks=all 并重试，broker 配置副本，消费者手动 ack 后再提交" }
     ],
-    "answer": ["C"],
-    "explanation": "保证消息不丢失需要生产者确认（acks=all）和重试、broker 多副本冗余、消费者手动 ack 确保处理成功后再提交位移。B 项不等待确认和自动提交都可能丢失消息；A 项单副本无冗余，故障即丢失；D 项批量自动确认在异常时可能丢失未处理消息。",
+    "answer": ["D"],
+    "explanation": "保证消息不丢失需要生产者确认（acks=all）和重试、broker 多副本冗余、消费者手动 ack 确保处理成功后再提交位移。B 项不等待确认和自动提交都可能丢失消息；A 项单副本无冗余，故障即丢失；C 项批量自动确认在异常时可能丢失未处理消息。",
     "source": "local100"
   },
   {
@@ -5350,11 +5350,11 @@
     "options": [
       { "key": "A", "text": "跨分片查询应尽量通过广播所有分片并合并结果来避免；分布式事务优先采用最终一致" },
       { "key": "B", "text": "跨分片查询应尽量使用 2PC 保证强一致；分布式事务优先采用 TCC 业务补偿" },
-      { "key": "C", "text": "跨分片查询应尽量通过按 tenant_id/user_id 等维度路由到单分片来避免；分布式事务优先采用最终一致 + 幂等 + 补偿，强一致仅用于资金等核心链路" },
-      { "key": "D", "text": "跨分片查询无法避免，应全部使用 Saga 长事务处理；分布式事务优先采用 2PC 强一致" }
+      { "key": "C", "text": "跨分片查询无法避免，应全部使用 Saga 长事务处理；分布式事务优先采用 2PC 强一致" },
+      { "key": "D", "text": "跨分片查询应尽量通过按 tenant_id/user_id 等维度路由到单分片来避免；分布式事务优先采用最终一致 + 幂等 + 补偿，强一致仅用于资金等核心链路" }
     ],
-    "answer": ["C"],
-    "explanation": "参考答案指出跨分片查询应尽量避免，按维度路由到单分片；分布式事务优先最终一致+幂等+补偿，强一致仅用于资金等核心链路。C 项准确概括了这一取舍。B 项错误地将 2PC 用于跨分片查询且分布式事务优先 TCC 不符合优先最终一致的原则；D 项将 Saga 用于跨分片查询且优先 2PC 强一致，与参考答案相反；A 项广播所有分片合并结果并不能避免跨分片查询，反而增加开销。",
+    "answer": ["D"],
+    "explanation": "参考答案指出跨分片查询应尽量避免，按维度路由到单分片；分布式事务优先最终一致+幂等+补偿，强一致仅用于资金等核心链路。D 项准确概括了这一取舍。B 项错误地将 2PC 用于跨分片查询且分布式事务优先 TCC 不符合优先最终一致的原则；C 项将 Saga 用于跨分片查询且优先 2PC 强一致，与参考答案相反；A 项广播所有分片合并结果并不能避免跨分片查询，反而增加开销。",
     "source": "local100"
   },
   {
@@ -5368,11 +5368,11 @@
     "options": [
       { "key": "A", "text": "URL 版本和 Header 版本均不会污染路径且调试容易；破坏性变更必须升版本，非破坏性变更也必须升版本" },
       { "key": "B", "text": "URL 版本会污染路径且调试困难；Header 版本 URL 干净且调试容易；破坏性变更必须升版本，非破坏性变更可向后兼容不升" },
-      { "key": "C", "text": "URL 版本直观易调试且不污染路径；Header 版本调试方便；破坏性变更无需升版本，非破坏性变更必须升版本" },
-      { "key": "D", "text": "URL 版本（/v1/...）直观、易调试、缓存清晰，但会污染路径；Header 版本（Accept: application/vnd.x.v2+json）URL 干净但调试难；破坏性变更必须升版本，非破坏性（加字段）可向后兼容不升" }
+      { "key": "C", "text": "URL 版本（/v1/...）直观、易调试、缓存清晰，但会污染路径；Header 版本（Accept: application/vnd.x.v2+json）URL 干净但调试难；破坏性变更必须升版本，非破坏性（加字段）可向后兼容不升" },
+      { "key": "D", "text": "URL 版本直观易调试且不污染路径；Header 版本调试方便；破坏性变更无需升版本，非破坏性变更必须升版本" }
     ],
-    "answer": ["D"],
-    "explanation": "参考答案明确：URL 版本直观、易调试、缓存清晰但污染路径；Header 版本 URL 干净但调试难；破坏性变更必须升版本，非破坏性（加字段）可向后兼容不升。D 项完全符合。C 项错误认为 URL 版本不污染路径且破坏性变更无需升版本；B 项错误认为 URL 版本调试困难、Header 版本调试容易；A 项错误认为两者均不污染路径且非破坏性变更也必须升版本。",
+    "answer": ["C"],
+    "explanation": "参考答案明确：URL 版本直观、易调试、缓存清晰但污染路径；Header 版本 URL 干净但调试难；破坏性变更必须升版本，非破坏性（加字段）可向后兼容不升。C 项完全符合。D 项错误认为 URL 版本不污染路径且破坏性变更无需升版本；B 项错误认为 URL 版本调试困难、Header 版本调试容易；A 项错误认为两者均不污染路径且非破坏性变更也必须升版本。",
     "source": "local100"
   },
   {
@@ -5540,13 +5540,13 @@
     "language": "",
     "prompt": "RAG（检索增强生成）相比直接让 LLM 回答，主要解决了什么问题？",
     "options": [
-      { "key": "A", "text": "解决知识时效性、私有数据访问、幻觉以及可溯源（附引用）的问题。" },
-      { "key": "B", "text": "解决 LLM 推理速度慢的问题，使生成速度不再受模型规模影响。" },
-      { "key": "C", "text": "解决 LLM 训练成本过高的问题，使训练不再需要大量算力。" },
-      { "key": "D", "text": "解决 LLM 无法处理多语言的问题，使模型自动支持所有语言。" }
+      { "key": "A", "text": "解决 LLM 推理速度慢的问题，使生成速度不再受模型规模影响。" },
+      { "key": "B", "text": "解决 LLM 训练成本过高的问题，使训练不再需要大量算力。" },
+      { "key": "C", "text": "解决 LLM 无法处理多语言的问题，使模型自动支持所有语言。" },
+      { "key": "D", "text": "解决知识时效性、私有数据访问、幻觉以及可溯源（附引用）的问题。" }
     ],
-    "answer": ["A"],
-    "explanation": "RAG 先检索外部相关文档再喂给 LLM 作答，从而引入最新或私有知识，降低幻觉，并可通过引用溯源。它并不降低训练成本、不直接提升推理速度，也不解决多语言支持问题。因此 A 正确，C、B、D 均不是 RAG 的主要价值。",
+    "answer": ["D"],
+    "explanation": "RAG 先检索外部相关文档再喂给 LLM 作答，从而引入最新或私有知识，降低幻觉，并可通过引用溯源。它并不降低训练成本、不直接提升推理速度，也不解决多语言支持问题。因此 D 正确，B、A、C 均不是 RAG 的主要价值。",
     "source": "local100"
   },
   {
@@ -5558,13 +5558,13 @@
     "language": "",
     "prompt": "关于 system prompt 与 few-shot 的作用，下列说法正确的是？",
     "options": [
-      { "key": "A", "text": "system prompt 用于设定角色、边界和输出格式，进行全局约束；few-shot 通过示例引导风格与任务模式，提升少样本表现。" },
-      { "key": "B", "text": "system prompt 和 few-shot 的作用完全相同，都是提供示例。" },
-      { "key": "C", "text": "system prompt 用于提供任务示例；few-shot 用于设定全局约束。" },
+      { "key": "A", "text": "system prompt 和 few-shot 的作用完全相同，都是提供示例。" },
+      { "key": "B", "text": "system prompt 用于提供任务示例；few-shot 用于设定全局约束。" },
+      { "key": "C", "text": "system prompt 用于设定角色、边界和输出格式，进行全局约束；few-shot 通过示例引导风格与任务模式，提升少样本表现。" },
       { "key": "D", "text": "system prompt 只能设定角色，不能约束输出格式；few-shot 只能提升风格，不能提升任务表现。" }
     ],
-    "answer": ["A"],
-    "explanation": "system prompt 的核心作用是设定角色、边界和输出格式，对模型行为进行全局约束；few-shot 则是通过提供少量示例来引导模型的输出风格和任务模式，从而提升少样本场景下的表现。选项 C 将两者作用颠倒；选项 B 错误地认为两者作用相同；选项 D 对 system prompt 和 few-shot 的能力描述过于狭窄，与参考答案不符。",
+    "answer": ["C"],
+    "explanation": "system prompt 的核心作用是设定角色、边界和输出格式，对模型行为进行全局约束；few-shot 则是通过提供少量示例来引导模型的输出风格和任务模式，从而提升少样本场景下的表现。选项 B 将两者作用颠倒；选项 A 错误地认为两者作用相同；选项 D 对 system prompt 和 few-shot 的能力描述过于狭窄，与参考答案不符。",
     "source": "local100"
   },
   {
@@ -5578,11 +5578,11 @@
     "options": [
       { "key": "A", "text": "前端必须等待全部响应完成后才能渲染；不全量返回是为了减少网络请求次数。" },
       { "key": "B", "text": "前端只能用 WebSocket 消费流式输出；不全量返回是为了节省后端内存。" },
-      { "key": "C", "text": "流式输出不需要处理断流和错误；不全量返回主要是为了降低服务器 CPU 负载。" },
-      { "key": "D", "text": "前端可用 fetch + ReadableStream 或 EventSource 解析；不全量返回可降低首字延迟（TTFT）、提升体感、支持中断并节省内存。" }
+      { "key": "C", "text": "前端可用 fetch + ReadableStream 或 EventSource 解析；不全量返回可降低首字延迟（TTFT）、提升体感、支持中断并节省内存。" },
+      { "key": "D", "text": "流式输出不需要处理断流和错误；不全量返回主要是为了降低服务器 CPU 负载。" }
     ],
-    "answer": ["D"],
-    "explanation": "流式输出时，后端通过 SSE、chunked 或 WebSocket 逐 token 推送，前端可以使用 fetch + ReadableStream 或 EventSource 进行解析。不全量返回的主要目的是降低首字延迟（TTFT）、提升用户体验、支持中断以及节省内存。选项 B 错误地限定只能用 WebSocket；选项 A 错误地认为必须等待全部完成；选项 C 忽略了断流和错误处理的必要性，且原因描述不准确。",
+    "answer": ["C"],
+    "explanation": "流式输出时，后端通过 SSE、chunked 或 WebSocket 逐 token 推送，前端可以使用 fetch + ReadableStream 或 EventSource 进行解析。不全量返回的主要目的是降低首字延迟（TTFT）、提升用户体验、支持中断以及节省内存。选项 B 错误地限定只能用 WebSocket；选项 A 错误地认为必须等待全部完成；选项 D 忽略了断流和错误处理的必要性，且原因描述不准确。",
     "source": "local100"
   },
   {
@@ -5595,12 +5595,12 @@
     "prompt": "关于 function calling / tool calling 以及 Agent 如何决定调用哪个工具，下列说法正确的是？",
     "options": [
       { "key": "A", "text": "Agent 只能调用一个固定工具，无法根据用户意图动态选择。" },
-      { "key": "B", "text": "模型根据上下文选择工具并产出结构化参数，由宿主执行后回传结果；决策基于工具描述（name/description/json schema）与用户意图。" },
-      { "key": "C", "text": "模型直接执行工具并返回结果，无需宿主参与；工具选择完全随机。" },
-      { "key": "D", "text": "工具调用不需要参数校验，也不需要限制调用次数。" }
+      { "key": "B", "text": "模型直接执行工具并返回结果，无需宿主参与；工具选择完全随机。" },
+      { "key": "C", "text": "工具调用不需要参数校验，也不需要限制调用次数。" },
+      { "key": "D", "text": "模型根据上下文选择工具并产出结构化参数，由宿主执行后回传结果；决策基于工具描述（name/description/json schema）与用户意图。" }
     ],
-    "answer": ["B"],
-    "explanation": "function calling / tool calling 中，模型根据上下文选择工具并生成结构化参数，实际执行由宿主完成，然后将结果回传给模型。Agent 决定调用哪个工具时，主要依据工具的描述（如名称、描述、JSON schema）以及用户意图。选项 C 错误地认为模型直接执行工具且选择随机；选项 A 错误地限定只能调用固定工具；选项 D 忽略了参数校验和调用次数限制的必要性。",
+    "answer": ["D"],
+    "explanation": "function calling / tool calling 中，模型根据上下文选择工具并生成结构化参数，实际执行由宿主完成，然后将结果回传给模型。Agent 决定调用哪个工具时，主要依据工具的描述（如名称、描述、JSON schema）以及用户意图。选项 B 错误地认为模型直接执行工具且选择随机；选项 A 错误地限定只能调用固定工具；选项 C 忽略了参数校验和调用次数限制的必要性。",
     "source": "local100"
   },
   {
@@ -5646,13 +5646,13 @@
     "language": "",
     "prompt": "在 RAG 检索阶段，关于 query 改写技术 HyDE 的描述，正确的是？",
     "options": [
-      { "key": "A", "text": "HyDE 先用 LLM 生成“假设答案”再检索，以缓解语义 mismatch" },
-      { "key": "B", "text": "HyDE 直接对用户 query 做关键词扩展，不涉及 LLM 生成" },
-      { "key": "C", "text": "HyDE 是一种多路召回融合算法，按排名倒数加权" },
-      { "key": "D", "text": "HyDE 要求必须同时使用向量和 BM25 两路召回" }
+      { "key": "A", "text": "HyDE 直接对用户 query 做关键词扩展，不涉及 LLM 生成" },
+      { "key": "B", "text": "HyDE 是一种多路召回融合算法，按排名倒数加权" },
+      { "key": "C", "text": "HyDE 要求必须同时使用向量和 BM25 两路召回" },
+      { "key": "D", "text": "HyDE 先用 LLM 生成“假设答案”再检索，以缓解语义 mismatch" }
     ],
-    "answer": ["A"],
-    "explanation": "参考答案明确 HyDE 是先用 LLM 生成“假设答案”再检索，从而缓解语义 mismatch。B 项错误，HyDE 核心是 LLM 生成假设答案而非简单关键词扩展；C 项混淆了 HyDE 与 RRF 融合；D 项错误，HyDE 不要求必须多路召回。因此 A 正确。",
+    "answer": ["D"],
+    "explanation": "参考答案明确 HyDE 是先用 LLM 生成“假设答案”再检索，从而缓解语义 mismatch。A 项错误，HyDE 核心是 LLM 生成假设答案而非简单关键词扩展；B 项混淆了 HyDE 与 RRF 融合；C 项错误，HyDE 不要求必须多路召回。因此 D 正确。",
     "source": "local100"
   },
   {
@@ -5698,13 +5698,13 @@
     "language": "",
     "prompt": "设计 Agent 工具接口时，以下哪项是统一接口的核心组成部分？",
     "options": [
-      { "key": "A", "text": "name、description、output_schema、execute" },
-      { "key": "B", "text": "name、description、input_schema（JSON Schema）、execute" },
+      { "key": "A", "text": "name、description、input_schema（JSON Schema）、execute" },
+      { "key": "B", "text": "name、description、output_schema、execute" },
       { "key": "C", "text": "id、type、parameters、callback" },
       { "key": "D", "text": "name、version、timeout、retry" }
     ],
-    "answer": ["B"],
-    "explanation": "参考答案明确指出统一接口应包含 name、description、input_schema（JSON Schema）和 execute。选项 D 缺少核心的 schema 和 execute；选项 C 的字段不符合统一接口定义；选项 A 将 input_schema 误写为 output_schema，因此只有 B 正确。",
+    "answer": ["A"],
+    "explanation": "参考答案明确指出统一接口应包含 name、description、input_schema（JSON Schema）和 execute。选项 D 缺少核心的 schema 和 execute；选项 C 的字段不符合统一接口定义；选项 B 将 input_schema 误写为 output_schema，因此只有 A 正确。",
     "source": "local100"
   },
   {
@@ -5717,12 +5717,12 @@
     "prompt": "LLM 应用进行限流与成本控制时，以下哪项措施符合要求？",
     "options": [
       { "key": "A", "text": "禁用缓存以避免不一致" },
-      { "key": "B", "text": "仅通过增加服务器数量来应对高并发" },
-      { "key": "C", "text": "对所有请求使用相同的大模型以保证质量" },
-      { "key": "D", "text": "按用户/key 限制并发与 QPS，并采用模型路由（小模型兜底、大模型精算）" }
+      { "key": "B", "text": "按用户/key 限制并发与 QPS，并采用模型路由（小模型兜底、大模型精算）" },
+      { "key": "C", "text": "仅通过增加服务器数量来应对高并发" },
+      { "key": "D", "text": "对所有请求使用相同的大模型以保证质量" }
     ],
-    "answer": ["D"],
-    "explanation": "参考答案提到限流应按用户/key 限制并发与 QPS，并采用模型路由（小模型兜底、大模型精算）。选项 C 未做模型区分，成本高；选项 B 不是限流措施；选项 A 与缓存节省调用的建议相反。",
+    "answer": ["B"],
+    "explanation": "参考答案提到限流应按用户/key 限制并发与 QPS，并采用模型路由（小模型兜底、大模型精算）。选项 D 未做模型区分，成本高；选项 C 不是限流措施；选项 A 与缓存节省调用的建议相反。",
     "source": "local100"
   },
   {
@@ -5856,13 +5856,13 @@
     "language": "",
     "prompt": "关于向量检索与 BM25 混合检索，以下哪项描述最符合要求？",
     "options": [
-      { "key": "A", "text": "向量检索补充语义匹配，BM25 补充精确术语/专有名词匹配，二者互补；可通过 RRF 或学习排序（reranker）加权融合。" },
-      { "key": "B", "text": "BM25 能完全解决语义近但术语不同的问题，因此无需向量检索。" },
-      { "key": "C", "text": "向量检索能完全替代 BM25，因为其语义理解能力足够处理所有术语差异。" },
+      { "key": "A", "text": "BM25 能完全解决语义近但术语不同的问题，因此无需向量检索。" },
+      { "key": "B", "text": "向量检索能完全替代 BM25，因为其语义理解能力足够处理所有术语差异。" },
+      { "key": "C", "text": "向量检索补充语义匹配，BM25 补充精确术语/专有名词匹配，二者互补；可通过 RRF 或学习排序（reranker）加权融合。" },
       { "key": "D", "text": "混合检索只需简单拼接向量和 BM25 的检索结果，无需任何融合算法。" }
     ],
-    "answer": ["A"],
-    "explanation": "参考答案强调向量补语义、BM25 补精确术语/专有名词，二者互补；融合可采用 RRF 或学习排序（reranker）加权。A 正确。B 错误，BM25 仍依赖字面，无法完全解决术语不同；C 错误，向量检索对精确术语匹配可能不足；D 错误，简单拼接并非有效融合，需要 RRF 或 reranker 等算法。",
+    "answer": ["C"],
+    "explanation": "参考答案强调向量补语义、BM25 补精确术语/专有名词，二者互补；融合可采用 RRF 或学习排序（reranker）加权。C 正确。A 错误，BM25 仍依赖字面，无法完全解决术语不同；B 错误，向量检索对精确术语匹配可能不足；D 错误，简单拼接并非有效融合，需要 RRF 或 reranker 等算法。",
     "source": "local100"
   },
   {
@@ -5908,13 +5908,13 @@
     "language": "",
     "prompt": "在设计企业知识库的权限隔离 RAG 时，以下哪项是确保检索阶段不越权召回的关键措施？",
     "options": [
-      { "key": "A", "text": "对所有用户使用相同的检索参数，以保证性能一致" },
-      { "key": "B", "text": "仅依赖数据库的行级权限控制，向量库不设 ACL" },
-      { "key": "C", "text": "在检索完成后，对返回的文档进行敏感词过滤" },
-      { "key": "D", "text": "在向量查询时注入用户可访问的 doc_id 集合，并利用 metadata 过滤（如 tenant/ACL）" }
+      { "key": "A", "text": "在向量查询时注入用户可访问的 doc_id 集合，并利用 metadata 过滤（如 tenant/ACL）" },
+      { "key": "B", "text": "对所有用户使用相同的检索参数，以保证性能一致" },
+      { "key": "C", "text": "仅依赖数据库的行级权限控制，向量库不设 ACL" },
+      { "key": "D", "text": "在检索完成后，对返回的文档进行敏感词过滤" }
     ],
-    "answer": ["D"],
-    "explanation": "参考答案指出，检索前应注入用户可访问的 doc_id 集合，并在向量查询时带 metadata 过滤（tenant/ACL），这是避免越权召回的关键。C 项是事后过滤，无法防止越权数据被召回；B 项忽略了向量库的 ACL，可能导致越权；A 项与权限隔离无关。",
+    "answer": ["A"],
+    "explanation": "参考答案指出，检索前应注入用户可访问的 doc_id 集合，并在向量查询时带 metadata 过滤（tenant/ACL），这是避免越权召回的关键。D 项是事后过滤，无法防止越权数据被召回；C 项忽略了向量库的 ACL，可能导致越权；B 项与权限隔离无关。",
     "source": "local100"
   },
   {
@@ -5927,12 +5927,12 @@
     "prompt": "关于推理加速技术，以下哪项描述是正确的？",
     "options": [
       { "key": "A", "text": "投机解码使用大模型生成草稿，再由小模型验证，以提高吞吐" },
-      { "key": "B", "text": "KV cache 通过复用已计算的注意力键值对来降低延迟，但受显存限制" },
-      { "key": "C", "text": "batch 推理是指将多个请求串行处理，以提高 GPU 利用率" },
+      { "key": "B", "text": "batch 推理是指将多个请求串行处理，以提高 GPU 利用率" },
+      { "key": "C", "text": "KV cache 通过复用已计算的注意力键值对来降低延迟，但受显存限制" },
       { "key": "D", "text": "量化（如 INT8/4）可以降低显存占用并提速，且不会损失任何精度" }
     ],
-    "answer": ["B"],
-    "explanation": "KV cache 复用已算注意力，降低延迟，但显存占用是限制因素。D 项错误，量化会带来精度损失，需要验证；A 项错误，投机解码是小模型草稿、大模型验证；C 项错误，batch 推理是合并连续请求（如 continuous batching）并行处理，而非串行。",
+    "answer": ["C"],
+    "explanation": "KV cache 复用已算注意力，降低延迟，但显存占用是限制因素。D 项错误，量化会带来精度损失，需要验证；A 项错误，投机解码是小模型草稿、大模型验证；B 项错误，batch 推理是合并连续请求（如 continuous batching）并行处理，而非串行。",
     "source": "local100"
   },
   {
@@ -6120,11 +6120,11 @@
     "options": [
       { "key": "A", "text": "只要定期做全量备份，就足以实现任意时间点恢复" },
       { "key": "B", "text": "异地多副本和加密不属于备份策略的考虑范围" },
-      { "key": "C", "text": "备份恢复演练只需在本地环境执行一次即可，无需定期进行" },
-      { "key": "D", "text": "全量备份定期执行，结合增量备份或 binlog 可以实现任意时间点恢复（PITR）" }
+      { "key": "C", "text": "全量备份定期执行，结合增量备份或 binlog 可以实现任意时间点恢复（PITR）" },
+      { "key": "D", "text": "备份恢复演练只需在本地环境执行一次即可，无需定期进行" }
     ],
-    "answer": ["D"],
-    "explanation": "全量备份提供基础恢复点，增量备份或 binlog 记录变化，两者结合才能实现 PITR。仅全量备份无法恢复到任意时间点，因此 A 错误。恢复演练应定期在隔离环境进行并校验数据一致性、计时 RTO，C 错误。异地多副本和加密是备份策略的重要部分，B 错误。",
+    "answer": ["C"],
+    "explanation": "全量备份提供基础恢复点，增量备份或 binlog 记录变化，两者结合才能实现 PITR。仅全量备份无法恢复到任意时间点，因此 A 错误。恢复演练应定期在隔离环境进行并校验数据一致性、计时 RTO，D 错误。异地多副本和加密是备份策略的重要部分，B 错误。",
     "source": "local100"
   },
   {
@@ -6190,11 +6190,11 @@
     "options": [
       { "key": "A", "text": "maxSurge 和 maxUnavailable 都表示最多可以创建的额外 Pod 数量。" },
       { "key": "B", "text": "maxSurge 表示更新过程中最多不可用的 Pod 数量；maxUnavailable 表示最多可以超出期望副本数的 Pod 数量。" },
-      { "key": "C", "text": "maxSurge 表示更新过程中最多可以超出期望副本数的 Pod 数量；maxUnavailable 表示最多不可用的 Pod 数量。" },
-      { "key": "D", "text": "maxSurge 和 maxUnavailable 都表示最多可以销毁的旧 Pod 数量。" }
+      { "key": "C", "text": "maxSurge 和 maxUnavailable 都表示最多可以销毁的旧 Pod 数量。" },
+      { "key": "D", "text": "maxSurge 表示更新过程中最多可以超出期望副本数的 Pod 数量；maxUnavailable 表示最多不可用的 Pod 数量。" }
     ],
-    "answer": ["C"],
-    "explanation": "maxSurge 控制滚动更新时最多可以超出期望副本数的 Pod 数量，即允许临时创建的新 Pod 上限；maxUnavailable 控制更新过程中最多允许不可用的 Pod 数量。两者共同决定更新速度和可用性。选项 B 将两者含义颠倒；选项 A 和 D 错误地将两个参数混为一谈，不符合 Kubernetes 的定义。",
+    "answer": ["D"],
+    "explanation": "maxSurge 控制滚动更新时最多可以超出期望副本数的 Pod 数量，即允许临时创建的新 Pod 上限；maxUnavailable 控制更新过程中最多允许不可用的 Pod 数量。两者共同决定更新速度和可用性。选项 B 将两者含义颠倒；选项 A 和 C 错误地将两个参数混为一谈，不符合 Kubernetes 的定义。",
     "source": "local100"
   },
   {
@@ -6241,12 +6241,12 @@
     "prompt": "在安全运维实践中，以下哪项做法符合最小权限原则？",
     "options": [
       { "key": "A", "text": "使用长期不变的密钥，避免频繁轮转带来的麻烦。" },
-      { "key": "B", "text": "为容器配置非 root 用户运行，并使用只读文件系统。" },
-      { "key": "C", "text": "关闭镜像扫描以加快 CI 流程。" },
-      { "key": "D", "text": "给所有服务账号分配集群管理员权限，方便运维。" }
+      { "key": "B", "text": "关闭镜像扫描以加快 CI 流程。" },
+      { "key": "C", "text": "给所有服务账号分配集群管理员权限，方便运维。" },
+      { "key": "D", "text": "为容器配置非 root 用户运行，并使用只读文件系统。" }
     ],
-    "answer": ["B"],
-    "explanation": "最小权限原则要求只授予完成任务所必需的最小权限。使用非 root 用户运行容器和只读文件系统可以降低容器逃逸和文件篡改风险，符合最小权限。选项 D 授予过大权限，违背最小权限；选项 C 关闭镜像扫描会引入漏洞风险；选项 A 长期不轮转密钥增加泄露风险。",
+    "answer": ["D"],
+    "explanation": "最小权限原则要求只授予完成任务所必需的最小权限。使用非 root 用户运行容器和只读文件系统可以降低容器逃逸和文件篡改风险，符合最小权限。选项 C 授予过大权限，违背最小权限；选项 B 关闭镜像扫描会引入漏洞风险；选项 A 长期不轮转密钥增加泄露风险。",
     "source": "local100"
   },
   {
@@ -6873,12 +6873,12 @@
     "prompt": "Vite 相比 Webpack 的核心优势是什么？它的 dev server 为什么快？",
     "options": [
       { "key": "A", "text": "开发态基于浏览器原生 ESM 按需编译，但依赖预构建使用 Rollup，HMR 基于 WebSocket 全量刷新，生产构建用 esbuild。" },
-      { "key": "B", "text": "开发态基于浏览器原生 ESM 按需编译，并用 esbuild 预构建依赖，HMR 基于 ESM 精确定位模块，生产构建用 Rollup。" },
-      { "key": "C", "text": "开发态基于 Webpack 的持久化缓存，并用 esbuild 预构建依赖，HMR 基于 ESM 精确定位模块，生产构建用 Rollup。" },
+      { "key": "B", "text": "开发态基于 Webpack 的持久化缓存，并用 esbuild 预构建依赖，HMR 基于 ESM 精确定位模块，生产构建用 Rollup。" },
+      { "key": "C", "text": "开发态基于浏览器原生 ESM 按需编译，并用 esbuild 预构建依赖，HMR 基于 ESM 精确定位模块，生产构建用 Rollup。" },
       { "key": "D", "text": "开发态基于 CommonJS 全量打包，并用 Babel 预构建依赖，HMR 基于文件监听全量刷新，生产构建用 esbuild。" }
     ],
-    "answer": ["B"],
-    "explanation": "Vite 开发态利用浏览器原生 ESM 实现按需编译，启动即快；使用 esbuild 预构建依赖（CJS 转 ESM、去重）解决依赖解析瓶颈；HMR 基于 ESM 精确定位模块，热更新粒度细；生产构建则用 Rollup 保证 Tree-shaking 与产物质量。D 项错误描述为 CommonJS 全量打包和 Babel；A 项错误将预构建说成 Rollup、HMR 说成全量刷新；C 项错误将开发态说成基于 Webpack 缓存。",
+    "answer": ["C"],
+    "explanation": "Vite 开发态利用浏览器原生 ESM 实现按需编译，启动即快；使用 esbuild 预构建依赖（CJS 转 ESM、去重）解决依赖解析瓶颈；HMR 基于 ESM 精确定位模块，热更新粒度细；生产构建则用 Rollup 保证 Tree-shaking 与产物质量。D 项错误描述为 CommonJS 全量打包和 Babel；A 项错误将预构建说成 Rollup、HMR 说成全量刷新；B 项错误将开发态说成基于 Webpack 缓存。",
     "source": "iq380"
   },
   {
@@ -7241,12 +7241,12 @@
     "prompt": "前端处理弱网/离线场景时，以下哪项是保证基本可用的正确做法？",
     "options": [
       { "key": "A", "text": "在弱网时直接禁用所有网络请求，避免失败" },
-      { "key": "B", "text": "完全依赖浏览器默认缓存，不额外做离线处理" },
-      { "key": "C", "text": "仅用 navigator.onLine 判断在线状态，不做其他处理" },
-      { "key": "D", "text": "用 PWA/Service Worker 缓存静态资源与关键接口，接口层做离线队列，网络恢复后重试与合并" }
+      { "key": "B", "text": "用 PWA/Service Worker 缓存静态资源与关键接口，接口层做离线队列，网络恢复后重试与合并" },
+      { "key": "C", "text": "完全依赖浏览器默认缓存，不额外做离线处理" },
+      { "key": "D", "text": "仅用 navigator.onLine 判断在线状态，不做其他处理" }
     ],
-    "answer": ["D"],
-    "explanation": "D 项正确，因为 Service Worker 可缓存静态资源与关键接口，离线队列能在网络恢复后重试与合并请求，保证基本可用。B 项错误，浏览器默认缓存不可控，无法保证关键资源离线可用。A 项错误，禁用请求会导致功能不可用。C 项错误，navigator.onLine 只能粗略判断网络状态，不能替代缓存与重试机制。",
+    "answer": ["B"],
+    "explanation": "B 项正确，因为 Service Worker 可缓存静态资源与关键接口，离线队列能在网络恢复后重试与合并请求，保证基本可用。C 项错误，浏览器默认缓存不可控，无法保证关键资源离线可用。A 项错误，禁用请求会导致功能不可用。D 项错误，navigator.onLine 只能粗略判断网络状态，不能替代缓存与重试机制。",
     "source": "iq380"
   },
   {
@@ -7400,11 +7400,11 @@
     "options": [
       { "key": "A", "text": "优先后端分页或游标，避免一次拉取全量数据" },
       { "key": "B", "text": "改用二进制/列式格式或压缩（gzip/brotli/NDJSON），并用 Web Worker 解析" },
-      { "key": "C", "text": "在前端主线程直接使用 JSON.parse 一次性解析整个大 JSON" },
-      { "key": "D", "text": "使用流式 JSON 解析（如基于 ReadableStream 的分块解析）边读边处理" }
+      { "key": "C", "text": "使用流式 JSON 解析（如基于 ReadableStream 的分块解析）边读边处理" },
+      { "key": "D", "text": "在前端主线程直接使用 JSON.parse 一次性解析整个大 JSON" }
     ],
-    "answer": ["C"],
-    "explanation": "参考要点包括后端分页、流式解析、二进制/压缩格式以及 Web Worker 解析。C 项在主线程一次性 JSON.parse 大 JSON 正是导致卡顿的常见原因，不符合优化方向。A、D、B 均为参考答案中的有效手段。",
+    "answer": ["D"],
+    "explanation": "参考要点包括后端分页、流式解析、二进制/压缩格式以及 Web Worker 解析。D 项在主线程一次性 JSON.parse 大 JSON 正是导致卡顿的常见原因，不符合优化方向。A、C、B 均为参考答案中的有效手段。",
     "source": "iq380"
   },
   {
@@ -7433,12 +7433,12 @@
     "prompt": "在 AI 对话前端中实现“边生成边渲染、可中断、可重新生成”的交互闭环，以下哪项做法最符合要求？",
     "options": [
       { "key": "A", "text": "重新生成时直接并发发送多个请求，不处理消息状态和并发顺序" },
-      { "key": "B", "text": "SSE/fetch-stream 累积 tokens 节流渲染，AbortController 中断保留已生成部分，状态机管理" },
-      { "key": "C", "text": "用户点击停止时直接清空已生成内容并重置整个对话" },
-      { "key": "D", "text": "一次性等待完整响应返回后再渲染，避免流式处理的复杂性" }
+      { "key": "B", "text": "用户点击停止时直接清空已生成内容并重置整个对话" },
+      { "key": "C", "text": "一次性等待完整响应返回后再渲染，避免流式处理的复杂性" },
+      { "key": "D", "text": "SSE/fetch-stream 累积 tokens 节流渲染，AbortController 中断保留已生成部分，状态机管理" }
     ],
-    "answer": ["B"],
-    "explanation": "参考要点包括流式累积 tokens 并节流渲染、用 AbortController 中断保留已生成部分、维护消息状态机（streaming/done/error/canceled）以及重新生成时重置状态并处理并发。B 项完整覆盖这些要点；D 项放弃流式渲染；C 项错误清空内容；A 项忽略状态与并发控制。",
+    "answer": ["D"],
+    "explanation": "参考要点包括流式累积 tokens 并节流渲染、用 AbortController 中断保留已生成部分、维护消息状态机（streaming/done/error/canceled）以及重新生成时重置状态并处理并发。D 项完整覆盖这些要点；C 项放弃流式渲染；B 项错误清空内容；A 项忽略状态与并发控制。",
     "source": "iq380"
   },
   {
@@ -10446,13 +10446,13 @@
     "language": "",
     "prompt": "关于 Chunk（切分）策略，以下哪项是参考答案中提到的避免语义丢失的有效方法？",
     "options": [
-      { "key": "A", "text": "使用重叠窗口（overlap）保留边界上下文，并采用结构感知切分" },
-      { "key": "B", "text": "仅使用固定长度切分，不考虑语义边界" },
-      { "key": "C", "text": "切分粒度越细越好，无需匹配查询意图" },
+      { "key": "A", "text": "仅使用固定长度切分，不考虑语义边界" },
+      { "key": "B", "text": "切分粒度越细越好，无需匹配查询意图" },
+      { "key": "C", "text": "使用重叠窗口（overlap）保留边界上下文，并采用结构感知切分" },
       { "key": "D", "text": "按纯字符数切分，忽略标题层级和代码块结构" }
     ],
-    "answer": ["A"],
-    "explanation": "参考答案提到，重叠窗口（overlap）可保留边界上下文，减少割裂；结构感知切分（如按 section、表格、代码块）优于纯字符数切分。B 项和 D 项忽略了语义和结构；C 项违背了 chunk 应自包含且粒度匹配查询意图的原则。因此 A 正确。",
+    "answer": ["C"],
+    "explanation": "参考答案提到，重叠窗口（overlap）可保留边界上下文，减少割裂；结构感知切分（如按 section、表格、代码块）优于纯字符数切分。A 项和 D 项忽略了语义和结构；B 项违背了 chunk 应自包含且粒度匹配查询意图的原则。因此 C 正确。",
     "source": "iq380"
   },
   {
@@ -10516,13 +10516,13 @@
     "language": "",
     "prompt": "关于 ANN 检索的 HNSW 与 IVF 索引，以下说法正确的是？",
     "options": [
-      { "key": "A", "text": "HNSW 查询快、召回高，但构建/内存开销大；IVF 省内存但需调 nprobe 平衡召回与速度" },
-      { "key": "B", "text": "HNSW 和 IVF 的召回率与延迟之间没有 trade-off" },
-      { "key": "C", "text": "HNSW 基于倒排聚类，内存开销小，适合超大规模内存敏感场景" },
+      { "key": "A", "text": "HNSW 和 IVF 的召回率与延迟之间没有 trade-off" },
+      { "key": "B", "text": "HNSW 基于倒排聚类，内存开销小，适合超大规模内存敏感场景" },
+      { "key": "C", "text": "HNSW 查询快、召回高，但构建/内存开销大；IVF 省内存但需调 nprobe 平衡召回与速度" },
       { "key": "D", "text": "IVF 基于图的分层导航，查询快、召回高，但构建/内存开销大" }
     ],
-    "answer": ["A"],
-    "explanation": "HNSW 基于图的分层导航，查询快、召回高，但构建/内存开销大、增删成本较高；IVF 是倒排聚类，聚类中心粗筛再细查，省内存但需调 nprobe 平衡。追求低延迟高召回选 HNSW；超大规模内存敏感可考虑 IVF/PQ。召回率与延迟呈 trade-off。C、D 将两者原理颠倒，B 错误。",
+    "answer": ["C"],
+    "explanation": "HNSW 基于图的分层导航，查询快、召回高，但构建/内存开销大、增删成本较高；IVF 是倒排聚类，聚类中心粗筛再细查，省内存但需调 nprobe 平衡。追求低延迟高召回选 HNSW；超大规模内存敏感可考虑 IVF/PQ。召回率与延迟呈 trade-off。B、D 将两者原理颠倒，A 错误。",
     "source": "iq380"
   },
   {
@@ -10535,12 +10535,12 @@
     "prompt": "在 Hybrid Search（向量 + 关键词 BM25）中，融合两种检索分数最常用的方法是什么？",
     "options": [
       { "key": "A", "text": "仅使用向量检索，忽略 BM25 分数" },
-      { "key": "B", "text": "将 BM25 分数乘以固定系数后与向量分数相加，无需归一化" },
-      { "key": "C", "text": "RRF（Reciprocal Rank Fusion）或加权归一化相加" },
+      { "key": "B", "text": "RRF（Reciprocal Rank Fusion）或加权归一化相加" },
+      { "key": "C", "text": "将 BM25 分数乘以固定系数后与向量分数相加，无需归一化" },
       { "key": "D", "text": "直接取向量相似度和 BM25 分数的最大值" }
     ],
-    "answer": ["C"],
-    "explanation": "参考答案明确指出，分别召回后融合的常用方法是 RRF（Reciprocal Rank Fusion）或加权归一化相加。选项 D 直接取最大值并非标准融合方法；选项 A 忽略 BM25 违背了混合检索的初衷；选项 B 未归一化直接相加会导致量纲不一致，不是推荐做法。",
+    "answer": ["B"],
+    "explanation": "参考答案明确指出，分别召回后融合的常用方法是 RRF（Reciprocal Rank Fusion）或加权归一化相加。选项 D 直接取最大值并非标准融合方法；选项 A 忽略 BM25 违背了混合检索的初衷；选项 C 未归一化直接相加会导致量纲不一致，不是推荐做法。",
     "source": "iq380"
   },
   {
@@ -10587,12 +10587,12 @@
     "prompt": "设计“带引用的回答”以实现 RAG 可溯源、可核验时，以下哪项是参考答案中的关键做法？",
     "options": [
       { "key": "A", "text": "让模型自由生成引用编号，无需后处理校验" },
-      { "key": "B", "text": "给每个 chunk 分配稳定 id（doc_id + 偏移），生成时要求输出 [1][2] 引用" },
-      { "key": "C", "text": "所有断言都标注为“模型推断”，不提供引用" },
+      { "key": "B", "text": "所有断言都标注为“模型推断”，不提供引用" },
+      { "key": "C", "text": "给每个 chunk 分配稳定 id（doc_id + 偏移），生成时要求输出 [1][2] 引用" },
       { "key": "D", "text": "仅在前端展示引用，后端不记录 chunk id" }
     ],
-    "answer": ["B"],
-    "explanation": "参考答案强调，应为每个 chunk 分配稳定 id（doc_id + 偏移），生成时要求输出 [1][2] 引用，并后处理校验引用 chunk 是否真包含支撑句。选项 A 不校验会导致编造引用；选项 D 后端不记录 id 无法溯源；选项 C 不提供引用违背可核验目标。",
+    "answer": ["C"],
+    "explanation": "参考答案强调，应为每个 chunk 分配稳定 id（doc_id + 偏移），生成时要求输出 [1][2] 引用，并后处理校验引用 chunk 是否真包含支撑句。选项 A 不校验会导致编造引用；选项 D 后端不记录 id 无法溯源；选项 B 不提供引用违背可核验目标。",
     "source": "iq380"
   },
   {
@@ -10604,13 +10604,13 @@
     "language": "",
     "prompt": "在 Prompt 工程中，关于 few-shot 和 chain-of-thought (CoT) 的描述，以下哪项是正确的？",
     "options": [
-      { "key": "A", "text": "few-shot 通过提供示例来引导模型输出格式与风格，适合结构化抽取、分类等任务。" },
-      { "key": "B", "text": "CoT 要求模型直接给出最终答案，不展示推理步骤，以提高响应速度。" },
+      { "key": "A", "text": "CoT 要求模型直接给出最终答案，不展示推理步骤，以提高响应速度。" },
+      { "key": "B", "text": "few-shot 通过提供示例来引导模型输出格式与风格，适合结构化抽取、分类等任务。" },
       { "key": "C", "text": "zero-shot 在复杂数学推理任务上通常比 CoT 更准确。" },
       { "key": "D", "text": "few-shot 示例的质量对模型输出没有影响，可以随意选择示例。" }
     ],
-    "answer": ["A"],
-    "explanation": "few-shot 的核心是提供少量示例来引导模型遵循期望的格式和风格，因此适合结构化抽取、分类等任务。CoT 是要求模型逐步思考，展示推理过程，从而提升多步推理和数学/逻辑题的正确率，所以 B 错误。对于复杂推理任务，CoT 或 few-shot-CoT 通常比 zero-shot 更有效，C 错误。示例的质量和偏差会显著影响模型输出，不当示例可能误导模型，D 错误。",
+    "answer": ["B"],
+    "explanation": "few-shot 的核心是提供少量示例来引导模型遵循期望的格式和风格，因此适合结构化抽取、分类等任务。CoT 是要求模型逐步思考，展示推理过程，从而提升多步推理和数学/逻辑题的正确率，所以 A 错误。对于复杂推理任务，CoT 或 few-shot-CoT 通常比 zero-shot 更有效，C 错误。示例的质量和偏差会显著影响模型输出，不当示例可能误导模型，D 错误。",
     "source": "iq380"
   },
   {
@@ -10641,11 +10641,11 @@
     "prompt": "为了控制 LLM 输出为严格的 JSON 或结构化数据，以下哪种做法最不推荐？",
     "options": [
       { "key": "A", "text": "用 Pydantic 或 JSON Schema 校验输出，失败时重试或降级。" },
-      { "key": "B", "text": "优先使用模型提供的 JSON mode 或 structured outputs 等能力。" },
-      { "key": "C", "text": "使用 Prompt 约束输出格式，并结合后置校验与修复（如重试）。" },
-      { "key": "D", "text": "主要依赖正则表达式解析非结构化文本，因为这样最灵活。" }
+      { "key": "B", "text": "主要依赖正则表达式解析非结构化文本，因为这样最灵活。" },
+      { "key": "C", "text": "优先使用模型提供的 JSON mode 或 structured outputs 等能力。" },
+      { "key": "D", "text": "使用 Prompt 约束输出格式，并结合后置校验与修复（如重试）。" }
     ],
-    "answer": ["D"],
+    "answer": ["B"],
     "explanation": "控制 LLM 输出为严格 JSON 时，应优先利用模型提供的 JSON mode 或 structured outputs 等原生能力，其次用 Prompt 约束并配合后置校验与修复，还可以用 Pydantic/JSON Schema 进行校验并在失败时重试或降级。纯正则解析非结构化文本非常脆弱，容易因格式微小变化而失败，因此是最不推荐的做法。",
     "source": "iq380"
   },
@@ -10676,10 +10676,10 @@
     "options": [
       { "key": "A", "text": "限制用户输入的长度不超过 100 字符" },
       { "key": "B", "text": "对所有用户输入进行 HTML 转义" },
-      { "key": "C", "text": "在系统提示中要求模型不要执行恶意指令" },
-      { "key": "D", "text": "将用户输入与系统指令用分隔符隔开，并声明优先级" }
+      { "key": "C", "text": "将用户输入与系统指令用分隔符隔开，并声明优先级" },
+      { "key": "D", "text": "在系统提示中要求模型不要执行恶意指令" }
     ],
-    "answer": ["D"],
+    "answer": ["C"],
     "explanation": "防止提示注入的核心是区分不可信用户输入与系统指令，通过分隔符、清晰边界和优先级声明来隔离。HTML 转义用于防 XSS，不解决提示注入；限制长度不能阻止注入；仅靠模型自我约束不可靠。",
     "source": "iq380"
   },
@@ -10728,10 +10728,10 @@
     "options": [
       { "key": "A", "text": "立即放弃整个任务并返回错误" },
       { "key": "B", "text": "无限重试直到成功" },
-      { "key": "C", "text": "忽略错误继续执行后续步骤" },
-      { "key": "D", "text": "封装超时并有限重试，失败后将错误反馈给模型调整" }
+      { "key": "C", "text": "封装超时并有限重试，失败后将错误反馈给模型调整" },
+      { "key": "D", "text": "忽略错误继续执行后续步骤" }
     ],
-    "answer": ["D"],
+    "answer": ["C"],
     "explanation": "合理策略是封装超时并有限重试（如指数退避），失败后将错误作为 observation 反馈给模型，让其调整或降级。无限重试和忽略错误都不可取，立即放弃则缺乏容错。",
     "source": "iq380"
   },
@@ -10834,11 +10834,11 @@
     "options": [
       { "key": "A", "text": "提供鉴权、限流、负载均衡、失败重试、fallback、用量计量与审计" },
       { "key": "B", "text": "支持按成本/延迟/质量进行模型选择（routing）" },
-      { "key": "C", "text": "直接训练和微调大语言模型本身" },
-      { "key": "D", "text": "统一接入多模型/多厂商，屏蔽差异并做路由/降级/配额" }
+      { "key": "C", "text": "统一接入多模型/多厂商，屏蔽差异并做路由/降级/配额" },
+      { "key": "D", "text": "直接训练和微调大语言模型本身" }
     ],
-    "answer": ["C"],
-    "explanation": "模型网关的核心是统一接入多模型、屏蔽差异，并提供鉴权、限流、负载均衡、重试、fallback、计量审计以及按成本/延迟/质量路由等治理能力。训练和微调模型属于模型研发环节，不是网关职责，因此 C 项不属于核心能力。",
+    "answer": ["D"],
+    "explanation": "模型网关的核心是统一接入多模型、屏蔽差异，并提供鉴权、限流、负载均衡、重试、fallback、计量审计以及按成本/延迟/质量路由等治理能力。训练和微调模型属于模型研发环节，不是网关职责，因此 D 项不属于核心能力。",
     "source": "iq380"
   },
   {
@@ -10851,12 +10851,12 @@
     "prompt": "关于 LLM 调用的限流与配额实现，下列说法正确的是？",
     "options": [
       { "key": "A", "text": "超限时应直接断开连接且不返回任何错误信息" },
-      { "key": "B", "text": "限流只能用固定窗口实现，不能用令牌桶或滑动窗口" },
-      { "key": "C", "text": "按用户/租户维度限流与计费，按模型区分配额并结合 RPM/TPM 限制，分布式可用 Redis Lua 原子计数" },
+      { "key": "B", "text": "按用户/租户维度限流与计费，按模型区分配额并结合 RPM/TPM 限制，分布式可用 Redis Lua 原子计数" },
+      { "key": "C", "text": "限流只能用固定窗口实现，不能用令牌桶或滑动窗口" },
       { "key": "D", "text": "只需按全局维度限流，无需区分用户/租户或模型" }
     ],
-    "answer": ["C"],
-    "explanation": "参考答案指出应按用户/租户维度限流与计费，防止单用户拖垮或烧钱；按模型区分配额（贵模型更紧），结合 RPM/TPM 限制；可用令牌桶/滑动窗口实现，分布式用 Redis Lua 原子计数；超限返回明确错误与重试建议。D 项忽略多租户与模型差异；B 项否定令牌桶/滑动窗口；A 项不符合超限返回明确错误的做法。",
+    "answer": ["B"],
+    "explanation": "参考答案指出应按用户/租户维度限流与计费，防止单用户拖垮或烧钱；按模型区分配额（贵模型更紧），结合 RPM/TPM 限制；可用令牌桶/滑动窗口实现，分布式用 Redis Lua 原子计数；超限返回明确错误与重试建议。D 项忽略多租户与模型差异；C 项否定令牌桶/滑动窗口；A 项不符合超限返回明确错误的做法。",
     "source": "iq380"
   },
   {
@@ -10904,11 +10904,11 @@
     "options": [
       { "key": "A", "text": "Faithfulness" },
       { "key": "B", "text": "无幻觉率" },
-      { "key": "C", "text": "Answer Relevancy" },
-      { "key": "D", "text": "Recall@k" }
+      { "key": "C", "text": "Recall@k" },
+      { "key": "D", "text": "Answer Relevancy" }
     ],
-    "answer": ["D"],
-    "explanation": "Recall@k 是检索阶段常用的指标，用于衡量前 k 个结果中召回相关文档的比例。Faithfulness、Answer Relevancy 和无幻觉率均属于生成质量指标，因此 A、C、B 错误。",
+    "answer": ["C"],
+    "explanation": "Recall@k 是检索阶段常用的指标，用于衡量前 k 个结果中召回相关文档的比例。Faithfulness、Answer Relevancy 和无幻觉率均属于生成质量指标，因此 A、D、B 错误。",
     "source": "iq380"
   },
   {
@@ -10920,13 +10920,13 @@
     "language": "",
     "prompt": "使用 LLM-as-a-Judge 进行评测时，以下哪种偏差是指裁判模型倾向于偏好自己生成的内容？",
     "options": [
-      { "key": "A", "text": "自我偏好" },
-      { "key": "B", "text": "位置偏好" },
-      { "key": "C", "text": "格式偏好" },
+      { "key": "A", "text": "位置偏好" },
+      { "key": "B", "text": "格式偏好" },
+      { "key": "C", "text": "自我偏好" },
       { "key": "D", "text": "长度偏好" }
     ],
-    "answer": ["A"],
-    "explanation": "自我偏好是指裁判模型倾向于给自己生成的内容更高评价，因此 A 正确。位置偏好指受内容出现位置影响，长度偏好指偏好更长回答，格式偏好并非参考答案中列出的偏差类型。",
+    "answer": ["C"],
+    "explanation": "自我偏好是指裁判模型倾向于给自己生成的内容更高评价，因此 C 正确。位置偏好指受内容出现位置影响，长度偏好指偏好更长回答，格式偏好并非参考答案中列出的偏差类型。",
     "source": "iq380"
   },
   {
@@ -10975,12 +10975,12 @@
     "prompt": "对 LLM 调用做链路追踪并与现有 APM 打通，以下哪种做法符合要求？",
     "options": [
       { "key": "A", "text": "仅在应用入口记录一个总 span，内部调用不细分。" },
-      { "key": "B", "text": "使用自定义 trace_id 格式，不遵循 W3C traceparent，以避免与上游系统冲突。" },
-      { "key": "C", "text": "使用 OpenTelemetry 在 retrieve/rerank/generate 等每层打 span，通过 W3C traceparent 透传与上游链路合并，并在 span 属性中记录模型、token、缓存命中、工具名等信息。" },
+      { "key": "B", "text": "使用 OpenTelemetry 在 retrieve/rerank/generate 等每层打 span，通过 W3C traceparent 透传与上游链路合并，并在 span 属性中记录模型、token、缓存命中、工具名等信息。" },
+      { "key": "C", "text": "使用自定义 trace_id 格式，不遵循 W3C traceparent，以避免与上游系统冲突。" },
       { "key": "D", "text": "链路追踪数据只能单独存储，无法在 Grafana/Jaeger 中与现有 APM 关联查看。" }
     ],
-    "answer": ["C"],
-    "explanation": "参考答案强调用 OpenTelemetry 在每层打 span（retrieve/rerank/generate）并带 trace_id，通过 W3C traceparent 透传与上游 Web/微服务链路合并，span 属性记录模型、token、是否命中缓存、工具名，最终在 Grafana/Jaeger 关联查看端到端延迟与失败点。选项 C 准确对应。选项 A 缺少分层 span；选项 B 违背 W3C 透传标准；选项 D 与“在 Grafana/Jaeger 关联查看”矛盾。",
+    "answer": ["B"],
+    "explanation": "参考答案强调用 OpenTelemetry 在每层打 span（retrieve/rerank/generate）并带 trace_id，通过 W3C traceparent 透传与上游 Web/微服务链路合并，span 属性记录模型、token、是否命中缓存、工具名，最终在 Grafana/Jaeger 关联查看端到端延迟与失败点。选项 B 准确对应。选项 A 缺少分层 span；选项 C 违背 W3C 透传标准；选项 D 与“在 Grafana/Jaeger 关联查看”矛盾。",
     "source": "iq380"
   },
   {
@@ -11008,13 +11008,13 @@
     "language": "",
     "prompt": "关于 Guardrails（护栏）在 LLM 应用中的落地，以下哪项最符合要求？",
     "options": [
-      { "key": "A", "text": "输入端做注入检测与截断，输出端做结构化校验、PII 脱敏与违规拦截，规则+分类模型+LLM judge" },
-      { "key": "B", "text": "护栏只需在输出端做内容安全过滤，输入端无需处理。" },
-      { "key": "C", "text": "护栏只能使用规则引擎实现，不能结合分类模型或 LLM judge。" },
+      { "key": "A", "text": "护栏只需在输出端做内容安全过滤，输入端无需处理。" },
+      { "key": "B", "text": "护栏只能使用规则引擎实现，不能结合分类模型或 LLM judge。" },
+      { "key": "C", "text": "输入端做注入检测与截断，输出端做结构化校验、PII 脱敏与违规拦截，规则+分类模型+LLM judge" },
       { "key": "D", "text": "护栏的主要目的是提升模型生成速度，与安全合规无关。" }
     ],
-    "answer": ["A"],
-    "explanation": "参考答案指出护栏在输入/输出两端做约束：输入侧包括敏感词/注入检测、超长截断、意图白名单；输出侧包括结构化校验、PII 脱敏、拒绝违规请求；实现上可用规则+分类模型+LLM judge 组合。选项 A 完整覆盖。选项 B 忽略输入端；选项 C 与“规则+分类模型+LLM judge 组合”矛盾；选项 D 曲解护栏目的，护栏核心是安全合规而非提速。",
+    "answer": ["C"],
+    "explanation": "参考答案指出护栏在输入/输出两端做约束：输入侧包括敏感词/注入检测、超长截断、意图白名单；输出侧包括结构化校验、PII 脱敏、拒绝违规请求；实现上可用规则+分类模型+LLM judge 组合。选项 C 完整覆盖。选项 A 忽略输入端；选项 B 与“规则+分类模型+LLM judge 组合”矛盾；选项 D 曲解护栏目的，护栏核心是安全合规而非提速。",
     "source": "iq380"
   },
   {
@@ -11044,13 +11044,13 @@
     "language": "",
     "prompt": "关于 RAG 中的查询改写（Query Rewriting）与多查询扩展，以下哪项描述符合要求？",
     "options": [
-      { "key": "A", "text": "多查询扩展是指对同一查询生成多个角度的子查询分别检索再合并结果" },
-      { "key": "B", "text": "查询改写会降低召回覆盖，因此不推荐使用" },
+      { "key": "A", "text": "查询改写会降低召回覆盖，因此不推荐使用" },
+      { "key": "B", "text": "多查询扩展是指对同一查询生成多个角度的子查询分别检索再合并结果" },
       { "key": "C", "text": "查询改写只能用于英文查询，中文口语无法改写" },
       { "key": "D", "text": "历史上下文感知改写是指忽略多轮对话，仅改写当前 query" }
     ],
-    "answer": ["A"],
-    "explanation": "参考答案指出多查询（Multi-Query）是生成多个角度的子 query 分别检索再合并，以提升召回覆盖。A 项正确。C 项错误，查询改写不限于英文，中文口语也可改写；B 项与参考答案相反，查询改写旨在提升召回覆盖；D 项错误，历史上下文感知改写需结合多轮对话补全指代，而非忽略上下文。",
+    "answer": ["B"],
+    "explanation": "参考答案指出多查询（Multi-Query）是生成多个角度的子 query 分别检索再合并，以提升召回覆盖。B 项正确。C 项错误，查询改写不限于英文，中文口语也可改写；A 项与参考答案相反，查询改写旨在提升召回覆盖；D 项错误，历史上下文感知改写需结合多轮对话补全指代，而非忽略上下文。",
     "source": "iq380"
   },
   {
@@ -11078,13 +11078,13 @@
     "language": "",
     "prompt": "在处理多模态 RAG（图文/表格/PDF）时，以下哪项做法符合要求？",
     "options": [
-      { "key": "A", "text": "多模态 RAG 只需处理文本，图像和表格无需特殊处理" },
-      { "key": "B", "text": "图像仅用文本描述后向量化，不使用多模态 Embedding" },
-      { "key": "C", "text": "表格转为 markdown/CSV 作为 chunk 以保留结构语义，检索时混合文本与图像向量，生成用多模态模型" },
+      { "key": "A", "text": "表格转为 markdown/CSV 作为 chunk 以保留结构语义，检索时混合文本与图像向量，生成用多模态模型" },
+      { "key": "B", "text": "多模态 RAG 只需处理文本，图像和表格无需特殊处理" },
+      { "key": "C", "text": "图像仅用文本描述后向量化，不使用多模态 Embedding" },
       { "key": "D", "text": "PDF 直接按纯文本切分，忽略布局和表格结构" }
     ],
-    "answer": ["C"],
-    "explanation": "参考答案强调 PDF 需保留布局/表格结构，用版面分析提取文本+坐标+表格；图像用多模态 Embedding 或 caption 后向量化；表格转为 markdown/CSV 作为 chunk 保留结构语义；检索时混合文本与图像向量，生成用多模态模型。C 项正确。D 项忽略布局和表格结构，会丢失信息；B 项未使用多模态 Embedding，不完整；A 项错误认为图像和表格无需特殊处理。",
+    "answer": ["A"],
+    "explanation": "参考答案强调 PDF 需保留布局/表格结构，用版面分析提取文本+坐标+表格；图像用多模态 Embedding 或 caption 后向量化；表格转为 markdown/CSV 作为 chunk 保留结构语义；检索时混合文本与图像向量，生成用多模态模型。A 项正确。D 项忽略布局和表格结构，会丢失信息；C 项未使用多模态 Embedding，不完整；B 项错误认为图像和表格无需特殊处理。",
     "source": "iq380"
   },
   {
@@ -11097,12 +11097,12 @@
     "prompt": "关于 Embedding 维度与向量检索性能/成本的关系，以下哪项描述是正确的？",
     "options": [
       { "key": "A", "text": "维度越高存储与距离计算成本不变" },
-      { "key": "B", "text": "维度越高表达力越强，但存储与距离计算成本线性上升" },
-      { "key": "C", "text": "向量库不支持任何量化压缩，只能存储原始维度向量" },
+      { "key": "B", "text": "向量库不支持任何量化压缩，只能存储原始维度向量" },
+      { "key": "C", "text": "维度越高表达力越强，但存储与距离计算成本线性上升" },
       { "key": "D", "text": "降维只能通过重新训练模型实现，无法用 PCA 或乘积量化" }
     ],
-    "answer": ["B"],
-    "explanation": "维度越高通常表达力越强，但存储与距离计算成本会线性上升，这是基本权衡。A 错误，因为成本随维度增加而上升；D 错误，因为可用 PCA 或乘积量化（PQ）降维/压缩；C 错误，因为向量库支持标量/乘积量化减少内存。",
+    "answer": ["C"],
+    "explanation": "维度越高通常表达力越强，但存储与距离计算成本会线性上升，这是基本权衡。A 错误，因为成本随维度增加而上升；D 错误，因为可用 PCA 或乘积量化（PQ）降维/压缩；B 错误，因为向量库支持标量/乘积量化减少内存。",
     "source": "iq380"
   },
   {
@@ -11131,12 +11131,12 @@
     "prompt": "在设计 RAG 的“拒答/不确定”机制时，以下哪种做法最有助于避免模型强行编造？",
     "options": [
       { "key": "A", "text": "召回结果为空时，让模型自由发挥以提供答案" },
-      { "key": "B", "text": "设定召回最低分阈值，低于阈值则判定“无足够依据”并拒答" },
-      { "key": "C", "text": "只依赖生成后的 judge 校验，不需要在 Prompt 中说明无依据时诚实说不知道" },
-      { "key": "D", "text": "无论召回分数高低，都让模型基于自身知识回答" }
+      { "key": "B", "text": "只依赖生成后的 judge 校验，不需要在 Prompt 中说明无依据时诚实说不知道" },
+      { "key": "C", "text": "无论召回分数高低，都让模型基于自身知识回答" },
+      { "key": "D", "text": "设定召回最低分阈值，低于阈值则判定“无足够依据”并拒答" }
     ],
-    "answer": ["B"],
-    "explanation": "设定召回最低分阈值可以在生成前判断是否有足够依据，低于阈值则拒答，这是避免编造的有效手段。D 错误，因为忽略召回分数容易导致无依据生成；C 错误，因为 Prompt 明确要求诚实说不知道是重要防线；A 错误，因为召回为空时自由发挥会加剧编造。",
+    "answer": ["D"],
+    "explanation": "设定召回最低分阈值可以在生成前判断是否有足够依据，低于阈值则拒答，这是避免编造的有效手段。C 错误，因为忽略召回分数容易导致无依据生成；B 错误，因为 Prompt 明确要求诚实说不知道是重要防线；A 错误，因为召回为空时自由发挥会加剧编造。",
     "source": "iq380"
   },
   {
@@ -11202,13 +11202,13 @@
     "language": "",
     "prompt": "关于 temperature、top_k、top_p 采样参数，下列说法正确的是？",
     "options": [
-      { "key": "A", "text": "事实问答和代码生成通常适合用较低温度" },
-      { "key": "B", "text": "top_k 按累计概率截断候选，top_p 限制候选前 k 个" },
-      { "key": "C", "text": "固定 seed 加低温即可保证多步生成绝对可复现" },
-      { "key": "D", "text": "temperature 越低输出越发散有创意，越高越确定保守" }
+      { "key": "A", "text": "top_k 按累计概率截断候选，top_p 限制候选前 k 个" },
+      { "key": "B", "text": "固定 seed 加低温即可保证多步生成绝对可复现" },
+      { "key": "C", "text": "temperature 越低输出越发散有创意，越高越确定保守" },
+      { "key": "D", "text": "事实问答和代码生成通常适合用较低温度" }
     ],
-    "answer": ["A"],
-    "explanation": "事实与代码任务需要确定、保守的输出，通常用低温。D 项把 temperature 的方向说反：低=确定保守，高=发散创意；B 项把 top_k 与 top_p 的定义颠倒，top_k 限制前 k 个候选，top_p 按累计概率截断；C 项错误，固定 seed 加低温也不能保证绝对确定，尤其多步生成。",
+    "answer": ["D"],
+    "explanation": "事实与代码任务需要确定、保守的输出，通常用低温。C 项把 temperature 的方向说反：低=确定保守，高=发散创意；A 项把 top_k 与 top_p 的定义颠倒，top_k 限制前 k 个候选，top_p 按累计概率截断；B 项错误，固定 seed 加低温也不能保证绝对确定，尤其多步生成。",
     "source": "iq380"
   },
   {
@@ -11325,12 +11325,12 @@
     "prompt": "设计 RAG 的元数据过滤时，以下哪项做法是正确的？",
     "options": [
       { "key": "A", "text": "元数据过滤会降低召回率，因此应尽量避免使用" },
-      { "key": "B", "text": "先做向量召回，再在应用层按元数据过滤" },
-      { "key": "C", "text": "权限隔离应在生成阶段通过提示词实现，而非元数据过滤" },
-      { "key": "D", "text": "每个 chunk 携带来源、时间、部门、权限标签等元数据，并在检索时先按元数据过滤再向量召回" }
+      { "key": "B", "text": "每个 chunk 携带来源、时间、部门、权限标签等元数据，并在检索时先按元数据过滤再向量召回" },
+      { "key": "C", "text": "先做向量召回，再在应用层按元数据过滤" },
+      { "key": "D", "text": "权限隔离应在生成阶段通过提示词实现，而非元数据过滤" }
     ],
-    "answer": ["D"],
-    "explanation": "元数据过滤的正确设计是每个 chunk 带来源、时间、部门、权限标签等元数据，检索时先按元数据过滤（如仅本租户/时间范围）再做向量召回，并将过滤下推到向量库以减少无关候选与泄露。选项 B 先召回后过滤效率低且可能泄露；选项 A 忽视了过滤对精度和安全的必要性；选项 C 提示词无法可靠实现权限隔离。",
+    "answer": ["B"],
+    "explanation": "元数据过滤的正确设计是每个 chunk 带来源、时间、部门、权限标签等元数据，检索时先按元数据过滤（如仅本租户/时间范围）再做向量召回，并将过滤下推到向量库以减少无关候选与泄露。选项 C 先召回后过滤效率低且可能泄露；选项 A 忽视了过滤对精度和安全的必要性；选项 D 提示词无法可靠实现权限隔离。",
     "source": "iq380"
   },
   {
@@ -11359,12 +11359,12 @@
     "prompt": "以下哪种做法最有助于在降低 Prompt token 成本的同时不损害输出质量？",
     "options": [
       { "key": "A", "text": "使用更长的自然语言描述来确保模型理解" },
-      { "key": "B", "text": "将稳定指令缓存（prompt caching），并用结构化模板替代冗长自然语言，经 A/B 验证质量无显著下降" },
-      { "key": "C", "text": "每轮都重新发送完整对话历史以保持上下文" },
+      { "key": "B", "text": "每轮都重新发送完整对话历史以保持上下文" },
+      { "key": "C", "text": "将稳定指令缓存（prompt caching），并用结构化模板替代冗长自然语言，经 A/B 验证质量无显著下降" },
       { "key": "D", "text": "直接删除所有示例和说明以缩短 Prompt" }
     ],
-    "answer": ["B"],
-    "explanation": "压缩 Prompt 应在不损质量的前提下进行：删除冗余说明、合并示例、用占位符减少重复，将稳定指令缓存以降低重复计费，并用结构化模板替代冗长自然语言，最后通过 A/B 验证输出质量无显著下降。选项 D 直接删除示例可能损害质量；选项 C 增加 token 成本；选项 A 与压缩目标相反。",
+    "answer": ["C"],
+    "explanation": "压缩 Prompt 应在不损质量的前提下进行：删除冗余说明、合并示例、用占位符减少重复，将稳定指令缓存以降低重复计费，并用结构化模板替代冗长自然语言，最后通过 A/B 验证输出质量无显著下降。选项 D 直接删除示例可能损害质量；选项 B 增加 token 成本；选项 A 与压缩目标相反。",
     "source": "iq380"
   },
   {
@@ -11376,13 +11376,13 @@
     "language": "",
     "prompt": "关于 Agent 的“反思（Reflection）”机制，以下哪项描述最准确？",
     "options": [
-      { "key": "A", "text": "让模型评估自身输出或计划，找出错误与改进点，再迭代优化" },
-      { "key": "B", "text": "在循环中无限次反思，直到模型认为完美为止" },
+      { "key": "A", "text": "在循环中无限次反思，直到模型认为完美为止" },
+      { "key": "B", "text": "让模型评估自身输出或计划，找出错误与改进点，再迭代优化" },
       { "key": "C", "text": "让模型重新生成完全相同的输出，直到结果稳定" },
       { "key": "D", "text": "仅依赖外部工具结果，模型自身不参与评估" }
     ],
-    "answer": ["A"],
-    "explanation": "反思机制的核心是模型对自身输出或计划进行自我评估，识别错误与改进点并迭代优化。C 项重复生成相同输出并非反思；B 项缺少停止条件会导致无限循环；D 项完全排除模型自身评估，不符合反思定义。",
+    "answer": ["B"],
+    "explanation": "反思机制的核心是模型对自身输出或计划进行自我评估，识别错误与改进点并迭代优化。C 项重复生成相同输出并非反思；A 项缺少停止条件会导致无限循环；D 项完全排除模型自身评估，不符合反思定义。",
     "source": "iq380"
   },
   {
@@ -11395,12 +11395,12 @@
     "prompt": "用程序化（代码/工具）执行替代纯文本推理来提升 Agent 可靠性，以下哪项做法最符合该思路？",
     "options": [
       { "key": "A", "text": "将所有计算任务交给模型心算，以减少外部依赖" },
-      { "key": "B", "text": "让模型用自然语言逐步描述计算过程，不实际执行代码" },
-      { "key": "C", "text": "让 Agent 生成并执行代码完成数据计算与转换，在沙箱中隔离运行" },
+      { "key": "B", "text": "让 Agent 生成并执行代码完成数据计算与转换，在沙箱中隔离运行" },
+      { "key": "C", "text": "让模型用自然语言逐步描述计算过程，不实际执行代码" },
       { "key": "D", "text": "直接在生产环境执行任意代码，无需权限与资源限制" }
     ],
-    "answer": ["C"],
-    "explanation": "程序化执行的核心是让 Agent 生成并执行代码（如 Python）完成数值计算、聚合和格式转换，结果确定且可验证，同时必须在沙箱中隔离运行以限制权限和资源。B 项仍是纯文本推理；A 项依赖心算易产生幻觉；D 项缺乏隔离，存在安全风险。",
+    "answer": ["B"],
+    "explanation": "程序化执行的核心是让 Agent 生成并执行代码（如 Python）完成数值计算、聚合和格式转换，结果确定且可验证，同时必须在沙箱中隔离运行以限制权限和资源。C 项仍是纯文本推理；A 项依赖心算易产生幻觉；D 项缺乏隔离，存在安全风险。",
     "source": "iq380"
   },
   {
@@ -11429,12 +11429,12 @@
     "prompt": "设计 LLM 应用的重试与退避策略时，以下哪项做法最合理？",
     "options": [
       { "key": "A", "text": "对所有错误立即无限重试，直到成功为止" },
-      { "key": "B", "text": "写操作重试无需考虑幂等性，直接重复执行即可" },
-      { "key": "C", "text": "收到 429 时忽略 Retry-After，固定间隔重试" },
-      { "key": "D", "text": "对 429/5xx/超时等可重试错误采用指数退避加抖动，并限制最大重试次数" }
+      { "key": "B", "text": "对 429/5xx/超时等可重试错误采用指数退避加抖动，并限制最大重试次数" },
+      { "key": "C", "text": "写操作重试无需考虑幂等性，直接重复执行即可" },
+      { "key": "D", "text": "收到 429 时忽略 Retry-After，固定间隔重试" }
     ],
-    "answer": ["D"],
-    "explanation": "合理的重试策略应对可重试错误（429/5xx/超时）采用指数退避加抖动，并限制最大重试次数以避免无限循环；收到 429 时应尊重 Retry-After 退避；写操作重试必须保证幂等，防止重复副作用。A 项无限重试会加剧服务压力；C 项忽略服务端限流；B 项忽视幂等性。",
+    "answer": ["B"],
+    "explanation": "合理的重试策略应对可重试错误（429/5xx/超时）采用指数退避加抖动，并限制最大重试次数以避免无限循环；收到 429 时应尊重 Retry-After 退避；写操作重试必须保证幂等，防止重复副作用。A 项无限重试会加剧服务压力；D 项忽略服务端限流；C 项忽视幂等性。",
     "source": "iq380"
   },
   {
@@ -11447,12 +11447,12 @@
     "prompt": "在 RAG 场景下，关于模型微调与 RAG 的取舍，以下哪项最准确？",
     "options": [
       { "key": "A", "text": "微调可以替代 RAG，因为微调后模型能记住所有私有数据。" },
-      { "key": "B", "text": "RAG 适合解决知识时效和私有数据问题，微调适合固化风格、格式或特定任务模式，二者可结合使用。" },
-      { "key": "C", "text": "微调成本低且无需数据，应优先于 RAG 使用。" },
-      { "key": "D", "text": "RAG 可以替代微调，因为 RAG 能改变模型的输出风格和格式。" }
+      { "key": "B", "text": "微调成本低且无需数据，应优先于 RAG 使用。" },
+      { "key": "C", "text": "RAG 可以替代微调，因为 RAG 能改变模型的输出风格和格式。" },
+      { "key": "D", "text": "RAG 适合解决知识时效和私有数据问题，微调适合固化风格、格式或特定任务模式，二者可结合使用。" }
     ],
-    "answer": ["B"],
-    "explanation": "B 正确：RAG 通过检索外部知识解决知识时效和私有数据问题，不改模型权重、成本低；微调则把风格、格式或特定任务模式固化进模型，二者可结合，微调提升格式遵循，RAG 提供事实。A 错误：微调并不能可靠记住所有私有数据，且更新成本高。D 错误：RAG 主要提供事实知识，不擅长改变输出风格和格式。C 错误：微调成本高且需要数据，应优先验证 RAG 是否够用。",
+    "answer": ["D"],
+    "explanation": "D 正确：RAG 通过检索外部知识解决知识时效和私有数据问题，不改模型权重、成本低；微调则把风格、格式或特定任务模式固化进模型，二者可结合，微调提升格式遵循，RAG 提供事实。A 错误：微调并不能可靠记住所有私有数据，且更新成本高。C 错误：RAG 主要提供事实知识，不擅长改变输出风格和格式。B 错误：微调成本高且需要数据，应优先验证 RAG 是否够用。",
     "source": "iq380"
   },
   {
@@ -11498,13 +11498,13 @@
     "language": "",
     "prompt": "关于 LLM 输出的可控生成（约束解码/grammar/JSON schema），以下哪项描述最准确？",
     "options": [
-      { "key": "A", "text": "约束解码会降低输出可靠性，因此不应使用。" },
-      { "key": "B", "text": "约束解码不需要任何推理后端支持，所有框架均可直接使用。" },
-      { "key": "C", "text": "使用 grammar-constrained decoding 可按文法限制输出，保证严格符合 JSON/正则/状态机，比 Prompt 约束更可靠，但部分框架需特定推理后端支持。" },
+      { "key": "A", "text": "使用 grammar-constrained decoding 可按文法限制输出，保证严格符合 JSON/正则/状态机，比 Prompt 约束更可靠，但部分框架需特定推理后端支持。" },
+      { "key": "B", "text": "约束解码会降低输出可靠性，因此不应使用。" },
+      { "key": "C", "text": "约束解码不需要任何推理后端支持，所有框架均可直接使用。" },
       { "key": "D", "text": "Prompt 约束比 grammar-constrained decoding 更可靠，能完全避免解析失败。" }
     ],
-    "answer": ["C"],
-    "explanation": "C 正确：grammar-constrained decoding（如 outlines/guidance）按文法限制输出，能保证输出严格符合 JSON、正则或状态机，减少解析失败，比 Prompt 约束更可靠，不受模型随意性影响；代价是部分框架需要特定推理后端支持。D 错误：Prompt 约束可靠性较低，无法完全避免解析失败。B 错误：约束解码常需特定推理后端支持，并非所有框架可直接使用。A 错误：约束解码旨在提高结构化输出的可靠性，而非降低。",
+    "answer": ["A"],
+    "explanation": "A 正确：grammar-constrained decoding（如 outlines/guidance）按文法限制输出，能保证输出严格符合 JSON、正则或状态机，减少解析失败，比 Prompt 约束更可靠，不受模型随意性影响；代价是部分框架需要特定推理后端支持。D 错误：Prompt 约束可靠性较低，无法完全避免解析失败。C 错误：约束解码常需特定推理后端支持，并非所有框架可直接使用。B 错误：约束解码旨在提高结构化输出的可靠性，而非降低。",
     "source": "iq380"
   },
   {
@@ -11516,13 +11516,13 @@
     "language": "",
     "prompt": "在 RAG 系统中处理“时效性问答”（如“今天天气/最新股价”）时，以下哪种做法最符合要求？",
     "options": [
-      { "key": "A", "text": "实时数据必须走工具/API 获取，并给文档打时间 metadata，检索优先近期，超时效文档降级" },
-      { "key": "B", "text": "回答中无需标注数据时间，只要内容相关即可" },
-      { "key": "C", "text": "对所有实时工具结果进行永久缓存，以降低调用次数" },
-      { "key": "D", "text": "将实时数据也预先存入静态知识库，通过 RAG 检索获取" }
+      { "key": "A", "text": "回答中无需标注数据时间，只要内容相关即可" },
+      { "key": "B", "text": "对所有实时工具结果进行永久缓存，以降低调用次数" },
+      { "key": "C", "text": "将实时数据也预先存入静态知识库，通过 RAG 检索获取" },
+      { "key": "D", "text": "实时数据必须走工具/API 获取，并给文档打时间 metadata，检索优先近期，超时效文档降级" }
     ],
-    "answer": ["A"],
-    "explanation": "参考答案明确指出：静态知识用 RAG，实时数据必须走工具/API 获取；给文档打时间 metadata，检索优先近期，超时效文档降级；实时工具结果可短期缓存（带 TTL）降低调用；回答中标注数据时间，避免用过期信息。选项 A 完整涵盖了这些要点。选项 D 错误，因为实时数据不应预先存入静态知识库；选项 C 错误，因为缓存应带 TTL 短期有效，而非永久；选项 B 错误，因为必须标注数据时间以避免误导。",
+    "answer": ["D"],
+    "explanation": "参考答案明确指出：静态知识用 RAG，实时数据必须走工具/API 获取；给文档打时间 metadata，检索优先近期，超时效文档降级；实时工具结果可短期缓存（带 TTL）降低调用；回答中标注数据时间，避免用过期信息。选项 D 完整涵盖了这些要点。选项 C 错误，因为实时数据不应预先存入静态知识库；选项 B 错误，因为缓存应带 TTL 短期有效，而非永久；选项 A 错误，因为必须标注数据时间以避免误导。",
     "source": "iq380"
   },
   {
@@ -11534,13 +11534,13 @@
     "language": "",
     "prompt": "关于用代码状态机实现 Agent 的“规划-执行-反思”循环，以下哪项描述与要求一致？",
     "options": [
-      { "key": "A", "text": "状态转移条件可以随意设置，无需考虑完成、失败或超步数" },
-      { "key": "B", "text": "使用隐式 Prompt 循环即可，无需显式状态" },
-      { "key": "C", "text": "状态机实现比纯 Prompt 隐式循环更难观测和测试" },
-      { "key": "D", "text": "用显式状态（规划/执行/反思/完成）驱动循环，每步持久化支持恢复与人工介入，转移条件明确避免死循环" }
+      { "key": "A", "text": "用显式状态（规划/执行/反思/完成）驱动循环，每步持久化支持恢复与人工介入，转移条件明确避免死循环" },
+      { "key": "B", "text": "状态转移条件可以随意设置，无需考虑完成、失败或超步数" },
+      { "key": "C", "text": "使用隐式 Prompt 循环即可，无需显式状态" },
+      { "key": "D", "text": "状态机实现比纯 Prompt 隐式循环更难观测和测试" }
     ],
-    "answer": ["D"],
-    "explanation": "参考要点包括：用显式状态（PLANNING/ACTING/REFLECTING/DONE）驱动循环；每步结果持久化，支持崩溃恢复与人工介入；状态转移条件明确（完成/失败/超步数），避免死循环；比纯 Prompt 隐式循环更可控、可观测、可测试。选项 D 正确概括了这些要点。选项 B 错误，因为参考答案强调显式状态；选项 C 错误，因为状态机实现更可控、可观测、可测试；选项 A 错误，因为状态转移条件必须明确以避免死循环。",
+    "answer": ["A"],
+    "explanation": "参考要点包括：用显式状态（PLANNING/ACTING/REFLECTING/DONE）驱动循环；每步结果持久化，支持崩溃恢复与人工介入；状态转移条件明确（完成/失败/超步数），避免死循环；比纯 Prompt 隐式循环更可控、可观测、可测试。选项 A 正确概括了这些要点。选项 C 错误，因为参考答案强调显式状态；选项 D 错误，因为状态机实现更可控、可观测、可测试；选项 B 错误，因为状态转移条件必须明确以避免死循环。",
     "source": "iq380"
   },
   {
@@ -11569,12 +11569,12 @@
     "prompt": "为防止 RAG/Agent 的“提示词越狱”导致输出违规内容，以下哪项措施最符合要求？",
     "options": [
       { "key": "A", "text": "日志留痕会暴露用户隐私，因此不应记录异常模式" },
-      { "key": "B", "text": "仅依赖系统指令约束即可，无需其他防护" },
-      { "key": "C", "text": "多层防御：输入过滤、指令约束、输出护栏与分类拦截，检测越狱模板并留痕" },
+      { "key": "B", "text": "多层防御：输入过滤、指令约束、输出护栏与分类拦截，检测越狱模板并留痕" },
+      { "key": "C", "text": "仅依赖系统指令约束即可，无需其他防护" },
       { "key": "D", "text": "输出前无需进行合规与敏感内容分类，只要输入过滤即可" }
     ],
-    "answer": ["C"],
-    "explanation": "参考要点包括：多层防御（输入过滤 + 系统指令约束 + 输出护栏 + 分类拦截）；检测常见越狱模板（角色扮演/虚构场景套取）；输出前做合规与敏感内容分类，违规直接拦截；日志留痕，异常模式持续对抗升级。选项 C 完整涵盖了这些措施。选项 B 错误，因为仅靠系统指令约束不足；选项 D 错误，因为输出前必须做合规与敏感内容分类；选项 A 错误，因为日志留痕是持续对抗升级的必要手段，不应因隐私顾虑而放弃。",
+    "answer": ["B"],
+    "explanation": "参考要点包括：多层防御（输入过滤 + 系统指令约束 + 输出护栏 + 分类拦截）；检测常见越狱模板（角色扮演/虚构场景套取）；输出前做合规与敏感内容分类，违规直接拦截；日志留痕，异常模式持续对抗升级。选项 B 完整涵盖了这些措施。选项 C 错误，因为仅靠系统指令约束不足；选项 D 错误，因为输出前必须做合规与敏感内容分类；选项 A 错误，因为日志留痕是持续对抗升级的必要手段，不应因隐私顾虑而放弃。",
     "source": "iq380"
   },
   {
@@ -11658,11 +11658,11 @@
     "options": [
       { "key": "A", "text": "readinessProbe 决定 Pod 是否需要重启，livenessProbe 决定 Pod 是否接收流量" },
       { "key": "B", "text": "readinessProbe 仅在启动时执行一次，livenessProbe 周期性执行" },
-      { "key": "C", "text": "两者作用完全相同，可以互相替代" },
-      { "key": "D", "text": "readinessProbe 决定 Pod 是否接收流量，livenessProbe 决定 Pod 是否需要重启" }
+      { "key": "C", "text": "readinessProbe 决定 Pod 是否接收流量，livenessProbe 决定 Pod 是否需要重启" },
+      { "key": "D", "text": "两者作用完全相同，可以互相替代" }
     ],
-    "answer": ["D"],
-    "explanation": "readinessProbe 用于判断容器是否就绪以接收流量，失败时会将 Pod 从 Service 端点中移除；livenessProbe 用于判断容器是否存活，失败时会触发重启。A 项将两者作用颠倒；C 项错误，两者职责不同不可替代；B 项错误，readinessProbe 也是周期性执行，并非仅启动时一次。",
+    "answer": ["C"],
+    "explanation": "readinessProbe 用于判断容器是否就绪以接收流量，失败时会将 Pod 从 Service 端点中移除；livenessProbe 用于判断容器是否存活，失败时会触发重启。A 项将两者作用颠倒；D 项错误，两者职责不同不可替代；B 项错误，readinessProbe 也是周期性执行，并非仅启动时一次。",
     "source": "iq380"
   },
   {
@@ -11690,13 +11690,13 @@
     "language": "",
     "prompt": "设计 CI/CD 流水线时，为了做到快速反馈，以下哪种阶段顺序最合理？",
     "options": [
-      { "key": "A", "text": "安全扫描 → 集成测试 → 部署 → 构建 → 单元测试 → lint" },
-      { "key": "B", "text": "构建 → 部署 → 单元测试 → lint → 集成测试 → 安全扫描" },
-      { "key": "C", "text": "lint → 单元测试 → 构建 → 集成测试 → 安全扫描 → 部署" },
+      { "key": "A", "text": "lint → 单元测试 → 构建 → 集成测试 → 安全扫描 → 部署" },
+      { "key": "B", "text": "安全扫描 → 集成测试 → 部署 → 构建 → 单元测试 → lint" },
+      { "key": "C", "text": "构建 → 部署 → 单元测试 → lint → 集成测试 → 安全扫描" },
       { "key": "D", "text": "集成测试 → 安全扫描 → 构建 → 单元测试 → lint → 部署" }
     ],
-    "answer": ["C"],
-    "explanation": "快速反馈原则要求将耗时短、能快速发现问题的阶段（如 lint、单元测试）前置，以便尽早失败并通知开发者；耗时的阶段（如集成测试、安全扫描）放在后面。C 项符合该原则。D、B、A 项均将耗时或依赖构建的阶段前置，导致反馈延迟，且 B 项在测试前部署违反质量门禁。",
+    "answer": ["A"],
+    "explanation": "快速反馈原则要求将耗时短、能快速发现问题的阶段（如 lint、单元测试）前置，以便尽早失败并通知开发者；耗时的阶段（如集成测试、安全扫描）放在后面。A 项符合该原则。D、C、B 项均将耗时或依赖构建的阶段前置，导致反馈延迟，且 C 项在测试前部署违反质量门禁。",
     "source": "iq380"
   },
   {
@@ -11849,12 +11849,12 @@
     "prompt": "在 Kubernetes 中设计无损下线流程时，以下哪项做法能确保 Pod 在收到 SIGTERM 后先停止接收新请求，再等待在途请求完成？",
     "options": [
       { "key": "A", "text": "在容器内忽略 SIGTERM 信号，让进程继续运行直到被强制杀死" },
-      { "key": "B", "text": "配置 preStop hook 将 readiness 置为 false，并设置足够的 terminationGracePeriodSeconds" },
-      { "key": "C", "text": "直接删除 Pod，依赖 K8s 自动处理流量摘除和进程终止" },
+      { "key": "B", "text": "直接删除 Pod，依赖 K8s 自动处理流量摘除和进程终止" },
+      { "key": "C", "text": "配置 preStop hook 将 readiness 置为 false，并设置足够的 terminationGracePeriodSeconds" },
       { "key": "D", "text": "仅增加副本数，依靠负载均衡自动分流" }
     ],
-    "answer": ["B"],
-    "explanation": "preStop hook 可以在容器终止前执行操作，例如将 readiness 探针置为 false，使 Endpoint 控制器将 Pod 从 Service 中摘除，从而停止接收新请求；同时设置足够的 terminationGracePeriodSeconds 给进程排空在途请求的时间。选项 C 直接删除 Pod 可能导致流量仍被路由到正在终止的 Pod；选项 A 忽略 SIGTERM 会导致进程无法优雅退出，最终被强制杀死；选项 D 增加副本数不能解决单个 Pod 下线时的流量摘除问题。",
+    "answer": ["C"],
+    "explanation": "preStop hook 可以在容器终止前执行操作，例如将 readiness 探针置为 false，使 Endpoint 控制器将 Pod 从 Service 中摘除，从而停止接收新请求；同时设置足够的 terminationGracePeriodSeconds 给进程排空在途请求的时间。选项 B 直接删除 Pod 可能导致流量仍被路由到正在终止的 Pod；选项 A 忽略 SIGTERM 会导致进程无法优雅退出，最终被强制杀死；选项 D 增加副本数不能解决单个 Pod 下线时的流量摘除问题。",
     "source": "iq380"
   },
   {
@@ -11883,12 +11883,12 @@
     "prompt": "在使用 Prometheus + Grafana 监控接口黄金指标时，以下哪种做法最适合记录请求延迟的分位数（如 p95、p99）？",
     "options": [
       { "key": "A", "text": "使用 Counter 类型记录每个请求的延迟值" },
-      { "key": "B", "text": "使用 Histogram 类型记录延迟分布" },
-      { "key": "C", "text": "使用 Gauge 类型记录当前延迟" },
-      { "key": "D", "text": "使用 Summary 类型记录请求总数" }
+      { "key": "B", "text": "使用 Gauge 类型记录当前延迟" },
+      { "key": "C", "text": "使用 Summary 类型记录请求总数" },
+      { "key": "D", "text": "使用 Histogram 类型记录延迟分布" }
     ],
-    "answer": ["B"],
-    "explanation": "Histogram 类型会将观测值放入可配置的桶中，并自动生成 _bucket、_sum 和 _count 时间序列，通过 histogram_quantile 函数可以计算分位数（如 p95、p99），适合记录延迟分布。Counter 只适合单调递增的计数（如请求总数），不能直接记录延迟值；Gauge 适合瞬时值，无法计算分位数；Summary 虽然也能计算分位数，但选项 D 描述为记录请求总数，与分位数计算无关。",
+    "answer": ["D"],
+    "explanation": "Histogram 类型会将观测值放入可配置的桶中，并自动生成 _bucket、_sum 和 _count 时间序列，通过 histogram_quantile 函数可以计算分位数（如 p95、p99），适合记录延迟分布。Counter 只适合单调递增的计数（如请求总数），不能直接记录延迟值；Gauge 适合瞬时值，无法计算分位数；Summary 虽然也能计算分位数，但选项 C 描述为记录请求总数，与分位数计算无关。",
     "source": "iq380"
   },
   {
@@ -11918,13 +11918,13 @@
     "language": "",
     "prompt": "在 CI 中安全地管理密钥（不进代码库）时，以下哪种做法最符合最小权限原则？",
     "options": [
-      { "key": "A", "text": "不同环境/阶段使用不同凭据，且凭据短期有效" },
-      { "key": "B", "text": "所有环境共用同一套长期有效的凭据" },
+      { "key": "A", "text": "所有环境共用同一套长期有效的凭据" },
+      { "key": "B", "text": "不同环境/阶段使用不同凭据，且凭据短期有效" },
       { "key": "C", "text": "将密钥硬编码在 CI 配置文件中，但使用加密变量" },
       { "key": "D", "text": "将密钥存储在代码库的私有分支中" }
     ],
-    "answer": ["A"],
-    "explanation": "最小权限原则要求不同环境/阶段使用不同凭据，且凭据短期有效，以降低泄露风险。选项C虽然使用加密变量，但硬编码在配置文件中仍可能泄露；选项B违反最小权限，共用长期凭据风险大；选项D将密钥存入代码库（即使私有分支）也不安全。",
+    "answer": ["B"],
+    "explanation": "最小权限原则要求不同环境/阶段使用不同凭据，且凭据短期有效，以降低泄露风险。选项C虽然使用加密变量，但硬编码在配置文件中仍可能泄露；选项A违反最小权限，共用长期凭据风险大；选项D将密钥存入代码库（即使私有分支）也不安全。",
     "source": "iq380"
   },
   {
@@ -11952,12 +11952,12 @@
     "language": "",
     "prompt": "Nginx 的 upstream 负载均衡策略中，以下哪项在扩缩容时可能导致会话失衡？",
     "options": [
-      { "key": "A", "text": "加权轮询" },
-      { "key": "B", "text": "least_conn" },
-      { "key": "C", "text": "ip_hash" },
+      { "key": "A", "text": "ip_hash" },
+      { "key": "B", "text": "加权轮询" },
+      { "key": "C", "text": "least_conn" },
       { "key": "D", "text": "round-robin" }
     ],
-    "answer": ["C"],
+    "answer": ["A"],
     "explanation": "ip_hash 根据客户端 IP 哈希分配后端，扩缩容时后端列表变化会导致哈希重分布，可能使同一客户端会话分配到不同后端，造成会话失衡。round-robin、least_conn 和加权轮询不依赖客户端 IP 哈希，扩缩容时影响较小。",
     "source": "iq380"
   },
@@ -11970,13 +11970,13 @@
     "language": "",
     "prompt": "关于蓝绿部署与金丝雀部署的取舍，以下哪项描述是正确的？",
     "options": [
-      { "key": "A", "text": "要求秒级回滚应选择蓝绿部署" },
-      { "key": "B", "text": "金丝雀部署需要两套全量环境，资源翻倍" },
-      { "key": "C", "text": "蓝绿部署逐步放量，风险可控但过程长" },
+      { "key": "A", "text": "金丝雀部署需要两套全量环境，资源翻倍" },
+      { "key": "B", "text": "蓝绿部署逐步放量，风险可控但过程长" },
+      { "key": "C", "text": "要求秒级回滚应选择蓝绿部署" },
       { "key": "D", "text": "金丝雀部署回滚速度比蓝绿部署更快" }
     ],
-    "answer": ["A"],
-    "explanation": "蓝绿部署通过切换流量实现瞬间回滚，适合要求秒级回滚的场景。选项C描述的是金丝雀部署的特点；选项B描述的是蓝绿部署的资源需求；选项D错误，金丝雀部署回滚需逐步调整流量，通常不如蓝绿部署回滚快。",
+    "answer": ["C"],
+    "explanation": "蓝绿部署通过切换流量实现瞬间回滚，适合要求秒级回滚的场景。选项B描述的是金丝雀部署的特点；选项A描述的是蓝绿部署的资源需求；选项D错误，金丝雀部署回滚需逐步调整流量，通常不如蓝绿部署回滚快。",
     "source": "iq380"
   },
   {
@@ -11990,11 +11990,11 @@
     "options": [
       { "key": "A", "text": "检查 Pod 的 CPU 使用率" },
       { "key": "B", "text": "检查 kube-apiserver 日志" },
-      { "key": "C", "text": "查看节点磁盘空间" },
-      { "key": "D", "text": "查看 endpoints 是否为空" }
+      { "key": "C", "text": "查看 endpoints 是否为空" },
+      { "key": "D", "text": "查看节点磁盘空间" }
     ],
-    "answer": ["D"],
-    "explanation": "Service 通过 selector 匹配 Pod 来生成 endpoints，若 endpoints 为空，说明没有后端 Pod，服务自然不可达。因此首先应检查 endpoints 是否为空。A、C、B 虽然可能影响服务，但不是排查 Service 到 Pod 连通性的首要步骤。",
+    "answer": ["C"],
+    "explanation": "Service 通过 selector 匹配 Pod 来生成 endpoints，若 endpoints 为空，说明没有后端 Pod，服务自然不可达。因此首先应检查 endpoints 是否为空。A、D、B 虽然可能影响服务，但不是排查 Service 到 Pod 连通性的首要步骤。",
     "source": "iq380"
   },
   {
@@ -12040,12 +12040,12 @@
     "language": "",
     "prompt": "在 Kubernetes 中，部署有状态服务时通常使用哪种资源对象来保证稳定的网络标识和持久化存储？",
     "options": [
-      { "key": "A", "text": "StatefulSet" },
-      { "key": "B", "text": "Deployment" },
-      { "key": "C", "text": "DaemonSet" },
+      { "key": "A", "text": "Deployment" },
+      { "key": "B", "text": "DaemonSet" },
+      { "key": "C", "text": "StatefulSet" },
       { "key": "D", "text": "ReplicaSet" }
     ],
-    "answer": ["A"],
+    "answer": ["C"],
     "explanation": "StatefulSet 为每个 Pod 提供稳定的网络标识和持久卷，适合有状态服务。Deployment 和 ReplicaSet 管理的 Pod 是无状态的，网络标识和存储不固定；DaemonSet 用于在每个节点运行一个 Pod，不保证稳定标识。",
     "source": "iq380"
   },
@@ -12076,13 +12076,13 @@
     "language": "",
     "prompt": "为了防护 DNS 解析成为服务依赖的隐性单点或故障点，以下哪项措施是参考答案中明确提到的？",
     "options": [
-      { "key": "A", "text": "每次请求都实时解析 DNS 以确保获取最新 IP" },
-      { "key": "B", "text": "忽略容器内 /etc/resolv.conf 的配置，因为其不影响解析行为" },
-      { "key": "C", "text": "只使用一个 DNS resolver 以简化配置" },
-      { "key": "D", "text": "设置合理的 DNS 缓存（应用/系统/resolver），并配置解析超时与失败重试" }
+      { "key": "A", "text": "设置合理的 DNS 缓存（应用/系统/resolver），并配置解析超时与失败重试" },
+      { "key": "B", "text": "每次请求都实时解析 DNS 以确保获取最新 IP" },
+      { "key": "C", "text": "忽略容器内 /etc/resolv.conf 的配置，因为其不影响解析行为" },
+      { "key": "D", "text": "只使用一个 DNS resolver 以简化配置" }
     ],
-    "answer": ["D"],
-    "explanation": "参考答案指出应设置合理的 DNS 缓存（应用/系统/resolver）以避免每次请求解析，同时配置解析超时与失败重试以避免阻塞主流程。选项 A 每次请求都解析会增加延迟和故障风险；选项 C 使用单一 resolver 会引入单点故障；选项 B 忽视 /etc/resolv.conf 配置（如 ndots）可能导致解析异常。因此 D 正确。",
+    "answer": ["A"],
+    "explanation": "参考答案指出应设置合理的 DNS 缓存（应用/系统/resolver）以避免每次请求解析，同时配置解析超时与失败重试以避免阻塞主流程。选项 B 每次请求都解析会增加延迟和故障风险；选项 D 使用单一 resolver 会引入单点故障；选项 C 忽视 /etc/resolv.conf 配置（如 ndots）可能导致解析异常。因此 A 正确。",
     "source": "iq380"
   },
   {
@@ -12110,13 +12110,13 @@
     "language": "",
     "prompt": "为了避免 CI/CD 流水线遭受依赖投毒或供应链攻击，以下哪项措施是参考答案中建议的？",
     "options": [
-      { "key": "A", "text": "在 CI 中以管理员权限运行所有步骤以简化操作" },
-      { "key": "B", "text": "跳过依赖漏洞扫描以加快流水线速度" },
-      { "key": "C", "text": "锁定依赖版本（lockfile），使用私有镜像/代理仓库，并对镜像进行签名和 SBOM 验证" },
+      { "key": "A", "text": "锁定依赖版本（lockfile），使用私有镜像/代理仓库，并对镜像进行签名和 SBOM 验证" },
+      { "key": "B", "text": "在 CI 中以管理员权限运行所有步骤以简化操作" },
+      { "key": "C", "text": "跳过依赖漏洞扫描以加快流水线速度" },
       { "key": "D", "text": "使用最新版本的依赖而不锁定版本，以获取安全更新" }
     ],
-    "answer": ["C"],
-    "explanation": "参考答案强调锁定依赖版本（lockfile）、使用私有镜像/代理仓库、镜像签名（cosign）与 SBOM 生成并验证来源，以及运行依赖漏洞扫描阻断高危。选项 D 不锁定版本会增加投毒风险；选项 A 使用管理员权限违背最小权限原则；选项 B 跳过扫描会遗漏已知漏洞。因此 C 正确。",
+    "answer": ["A"],
+    "explanation": "参考答案强调锁定依赖版本（lockfile）、使用私有镜像/代理仓库、镜像签名（cosign）与 SBOM 生成并验证来源，以及运行依赖漏洞扫描阻断高危。选项 D 不锁定版本会增加投毒风险；选项 B 使用管理员权限违背最小权限原则；选项 C 跳过扫描会遗漏已知漏洞。因此 A 正确。",
     "source": "iq380"
   },
   {
@@ -12162,13 +12162,13 @@
     "language": "",
     "prompt": "使用 Prometheus 检测“服务降级但没报错”的亚健康状态（如延迟升高）时，以下哪种做法最有效？",
     "options": [
-      { "key": "A", "text": "用 p95/p99 延迟监控长尾，并按 SLO burn rate 告警" },
-      { "key": "B", "text": "仅监控错误率，错误率上升时告警。" },
-      { "key": "C", "text": "监控 CPU 使用率，超过 80% 时告警。" },
+      { "key": "A", "text": "仅监控错误率，错误率上升时告警。" },
+      { "key": "B", "text": "监控 CPU 使用率，超过 80% 时告警。" },
+      { "key": "C", "text": "用 p95/p99 延迟监控长尾，并按 SLO burn rate 告警" },
       { "key": "D", "text": "监控平均延迟，当平均值超过阈值时告警。" }
     ],
-    "answer": ["A"],
-    "explanation": "亚健康状态常表现为延迟长尾恶化而非平均延迟上升，因此应使用 p95/p99 分位延迟监控长尾，并结合 SLO（如 99% 请求 < 300ms）的 burn rate 告警。选项 D 平均延迟会掩盖长尾问题；选项 B 错误率无法捕捉无报错的降级；选项 C CPU 使用率是资源指标，不能直接反映服务延迟亚健康。",
+    "answer": ["C"],
+    "explanation": "亚健康状态常表现为延迟长尾恶化而非平均延迟上升，因此应使用 p95/p99 分位延迟监控长尾，并结合 SLO（如 99% 请求 < 300ms）的 burn rate 告警。选项 D 平均延迟会掩盖长尾问题；选项 A 错误率无法捕捉无报错的降级；选项 B CPU 使用率是资源指标，不能直接反映服务延迟亚健康。",
     "source": "iq380"
   },
   {
@@ -12181,12 +12181,12 @@
     "prompt": "将 Trivy 容器镜像漏洞扫描集成进 CI 并分级处理时，以下哪种做法符合最佳实践？",
     "options": [
       { "key": "A", "text": "CI 中运行 Trivy，仅当发现 CRITICAL 漏洞时记录日志，不阻断合并，也不定期重扫。" },
-      { "key": "B", "text": "CI 中运行 Trivy 扫描镜像和依赖，CRITICAL/HIGH 漏洞阻断合并，中低危记录跟踪，并维护基线白名单。" },
-      { "key": "C", "text": "仅在本地开发环境运行 Trivy，不集成到 CI，所有漏洞仅记录不阻断。" },
-      { "key": "D", "text": "CI 中运行 Trivy，但所有级别漏洞都阻断合并，不设白名单。" }
+      { "key": "B", "text": "仅在本地开发环境运行 Trivy，不集成到 CI，所有漏洞仅记录不阻断。" },
+      { "key": "C", "text": "CI 中运行 Trivy，但所有级别漏洞都阻断合并，不设白名单。" },
+      { "key": "D", "text": "CI 中运行 Trivy 扫描镜像和依赖，CRITICAL/HIGH 漏洞阻断合并，中低危记录跟踪，并维护基线白名单。" }
     ],
-    "answer": ["B"],
-    "explanation": "最佳实践是在 CI 中运行 Trivy 扫描镜像和依赖，对 CRITICAL/HIGH 漏洞阻断合并，中低危记录跟踪，并维护基线白名单（对已知误报或不可修复漏洞加白并留痕），定期重扫。选项 C 不集成 CI 且不阻断，风险高；选项 D 所有级别都阻断且无白名单，会导致流程僵化；选项 A 不阻断且不重扫，无法有效控制风险。",
+    "answer": ["D"],
+    "explanation": "最佳实践是在 CI 中运行 Trivy 扫描镜像和依赖，对 CRITICAL/HIGH 漏洞阻断合并，中低危记录跟踪，并维护基线白名单（对已知误报或不可修复漏洞加白并留痕），定期重扫。选项 B 不集成 CI 且不阻断，风险高；选项 C 所有级别都阻断且无白名单，会导致流程僵化；选项 A 不阻断且不重扫，无法有效控制风险。",
     "source": "iq380"
   },
   {
@@ -12233,12 +12233,12 @@
     "prompt": "关于混沌工程验证系统韧性的做法，以下哪项是正确的？",
     "options": [
       { "key": "A", "text": "故障注入应避免核心依赖，只对边缘服务进行测试" },
-      { "key": "B", "text": "直接在生产环境全量注入故障，以最大程度验证系统韧性" },
-      { "key": "C", "text": "混沌工程只需注入故障，无需根据结果改进容错机制" },
-      { "key": "D", "text": "先建立稳态假设（如错误率不变），再小范围可控地注入故障并观察" }
+      { "key": "B", "text": "先建立稳态假设（如错误率不变），再小范围可控地注入故障并观察" },
+      { "key": "C", "text": "直接在生产环境全量注入故障，以最大程度验证系统韧性" },
+      { "key": "D", "text": "混沌工程只需注入故障，无需根据结果改进容错机制" }
     ],
-    "answer": ["D"],
-    "explanation": "混沌工程应先建立稳态假设（如错误率不变），然后在小范围、可控、可一键停止的条件下注入故障并观察系统行为。B 错误，直接全量生产注入故障会影响真实用户，风险极高。C 错误，混沌工程需要根据结果改进容错机制（如重试、熔断、降级）。A 错误，应从核心依赖入手注入故障（如杀 Pod、断网络、增延迟、填磁盘），才能有效验证系统韧性。",
+    "answer": ["B"],
+    "explanation": "混沌工程应先建立稳态假设（如错误率不变），然后在小范围、可控、可一键停止的条件下注入故障并观察系统行为。C 错误，直接全量生产注入故障会影响真实用户，风险极高。D 错误，混沌工程需要根据结果改进容错机制（如重试、熔断、降级）。A 错误，应从核心依赖入手注入故障（如杀 Pod、断网络、增延迟、填磁盘），才能有效验证系统韧性。",
     "source": "iq380"
   },
   {
@@ -12250,13 +12250,13 @@
     "language": "",
     "prompt": "关于告警升级（escalation）与 on-call 机制的设计，以下哪项描述是正确的？",
     "options": [
-      { "key": "A", "text": "夜间和周末不需要安排值班表，依靠自动恢复即可" },
-      { "key": "B", "text": "所有告警都应发送给同一值班人，无需按严重度路由" },
-      { "key": "C", "text": "告警内容只需包含指标名称，无需提供日志链接等上下文" },
-      { "key": "D", "text": "告警未确认超时后应自动升级到上级或备份人员" }
+      { "key": "A", "text": "告警未确认超时后应自动升级到上级或备份人员" },
+      { "key": "B", "text": "夜间和周末不需要安排值班表，依靠自动恢复即可" },
+      { "key": "C", "text": "所有告警都应发送给同一值班人，无需按严重度路由" },
+      { "key": "D", "text": "告警内容只需包含指标名称，无需提供日志链接等上下文" }
     ],
-    "answer": ["D"],
-    "explanation": "告警升级机制要求未确认的告警在超时后自动升级（escalate）到上级或备份人员，以避免漏警。B 错误，告警应按严重度路由到对应的值班人或群组。A 错误，夜间和周末需要清晰的值班表与兜底安排。C 错误，告警内容应包含上下文（如指标、日志链接），便于快速定位问题。",
+    "answer": ["A"],
+    "explanation": "告警升级机制要求未确认的告警在超时后自动升级（escalate）到上级或备份人员，以避免漏警。C 错误，告警应按严重度路由到对应的值班人或群组。B 错误，夜间和周末需要清晰的值班表与兜底安排。D 错误，告警内容应包含上下文（如指标、日志链接），便于快速定位问题。",
     "source": "iq380"
   },
   {
@@ -12287,12 +12287,12 @@
     "prompt": "使用 Helm 管理多环境部署时，关于 values 覆盖策略，以下做法正确的是？",
     "options": [
       { "key": "A", "text": "在模板中硬编码环境特定配置，避免使用 values" },
-      { "key": "B", "text": "使用多层 values 覆盖：默认 values.yaml 加环境 overlay（如 --values env.yaml）" },
-      { "key": "C", "text": "所有环境共用一份 values.yaml，通过 --set 临时修改所有差异" },
-      { "key": "D", "text": "为每个环境复制整个 Chart 目录，分别修改模板" }
+      { "key": "B", "text": "所有环境共用一份 values.yaml，通过 --set 临时修改所有差异" },
+      { "key": "C", "text": "为每个环境复制整个 Chart 目录，分别修改模板" },
+      { "key": "D", "text": "使用多层 values 覆盖：默认 values.yaml 加环境 overlay（如 --values env.yaml）" }
     ],
-    "answer": ["B"],
-    "explanation": "Helm 推荐通过 Chart 模板化资源，并用多层 values 覆盖来区分环境差异，例如默认 values.yaml 提供基础配置，环境 overlay 文件（如 env.yaml）通过 --values 覆盖。选项 C 过度依赖 --set 不利于维护；选项 D 导致重复和难以同步；选项 A 硬编码违反模板化原则。",
+    "answer": ["D"],
+    "explanation": "Helm 推荐通过 Chart 模板化资源，并用多层 values 覆盖来区分环境差异，例如默认 values.yaml 提供基础配置，环境 overlay 文件（如 env.yaml）通过 --values 覆盖。选项 B 过度依赖 --set 不利于维护；选项 C 导致重复和难以同步；选项 A 硬编码违反模板化原则。",
     "source": "iq380"
   },
   {
@@ -12339,12 +12339,12 @@
     "prompt": "设计支持百万级 QPS 的短链服务时，以下哪项是参考答案中提到的关键瓶颈及优化措施？",
     "options": [
       { "key": "A", "text": "数据库连接数不足，增加连接池大小" },
-      { "key": "B", "text": "缓存穿透，使用布隆过滤器" },
-      { "key": "C", "text": "网络带宽限制，升级带宽" },
-      { "key": "D", "text": "发号竞争与统计写入，采用批量/异步削峰" }
+      { "key": "B", "text": "发号竞争与统计写入，采用批量/异步削峰" },
+      { "key": "C", "text": "缓存穿透，使用布隆过滤器" },
+      { "key": "D", "text": "网络带宽限制，升级带宽" }
     ],
-    "answer": ["D"],
-    "explanation": "参考答案明确指出瓶颈在发号竞争与统计写入，用批量/异步削峰。A、B、C 虽为常见优化点，但并非本题参考答案中提到的瓶颈与优化措施。",
+    "answer": ["B"],
+    "explanation": "参考答案明确指出瓶颈在发号竞争与统计写入，用批量/异步削峰。A、C、D 虽为常见优化点，但并非本题参考答案中提到的瓶颈与优化措施。",
     "source": "iq380"
   },
   {
@@ -12390,13 +12390,13 @@
     "language": "",
     "prompt": "为避免前后端“联调地狱”，参考答案建议采用哪种方式作为接口契约的单一事实来源？",
     "options": [
-      { "key": "A", "text": "OpenAPI/Swagger" },
-      { "key": "B", "text": "数据库表结构" },
+      { "key": "A", "text": "数据库表结构" },
+      { "key": "B", "text": "OpenAPI/Swagger" },
       { "key": "C", "text": "口头约定" },
       { "key": "D", "text": "Word 文档" }
     ],
-    "answer": ["A"],
-    "explanation": "参考答案明确用 OpenAPI/Swagger 作为单一事实来源，前后端先定 schema 再开发。D、C、B 均不是参考答案推荐的方式。",
+    "answer": ["B"],
+    "explanation": "参考答案明确用 OpenAPI/Swagger 作为单一事实来源，前后端先定 schema 再开发。D、C、A 均不是参考答案推荐的方式。",
     "source": "iq380"
   },
   {
@@ -12478,13 +12478,13 @@
     "language": "",
     "prompt": "在AI服务治理中，关于模型版本灰度与流量回放对比，以下哪项描述是正确的？",
     "options": [
-      { "key": "A", "text": "流量回放是指将线上流量直接转发到新模型，无需评分对比" },
-      { "key": "B", "text": "灰度发布时只需关注模型准确率，无需考虑成本" },
-      { "key": "C", "text": "模型版本灰度后不需要人工抽检，完全依赖自动指标" },
-      { "key": "D", "text": "按流量或用户切分模型版本，并统一埋点对比质量与成本" }
+      { "key": "A", "text": "按流量或用户切分模型版本，并统一埋点对比质量与成本" },
+      { "key": "B", "text": "流量回放是指将线上流量直接转发到新模型，无需评分对比" },
+      { "key": "C", "text": "灰度发布时只需关注模型准确率，无需考虑成本" },
+      { "key": "D", "text": "模型版本灰度后不需要人工抽检，完全依赖自动指标" }
     ],
-    "answer": ["D"],
-    "explanation": "参考答案指出，模型版本灰度应按流量或用户切分，并统一埋点对比质量与成本。B项错误，因为成本也是重要指标；A项错误，流量回放需用历史query跑新旧模型并评分对比；C项错误，关键场景需人工抽检。",
+    "answer": ["A"],
+    "explanation": "参考答案指出，模型版本灰度应按流量或用户切分，并统一埋点对比质量与成本。C项错误，因为成本也是重要指标；B项错误，流量回放需用历史query跑新旧模型并评分对比；D项错误，关键场景需人工抽检。",
     "source": "iq380"
   },
   {
@@ -12514,13 +12514,13 @@
     "language": "",
     "prompt": "设计多模型LLM网关时，关于路由与fallback，以下哪项描述是正确的？",
     "options": [
-      { "key": "A", "text": "路由策略应统一采用最低成本模型，无需考虑延迟" },
-      { "key": "B", "text": "每个模型应有健康度/配额监控，失败时自动fallback到次优模型" },
+      { "key": "A", "text": "每个模型应有健康度/配额监控，失败时自动fallback到次优模型" },
+      { "key": "B", "text": "路由策略应统一采用最低成本模型，无需考虑延迟" },
       { "key": "C", "text": "网关不需要统一请求/响应契约，各厂商API直接透传即可" },
       { "key": "D", "text": "所有请求都应路由到最大模型以保证质量" }
     ],
-    "answer": ["B"],
-    "explanation": "参考答案指出，每模型应有健康度/配额，失败自动fallback到次优。D项错误，应根据成本/质量/延迟路由；A项错误，时延敏感场景需低延迟实例；C项错误，网关需统一契约屏蔽厂商差异。",
+    "answer": ["A"],
+    "explanation": "参考答案指出，每模型应有健康度/配额，失败自动fallback到次优。D项错误，应根据成本/质量/延迟路由；B项错误，时延敏感场景需低延迟实例；C项错误，网关需统一契约屏蔽厂商差异。",
     "source": "iq380"
   },
   {
@@ -12549,11 +12549,11 @@
     "prompt": "在设计实时协同编辑后端时，解决并发编辑冲突的主流方案是？",
     "options": [
       { "key": "A", "text": "消息队列顺序消费" },
-      { "key": "B", "text": "OT 或 CRDT 解决并发冲突" },
-      { "key": "C", "text": "数据库事务隔离" },
-      { "key": "D", "text": "悲观锁或乐观锁" }
+      { "key": "B", "text": "数据库事务隔离" },
+      { "key": "C", "text": "悲观锁或乐观锁" },
+      { "key": "D", "text": "OT 或 CRDT 解决并发冲突" }
     ],
-    "answer": ["B"],
+    "answer": ["D"],
     "explanation": "参考答案明确指出方案是OT或CRDT解决并发编辑。OT通过变换操作解决冲突，CRDT通过数据结构保证最终一致。悲观锁/乐观锁、消息队列顺序消费、数据库事务隔离均不是协同编辑冲突解决的主流方案，它们无法处理实时并发编辑的语义冲突。",
     "source": "iq380"
   },
@@ -12568,10 +12568,10 @@
     "options": [
       { "key": "A", "text": "遇到瓶颈立即扩容，无需分析" },
       { "key": "B", "text": "直接在生产环境加压，无需隔离" },
-      { "key": "C", "text": "使用生产等价环境或影子流量，逐步加压找拐点" },
-      { "key": "D", "text": "只监控应用层指标即可定位瓶颈" }
+      { "key": "C", "text": "只监控应用层指标即可定位瓶颈" },
+      { "key": "D", "text": "使用生产等价环境或影子流量，逐步加压找拐点" }
     ],
-    "answer": ["C"],
+    "answer": ["D"],
     "explanation": "参考答案指出应用生产等价环境或影子流量，逐步加压找拐点。直接在生产环境加压可能影响真实用户，只监控应用层无法定位底层瓶颈，盲目扩容可能掩盖问题。正确做法是监控每层指标定位瓶颈，优化后再扩容。",
     "source": "iq380"
   },
@@ -12602,11 +12602,11 @@
     "options": [
       { "key": "A", "text": "仅依赖客户端清除token" },
       { "key": "B", "text": "为每个设备维护独立会话，互不影响" },
-      { "key": "C", "text": "新登录时使旧会话失效（如修改token版本或删除会话）" },
-      { "key": "D", "text": "使用JWT且不存储会话状态" }
+      { "key": "C", "text": "使用JWT且不存储会话状态" },
+      { "key": "D", "text": "新登录时使旧会话失效（如修改token版本或删除会话）" }
     ],
-    "answer": ["C"],
-    "explanation": "参考答案指出单设备策略是新登录使旧会话失效，可通过改token版本或删会话实现。为每个设备维护独立会话是多设备策略；JWT无状态难以主动失效；仅依赖客户端清除token无法保证服务端安全。因此C正确。",
+    "answer": ["D"],
+    "explanation": "参考答案指出单设备策略是新登录使旧会话失效，可通过改token版本或删会话实现。为每个设备维护独立会话是多设备策略；JWT无状态难以主动失效；仅依赖客户端清除token无法保证服务端安全。因此D正确。",
     "source": "iq380"
   },
   {
@@ -12619,12 +12619,12 @@
     "prompt": "在设计基于 Elasticsearch 的搜索系统时，以下哪项是提升查询性能的正确做法？",
     "options": [
       { "key": "A", "text": "使用 from/size 进行深度分页" },
-      { "key": "B", "text": "使用 script 排序实现自定义排序" },
-      { "key": "C", "text": "将所有字段设为 text 类型以支持过滤" },
-      { "key": "D", "text": "使用 filter 查询以利用缓存" }
+      { "key": "B", "text": "使用 filter 查询以利用缓存" },
+      { "key": "C", "text": "使用 script 排序实现自定义排序" },
+      { "key": "D", "text": "将所有字段设为 text 类型以支持过滤" }
     ],
-    "answer": ["D"],
-    "explanation": "filter 查询不计算评分且结果可被缓存，能显著提升性能，是参考答案中明确指出的性能优化手段。B 项脚本排序开销大，应避免；A 项深度分页用 from/size 效率低，应使用 search_after；C 项业务过滤字段应建为 keyword 或数值类型，text 类型不适合精确过滤。",
+    "answer": ["B"],
+    "explanation": "filter 查询不计算评分且结果可被缓存，能显著提升性能，是参考答案中明确指出的性能优化手段。C 项脚本排序开销大，应避免；A 项深度分页用 from/size 效率低，应使用 search_after；D 项业务过滤字段应建为 keyword 或数值类型，text 类型不适合精确过滤。",
     "source": "iq380"
   },
   {
@@ -12652,13 +12652,13 @@
     "language": "",
     "prompt": "在设计延迟敏感的实时推荐系统时，以下哪项是在线层保证低延迟的关键措施？",
     "options": [
-      { "key": "A", "text": "在线层进行全量模型训练" },
-      { "key": "B", "text": "使用内存特征和轻量模型进行低延迟排序，并设置超时降级" },
+      { "key": "A", "text": "使用内存特征和轻量模型进行低延迟排序，并设置超时降级" },
+      { "key": "B", "text": "在线层进行全量模型训练" },
       { "key": "C", "text": "取消缓存以简化架构" },
       { "key": "D", "text": "所有候选召回都在在线层完成" }
     ],
-    "answer": ["B"],
-    "explanation": "参考答案明确在线层应使用内存特征加轻模型实现低延迟排序，并通过超时降级到默认列表来保证 SLA。A 项全量训练属于离线层；D 项候选召回主要由近线层负责；C 项取消缓存会增大延迟，与多级缓存保证延迟的做法相悖。",
+    "answer": ["A"],
+    "explanation": "参考答案明确在线层应使用内存特征加轻模型实现低延迟排序，并通过超时降级到默认列表来保证 SLA。B 项全量训练属于离线层；D 项候选召回主要由近线层负责；C 项取消缓存会增大延迟，与多级缓存保证延迟的做法相悖。",
     "source": "iq380"
   },
   {
@@ -12672,11 +12672,11 @@
     "options": [
       { "key": "A", "text": "关闭主从复制以避免延迟" },
       { "key": "B", "text": "所有读请求都强制走从库" },
-      { "key": "C", "text": "写后读主，并在会话内标记强制读主库" },
-      { "key": "D", "text": "忽略延迟，因为从库数据总是最新的" }
+      { "key": "C", "text": "忽略延迟，因为从库数据总是最新的" },
+      { "key": "D", "text": "写后读主，并在会话内标记强制读主库" }
     ],
-    "answer": ["C"],
-    "explanation": "参考答案指出强一致读应走主库，并可用写后读主标记（如会话内强制主）避免读到旧数据。B 项全部读从库会放大延迟问题；A 项关闭复制违背读写分离目的；D 项从库数据存在延迟，并非总是最新。",
+    "answer": ["D"],
+    "explanation": "参考答案指出强一致读应走主库，并可用写后读主标记（如会话内强制主）避免读到旧数据。B 项全部读从库会放大延迟问题；A 项关闭复制违背读写分离目的；C 项从库数据存在延迟，并非总是最新。",
     "source": "iq380"
   },
   {
@@ -12688,13 +12688,13 @@
     "language": "",
     "prompt": "在设计基于消息队列解耦的订单系统（下单→库存→通知→积分）时，以下哪项做法能保证同一订单的事件被消费者按顺序处理？",
     "options": [
-      { "key": "A", "text": "将同一订单的事件发送到同一分区（以订单ID为key）" },
-      { "key": "B", "text": "为每个事件生成全局唯一ID并去重" },
-      { "key": "C", "text": "生产者开启确认机制并设置重试" },
-      { "key": "D", "text": "消费者手动ack并配置死信队列" }
+      { "key": "A", "text": "为每个事件生成全局唯一ID并去重" },
+      { "key": "B", "text": "生产者开启确认机制并设置重试" },
+      { "key": "C", "text": "消费者手动ack并配置死信队列" },
+      { "key": "D", "text": "将同一订单的事件发送到同一分区（以订单ID为key）" }
     ],
-    "answer": ["A"],
-    "explanation": "参考答案指出顺序性通过同订单分区（key）保证局部有序，因此A正确。B是幂等去重措施，C是可靠投递措施，D是可靠消费与死信处理措施，三者均不直接保证顺序。",
+    "answer": ["D"],
+    "explanation": "参考答案指出顺序性通过同订单分区（key）保证局部有序，因此D正确。A是幂等去重措施，B是可靠投递措施，C是可靠消费与死信处理措施，三者均不直接保证顺序。",
     "source": "iq380"
   },
   {
@@ -12741,12 +12741,12 @@
     "prompt": "在设计灰度发布+自动回滚系统时，以下哪项是参考答案中提到的自动回滚触发条件？",
     "options": [
       { "key": "A", "text": "错误率超过5%并持续5分钟" },
-      { "key": "B", "text": "错误率超过1%并持续1分钟" },
-      { "key": "C", "text": "业务指标下降10%并持续10分钟" },
+      { "key": "B", "text": "业务指标下降10%并持续10分钟" },
+      { "key": "C", "text": "错误率超过1%并持续1分钟" },
       { "key": "D", "text": "延迟超过1秒并持续1分钟" }
     ],
-    "answer": ["B"],
-    "explanation": "参考答案明确自动回滚阈值示例为错误率>1%持续1min回滚，因此B正确。A、D、C的阈值与持续时间均与参考答案不符，属于常见误解。",
+    "answer": ["C"],
+    "explanation": "参考答案明确自动回滚阈值示例为错误率>1%持续1min回滚，因此C正确。A、D、B的阈值与持续时间均与参考答案不符，属于常见误解。",
     "source": "iq380"
   },
   {
@@ -12759,12 +12759,12 @@
     "prompt": "关于 API 网关的职责边界，以下哪项最符合“必做”与“不该做”的划分？",
     "options": [
       { "key": "A", "text": "网关应集中实现所有业务规则和领域逻辑，以便统一管理和快速迭代。" },
-      { "key": "B", "text": "网关应保持功能丰富，尽量把领域规则下沉到网关层，业务服务只做数据透传。" },
-      { "key": "C", "text": "网关应承担鉴权、限流、路由、协议转换、日志、TLS、降级入口等职责，但不应承载重业务逻辑或直接连 DB 做复杂事务。" },
+      { "key": "B", "text": "网关应承担鉴权、限流、路由、协议转换、日志、TLS、降级入口等职责，但不应承载重业务逻辑或直接连 DB 做复杂事务。" },
+      { "key": "C", "text": "网关应保持功能丰富，尽量把领域规则下沉到网关层，业务服务只做数据透传。" },
       { "key": "D", "text": "网关应直接连接数据库执行复杂事务，以减少业务服务的调用链路。" }
     ],
-    "answer": ["C"],
-    "explanation": "参考答案明确网关必做鉴权、限流、路由、协议转换、日志、TLS、降级入口，不该做重业务逻辑、直接连 DB 复杂事务、领域规则下沉到服务。C 项准确概括了该边界。A、D、B 均把重业务逻辑、复杂事务或领域规则错误地放入网关，违背“保持薄”的原则，因此错误。",
+    "answer": ["B"],
+    "explanation": "参考答案明确网关必做鉴权、限流、路由、协议转换、日志、TLS、降级入口，不该做重业务逻辑、直接连 DB 复杂事务、领域规则下沉到服务。B 项准确概括了该边界。A、D、C 均把重业务逻辑、复杂事务或领域规则错误地放入网关，违背“保持薄”的原则，因此错误。",
     "source": "iq380"
   },
   {
@@ -12776,13 +12776,13 @@
     "language": "",
     "prompt": "针对热点 key / 热点数据（如某大 V 动态）的读压力，以下哪种做法最符合参考答案的设计思路？",
     "options": [
-      { "key": "A", "text": "对热点 key 的所有读请求直接穿透到数据库，利用数据库连接池扛住压力。" },
-      { "key": "B", "text": "仅依赖集中式 Redis 缓存，通过增加 Redis 节点数量来分散读压力。" },
-      { "key": "C", "text": "将热点 key 固定路由到单一节点，避免多节点数据不一致。" },
-      { "key": "D", "text": "识别热点后，使用进程内本地缓存加短期副本分散读压力，并可对热点 key 加随机后缀打散到多节点、读时聚合。" }
+      { "key": "A", "text": "识别热点后，使用进程内本地缓存加短期副本分散读压力，并可对热点 key 加随机后缀打散到多节点、读时聚合。" },
+      { "key": "B", "text": "对热点 key 的所有读请求直接穿透到数据库，利用数据库连接池扛住压力。" },
+      { "key": "C", "text": "仅依赖集中式 Redis 缓存，通过增加 Redis 节点数量来分散读压力。" },
+      { "key": "D", "text": "将热点 key 固定路由到单一节点，避免多节点数据不一致。" }
     ],
-    "answer": ["D"],
-    "explanation": "参考答案指出应识别热点，做本地缓存（进程内）加短期副本分散读压力，热点 key 加随机后缀打散到多节点（读时聚合），写热点用合并/队列削峰，并限流保护。D 项完整覆盖这些要点。B 项只靠集中式缓存扩容，未解决单 key 热点；A 项穿透数据库会压垮 DB；C 项固定单节点会形成单点瓶颈，均错误。",
+    "answer": ["A"],
+    "explanation": "参考答案指出应识别热点，做本地缓存（进程内）加短期副本分散读压力，热点 key 加随机后缀打散到多节点（读时聚合），写热点用合并/队列削峰，并限流保护。A 项完整覆盖这些要点。C 项只靠集中式缓存扩容，未解决单 key 热点；B 项穿透数据库会压垮 DB；D 项固定单节点会形成单点瓶颈，均错误。",
     "source": "iq380"
   },
   {
@@ -12812,11 +12812,11 @@
     "options": [
       { "key": "A", "text": "仅使用单实例部署定时任务，避免重复执行，无需考虑扩展和容错。" },
       { "key": "B", "text": "所有实例同时触发任务，依靠数据库唯一索引去重，无需幂等设计。" },
-      { "key": "C", "text": "使用 leader 选举或分布式锁抢占执行权，任务保持幂等，大任务分片给多实例并发，并具备失败重试、告警与执行记录。" },
-      { "key": "D", "text": "每个实例独立执行全量任务，通过事后对账修正重复执行带来的副作用。" }
+      { "key": "C", "text": "每个实例独立执行全量任务，通过事后对账修正重复执行带来的副作用。" },
+      { "key": "D", "text": "使用 leader 选举或分布式锁抢占执行权，任务保持幂等，大任务分片给多实例并发，并具备失败重试、告警与执行记录。" }
     ],
-    "answer": ["C"],
-    "explanation": "参考答案要求用 leader 选举（只有主节点触发）或分布式锁抢占执行权，任务幂等，大任务按分片分配给多实例并发，并具备失败重试、告警与可追溯执行记录。C 项完整覆盖。B 项所有实例同时触发且不设计幂等，仍可能重复执行；A 项单实例无法扩展且无容错；D 项全量重复执行依赖事后对账，不能避免重复执行，均错误。",
+    "answer": ["D"],
+    "explanation": "参考答案要求用 leader 选举（只有主节点触发）或分布式锁抢占执行权，任务幂等，大任务按分片分配给多实例并发，并具备失败重试、告警与可追溯执行记录。D 项完整覆盖。B 项所有实例同时触发且不设计幂等，仍可能重复执行；A 项单实例无法扩展且无容错；C 项全量重复执行依赖事后对账，不能避免重复执行，均错误。",
     "source": "iq380"
   },
   {
@@ -12847,12 +12847,12 @@
     "prompt": "设计购物车系统时，关于库存校验的一致性策略，以下哪项符合要求？",
     "options": [
       { "key": "A", "text": "加购时强一致校验库存，结算时弱一致" },
-      { "key": "B", "text": "加购可弱一致，结算时强一致校验库存" },
-      { "key": "C", "text": "加购和结算都强一致校验库存" },
-      { "key": "D", "text": "加购和结算都弱一致校验库存" }
+      { "key": "B", "text": "加购和结算都强一致校验库存" },
+      { "key": "C", "text": "加购和结算都弱一致校验库存" },
+      { "key": "D", "text": "加购可弱一致，结算时强一致校验库存" }
     ],
-    "answer": ["B"],
-    "explanation": "参考要点明确：库存校验在结算时强一致，加购可弱一致。加购时强一致会带来不必要的性能开销；结算时弱一致可能导致超卖。因此B正确，A、C、D均不符合要点。",
+    "answer": ["D"],
+    "explanation": "参考要点明确：库存校验在结算时强一致，加购可弱一致。加购时强一致会带来不必要的性能开销；结算时弱一致可能导致超卖。因此D正确，A、B、C均不符合要点。",
     "source": "iq380"
   },
   {
@@ -12882,11 +12882,11 @@
     "options": [
       { "key": "A", "text": "使用dynamic batching增大批处理窗口" },
       { "key": "B", "text": "采用SSE代替WebSocket" },
-      { "key": "C", "text": "增加GPU数量" },
-      { "key": "D", "text": "预加载模型、预热" }
+      { "key": "C", "text": "预加载模型、预热" },
+      { "key": "D", "text": "增加GPU数量" }
     ],
-    "answer": ["D"],
-    "explanation": "参考要点提到，预加载模型、预热可以避免首请求冷启动，从而降低首请求延迟。选项A增大批处理窗口可能增加延迟；选项B协议选择不直接解决冷启动；选项C增加GPU数量不直接解决冷启动问题。因此D正确。",
+    "answer": ["C"],
+    "explanation": "参考要点提到，预加载模型、预热可以避免首请求冷启动，从而降低首请求延迟。选项A增大批处理窗口可能增加延迟；选项B协议选择不直接解决冷启动；选项D增加GPU数量不直接解决冷启动问题。因此C正确。",
     "source": "iq380"
   },
   {
@@ -12916,13 +12916,13 @@
     "language": "",
     "prompt": "设计开放平台API（第三方调用）的鉴权与限流时，以下哪项是参考答案推荐的做法？",
     "options": [
-      { "key": "A", "text": "限流仅按IP进行，不区分应用" },
-      { "key": "B", "text": "不需要提供sandbox环境和Webhook回调校验" },
-      { "key": "C", "text": "仅使用固定API Key进行鉴权，无需签名" },
-      { "key": "D", "text": "用 API Key/Secret 或 OAuth2 鉴权，并对请求签名防重放" }
+      { "key": "A", "text": "用 API Key/Secret 或 OAuth2 鉴权，并对请求签名防重放" },
+      { "key": "B", "text": "限流仅按IP进行，不区分应用" },
+      { "key": "C", "text": "不需要提供sandbox环境和Webhook回调校验" },
+      { "key": "D", "text": "仅使用固定API Key进行鉴权，无需签名" }
     ],
-    "answer": ["D"],
-    "explanation": "参考答案明确用API Key/Secret或OAuth2 client_credentials鉴权，请求签名（timestamp+nonce防重放）保证来源与完整，因此D正确。C错误，仅固定API Key无法防重放和保证完整性。A错误，应按app限流与配额。B错误，应提供sandbox环境与Webhook回调校验。",
+    "answer": ["A"],
+    "explanation": "参考答案明确用API Key/Secret或OAuth2 client_credentials鉴权，请求签名（timestamp+nonce防重放）保证来源与完整，因此A正确。D错误，仅固定API Key无法防重放和保证完整性。B错误，应按app限流与配额。C错误，应提供sandbox环境与Webhook回调校验。",
     "source": "iq380"
   },
   {
@@ -12951,12 +12951,12 @@
     "prompt": "AI后端进行成本优化时，以下哪项措施符合要求？",
     "options": [
       { "key": "A", "text": "关闭批处理以降低GPU利用率" },
-      { "key": "B", "text": "禁止使用量化技术，因为会降低精度" },
-      { "key": "C", "text": "通过模型路由将简单任务交给小模型，并使用语义缓存命中重复问题" },
+      { "key": "B", "text": "通过模型路由将简单任务交给小模型，并使用语义缓存命中重复问题" },
+      { "key": "C", "text": "禁止使用量化技术，因为会降低精度" },
       { "key": "D", "text": "所有任务统一使用最大最贵的模型以保证效果" }
     ],
-    "answer": ["C"],
-    "explanation": "参考答案指出路由简单任务小模型减少贵模型调用，语义缓存命中重复问题，因此C正确。D错误，应路由简单任务到小模型。A错误，批处理可提升GPU利用率。B错误，量化（INT8/FP8）可降显存与提速，是推荐做法。",
+    "answer": ["B"],
+    "explanation": "参考答案指出路由简单任务小模型减少贵模型调用，语义缓存命中重复问题，因此B正确。D错误，应路由简单任务到小模型。A错误，批处理可提升GPU利用率。C错误，量化（INT8/FP8）可降显存与提速，是推荐做法。",
     "source": "iq380"
   },
   {
@@ -12968,13 +12968,13 @@
     "language": "",
     "prompt": "设计高写入、低查询延迟的实时监控指标后端时，以下哪项做法最符合要求？",
     "options": [
-      { "key": "A", "text": "将所有原始数据永久保留，查询时实时计算所有聚合" },
-      { "key": "B", "text": "使用关系型数据库单条插入并实时全表扫描聚合" },
-      { "key": "C", "text": "采用时序库或预聚合管道，批量写入并降采样，查询走预计算指标" },
+      { "key": "A", "text": "采用时序库或预聚合管道，批量写入并降采样，查询走预计算指标" },
+      { "key": "B", "text": "将所有原始数据永久保留，查询时实时计算所有聚合" },
+      { "key": "C", "text": "使用关系型数据库单条插入并实时全表扫描聚合" },
       { "key": "D", "text": "仅靠增加缓存层，不改变写入和存储策略" }
     ],
-    "answer": ["C"],
-    "explanation": "参考答案强调用时序库（如 Prometheus/VictoriaMetrics）或预聚合管道，写多读少场景下批量写入并降采样（原始短保留、聚合长保留），查询走预计算指标或 Rollup 避免实时大范围扫描。C 项完整覆盖这些要点。B 项单条插入和实时全表扫描无法应对高写入与低延迟；A 项永久保留原始数据且实时聚合会拖慢查询；D 项仅加缓存不解决写入链路和存储聚合问题。",
+    "answer": ["A"],
+    "explanation": "参考答案强调用时序库（如 Prometheus/VictoriaMetrics）或预聚合管道，写多读少场景下批量写入并降采样（原始短保留、聚合长保留），查询走预计算指标或 Rollup 避免实时大范围扫描。A 项完整覆盖这些要点。C 项单条插入和实时全表扫描无法应对高写入与低延迟；B 项永久保留原始数据且实时聚合会拖慢查询；D 项仅加缓存不解决写入链路和存储聚合问题。",
     "source": "iq380"
   },
   {
@@ -12986,13 +12986,13 @@
     "language": "",
     "prompt": "设计防爬/反自动化系统时，以下哪项策略最符合要求？",
     "options": [
-      { "key": "A", "text": "对所有来自同一 IP 的请求一律封禁" },
-      { "key": "B", "text": "完全放行所有请求，避免误伤真实用户" },
-      { "key": "C", "text": "基于行为风控区分人机，按风险分级处理，限流按账号/设备/IP 组合，并提供人工申诉" },
+      { "key": "A", "text": "基于行为风控区分人机，按风险分级处理，限流按账号/设备/IP 组合，并提供人工申诉" },
+      { "key": "B", "text": "对所有来自同一 IP 的请求一律封禁" },
+      { "key": "C", "text": "完全放行所有请求，避免误伤真实用户" },
       { "key": "D", "text": "仅依赖验证码，不区分风险等级" }
     ],
-    "answer": ["C"],
-    "explanation": "参考答案指出应通过行为风控（鼠标/请求节奏）区分人机，而非单纯 IP 封禁；实施风险分级（低风险放行，高风险出验证码/二次校验）；限流按账号/设备/IP 组合避免误伤 NAT 用户；并保留人工申诉通道持续校准规则。C 项综合了这些要点。A 项单纯 IP 封禁会误伤 NAT 用户；D 项不区分风险等级影响体验；B 项完全放行无法防爬。",
+    "answer": ["A"],
+    "explanation": "参考答案指出应通过行为风控（鼠标/请求节奏）区分人机，而非单纯 IP 封禁；实施风险分级（低风险放行，高风险出验证码/二次校验）；限流按账号/设备/IP 组合避免误伤 NAT 用户；并保留人工申诉通道持续校准规则。A 项综合了这些要点。B 项单纯 IP 封禁会误伤 NAT 用户；D 项不区分风险等级影响体验；C 项完全放行无法防爬。",
     "source": "iq380"
   },
   {
@@ -13388,5 +13388,1381 @@
     "answer": ["B"],
     "explanation": "散列函数将任意长度的输入映射为固定长度的输出，且同一输入结果稳定；不同输入可能产生相同散列值（哈希冲突），因此 D 项“一定不同”错误；输出长度固定，C 项错误；散列函数通常不可逆，A 项错误。",
     "source": "fe-interview"
+  },
+  {
+    "id": "aieng-001",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "",
+    "prompt": "zero-shot、one-shot、few-shot 提示的核心区别在于？",
+    "options": [
+      { "key": "A", "text": "只影响生成速度" },
+      { "key": "B", "text": "仅在微调时才使用" },
+      { "key": "C", "text": "是否提供示例：zero 无示例、one 给 1 个、few 给多个示例" },
+      { "key": "D", "text": "模型参数量不同" }
+    ],
+    "answer": ["C"],
+    "explanation": "三者指推理时是否提供任务示例；示例能显著提升复杂任务的遵循度与格式一致性。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-002",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "language": "",
+    "prompt": "下列哪些属于常见的高级 Prompt 技巧？",
+    "options": [
+      { "key": "A", "text": "角色设定（system persona）" },
+      { "key": "B", "text": "少样本示例（few-shot）" },
+      { "key": "C", "text": "Chain-of-Thought（思维链）" },
+      { "key": "D", "text": "增大 max_tokens 即可提升推理" }
+    ],
+    "answer": ["A", "B", "C"],
+    "explanation": "CoT、角色设定、少样本都是经典提升技巧；增大 max_tokens 只是放宽输出长度，不属于提示技巧。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-003",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "language": "",
+    "prompt": "Chain-of-Thought（思维链）提示的主要作用是？",
+    "options": [
+      { "key": "A", "text": "加快 token 生成速度" },
+      { "key": "B", "text": "强制模型只输出 JSON" },
+      { "key": "C", "text": "减少上下文长度" },
+      { "key": "D", "text": "让模型分步推理，降低复杂任务出错率" }
+    ],
+    "answer": ["D"],
+    "explanation": "CoT 引导模型显式写出中间推理步骤，把复杂问题拆解为可验证子步骤，显著提升算术/逻辑/多跳推理准确率。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-004",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "",
+    "prompt": "系统提示（System Prompt）与用户提示（User Prompt）的主要区别是？",
+    "options": [
+      { "key": "A", "text": "系统提示只在微调时有效" },
+      { "key": "B", "text": "用户提示优先级更低" },
+      { "key": "C", "text": "两者完全等价" },
+      { "key": "D", "text": "系统提示设定角色/规则/边界，用户提示承载具体任务" }
+    ],
+    "answer": ["D"],
+    "explanation": "系统提示在对话最前定义模型身份与全局规则；用户提示是每轮具体请求，系统提示通常优先级最高。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-005",
+    "direction": "AI 工程",
+    "kind": "judge",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "",
+    "prompt": "Prompt 越长，模型输出质量一定越高。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": ["B"],
+    "explanation": "提示过长会引入噪声、稀释关键指令、挤占上下文，反而可能降低质量；质量取决于清晰度与结构。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-006",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "language": "",
+    "prompt": "面对 Prompt 注入攻击，下列哪种做法是有效的缓解手段？",
+    "options": [
+      { "key": "A", "text": "完全禁止任何用户输入" },
+      { "key": "B", "text": "把外部文本直接拼进系统提示以提升相关性" },
+      { "key": "C", "text": "仅依赖增大 temperature" },
+      { "key": "D", "text": "隔离并标注不可信外部内容，并对输出做约束与护栏" }
+    ],
+    "answer": ["D"],
+    "explanation": "注入靠“劫持指令”生效；隔离不可信内容、标注来源、输出约束与最小权限工具授权是核心防线。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-007",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "language": "",
+    "prompt": "结构化输出（JSON Mode / Function Calling）在应用开发中的核心价值是？",
+    "options": [
+      { "key": "A", "text": "提升模型参数规模" },
+      { "key": "B", "text": "让模型产出可被程序直接解析的确定格式" },
+      { "key": "C", "text": "缩短上下文窗口" },
+      { "key": "D", "text": "替代所有自然语言交互" }
+    ],
+    "answer": ["B"],
+    "explanation": "结构化输出避免脆弱的正则抽取，是 LLM 接入下游逻辑、数据落库与工具调用的关键接口。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-008",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "language": "",
+    "prompt": "关于“好的 Prompt”，下列说法正确的有？",
+    "options": [
+      { "key": "A", "text": "复杂任务可配示例" },
+      { "key": "B", "text": "指令清晰、目标明确" },
+      { "key": "C", "text": "给出必要格式与约束" },
+      { "key": "D", "text": "越长越好、信息越堆越多越稳" }
+    ],
+    "answer": ["A", "B", "C"],
+    "explanation": "清晰指令、格式约束与适度示例是高质量提示的共性；冗长堆砌反而稀释信号。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-009",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "",
+    "prompt": "调用 LLM API 时，temperature 参数主要控制什么？",
+    "options": [
+      { "key": "A", "text": "计费单价" },
+      { "key": "B", "text": "输入 token 上限" },
+      { "key": "C", "text": "输出的随机性/多样性" },
+      { "key": "D", "text": "最大输出长度" }
+    ],
+    "answer": ["C"],
+    "explanation": "temperature 越高输出越随机多样，越低越确定保守；0 适合需要稳定性的任务。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-010",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "",
+    "prompt": "关于 LLM 的 token，下列说法正确的是？",
+    "options": [
+      { "key": "A", "text": "token 只统计输出不计输入" },
+      { "key": "B", "text": "一个汉字固定等于一个 token" },
+      { "key": "C", "text": "token 是模型处理文本的最小单位，计费与限流通常按 token 计" },
+      { "key": "D", "text": "token 数量与字符数永远相等" }
+    ],
+    "answer": ["C"],
+    "explanation": "token 是分词后的最小单元，API 一般按输入+输出 token 计费并设总量上限。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-011",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "",
+    "prompt": "什么是流式输出（streaming）？为什么聊天应用普遍使用它？",
+    "options": [
+      { "key": "A", "text": "会显著降低生成质量" },
+      { "key": "B", "text": "一次性返回完整结果以节省带宽" },
+      { "key": "C", "text": "逐 token 返回，降低首字延迟、提升交互体验" },
+      { "key": "D", "text": "仅用于离线批处理" }
+    ],
+    "answer": ["C"],
+    "explanation": "流式让服务端边生成边推送，首字时间（TTFT）大幅缩短；底层常基于 SSE 或 WebSocket。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-012",
+    "direction": "AI 工程",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "language": "",
+    "prompt": "max_tokens 参数限制的是单次请求中模型生成的最大输出 token 数。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": ["A"],
+    "explanation": "以 OpenAI 等主流 API 为例，max_tokens 指 completion 上限；输入长度另由模型上下文窗口约束。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-013",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "language": "",
+    "prompt": "应用层处理 LLM 速率限制（rate limit）的正确做法包括？",
+    "options": [
+      { "key": "A", "text": "对可幂等请求才重试" },
+      { "key": "B", "text": "忽略限流直接高频请求" },
+      { "key": "C", "text": "指数退避+抖动重试" },
+      { "key": "D", "text": "并发限流（令牌桶/信号量）" }
+    ],
+    "answer": ["A", "C", "D"],
+    "explanation": "限流需退避重试、并发控制与幂等判断；对不可幂等请求重试可能放大副作用。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-014",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "",
+    "prompt": "什么是上下文窗口（context window）？超出会发生什么？",
+    "options": [
+      { "key": "A", "text": "每次会话的固定费用" },
+      { "key": "B", "text": "用户界面的宽度" },
+      { "key": "C", "text": "模型单次能处理的最大 token 数；超出会被截断或报错" },
+      { "key": "D", "text": "训练数据集大小" }
+    ],
+    "answer": ["C"],
+    "explanation": "上下文窗口是输入+输出 token 的总容量上限；超出时旧内容被截断或请求被拒，需靠截断/摘要/外部记忆解决。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-015",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "language": "",
+    "prompt": "关于 top_p 与 temperature，下列说法正确的有？",
+    "options": [
+      { "key": "A", "text": "top_p 控制最大输出长度" },
+      { "key": "B", "text": "top_p 按累积概率截断候选词集（核采样）" },
+      { "key": "C", "text": "temperature 缩放 logits 改变分布" },
+      { "key": "D", "text": "两者通常不必同时拉到极高" }
+    ],
+    "answer": ["B", "C", "D"],
+    "explanation": "top_p 是核采样阈值，temperature 是分布温度；输出长度由 max_tokens 控制。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-016",
+    "direction": "AI 工程",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "language": "",
+    "prompt": "temperature=0 时，同一 prompt 多次调用结果一定完全一致。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": ["B"],
+    "explanation": "即便 temperature=0，部分实现仍存在非确定性（并行采样、量化、服务端负载），只能说高度可复现。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-017",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "language": "",
+    "prompt": "LLM 调用缓存在哪些场景适用？",
+    "options": [
+      { "key": "A", "text": "模板化生成" },
+      { "key": "B", "text": "对时效性不敏感的知识问答" },
+      { "key": "C", "text": "幂等且结果稳定的请求" },
+      { "key": "D", "text": "含用户私有/实时数据的请求" }
+    ],
+    "answer": ["A", "B", "C"],
+    "explanation": "缓存适合稳定、非实时、可幂等的内容；含私有/实时数据的请求禁止缓存以防串味与越权。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-018",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "",
+    "prompt": "什么是 Embedding（嵌入向量）？它如何表示语义？",
+    "options": [
+      { "key": "A", "text": "仅用于图像压缩" },
+      { "key": "B", "text": "把文本按字符编码成 ASCII" },
+      { "key": "C", "text": "与词袋模型完全相同" },
+      { "key": "D", "text": "把文本映射为稠密向量，语义相近的文本向量距离更近" }
+    ],
+    "answer": ["D"],
+    "explanation": "Embedding 把文本投影到高维连续空间，语义相似的样本在空间中邻近，支持基于距离的语义检索。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-019",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "language": "",
+    "prompt": "常见的向量相似度度量包括？",
+    "options": [
+      { "key": "A", "text": "词频差" },
+      { "key": "B", "text": "余弦相似度" },
+      { "key": "C", "text": "欧氏距离" },
+      { "key": "D", "text": "点积" }
+    ],
+    "answer": ["B", "C", "D"],
+    "explanation": "余弦衡量方向一致性、点积衡量方向与幅度、欧氏衡量绝对距离；选哪种取决于是否归一化及是否关注模长。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-020",
+    "direction": "AI 工程",
+    "kind": "judge",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "",
+    "prompt": "Embedding 维度越高，语义表示一定越好。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": ["B"],
+    "explanation": "维度需与训练任务匹配；过高易过拟合且浪费算力，更关键的是模型质量与对齐方式。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-021",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "language": "",
+    "prompt": "向量数据库相比传统关系型数据库的核心差异是？",
+    "options": [
+      { "key": "A", "text": "原生支持近似最近邻（ANN）检索而非精确等值/范围查询" },
+      { "key": "B", "text": "完全不支持事务" },
+      { "key": "C", "text": "不支持任何索引" },
+      { "key": "D", "text": "只能存储字符串" }
+    ],
+    "answer": ["A"],
+    "explanation": "向量库针对高维向量的相似性搜索做了专用索引（HNSW、IVF 等）；传统关系库擅长结构化查询。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-022",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "language": "",
+    "prompt": "下列哪些是主流向量数据库/方案及其适用场景？",
+    "options": [
+      { "key": "A", "text": "向量数据库不能和 SQL 共存，必须彻底替换关系库" },
+      { "key": "B", "text": "pgvector 适合已用 Postgres、复用事务与 SQL 的中小场景" },
+      { "key": "C", "text": "Pinecone 是托管 Serverless 方案，运维省心" },
+      { "key": "D", "text": "Milvus/Qdrant/Weaviate 适合自建大规模检索" }
+    ],
+    "answer": ["B", "C", "D"],
+    "explanation": "方案各有侧重；pgvector 等证明向量能力可内嵌于关系库，并非非此即彼。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-023",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "language": "",
+    "prompt": "为什么大规模向量检索普遍采用 ANN（近似最近邻）而非精确 KNN？",
+    "options": [
+      { "key": "A", "text": "ANN 不需要任何索引" },
+      { "key": "B", "text": "KNN 无法并行" },
+      { "key": "C", "text": "ANN 结果永远比 KNN 更准" },
+      { "key": "D", "text": "精确 KNN 随数据量超线性变慢，ANN 以可接受精度损失换数量级加速" }
+    ],
+    "answer": ["D"],
+    "explanation": "精确 KNN 在亿级向量下开销不可接受；ANN（HNSW、IVF-PQ）通过图/聚类索引快速逼近 Top-K，是 RAG 在线检索基石。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-024",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "language": "",
+    "prompt": "关于 HNSW 索引，下列说法正确的有？",
+    "options": [
+      { "key": "A", "text": "是一种精确最近邻算法，结果零误差" },
+      { "key": "B", "text": "分层可导航小世界图，查询从稀疏顶层贪心下降到底层精搜" },
+      { "key": "C", "text": "建图内存占用大、写入/删除较贵" },
+      { "key": "D", "text": "召回高、查询快" }
+    ],
+    "answer": ["B", "C", "D"],
+    "explanation": "HNSW 用图索引换取速度与召回，代价是内存与写放大；它仍是近似而非精确算法。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-025",
+    "direction": "AI 工程",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "language": "",
+    "prompt": "向量检索只能用于文本，不能用于图像或音频。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": ["B"],
+    "explanation": "多模态嵌入模型（如 CLIP）能把图像/音频编码到同一向量空间，同样可做相似检索与跨模态搜索。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-026",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "language": "",
+    "prompt": "对向量做 L2 归一化后，余弦相似度等价于？",
+    "options": [
+      { "key": "A", "text": "曼哈顿距离" },
+      { "key": "B", "text": "点积" },
+      { "key": "C", "text": "欧氏距离平方的一半" },
+      { "key": "D", "text": "汉明距离" }
+    ],
+    "answer": ["B"],
+    "explanation": "归一化后向量模长为 1，余弦相似度 = 两向量点积；这也是很多向量库要求先 normalize 再只用点积加速的原因。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-027",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "",
+    "prompt": "RAG（检索增强生成）主要解决了 LLM 的哪些问题？",
+    "options": [
+      { "key": "A", "text": "仅解决中文支持" },
+      { "key": "B", "text": "知识滞后、幻觉、私有数据不可达" },
+      { "key": "C", "text": "模型参数量不足" },
+      { "key": "D", "text": "训练速度慢" }
+    ],
+    "answer": ["B"],
+    "explanation": "RAG 在生成前先检索权威/私有文档注入上下文，缓解知识截止、减少无依据幻觉，并让模型用到私域数据。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-028",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "language": "",
+    "prompt": "标准 RAG 流程通常包含哪些阶段？",
+    "options": [
+      { "key": "A", "text": "生成（generation）" },
+      { "key": "B", "text": "增强（augmentation，拼入上下文）" },
+      { "key": "C", "text": "模型重新训练" },
+      { "key": "D", "text": "检索（retrieval）" }
+    ],
+    "answer": ["A", "B", "D"],
+    "explanation": "RAG 是推理期流程：检索→拼入提示增强→交给 LLM 生成；不涉及训练/微调。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-029",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "language": "",
+    "prompt": "关于文档切分（chunking），下列说法正确的有？",
+    "options": [
+      { "key": "A", "text": "按标题/语义递归切分更友好" },
+      { "key": "B", "text": "固定长度切分实现简单但可能割裂语义" },
+      { "key": "C", "text": "滑动窗口重叠可缓解边界割裂" },
+      { "key": "D", "text": "切得越大越好，越多上下文越准" }
+    ],
+    "answer": ["A", "B", "C"],
+    "explanation": "粒度太小丢上下文、太大引噪声；重叠可缓解边界问题，但都需结合检索器与任务调节。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-030",
+    "direction": "AI 工程",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "language": "",
+    "prompt": "RAG 中检索到的文档越多，最终答案一定越准确。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": ["B"],
+    "explanation": "过多无关片段会稀释关键信号、挤占上下文并放大噪声，反而降低质量；需配合重排与相关性阈值。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-031",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "language": "",
+    "prompt": "Advanced RAG 相对 Naive RAG 常用的优化手段包括？",
+    "options": [
+      { "key": "A", "text": "上下文压缩" },
+      { "key": "B", "text": "查询改写/扩展" },
+      { "key": "C", "text": "混合检索（向量+关键词）" },
+      { "key": "D", "text": "重排序（rerank）" }
+    ],
+    "answer": ["A", "B", "C", "D"],
+    "explanation": "从检索前后两头优化：query 侧改写、召回侧混合、精排侧 rerank、送入侧压缩，全面提升相关性与信噪比。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-032",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "language": "",
+    "prompt": "RAG 中的重排序（rerank）用于解决什么问题？",
+    "options": [
+      { "key": "A", "text": "替代向量数据库" },
+      { "key": "B", "text": "对初召回结果按相关性二次精排，提升送入 LLM 的片段质量" },
+      { "key": "C", "text": "仅用于图像生成" },
+      { "key": "D", "text": "压缩模型参数量" }
+    ],
+    "answer": ["B"],
+    "explanation": "向量召回侧重速度、精度有限；rerank 模型（如 cross-encoder）对 query-doc 联合打分，精排出 top 片段。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-033",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "language": "",
+    "prompt": "混合检索（hybrid search）相比纯向量检索的优势是？",
+    "options": [
+      { "key": "A", "text": "检索速度一定更慢不可用" },
+      { "key": "B", "text": "只能用于英文" },
+      { "key": "C", "text": "结合语义向量与关键词（BM25）互补，兼顾意图与精确匹配" },
+      { "key": "D", "text": "完全不需要向量" }
+    ],
+    "answer": ["C"],
+    "explanation": "向量擅长语义泛化但弱于专名/编号精确匹配；BM25 反之。混合检索用 RRF 等融合两者，适合含术语的知识库。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-034",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "language": "",
+    "prompt": "评估 RAG 检索质量常用的指标包括？",
+    "options": [
+      { "key": "A", "text": "Hit Rate（命中率）" },
+      { "key": "B", "text": "MRR（平均倒数排名）" },
+      { "key": "C", "text": "模型显存占用" },
+      { "key": "D", "text": "NDCG" }
+    ],
+    "answer": ["A", "B", "D"],
+    "explanation": "离线可用命中率、MRR、NDCG 衡量片段相关性；显存占用不是检索质量指标。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-035",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "language": "",
+    "prompt": "RAG 中知识库没有答案时，较稳妥的做法是？",
+    "options": [
+      { "key": "A", "text": "检索得分低于阈值时提示模型明确拒答，避免强行编造" },
+      { "key": "B", "text": "直接返回随机片段" },
+      { "key": "C", "text": "无论如何都要生成一个答案" },
+      { "key": "D", "text": "关闭检索只用模型参数记忆" }
+    ],
+    "answer": ["A"],
+    "explanation": "阈值/相关性兜底让模型“知之为知之”；强行编造会放大幻觉，是 RAG 落地常见坑。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-036",
+    "direction": "AI 工程",
+    "kind": "judge",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "",
+    "prompt": "RAG 必须依赖向量数据库，不能用传统数据库做检索。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": ["B"],
+    "explanation": "RAG 本质是“检索+生成”，检索可用关键词、SQL、图谱或混合方案；向量库只是常见的语义检索实现。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-037",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "nice_to_know",
+    "language": "",
+    "prompt": "GraphRAG 相比传统 RAG 更擅长的场景是？",
+    "options": [
+      { "key": "A", "text": "跨文档的全局归纳与主题总结" },
+      { "key": "B", "text": "完全取代向量检索" },
+      { "key": "C", "text": "回答需要聚合大量文档的宏观问题" },
+      { "key": "D", "text": "单一片段内的精确事实抽取" }
+    ],
+    "answer": ["A", "C"],
+    "explanation": "GraphRAG 先抽取实体/关系构建知识图谱，擅长全局归纳；局部事实抽取仍可由传统 RAG 完成，二者可互补。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-038",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "language": "",
+    "prompt": "RAG 的上下文压缩（context compression）技术包括？",
+    "options": [
+      { "key": "A", "text": "用 LLM 对小片段摘要后再拼接" },
+      { "key": "B", "text": "把整个知识库原样塞入上下文" },
+      { "key": "C", "text": "只保留与 query 最相关的句子（extractive）" },
+      { "key": "D", "text": "rerank 后仅截取 top" }
+    ],
+    "answer": ["A", "C", "D"],
+    "explanation": "压缩聚焦关键证据、减少冗余与噪声；原样全塞会撑爆窗口并稀释信号。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-039",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "",
+    "prompt": "什么是 Function Calling（函数调用）？它与普通文本生成的区别？",
+    "options": [
+      { "key": "A", "text": "模型输出结构化“调用某函数的请求”，由应用执行后回传结果" },
+      { "key": "B", "text": "模型直接在内部运行代码" },
+      { "key": "C", "text": "仅用于翻译" },
+      { "key": "D", "text": "等价于微调" }
+    ],
+    "answer": ["A"],
+    "explanation": "模型生成符合 schema 的工具调用请求，由宿主程序调用真实 API 并把结果喂回模型继续推理。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-040",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "language": "",
+    "prompt": "关于工具描述（schema）的重要性，下列说法正确的有？",
+    "options": [
+      { "key": "A", "text": "清晰的描述帮助模型正确选工具" },
+      { "key": "B", "text": "模糊缺失会导致选错工具或参数错误" },
+      { "key": "C", "text": "schema 可有可无，模型能猜" },
+      { "key": "D", "text": "参数类型与约束需明确" }
+    ],
+    "answer": ["A", "B", "D"],
+    "explanation": "schema 是模型理解工具能力的唯一依据；模糊会导致选错或产出非法参数。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-041",
+    "direction": "AI 工程",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "language": "",
+    "prompt": "Function Calling 返回的结果就是工具已执行完毕的返回值。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": ["B"],
+    "explanation": "模型只返回“调用请求”，真正执行由应用负责；若未实现对应工具或不校验，模型拿不到真实结果。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-042",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "language": "",
+    "prompt": "多个工具并行/串行调用时，保证结果正确聚合的做法包括？",
+    "options": [
+      { "key": "A", "text": "串行需等待上一步结果再决定下一步" },
+      { "key": "B", "text": "所有工具必须一次性并行才高效" },
+      { "key": "C", "text": "用唯一 call_id 关联调用与结果" },
+      { "key": "D", "text": "对写库/发消息等副作用工具谨慎并行" }
+    ],
+    "answer": ["A", "C", "D"],
+    "explanation": "配对与顺序控制是关键；有副作用的工具并行需事务与幂等，不能盲目并发。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-043",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "language": "",
+    "prompt": "为何要对工具入参做严格的 JSON Schema 校验？",
+    "options": [
+      { "key": "A", "text": "减少提示长度" },
+      { "key": "B", "text": "提高模型参数量" },
+      { "key": "C", "text": "在进业务前拦截越界/缺字段/类型错误，避免脏数据进入外部系统" },
+      { "key": "D", "text": "仅为美观" }
+    ],
+    "answer": ["C"],
+    "explanation": "模型可能生成非法参数；严格校验能返回修正提示让模型重试，避免故障扩散。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-044",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "language": "",
+    "prompt": "什么是 AI Agent？它与单次 LLM 调用的核心区别？",
+    "options": [
+      { "key": "A", "text": "两者完全相同" },
+      { "key": "B", "text": "Agent 只能做文本分类" },
+      { "key": "C", "text": "Agent 不需要大模型" },
+      { "key": "D", "text": "Agent 能自主规划、调用工具、迭代反思以完成多步目标" }
+    ],
+    "answer": ["D"],
+    "explanation": "Agent 在 LLM 之上加规划、工具使用与记忆回路，能分解任务、执行动作并据反馈调整。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-045",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "language": "",
+    "prompt": "ReAct 范式（Reason + Act）指的是？",
+    "options": [
+      { "key": "A", "text": "只做推理不做动作" },
+      { "key": "B", "text": "只做动作不思考" },
+      { "key": "C", "text": "一种数据库事务模型" },
+      { "key": "D", "text": "交替进行“思考理由”与“执行动作”，再观察结果继续" }
+    ],
+    "answer": ["D"],
+    "explanation": "ReAct 让模型输出 Thought→Action→Observation 循环，把推理与行动交织，提升可控性与可解释性。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-046",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "language": "",
+    "prompt": "Agent 的“规划 / 记忆 / 工具”三大能力分别解决什么？",
+    "options": [
+      { "key": "A", "text": "记忆：保存与复用历史上下文" },
+      { "key": "B", "text": "工具：连接外部系统与实时数据" },
+      { "key": "C", "text": "规划：把目标拆成可执行步骤" },
+      { "key": "D", "text": "三者都只用于训练模型" }
+    ],
+    "answer": ["A", "B", "C"],
+    "explanation": "规划决定“做什么”，记忆解决“记得什么”，工具解决“能动手做什么”。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-047",
+    "direction": "AI 工程",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "language": "",
+    "prompt": "Agent 应该是完全自主循环的，不该有任何人工介入。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": ["B"],
+    "explanation": "高风险动作（删数据、发消息、支付）通常需要 human-in-the-loop 确认；可控性比“全自动”更重要。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-048",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "language": "",
+    "prompt": "关于 Agent 的短期/长期记忆设计，下列合理的做法有？",
+    "options": [
+      { "key": "A", "text": "短期用对话历史+滑动窗口/摘要控制上下文" },
+      { "key": "B", "text": "记忆越长越好，永不清理" },
+      { "key": "C", "text": "长期用向量库存经验与用户画像" },
+      { "key": "D", "text": "需去重与遗忘策略避免矛盾" }
+    ],
+    "answer": ["A", "C", "D"],
+    "explanation": "记忆需有边界：短期控窗口、长期可检索、并做去重与遗忘以防上下文膨胀与矛盾。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-049",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "language": "",
+    "prompt": "多 Agent 协作的常见编排模式包括？",
+    "options": [
+      { "key": "A", "text": "共享黑板（blackboard）" },
+      { "key": "B", "text": "辩论/评审（critic）" },
+      { "key": "C", "text": "流水线（pipeline）" },
+      { "key": "D", "text": "主管-工人（manager-worker）" }
+    ],
+    "answer": ["A", "B", "C", "D"],
+    "explanation": "多种模式各有侧重；关键在角色边界、消息协议与冲突解决，避免无限协商。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-050",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "language": "",
+    "prompt": "Agent 循环中避免无限循环与失控的手段包括？",
+    "options": [
+      { "key": "A", "text": "工具失败上限与兜底" },
+      { "key": "B", "text": "完全不设任何上限以求最优" },
+      { "key": "C", "text": "设最大步数/最大 token 预算" },
+      { "key": "D", "text": "检测重复动作与无进展并提前终止" }
+    ],
+    "answer": ["A", "C", "D"],
+    "explanation": "必须有步数/预算护栏、停滞检测与失败上限，否则易陷入失控循环。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-051",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "language": "",
+    "prompt": "Agent 可观测性（tracing）为什么重要？",
+    "options": [
+      { "key": "A", "text": "只在训练时需要" },
+      { "key": "B", "text": "能回放每一步思考/工具/结果，便于调试、评估与成本控制" },
+      { "key": "C", "text": "会降低模型能力" },
+      { "key": "D", "text": "仅用于美化界面" }
+    ],
+    "answer": ["B"],
+    "explanation": "Agent 决策链路长且非确定，tracing 记录完整轨迹，是定位错误与优化 prompt/工具设计的必备能力。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-052",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "language": "",
+    "prompt": "Agent 的“反思（reflection）”机制的价值包括？",
+    "options": [
+      { "key": "A", "text": "把“生成-评价-修正”闭环化" },
+      { "key": "B", "text": "让模型一次就百分百正确" },
+      { "key": "C", "text": "生成后自我批评/评估" },
+      { "key": "D", "text": "发现错误再迭代改进" }
+    ],
+    "answer": ["A", "C", "D"],
+    "explanation": "反思将自我评审闭环化，显著提升复杂任务最终质量，但无法保证一次正确。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-053",
+    "direction": "AI 工程",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "language": "",
+    "prompt": "Agent 调用工具失败时，应直接抛出异常并终止整个流程。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": ["B"],
+    "explanation": "健壮 Agent 应捕获失败、把错误回传模型让其重试或换策略，仅在超出重试/预算上限时才优雅终止。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-054",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "language": "",
+    "prompt": "Agent 的护栏（guardrails）与安全控制包括？",
+    "options": [
+      { "key": "A", "text": "敏感动作人工确认与成本上限" },
+      { "key": "B", "text": "输入校验与注入防护" },
+      { "key": "C", "text": "输出格式与内容审核" },
+      { "key": "D", "text": "工具调用白名单与权限最小化" }
+    ],
+    "answer": ["A", "B", "C", "D"],
+    "explanation": "护栏在输入/输出/工具层设约束，防止越权与有害行为，是生产落地的底线。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-055",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "language": "",
+    "prompt": "评估 LLM 应用质量可用的指标包括？",
+    "options": [
+      { "key": "A", "text": "Answer Relevancy（答案相关性）" },
+      { "key": "B", "text": "线上采纳率/重试率/会话完成率" },
+      { "key": "C", "text": "任务准确率与 Faithfulness（忠实度）" },
+      { "key": "D", "text": "仅看模型参数量" }
+    ],
+    "answer": ["A", "B", "C"],
+    "explanation": "需离线（准确率/忠实度/相关性）与在线（采纳率/成本/延迟）结合；参数量不是质量指标。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-056",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "language": "",
+    "prompt": "LLM-as-a-Judge（用模型当裁判）的主要风险是？",
+    "options": [
+      { "key": "A", "text": "裁判模型本身有偏差、易被长文本位置效应影响" },
+      { "key": "B", "text": "成本为零" },
+      { "key": "C", "text": "只能用于训练不能评测" },
+      { "key": "D", "text": "完全客观无风险" }
+    ],
+    "answer": ["A"],
+    "explanation": "模型裁判存在偏好/位置偏差与自赞倾向；应校准、双人对照、关键项人工抽检。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-057",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "nice_to_know",
+    "language": "",
+    "prompt": "RAGAS 等框架通常从哪些维度评估 RAG？",
+    "options": [
+      { "key": "A", "text": "Answer Relevancy（答案相关性）" },
+      { "key": "B", "text": "仅评估生成速度" },
+      { "key": "C", "text": "Context Precision / Recall（检索质量）" },
+      { "key": "D", "text": "Faithfulness（答案是否忠于上下文）" }
+    ],
+    "answer": ["A", "C", "D"],
+    "explanation": "RAGAS 把端到端 RAG 拆成可定位瓶颈的子指标：检索质量与答案忠实/相关。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-058",
+    "direction": "AI 工程",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "language": "",
+    "prompt": "人工评估不可扩展，所以 LLM 应用完全不需要人工评估。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": ["B"],
+    "explanation": "人工评估虽贵但仍是金标准，尤其用于校准自动指标、发现长尾与安全风险；应“自动筛劣+人工抽评”。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-059",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "language": "",
+    "prompt": "关于大模型幻觉（hallucination），下列说法正确的是？",
+    "options": [
+      { "key": "A", "text": "只发生在翻译场景" },
+      { "key": "B", "text": "是数据库术语" },
+      { "key": "C", "text": "RAG 能 100% 消除幻觉" },
+      { "key": "D", "text": "指生成看似合理但无依据的内容，RAG 可缓解但不保证消除" }
+    ],
+    "answer": ["D"],
+    "explanation": "幻觉源于概率生成与知识缺口；RAG 通过注入证据降低概率，但检索不全/模型仍可能编造。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-060",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "language": "",
+    "prompt": "降低 LLM 应用延迟与成本的手段包括？",
+    "options": [
+      { "key": "A", "text": "提示精简与上下文压缩" },
+      { "key": "B", "text": "模型路由（简单任务用小模型）" },
+      { "key": "C", "text": "增大 max_tokens 提升质量" },
+      { "key": "D", "text": "缓存高频请求" }
+    ],
+    "answer": ["A", "B", "D"],
+    "explanation": "缓存、路由、压缩与流式是降本提速主力；盲目增大 max_tokens 只增成本。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-061",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "nice_to_know",
+    "language": "",
+    "prompt": "什么是模型路由（model routing）/ 级联（cascade）？",
+    "options": [
+      { "key": "A", "text": "用轻量模型先判难度，简单请求直接答、难的才升级大模型" },
+      { "key": "B", "text": "把请求随机分发到任意模型" },
+      { "key": "C", "text": "等于微调" },
+      { "key": "D", "text": "仅用于离线训练" }
+    ],
+    "answer": ["A"],
+    "explanation": "路由/级联以低成本模型覆盖多数简单请求，仅在置信度低时调用更强（更贵）模型，质量近似下显著降本。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-062",
+    "direction": "AI 工程",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "language": "",
+    "prompt": "小模型永远无法替代大模型完成任何任务。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": ["B"],
+    "explanation": "经蒸馏/微调的小模型在大量垂直任务上已可媲美大模型且更快更省；并非“永远”，应依任务选型。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-063",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "language": "",
+    "prompt": "生产环境为 LLM 调用设计降级与兜底的做法包括？",
+    "options": [
+      { "key": "A", "text": "记录失败指标告警" },
+      { "key": "B", "text": "主模型超时/限流则切备用或更小模型" },
+      { "key": "C", "text": "关键路径用缓存/规则兜底" },
+      { "key": "D", "text": "返回友好错误而非崩溃" }
+    ],
+    "answer": ["A", "B", "C", "D"],
+    "explanation": "多层次降级保障可用性：换模型、缓存兜底、友好错误与告警，避免雪崩。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-064",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "nice_to_know",
+    "language": "",
+    "prompt": "多模态模型是指？",
+    "options": [
+      { "key": "A", "text": "能同时理解和/或生成文本、图像、音频等多种模态的模型" },
+      { "key": "B", "text": "只能处理文本" },
+      { "key": "C", "text": "仅用于视频压缩" },
+      { "key": "D", "text": "等同于传统 OCR" }
+    ],
+    "answer": ["A"],
+    "explanation": "多模态模型统一处理多种感官数据，如视觉-语言模型可图文互理解，支撑看图问答等应用。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-065",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "language": "",
+    "prompt": "关于多模态检索（如图文检索），下列说法正确的有？",
+    "options": [
+      { "key": "A", "text": "文本 query 可直接检索相关图片或图注" },
+      { "key": "B", "text": "用多模态嵌入把图像与文本编码到同一向量空间" },
+      { "key": "C", "text": "常用于商品、文档图表、知识库配图检索" },
+      { "key": "D", "text": "只能在纯文本空间内检索" }
+    ],
+    "answer": ["A", "B", "C"],
+    "explanation": "多模态嵌入让跨模态语义对齐，支持以文搜图、以图搜文等检索增强场景。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-066",
+    "direction": "AI 工程",
+    "kind": "judge",
+    "difficulty": "basic",
+    "essentiality": "nice_to_know",
+    "language": "",
+    "prompt": "多模态模型只能接受图像和文本，不能处理音频。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": ["B"],
+    "explanation": "不少模型已支持音频（语音转写、音频理解）甚至视频；模态支持取决于具体架构与训练数据。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-067",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "language": "",
+    "prompt": "Transformer 的核心机制是？",
+    "options": [
+      { "key": "A", "text": "循环单元逐个处理" },
+      { "key": "B", "text": "单纯的词袋叠加" },
+      { "key": "C", "text": "卷积滑动窗口" },
+      { "key": "D", "text": "自注意力（Self-Attention），并行建模序列中任意两位置依赖" }
+    ],
+    "answer": ["D"],
+    "explanation": "Transformer 用自注意力替代 RNN 的时序递推，实现全局并行依赖建模，是现代 LLM 的骨架。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-068",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "nice_to_know",
+    "language": "",
+    "prompt": "多头注意力（Multi-Head Attention）的作用是？",
+    "options": [
+      { "key": "A", "text": "在不同子空间并行捕捉多种语义/语法关系，丰富表示" },
+      { "key": "B", "text": "等价于单层感知机" },
+      { "key": "C", "text": "减少参数量到零" },
+      { "key": "D", "text": "只在解码器使用" }
+    ],
+    "answer": ["A"],
+    "explanation": "多个注意力头各自关注不同关系（句法、指代、距离等），拼接后线性融合，使模型同时捕获多样化依赖。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-069",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "language": "",
+    "prompt": "为什么 Transformer 需要位置编码（Positional Encoding）？",
+    "options": [
+      { "key": "A", "text": "为了压缩模型" },
+      { "key": "B", "text": "仅在微调时需要" },
+      { "key": "C", "text": "自注意力本身无序，需显式注入 token 位置信息" },
+      { "key": "D", "text": "用于图像分类" }
+    ],
+    "answer": ["C"],
+    "explanation": "注意力对顺序不敏感，加入位置编码让模型感知词序，否则“猫追狗”与“狗追猫”无法区分。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-070",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "language": "",
+    "prompt": "预训练（pretraining）与微调（fine-tuning）的区别是？",
+    "options": [
+      { "key": "A", "text": "两者完全一样" },
+      { "key": "B", "text": "微调先于预训练" },
+      { "key": "C", "text": "预训练学通用表示，微调在特定任务数据上适配" },
+      { "key": "D", "text": "预训练只用于图像" }
+    ],
+    "answer": ["C"],
+    "explanation": "预训练习得广泛语言/世界知识；微调用小规模标注数据把通用能力迁移到下游任务。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-071",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "nice_to_know",
+    "language": "",
+    "prompt": "LoRA / QLoRA 微调的核心思想是？",
+    "options": [
+      { "key": "A", "text": "冻结原权重，向注意力/线性层注入低秩可训练矩阵，仅训少量参数" },
+      { "key": "B", "text": "仅改变输入分词" },
+      { "key": "C", "text": "重新训练整个模型全部参数" },
+      { "key": "D", "text": "等于提示工程" }
+    ],
+    "answer": ["A"],
+    "explanation": "LoRA 以低秩矩阵适配任务，省显存易切换；QLoRA 再叠加 4-bit 量化，把大模型微调压到单卡消费级 GPU。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-072",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "nice_to_know",
+    "language": "",
+    "prompt": "RLHF（基于人类反馈的强化学习）用于？",
+    "options": [
+      { "key": "A", "text": "用奖励模型+强化学习最大化人类偏好，对齐有用/诚实/无害" },
+      { "key": "B", "text": "仅加速推理" },
+      { "key": "C", "text": "等同于数据增强" },
+      { "key": "D", "text": "替代分词器" }
+    ],
+    "answer": ["A"],
+    "explanation": "RLHF 先用人工偏好训练奖励模型，再以 PPO 等微调策略模型，使输出更符合人类偏好，是 ChatGPT 类对齐关键。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-073",
+    "direction": "AI 工程",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "language": "",
+    "prompt": "微调一定比 Prompt Engineering 效果更好。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": ["B"],
+    "explanation": "视任务与数据而定：多数场景提示工程+检索已足够灵活；仅当需固化领域风格/低成本高并发时微调才显优势。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-074",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "nice_to_know",
+    "language": "",
+    "prompt": "模型量化（quantization）主要影响什么？",
+    "options": [
+      { "key": "A", "text": "用更低精度表示权重，降低显存与推理成本，可能轻微损精度" },
+      { "key": "B", "text": "提升模型参数量" },
+      { "key": "C", "text": "只改变训练速度" },
+      { "key": "D", "text": "与推理无关" }
+    ],
+    "answer": ["A"],
+    "explanation": "量化把权重压到更低比特，显著节省显存、加速推理，常伴可接受的质量折损，是部署端侧/单卡的关键。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-075",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "nice_to_know",
+    "language": "",
+    "prompt": "知识蒸馏（knowledge distillation）是指？",
+    "options": [
+      { "key": "A", "text": "把模型拆成多份分布式训练" },
+      { "key": "B", "text": "仅用于数据清洗" },
+      { "key": "C", "text": "用大模型（教师）的输出/软标签训练小模型（学生）以迁移能力" },
+      { "key": "D", "text": "等同于剪枝" }
+    ],
+    "answer": ["C"],
+    "explanation": "蒸馏让小模型模仿大模型的软概率分布（含暗知识），在远小体积下逼近大模型表现，常用于端侧与降本。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-076",
+    "direction": "AI 工程",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "nice_to_know",
+    "language": "",
+    "prompt": "注意力中的 KV Cache 如何降低自回归推理成本？",
+    "options": [
+      { "key": "A", "text": "增加每步计算量" },
+      { "key": "B", "text": "与上下文长度无关" },
+      { "key": "C", "text": "只在训练时使用" },
+      { "key": "D", "text": "缓存历史 K/V，避免重复计算，将每步复杂度从 O(n²) 降到 O(n)" }
+    ],
+    "answer": ["D"],
+    "explanation": "解码时每步要对所有已生成 token 的 K/V 做注意力；KV Cache 复用历史，是长序列推理提速与省算的关键。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-077",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "nice_to_know",
+    "language": "",
+    "prompt": "关于大模型的“涌现能力（emergent abilities）”，下列说法合理的有？",
+    "options": [
+      { "key": "A", "text": "某些能力在规模/数据跨过阈值后才突然出现" },
+      { "key": "B", "text": "小模型也可能具备部分能力，并非绝对二分" },
+      { "key": "C", "text": "存在“看似涌现实为平滑”的学术争议" },
+      { "key": "D", "text": "规模越大一定线性越好，毫无争议" }
+    ],
+    "answer": ["A", "B", "C"],
+    "explanation": "涌现指能力在阈值后突现的现象，但度量与“是否真涌现”仍有争议；并非规模越大越好这么简单。",
+    "source": "ai-eng"
+  },
+  {
+    "id": "aieng-078",
+    "direction": "AI 工程",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "nice_to_know",
+    "language": "",
+    "prompt": "关于 Self-Attention 的计算步骤，下列说法正确的有？",
+    "options": [
+      { "key": "A", "text": "由 token 映射出 Query/Key/Value 三向量" },
+      { "key": "B", "text": "用 Q 与 K 点积并缩放后 softmax 得注意力权重" },
+      { "key": "C", "text": "权重对 V 加权求和得到上下文表示" },
+      { "key": "D", "text": "无需任何矩阵运算，纯查表完成" }
+    ],
+    "answer": ["A", "B", "C"],
+    "explanation": "Self-Attention 经 Q/K/V 投影、缩放点积、softmax 与加权 V 求和，全靠线性变换与归一化完成。",
+    "source": "ai-eng"
   }
 ]

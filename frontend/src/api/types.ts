@@ -530,7 +530,7 @@ export interface PolishFullResponse {
 /** 语言筛选 = 闭集 + 「全部」（`'all'` 与通用题的 `''` 并存，两条语义不同）。 */
 export type PracticeLanguageFilter = 'all' | QuestionLanguage
 /** 方向筛选 = 四方向 + 「全部」。 */
-export type PracticeDirectionFilter = 'all' | '前端' | '后端' | '算法与数据结构' | '计算机基础'
+export type PracticeDirectionFilter = 'all' | '前端' | '后端' | '算法与数据结构' | '计算机基础' | 'AI 工程'
 /** 难度筛选 = 三档 + 「全部」。 */
 export type PracticeDifficultyFilter = 'all' | ExamDifficulty
 /** 必备度筛选 = 三档 + 「全部」。 */

@@ -41,7 +41,7 @@ from .. import repository
 from . import question_bank, rules
 
 #: 本批来源闭集（顺序即报表与批次落盘顺序）。
-SOURCES: tuple[str, ...] = ("tiji", "local100", "iq380", "fe-interview")
+SOURCES: tuple[str, ...] = ("tiji", "local100", "iq380", "fe-interview", "ai-eng")
 
 #: 来源 → 素材文件名（`docs/question-bank-staging/` 下的可复现输入，必须随仓库提交）。
 STAGING_FILES: dict[str, str] = {
@@ -49,17 +49,20 @@ STAGING_FILES: dict[str, str] = {
     "local100": "02-本地100题.json",
     "iq380": "03-七方向379题.json",
     "fe-interview": "04-fe-interview20.json",
+    "ai-eng": "05-ai-engineering78.json",
 }
 
 #: 来源 → 种子 id 前缀（避开 legacy `fe-/be-/al-/cs-` 与 r11 九个语言前缀，保证
 #: `test_question_bank_quality._is_new()` 的口径不被污染）。
 #: `iq380-` 刻意不用 `iq-`：面试发言 id 也是 `iq-{序号}`（`interview.py` 写
 #: `runs.payload.questions[].id`），同名不同域，数据不撞但 grep / 日志会混淆，故加宽前缀。
+#: `aieng-` 为「AI 工程」方向题，独立前缀避免与面试发言 `iq-` 或既有语言前缀混淆。
 ID_PREFIX: dict[str, str] = {
     "tiji": "tiji-",
     "local100": "l100-",
     "iq380": "iq380-",
     "fe-interview": "fei-",
+    "ai-eng": "aieng-",
 }
 
 #: 近重复口径：字符 n-gram 的 Jaccard 下界（常量只在这里，别处不得再写一个阈值）。
@@ -68,7 +71,7 @@ NEAR_DUP_JACCARD = 0.62
 
 #: 批内冲突取舍的来源优先级（高 → 低），与 `SOURCES` 顺序一致但**语义不同**：
 #: 前者决定谁赢，后者决定写盘顺序。
-SOURCE_PRIORITY: tuple[str, ...] = ("tiji", "local100", "iq380", "fe-interview")
+SOURCE_PRIORITY: tuple[str, ...] = ("tiji", "local100", "iq380", "fe-interview", "ai-eng")
 
 #: 判断题的固定选项（与存量 seed 的 36 道逐字一致：前端按 options 原样渲染，文案不可改）。
 #: 素材里 4 条 key 是中文（`正确`/`错误`）、其余 116 条 key 已是 A/B —— 一律按本常量重建。

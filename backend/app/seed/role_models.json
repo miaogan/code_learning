@@ -267,6 +267,73 @@
         {"name": "系统设计", "required": 4},
         {"name": "可观测性", "required": 3}
       ]
+    },
+    {
+      "role": "AI 工程师",
+      "direction": "AI 工程",
+      "level": "初级",
+      "years_min": 0,
+      "years_max": 2,
+      "must_have": ["LLM 应用开发", "Prompt 工程", "Python 数据处理"],
+      "skills": [
+        {"name": "LLM 应用开发", "required": 2},
+        {"name": "Prompt 工程", "required": 2},
+        {"name": "Python 数据处理", "required": 2},
+        {"name": "Embedding 与向量检索", "required": 1},
+        {"name": "HTTP / 流式输出", "required": 1},
+        {"name": "Git 与工程化", "required": 1}
+      ]
+    },
+    {
+      "role": "AI 工程师",
+      "direction": "AI 工程",
+      "level": "中级",
+      "years_min": 2,
+      "years_max": 5,
+      "must_have": ["RAG 检索增强", "Agent 设计", "向量数据库"],
+      "skills": [
+        {"name": "RAG 检索增强", "required": 3},
+        {"name": "Agent 设计", "required": 3},
+        {"name": "向量数据库", "required": 3},
+        {"name": "Function Calling / 工具调用", "required": 2},
+        {"name": "LLM 应用评估", "required": 2},
+        {"name": "Prompt 工程", "required": 2},
+        {"name": "Python 后端服务", "required": 2}
+      ]
+    },
+    {
+      "role": "AI 工程师",
+      "direction": "AI 工程",
+      "level": "高级",
+      "years_min": 5,
+      "years_max": 10,
+      "must_have": ["RAG 架构", "Agent 编排与可靠性", "LLM 评估体系"],
+      "skills": [
+        {"name": "RAG 架构", "required": 4},
+        {"name": "Agent 编排与可靠性", "required": 4},
+        {"name": "LLM 评估体系", "required": 3},
+        {"name": "向量数据库与召回优化", "required": 3},
+        {"name": "微调与蒸馏", "required": 2},
+        {"name": "多模态应用", "required": 2},
+        {"name": "成本与延迟优化", "required": 2}
+      ]
+    },
+    {
+      "role": "AI 工程师",
+      "direction": "AI 工程",
+      "level": "专家",
+      "years_min": 10,
+      "years_max": 99,
+      "must_have": ["AI 系统架构", "模型训练与微调", "规模化推理"],
+      "skills": [
+        {"name": "AI 系统架构", "required": 4},
+        {"name": "模型训练与微调", "required": 4},
+        {"name": "规模化推理", "required": 4},
+        {"name": "RAG 与 Agent 前沿", "required": 4},
+        {"name": "多模态与对齐", "required": 3},
+        {"name": "评估与安全", "required": 3},
+        {"name": "团队与技术规划", "required": 3}
+      ]
     }
   ]
 }
