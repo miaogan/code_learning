@@ -33,6 +33,8 @@ describe('flow 存储按账号分区', () => {
       hasResume: false,
       hasProfile: false,
       hasReport: false,
+      hasInterview: false,
+      hasExam: false,
     })
     flow.setFlow({ hasProfile: true })
     expect(store.get('sc.flow.user-a')).toContain('"hasProfile":true')
@@ -58,6 +60,8 @@ describe('flow 存储按账号分区', () => {
       hasResume: false,
       hasProfile: false,
       hasReport: false,
+      hasInterview: false,
+      hasExam: false,
     })
   })
 })

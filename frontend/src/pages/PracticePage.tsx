@@ -91,6 +91,8 @@ export default function PracticePage() {
   const cardRef = useRef<HTMLDivElement>(null)
   const feedbackRef = useRef<HTMLDivElement>(null)
   const needRef = useRef<HTMLParagraphElement>(null)
+  /** 最近一次出题请求的来源（筛选条件 + 是否错题重练）：失败重试按来源原样重放。 */
+  const paperRequestRef = useRef<{ filters: PracticeFiltersState; retrain: boolean } | null>(null)
 
   const reloadStats = useCallback(() => setStatsPulse((value) => value + 1), [])
 
@@ -175,6 +177,7 @@ export default function PracticePage() {
   const firstLoading = stats === null && statsLoading
 
   const startPaper = async (nextFilters: PracticeFiltersState, isRetrain: boolean) => {
+    paperRequestRef.current = { filters: { ...nextFilters }, retrain: isRetrain }
     setStarting(true)
     setPaperError(null)
     try {
@@ -417,27 +420,15 @@ export default function PracticePage() {
       )
     }
     return (
-      <>
-        <PracticeFilters
-          filters={filters}
-          onChange={(patch) => setFilters((previous) => ({ ...previous, ...patch }))}
-          hitCount={stats ? stats.hit : null}
-          hitLoading={statsLoading}
-          globalStats={stats}
-          onStart={() => void startPaper(filters, false)}
-          startLoading={starting}
-        />
-        {paperError ? (
-          <InlineError
-            message={paperError}
-            onRetry={() => void startPaper(filters, retrain)}
-            retryLabel="重试"
-          />
-        ) : null}
-        {starting ? (
-          <PhaseLoader title="正在按筛选挑题" phases={PAPER_PHASES} active={0} />
-        ) : null}
-      </>
+      <PracticeFilters
+        filters={filters}
+        onChange={(patch) => setFilters((previous) => ({ ...previous, ...patch }))}
+        hitCount={stats ? stats.hit : null}
+        hitLoading={statsLoading}
+        globalStats={stats}
+        onStart={() => void startPaper(filters, false)}
+        startLoading={starting}
+      />
     )
   }
 
@@ -494,6 +485,21 @@ export default function PracticePage() {
       </div>
 
       {tab === 'practice' ? renderPractice() : renderWrong()}
+
+      {/* 出题失败 / 挑题中都放在三视图共享区：完成态与错题本发起新一轮同样能看到反馈。 */}
+      {paperError ? (
+        <InlineError
+          message={paperError}
+          onRetry={() => {
+            const last = paperRequestRef.current
+            if (last !== null) void startPaper(last.filters, last.retrain)
+          }}
+          retryLabel="重试"
+        />
+      ) : null}
+      {starting ? (
+        <PhaseLoader title="正在按筛选挑题" phases={PAPER_PHASES} active={0} />
+      ) : null}
 
       <ConfirmModal
         open={exitOpen}

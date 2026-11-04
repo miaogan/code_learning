@@ -15,6 +15,7 @@ import { RingProgress } from '../components/ui/RingProgress'
 import { filteredNotice, proficiencyRuleHint } from '../lib/examNotice'
 import { formatElapsed } from '../lib/format'
 import { useAsync } from '../lib/useAsync'
+import { setFlow } from '../state/flow'
 
 /** 卷面下限（AC-4：总数 ≥10、客观 ≥8），用于兜底拦截题型异常，不作为正常路径判断。 */
 const MIN_QUESTIONS = 10
@@ -47,6 +48,8 @@ export default function ExamPage() {
   const [answers, setAnswers] = useState<Record<string, string[] | string>>({})
   const [result, setResult] = useState<ExamResult | null>(null)
   const [createError, setCreateError] = useState<string | null>(null)
+  /** 「再出一套笔试」先确认：出卷中/失败时不影响当前已出分的成绩可见。 */
+  const [restartOpen, setRestartOpen] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [pendingLeave, setPendingLeave] = useState<string | null>(null)
@@ -142,6 +145,7 @@ export default function ExamPage() {
 
   const startExam = async () => {
     if (!profile) return
+    const hadResult = result !== null
     const attempt = attemptRef.current + 1
     attemptRef.current = attempt
     setStage('creating')
@@ -154,7 +158,7 @@ export default function ExamPage() {
       if (attemptRef.current !== attempt || !mountedRef.current) return
       const objective = created.questions.filter((item) => item.kind !== 'text').length
       if (created.questions.length < MIN_QUESTIONS || objective < MIN_OBJECTIVE) {
-        setStage('idle')
+        setStage(hadResult ? 'submitted' : 'idle')
         setCreateError(
           `题型异常：本次仅 ${created.questions.length} 题（客观 ${objective} 道，需 ${MIN_QUESTIONS} 题 / 客观 ${MIN_OBJECTIVE} 道），请重新生成试卷`,
         )
@@ -167,14 +171,15 @@ export default function ExamPage() {
       setStage('running')
     } catch (error) {
       if (attemptRef.current !== attempt || !mountedRef.current) return
-      setStage('idle')
+      // 已有成绩时失败不把用户踢出结果页：原成绩与复核保持可见。
+      setStage(hadResult ? 'submitted' : 'idle')
       setCreateError(error instanceof ApiError ? error.message : '组卷失败，请稍后重试')
     }
   }
 
   const cancelCreate = () => {
     attemptRef.current += 1
-    setStage('idle')
+    setStage(result !== null ? 'submitted' : 'idle')
   }
 
   const submitExam = async () => {
@@ -186,6 +191,7 @@ export default function ExamPage() {
       const graded = await api.submitExam(run.run_id, { answers })
       if (!mountedRef.current) return
       setResult(graded)
+      setFlow({ hasExam: true })
       setStage('submitted')
     } catch (error) {
       if (!mountedRef.current) return
@@ -318,31 +324,6 @@ export default function ExamPage() {
             ))}
           </div>
 
-          {confirmOpen ? (
-            <Card>
-              <p className="sc-qcard-prompt">
-                {`还有 ${total - answeredCount} 题未答，仍要提交？`}
-              </p>
-              <p className="sc-qcard-hint">未作答的题会按错误计分；提交后本卷成绩固定，不能再改。</p>
-              <div className="sc-btn-row">
-                <Button onClick={() => void submitExam()} loading={submitting}>
-                  确认提交
-                </Button>
-                <Button variant="secondary" onClick={() => setConfirmOpen(false)}>
-                  继续作答
-                </Button>
-              </div>
-            </Card>
-          ) : null}
-
-          {submitError ? (
-            <InlineError
-              message={submitError}
-              onRetry={() => void submitExam()}
-              retryLabel="重试提交"
-            />
-          ) : null}
-
           {run.questions.map((question, slot) => (
             <ExamQuestionCard
               key={question.id}
@@ -353,6 +334,15 @@ export default function ExamPage() {
               locked={submitting}
             />
           ))}
+
+          {/* 提交错误贴着提交按钮（卷面很长，放在题目列表之前用户看不到）。 */}
+          {submitError ? (
+            <InlineError
+              message={submitError}
+              onRetry={() => void submitExam()}
+              retryLabel="重试提交"
+            />
+          ) : null}
 
           <div className="sc-btn-row is-end">
             <span className="sc-meta-line">
@@ -396,12 +386,40 @@ export default function ExamPage() {
             >
               生成诊断报告
             </Link>
-            <Button variant="secondary" onClick={() => void startExam()}>
+            <Button variant="secondary" onClick={() => setRestartOpen(true)}>
               再出一套笔试
             </Button>
           </div>
+
+          {/* 已有成绩时再出卷失败：错误与重试贴着结果页，不丢失本场成绩。 */}
+          {createError ? (
+            <InlineError message={createError} onRetry={() => void startExam()} retryLabel="重新出卷" />
+          ) : null}
         </>
       ) : null}
+
+      <ConfirmModal
+        open={restartOpen}
+        title="再出一套笔试"
+        message="将按当前画像重新组卷，本场成绩与逐题复核会被新一套覆盖（本轮成绩仍会保留在成绩趋势里）。"
+        confirmLabel="重新出卷"
+        cancelLabel="留在本场"
+        onConfirm={() => {
+          setRestartOpen(false)
+          void startExam()
+        }}
+        onCancel={() => setRestartOpen(false)}
+      />
+
+      <ConfirmModal
+        open={confirmOpen}
+        title="还有题目未作答"
+        message={`还有 ${total - answeredCount} 题未答。未作答的题会按错误计分；提交后本卷成绩固定，不能再改。`}
+        confirmLabel="仍然提交"
+        cancelLabel="继续作答"
+        onConfirm={() => void submitExam()}
+        onCancel={() => setConfirmOpen(false)}
+      />
 
       <ConfirmModal
         open={pendingLeave !== null}

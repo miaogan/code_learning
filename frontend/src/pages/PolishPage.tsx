@@ -133,6 +133,8 @@ export default function PolishPage() {
   const [tab, setTab] = useState<'original' | 'polished'>('polished')
   const [toast, setToast] = useState<{ message: string; seq: number } | null>(null)
   const [pendingLeave, setPendingLeave] = useState<string | null>(null)
+  /** 已有成稿时「按此岗位重跑」先确认：重跑会清空当前成稿。 */
+  const [reanalyze, setReanalyze] = useState<{ role: string | null } | null>(null)
   const [composeOpen, setComposeOpen] = useState(false)
   const [wide, setWide] = useState(() =>
     typeof window === 'undefined' ? true : window.matchMedia('(min-width: 1320px)').matches,
@@ -183,9 +185,21 @@ export default function PolishPage() {
     return () => window.clearInterval(timer)
   }, [generating])
 
+  const suggestions = useMemo(() => session?.suggestions ?? [], [session])
+  const adoptedIds = useMemo(
+    () => suggestions.filter((item) => states[item.id] === 'adopted').map((item) => item.id),
+    [suggestions, states],
+  )
+  const pendingCount = suggestions.filter((item) => (states[item.id] ?? 'pending') === 'pending').length
+  const adoptionKey = adoptedIds.join(',')
+  const stale = full !== null && adoptionSnapshot !== null && adoptionKey !== adoptionSnapshot
+
   // 生成中离开保护：页签关闭/刷新 + 应用内链接跳转（DESIGN §2.4）
+  // 扩展：有已采纳条目但还没生成成稿时，切页也会静默丢失本次润色进度。
+  const guardLeave = generating || (adoptedIds.length > 0 && (full === null || stale))
+
   useEffect(() => {
-    if (!generating) {
+    if (!guardLeave) {
       setPendingLeave(null)
       return
     }
@@ -208,16 +222,7 @@ export default function PolishPage() {
       window.removeEventListener('beforeunload', onBeforeUnload)
       document.removeEventListener('click', onClickCapture, true)
     }
-  }, [generating, pathname])
-
-  const suggestions = useMemo(() => session?.suggestions ?? [], [session])
-  const adoptedIds = useMemo(
-    () => suggestions.filter((item) => states[item.id] === 'adopted').map((item) => item.id),
-    [suggestions, states],
-  )
-  const pendingCount = suggestions.filter((item) => (states[item.id] ?? 'pending') === 'pending').length
-  const adoptionKey = adoptedIds.join(',')
-  const stale = full !== null && adoptionSnapshot !== null && adoptionKey !== adoptionSnapshot
+  }, [guardLeave, pathname])
 
   // --- r7 AC-5：报告页「去改这一条」→ 逐字定位 ---------------------------------
   const focusTarget = useMemo(() => parseFocusParams(new URLSearchParams(search)), [search])
@@ -361,10 +366,9 @@ export default function PolishPage() {
     }
   }
 
+  /** 「恢复默认」只重置输入，不自动重跑分析（避免无提示清空当前成稿）。 */
   const resetRole = () => {
-    const fallback = profile?.target_role ?? ''
-    setRoleInput(fallback)
-    if (session !== null) void analyze(null)
+    setRoleInput(profile?.target_role ?? '')
   }
 
   const profileMissing = profileAsync.error?.status === 404
@@ -408,7 +412,14 @@ export default function PolishPage() {
               defaultRole={defaultRole}
               busy={analyzing || generating}
               onChange={setRoleInput}
-              onApply={() => void analyze(roleInput)}
+              onApply={() => {
+                // 已有成稿时重跑会清空成稿：先确认，避免误点丢失。
+                if (full !== null) {
+                  setReanalyze({ role: roleInput })
+                  return
+                }
+                void analyze(roleInput)
+              }}
               onReset={resetRole}
             />
 
@@ -627,9 +638,27 @@ export default function PolishPage() {
       ) : null}
 
       <ConfirmModal
+        open={reanalyze !== null}
+        title="重新分析会清空当前成稿"
+        message="按新岗位重跑建议后，当前已生成的成稿会被清空；已采纳的建议会尽量保留，但成稿需要重新生成。"
+        confirmLabel="重新分析"
+        cancelLabel="保留成稿"
+        onConfirm={() => {
+          const target = reanalyze
+          setReanalyze(null)
+          if (target !== null) void analyze(target.role)
+        }}
+        onCancel={() => setReanalyze(null)}
+      />
+
+      <ConfirmModal
         open={pendingLeave !== null}
-        title="成稿生成中，离开会丢失本次采纳状态"
-        message="成稿还在生成；离开本页后，本次的采纳与忽略状态不会保留，已生成的内容也不会带回。"
+        title={generating ? '成稿生成中，离开会丢失本次采纳状态' : '有未生成成稿的润色进度'}
+        message={
+          generating
+            ? '成稿还在生成；离开本页后，本次的采纳与忽略状态不会保留，已生成的内容也不会带回。'
+            : '已采纳的建议还没有生成成稿；离开本页后会丢失本次润色进度。'
+        }
         confirmLabel="仍然离开"
         cancelLabel="留在本页"
         onConfirm={() => {

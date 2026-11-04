@@ -4,6 +4,7 @@ import { ApiError, api } from '../api/client'
 import type { AiCapability, JsonMode, KeyMode } from '../api/types'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
+import { ConfirmModal } from '../components/ui/ConfirmModal'
 import { InlineError } from '../components/ui/InlineError'
 import { applyMe, useAuth } from '../state/auth'
 import { dismissKeyRequired } from '../state/aiGate'
@@ -32,6 +33,8 @@ export default function SettingsPage() {
   const [aiBusy, setAiBusy] = useState<'test' | 'save' | 'clear' | null>(null)
   const [aiError, setAiError] = useState<string | null>(null)
   const [aiNotice, setAiNotice] = useState<string | null>(null)
+  /** 清除 Key 先确认：这个动作会让所有 AI 能力立刻不可用。 */
+  const [clearOpen, setClearOpen] = useState(false)
 
   const [oldPassword, setOldPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -226,7 +229,7 @@ export default function SettingsPage() {
                 variant="ghost"
                 disabled={!me.ai_masked_key || aiBusy !== null}
                 loading={aiBusy === 'clear'}
-                onClick={clearKey}
+                onClick={() => setClearOpen(true)}
               >
                 清除已保存的 Key
               </Button>
@@ -270,6 +273,19 @@ export default function SettingsPage() {
           </form>
         </Card>
       </div>
+
+      <ConfirmModal
+        open={clearOpen}
+        title="清除已保存的 Key"
+        message="清除后 AI 能力会立即关闭：画像生成、模拟面试、诊断报告等都需要重新配置 Key 才能使用。"
+        confirmLabel="清除 Key"
+        cancelLabel="保留"
+        onConfirm={() => {
+          setClearOpen(false)
+          void clearKey()
+        }}
+        onCancel={() => setClearOpen(false)}
+      />
     </section>
   )
 }

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ApiError, api } from '../api/client'
 import type {
   InterviewRun,
@@ -18,8 +18,10 @@ import { SettingsBar } from '../components/interview/SettingsBar'
 import { Button } from '../components/ui/Button'
 import { EmptyState } from '../components/ui/EmptyState'
 import { InlineError } from '../components/ui/InlineError'
+import { NoticeModal } from '../components/ui/NoticeModal'
 import { PhaseLoader } from '../components/ui/PhaseLoader'
 import { useAsync } from '../lib/useAsync'
+import { setFlow } from '../state/flow'
 
 /** 页面阶段（TECHNICAL §4.1）：gate / empty / error 由画像请求派生，其余为用户推进后的确定态。 */
 type Stage = 'configure' | 'creating' | 'chat' | 'ended'
@@ -74,6 +76,10 @@ function sessionOf(run: InterviewRun): InterviewSession {
 export default function InterviewPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const runIdParam = searchParams.get('run_id')
+  const navigate = useNavigate()
+
+  /** 没有画像（404）时进入空态：首帧弹一次「未上传简历」，关掉后留在空态页可再去上传。 */
+  const [resumePromptDismissed, setResumePromptDismissed] = useState(false)
 
   const profileAsync = useAsync((signal) => api.latestProfile(signal), [])
   const createAbortRef = useRef<AbortController | null>(null)
@@ -89,6 +95,8 @@ export default function InterviewPage() {
   const [track, setTrack] = useState<RunTrack>(EMPTY_TRACK)
   const [answer, setAnswer] = useState('')
   const [restore, setRestore] = useState<RestoreState>({ status: 'idle', error: null })
+  /** 「重新读取」计数：run_id 不变时靠它触发恢复 effect 重跑。 */
+  const [restoreTick, setRestoreTick] = useState(0)
 
   const profile = profileAsync.data
 
@@ -119,13 +127,14 @@ export default function InterviewPage() {
         setTrack(EMPTY_TRACK)
         setRestore({ status: 'idle', error: null })
         setStage(restored.status === 'completed' ? 'ended' : 'chat')
+        if (restored.status === 'completed') setFlow({ hasInterview: true })
       })
       .catch((error: unknown) => {
         if (controller.signal.aborted) return
         setRestore({ status: 'error', error: messageOf(error, '无法恢复本场面试') })
       })
     return () => controller.abort()
-  }, [runIdParam])
+  }, [runIdParam, restoreTick])
 
   // 开局计时（三段文案按秒步进）+ 单轮评分计时。
   useEffect(() => {
@@ -151,11 +160,10 @@ export default function InterviewPage() {
   }, [])
 
   const reloadRestore = () => {
-    const target = runIdParam
-    if (!target) return
+    if (!runIdParam) return
     activeRunIdRef.current = null
-    setRestore({ status: 'idle', error: null })
-    setSearchParams({ run_id: target }, { replace: true })
+    setRestore({ status: 'loading', error: null })
+    setRestoreTick((value) => value + 1)
   }
 
   /** 开局（AC-1）：patch 省略 = 跳过表单，由服务端 fill_settings 补全（不把表单清空）。 */
@@ -220,7 +228,10 @@ export default function InterviewPage() {
       })
       setAnswer('')
       setTrack((prev) => ({ ...prev, submitting: false, elapsedS: 0 }))
-      if (!turn.next_question) setStage('ended')
+      if (!turn.next_question) {
+        setStage('ended')
+        setFlow({ hasInterview: true })
+      }
     } catch (error) {
       setTrack((prev) => ({
         ...prev,
@@ -335,11 +346,21 @@ export default function InterviewPage() {
     content = <PhaseLoader title="正在读取你的最新画像" phases={['读取画像']} active={0} />
   } else if (profileView === 'empty') {
     content = (
-      <EmptyState
-        reason="模拟面试会依据你的画像出题（技术题 ≥5 · 项目深挖 ≥3 · 进阶 ≤20%）。先上传简历并确认画像，再来测评。"
-        actionLabel="上传简历"
-        actionTo="/"
-      />
+      <>
+        <EmptyState
+          reason="模拟面试会依据你的画像出题（技术题 ≥5 · 项目深挖 ≥3 · 进阶 ≤20%）。先上传简历并确认画像，再来测评。"
+          actionLabel="上传简历"
+          actionTo="/"
+        />
+        <NoticeModal
+          open={!resumePromptDismissed}
+          title="未上传简历"
+          message="还没有检测到简历。模拟面试会依据你的技术画像出题，请先上传一份简历（PDF / DOCX / TXT，≤10MB）并确认画像。"
+          primaryLabel="去上传简历"
+          onPrimary={() => navigate('/')}
+          onClose={() => setResumePromptDismissed(true)}
+        />
+      </>
     )
   } else if (profileView === 'error') {
     content = (

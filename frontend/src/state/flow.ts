@@ -5,10 +5,18 @@ export interface FlowState {
   hasResume: boolean
   hasProfile: boolean
   hasReport: boolean
+  hasInterview: boolean
+  hasExam: boolean
 }
 
 const STORAGE_PREFIX = 'sc.flow'
-const EMPTY: FlowState = { hasResume: false, hasProfile: false, hasReport: false }
+const EMPTY: FlowState = {
+  hasResume: false,
+  hasProfile: false,
+  hasReport: false,
+  hasInterview: false,
+  hasExam: false,
+}
 
 /** r23：同一台机器多人用时，进度必须按账号分开存，否则退出后下一个人看到上一个人的对勾。 */
 function keyFor(userId: string | null): string {
@@ -20,10 +28,14 @@ function readStorage(key: string): FlowState {
     const raw = window.localStorage.getItem(key)
     if (!raw) return EMPTY
     const parsed = JSON.parse(raw) as Partial<FlowState>
+    // 旧版本只记到 hasProfile：存量数据按当时的展示口径回填，避免升级后步骤条从「已完成」回退。
+    const legacy = parsed.hasInterview === undefined && parsed.hasExam === undefined
     return {
       hasResume: Boolean(parsed.hasResume),
       hasProfile: Boolean(parsed.hasProfile),
       hasReport: Boolean(parsed.hasReport),
+      hasInterview: legacy ? Boolean(parsed.hasProfile) : Boolean(parsed.hasInterview),
+      hasExam: legacy ? Boolean(parsed.hasProfile) : Boolean(parsed.hasExam),
     }
   } catch {
     return EMPTY

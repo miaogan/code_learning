@@ -16,6 +16,8 @@ import { Toast } from '../components/ui/Toast'
 import { polishRoleHref } from '../lib/coach'
 import { formatScore } from '../lib/format'
 import { useAsync } from '../lib/useAsync'
+import { useAuth } from '../state/auth'
+import { setFlow } from '../state/flow'
 
 /** 生成报告的三段式阶段文案（DESIGN §0.6：AI 等待必须有文字步进，禁止只有转圈）。 */
 const GENERATE_PHASES = ['汇总作答记录', '定位短板', '匹配课程']
@@ -62,6 +64,34 @@ function runIdsOf(search: string): string[] | null {
   return ids.length === 0 ? null : ids
 }
 
+/** 本场报告的本地缓存键：同一组 run_ids 刷新时直接复用，不再重跑 AI。 */
+const REPORT_CACHE_PREFIX = 'report:run_ids:'
+
+/** 读取本场报告缓存（sessionStorage 不可用时静默回落 null，不影响正常生成）。 */
+function readCachedReport(key: string): Report | null {
+  try {
+    const raw = window.sessionStorage.getItem(`${REPORT_CACHE_PREFIX}${key}`)
+    if (raw === null) return null
+    const parsed: unknown = JSON.parse(raw)
+    if (typeof parsed !== 'object' || parsed === null) return null
+    const candidate = parsed as { id?: unknown; run_ids?: unknown }
+    return typeof candidate.id === 'string' && Array.isArray(candidate.run_ids)
+      ? (parsed as Report)
+      : null
+  } catch {
+    return null
+  }
+}
+
+/** 写入本场报告缓存；存储满/隐私模式下静默失败（仅失去「刷新不重跑」的优化）。 */
+function writeCachedReport(key: string, report: Report): void {
+  try {
+    window.sessionStorage.setItem(`${REPORT_CACHE_PREFIX}${key}`, JSON.stringify(report))
+  } catch {
+    // 忽略：缓存只是优化，不影响页面
+  }
+}
+
 /** 复制失败的中文原因：浏览器拒绝/不支持剪贴板时引导用户走「导出 .md」。 */
 function clipboardErrorMessage(error: unknown): string {
   if (error instanceof ApiError) return error.message || '复制失败，请改用「导出 .md」手动保存'
@@ -100,9 +130,18 @@ export default function ReportPage() {
 
   // `?run_ids=`：从面试/笔试结果页进入时把报告锁定在本场；缺省仍是「读最近一份报告」。
   const { search } = useLocation()
+  const { me } = useAuth()
+  /** 缓存按账号分区：同一浏览器换账号后，sessionStorage 里不得再展示上一个人的报告。 */
+  const cacheScope = me?.id ?? 'anon'
   const requestedRunIds = useMemo(() => runIdsOf(search), [search])
   const requestedKey = requestedRunIds === null ? '' : requestedRunIds.join(',')
+  const cacheKey = requestedKey === '' ? '' : `${cacheScope}:${requestedKey}`
   const requested = requestedRunIds !== null
+  /** 同一组 run_ids 的本地缓存：刷新时直接展示，不重跑 AI（无缓存时才自动生成）。 */
+  const cachedReport = useMemo(
+    () => (cacheKey === '' ? null : readCachedReport(cacheKey)),
+    [cacheKey],
+  )
 
   // StrictMode 会挂载→卸载→再挂载：effect 体里重新置 true，避免开发态下 setState 全被守卫吞掉
   useEffect(() => {
@@ -118,16 +157,22 @@ export default function ReportPage() {
     return () => window.clearInterval(timer)
   }, [generating])
 
-  const report = generated ?? reportAsync.data
+  // 带 ?run_ids= 时以本场报告为准：优先新生成的结果，其次是同组 id 的本地缓存（刷新不重跑）。
+  const report = generated ?? (requested ? cachedReport : reportAsync.data)
   const reportMissing = reportAsync.status === 'error' && reportAsync.error?.status === 404
   const profileMissing = profileAsync.status === 'error' && profileAsync.error?.status === 404
   const profilePending = profileAsync.status !== 'success' && profileAsync.status !== 'error'
   const firstLoad =
     (reportAsync.status === 'loading' && report === null) || (reportMissing && profilePending)
   /** 带 ?run_ids= 进来：本场报告还没出来（生成中/尚未开始）。 */
-  const requestPending = requested && generated === null && generateError === null
+  const requestPending = requested && report === null && generateError === null
   /** 带 ?run_ids= 进来但本场生成失败（此时不能退回展示旧报告，否则会张冠李戴）。 */
-  const requestFailed = requested && generated === null && generateError !== null
+  const requestFailed = requested && report === null && generateError !== null
+
+  // 报告真正可看时才把步骤条标记为完成（刷新后依旧以服务端报告为准）。
+  useEffect(() => {
+    if (report !== null) setFlow({ hasReport: true })
+  }, [report])
   const generatePhase = elapsed < PHASE_STEP_S[0] ? 0 : elapsed < PHASE_STEP_S[1] ? 1 : 2
 
   const generateReport = useCallback(async (runIds: string[] | null = null) => {
@@ -146,6 +191,9 @@ export default function ReportPage() {
       )
       if (!mountedRef.current) return
       setGenerated(fresh)
+      // 本场报告落缓存：同一组 run_ids 再刷新/回访直接复用，避免重复消耗 AI。
+      const key = runIds === null || runIds.length === 0 ? '' : `${cacheScope}:${runIds.join(',')}`
+      if (key !== '') writeCachedReport(key, fresh)
     } catch (error) {
       if (!mountedRef.current) return
       setGenerateError(errorMessage(error, '生成失败，请稍后重试；已有报告不会被覆盖'))
@@ -153,14 +201,15 @@ export default function ReportPage() {
       generatingRef.current = false
       if (mountedRef.current) setGenerating(false)
     }
-  }, [])
+  }, [cacheScope])
 
-  // 带 ?run_ids= 进入时自动生成本场报告：同一组 id 只跑一次，失败后由用户点「重试」。
+  // 带 ?run_ids= 进入时自动生成本场报告：同一组 id 只跑一次；已有缓存则直接展示，失败后由用户点「重试」。
   useEffect(() => {
-    if (requestedKey === '' || autoStartRef.current === requestedKey) return
-    autoStartRef.current = requestedKey
+    if (cacheKey === '' || autoStartRef.current === cacheKey) return
+    autoStartRef.current = cacheKey
+    if (readCachedReport(cacheKey) !== null) return
     void generateReport(requestedRunIds)
-  }, [requestedKey, requestedRunIds, generateReport])
+  }, [cacheKey, requestedRunIds, generateReport])
 
   /** 重新生成沿用当前入口的 id 集：带 ?run_ids= 时仍是本场，不会退回「最近一批」。 */
   const regenerate = () => {

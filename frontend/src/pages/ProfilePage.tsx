@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { ApiError, api } from '../api/client'
 import type {
   Evidence,
@@ -16,8 +16,10 @@ import type { DimensionEntry, ProfileDimensionKey } from '../components/profile/
 import { ProfileEditor } from '../components/profile/ProfileEditor'
 import type { EditorField } from '../components/profile/ProfileEditor'
 import { Chip } from '../components/ui/Chip'
+import { ConfirmModal } from '../components/ui/ConfirmModal'
 import { EmptyState } from '../components/ui/EmptyState'
 import { InlineError } from '../components/ui/InlineError'
+import { NoticeModal } from '../components/ui/NoticeModal'
 import { PhaseLoader } from '../components/ui/PhaseLoader'
 import { polishRoleHref } from '../lib/coach'
 import { joinMeta, textOrEmpty } from '../lib/profileText'
@@ -416,6 +418,10 @@ type EditTarget = { dimension: ProfileDimensionKey; index: number | null }
 export default function ProfilePage() {
   const profileAsync = useAsync((signal) => api.latestProfile(signal), [])
   const location = useLocation()
+  const navigate = useNavigate()
+
+  /** 没有画像（404）时进入空态：首帧弹一次「未上传简历」，关掉后留在空态页可再去上传。 */
+  const [resumePromptDismissed, setResumePromptDismissed] = useState(false)
 
   /**
    * 一次性合并摘要（DESIGN §2.2 / §7-1）：只由「上传 → 生成/合并」那一趟的 `location.state` 带入，
@@ -440,6 +446,8 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
   const [retryPatch, setRetryPatch] = useState<ProfilePatch | null>(null)
+  /** 待确认删除的条目（单击「删除」只打开确认框，不直接 PATCH）。 */
+  const [pendingDelete, setPendingDelete] = useState<{ entryKey: string; title: string } | null>(null)
 
   const remote = profileAsync.data
   const baseId = remote?.updated_at ?? null
@@ -645,11 +653,21 @@ export default function ProfilePage() {
       ) : null}
 
       {view === 'empty' ? (
-        <EmptyState
-          reason="还没有画像。先上传一份简历（PDF / DOCX / TXT，≤10MB），AI 会据此建立可溯源的 5 维画像。"
-          actionLabel="上传简历"
-          actionTo="/"
-        />
+        <>
+          <EmptyState
+            reason="还没有画像。先上传一份简历（PDF / DOCX / TXT，≤10MB），AI 会据此建立可溯源的 5 维画像。"
+            actionLabel="上传简历"
+            actionTo="/"
+          />
+          <NoticeModal
+            open={!resumePromptDismissed}
+            title="未上传简历"
+            message="还没有检测到简历。请先上传一份简历（PDF / DOCX / TXT，≤10MB），AI 才能据此建立可溯源的 5 维技术画像。"
+            primaryLabel="去上传简历"
+            onPrimary={() => navigate('/')}
+            onClose={() => setResumePromptDismissed(true)}
+          />
+        </>
       ) : null}
 
       {view === 'error' && profileAsync.error ? (
@@ -692,7 +710,10 @@ export default function ProfilePage() {
                       if (parsed !== null) startEdit(parsed.dimension, parsed.index)
                     }}
                     onDeleteEntry={(entryKey) => {
-                      void deleteEntry(entryKey)
+                      const parsed = parseEntryKey(entryKey)
+                      if (parsed === null) return
+                      const title = entries[parsed.dimension][parsed.index]?.title ?? '这一条'
+                      setPendingDelete({ entryKey, title })
                     }}
                     editor={
                       edit !== null && edit.dimension === item.key ? (
@@ -738,6 +759,24 @@ export default function ProfilePage() {
           </div>
         </>
       ) : null}
+
+      <ConfirmModal
+        open={pendingDelete !== null}
+        title="删除这一条"
+        message={
+          pendingDelete === null
+            ? ''
+            : `将从画像中删除「${pendingDelete.title}」。保存后立即生效，无法撤销。`
+        }
+        confirmLabel="删除"
+        cancelLabel="保留"
+        onConfirm={() => {
+          const target = pendingDelete
+          setPendingDelete(null)
+          if (target !== null) void deleteEntry(target.entryKey)
+        }}
+        onCancel={() => setPendingDelete(null)}
+      />
     </section>
   )
 }

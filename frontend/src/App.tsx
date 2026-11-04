@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { Link, Route, Routes, useLocation } from 'react-router-dom'
-import { AiKeyBanner } from './components/ui/AiKeyBanner'
+import { AiKeyModal } from './components/ui/AiKeyModal'
 import { Button } from './components/ui/Button'
 import { Stepper, type StepItem, type StepState } from './components/ui/Stepper'
 import { ToolNav } from './components/ui/ToolNav'
@@ -45,7 +45,7 @@ export default function App() {
     void startAuth()
   }, [])
 
-  // 登出 / 被踢回登录页时清掉 AI 能力提示，避免下次登录看到上一轮的旧横幅。
+  // 登出 / 被踢回登录页时清掉 AI 能力提示，避免下次登录看到上一轮的旧弹框。
   useEffect(() => {
     if (auth.me === null) dismissKeyRequired()
   }, [auth.me])
@@ -53,7 +53,8 @@ export default function App() {
   const isDone = (key: string): boolean => {
     if (key === 'upload') return flow.hasResume
     if (key === 'profile') return flow.hasProfile
-    if (key === 'interview' || key === 'exam') return flow.hasProfile
+    if (key === 'interview') return flow.hasInterview
+    if (key === 'exam') return flow.hasExam
     if (key === 'report') return flow.hasReport
     return false
   }
@@ -107,7 +108,7 @@ export default function App() {
             <ToolNav items={TOOL_ITEMS} orientation="horizontal" />
           </div>
           <div className="sc-page">
-            <AiKeyBanner />
+            <AiKeyModal />
             <Routes>
               <Route path="/" element={<UploadPage />} />
               <Route path="/profile" element={<ProfilePage />} />

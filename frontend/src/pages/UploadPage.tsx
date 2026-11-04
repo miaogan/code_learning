@@ -18,7 +18,8 @@ const MAX_BYTES = 10 * 1024 * 1024
 const ACCEPTED = ['.pdf', '.docx', '.txt']
 
 /** idle →（上传）→（生成/合并画像）→ done；任一步失败进 error 并记住失败在哪一步（重试只重跑那一步）。 */
-type Phase = 'idle' | 'uploading' | 'profiling' | 'done' | 'error'
+/** paused = 简历已上传解析，用户取消了画像生成；可继续生成或重新上传。 */
+type Phase = 'idle' | 'uploading' | 'profiling' | 'paused' | 'done' | 'error'
 
 interface Failure {
   message: string
@@ -56,6 +57,8 @@ export default function UploadPage() {
   const [dragOver, setDragOver] = useState(false)
   const [picked, setPicked] = useState<File | null>(null)
   const [meta, setMeta] = useState<ResumeMeta | null>(null)
+  /** meta 的镜像：取消时在 abort 回调里判断「简历是否已解析」，避免把已上传的 resume_id 丢掉。 */
+  const metaRef = useRef<ResumeMeta | null>(null)
   const [merge, setMerge] = useState<ProfileMergeSummary | null>(null)
   const [failure, setFailure] = useState<Failure | null>(null)
   const [uploadSec, setUploadSec] = useState(0)
@@ -64,7 +67,13 @@ export default function UploadPage() {
   // 回访识别：已有画像的用户（换设备/重新登录后）不必再传一份简历，首页给「继续」入口。
   // 没有画像时接口报 PROFILE_MISSING，这里按「新用户」处理，不显示任何错误。
   const savedProfileAsync = useAsync((signal) => api.latestProfile(signal), [])
-  const saved = savedProfileAsync.status === 'success' ? savedProfileAsync.data : null
+  // data 是「最近一次成功值」（重载期间保留）：生成成功后再 reload，页头与回访摘要卡不闪空。
+  const saved = savedProfileAsync.data
+  // 只有「没有画像」（404）才按新用户处理；其它错误必须显式报错并给重试，不能假装是新用户。
+  const savedError =
+    savedProfileAsync.status === 'error' && savedProfileAsync.error?.status !== 404
+      ? (savedProfileAsync.error?.message ?? '画像读取失败，请稍后重试')
+      : null
 
   // 服务端已有画像 → 把步骤条对勾补齐（对勾原本只来自本机 localStorage）。
   useEffect(() => {
@@ -87,9 +96,12 @@ export default function UploadPage() {
       setMerge(generated.merge_summary ?? null)
       setFlow({ hasResume: true, hasProfile: true })
       setPhase('done')
+      // 生成成功后重读最新画像：清掉上一次非 404 的读取错误，并让页头/回访卡立即反映新画像。
+      void savedProfileAsync.reload()
     } catch (err) {
       if (controller.signal.aborted) {
-        setPhase('idle')
+        // 取消但简历已解析：停在 paused，保留 resume_id 供「继续生成」。
+        setPhase(metaRef.current === null ? 'idle' : 'paused')
         return
       }
       setFailure({
@@ -111,6 +123,7 @@ export default function UploadPage() {
     setPicked(file)
     setFailure(null)
     setMeta(null)
+    metaRef.current = null
     setMerge(null)
     setUploadSec(0)
     setProfileSec(0)
@@ -121,12 +134,14 @@ export default function UploadPage() {
     try {
       const result = await api.uploadResume(file, controller.signal)
       setMeta(result)
+      metaRef.current = result
       setFlow({ hasResume: true })
       // 第二步的失败由 buildProfile 内部处理，不会落到这里的 catch（只有上传解析失败才进这里）。
       await buildProfile(result.resume_id, controller)
     } catch (err) {
       if (controller.signal.aborted) {
-        setPhase('idle')
+        // 取消但简历已解析：停在 paused，保留 resume_id 供「继续生成」。
+        setPhase(metaRef.current === null ? 'idle' : 'paused')
         return
       }
       setFailure({
@@ -153,14 +168,24 @@ export default function UploadPage() {
     void buildProfile(meta.resume_id, controller)
   }
 
+  /** 取消：只中止请求；若简历已解析，abort 回调会把页面停在 paused（可继续生成），不丢 resume_id。 */
   const cancel = () => {
     abortRef.current?.abort()
-    setPhase('idle')
     setUploadSec(0)
     setProfileSec(0)
   }
 
+  /** paused 状态的出口：用已解析的 resume_id 重跑第二步，不必重新上传文件。 */
+  const resumeBuilding = () => {
+    const current = metaRef.current
+    if (current === null) return
+    const controller = new AbortController()
+    abortRef.current = controller
+    void buildProfile(current.resume_id, controller)
+  }
+
   const reset = () => {
+    metaRef.current = null
     abortRef.current?.abort()
     setPicked(null)
     setMeta(null)
@@ -209,6 +234,11 @@ export default function UploadPage() {
             : '也可以上传新版简历：自动合并，保留原有能力与证据'}
         </p>
       </header>
+
+      {/* 非 404 的画像读取失败：显式报错 + 重试，不当作「新用户」。 */}
+      {savedError !== null ? (
+        <InlineError message={savedError} onRetry={savedProfileAsync.reload} />
+      ) : null}
 
       {phase === 'idle' && saved !== null ? (
         <Card>
@@ -316,6 +346,26 @@ export default function UploadPage() {
               <div className="sc-actions">
                 <Button variant="ghost" size="sm" onClick={cancel}>
                   取消
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </div>
+      ) : null}
+
+      {phase === 'paused' && meta ? (
+        <div className="sc-actions">
+          <Card>
+            <div className="sc-upload-summary">
+              <p className="sc-file-name">{meta.file_name}</p>
+              <p className="sc-summary-meta">
+                {`简历已解析完成（抽取 ${formatChars(meta.chars)} · ${meta.sections} 章节），画像生成已取消。`}
+              </p>
+              <p className="sc-meta-line">可以继续生成画像，不需要重新上传简历。</p>
+              <div className="sc-btn-row">
+                <Button onClick={resumeBuilding}>继续生成画像</Button>
+                <Button variant="secondary" onClick={reset}>
+                  重新上传
                 </Button>
               </div>
             </div>
