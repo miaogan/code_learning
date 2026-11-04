@@ -120,7 +120,7 @@
   },
   {
     "id": "fe-q8",
-    "direction": "前端",
+    "direction": "计算机基础",
     "kind": "multiple",
     "difficulty": "basic",
     "essentiality": "advanced",
@@ -326,7 +326,7 @@
   },
   {
     "id": "be-q1",
-    "direction": "后端",
+    "direction": "计算机基础",
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "must_know",
@@ -343,7 +343,7 @@
   },
   {
     "id": "be-q2",
-    "direction": "后端",
+    "direction": "SQL 与数据库",
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "must_know",
@@ -360,7 +360,7 @@
   },
   {
     "id": "be-q3",
-    "direction": "后端",
+    "direction": "计算机基础",
     "kind": "multiple",
     "difficulty": "challenge",
     "essentiality": "advanced",
@@ -377,7 +377,7 @@
   },
   {
     "id": "be-q4",
-    "direction": "后端",
+    "direction": "计算机基础",
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "nice_to_know",
@@ -394,7 +394,7 @@
   },
   {
     "id": "be-q5",
-    "direction": "后端",
+    "direction": "SQL 与数据库",
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "must_know",
@@ -445,7 +445,7 @@
   },
   {
     "id": "be-q8",
-    "direction": "后端",
+    "direction": "SQL 与数据库",
     "kind": "multiple",
     "difficulty": "basic",
     "essentiality": "nice_to_know",
@@ -462,7 +462,7 @@
   },
   {
     "id": "be-q9",
-    "direction": "后端",
+    "direction": "SQL 与数据库",
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "nice_to_know",
@@ -479,7 +479,7 @@
   },
   {
     "id": "be-q10",
-    "direction": "后端",
+    "direction": "计算机基础",
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "must_know",
@@ -496,7 +496,7 @@
   },
   {
     "id": "be-q11",
-    "direction": "后端",
+    "direction": "SQL 与数据库",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "advanced",
@@ -513,7 +513,7 @@
   },
   {
     "id": "be-q12",
-    "direction": "后端",
+    "direction": "SQL 与数据库",
     "kind": "multiple",
     "difficulty": "challenge",
     "essentiality": "advanced",
@@ -530,7 +530,7 @@
   },
   {
     "id": "be-q13",
-    "direction": "后端",
+    "direction": "计算机基础",
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "nice_to_know",
@@ -547,7 +547,7 @@
   },
   {
     "id": "be-q14",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "multiple",
     "difficulty": "basic",
     "essentiality": "nice_to_know",
@@ -581,7 +581,7 @@
   },
   {
     "id": "be-q16",
-    "direction": "后端",
+    "direction": "计算机基础",
     "kind": "multiple",
     "difficulty": "basic",
     "essentiality": "nice_to_know",
@@ -598,7 +598,7 @@
   },
   {
     "id": "be-q17",
-    "direction": "后端",
+    "direction": "SQL 与数据库",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "nice_to_know",
@@ -615,7 +615,7 @@
   },
   {
     "id": "be-q18",
-    "direction": "后端",
+    "direction": "SQL 与数据库",
     "kind": "text",
     "difficulty": "basic",
     "essentiality": "must_know",
@@ -627,7 +627,7 @@
   },
   {
     "id": "be-q19",
-    "direction": "后端",
+    "direction": "SQL 与数据库",
     "kind": "text",
     "difficulty": "basic",
     "essentiality": "nice_to_know",
@@ -5131,7 +5131,7 @@
   },
   {
     "id": "l100-029",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "must_know",
@@ -5149,7 +5149,7 @@
   },
   {
     "id": "l100-030",
-    "direction": "后端",
+    "direction": "计算机基础",
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "must_know",
@@ -5219,7 +5219,7 @@
   },
   {
     "id": "l100-034",
-    "direction": "后端",
+    "direction": "SQL 与数据库",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -5237,7 +5237,7 @@
   },
   {
     "id": "l100-035",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -5255,7 +5255,7 @@
   },
   {
     "id": "l100-036",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "judge",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -5289,7 +5289,7 @@
   },
   {
     "id": "l100-038",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -5307,7 +5307,7 @@
   },
   {
     "id": "l100-039",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "judge",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -5429,7 +5429,7 @@
   },
   {
     "id": "l100-046",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "challenge",
     "essentiality": "must_know",
@@ -5447,7 +5447,7 @@
   },
   {
     "id": "l100-047",
-    "direction": "后端",
+    "direction": "SQL 与数据库",
     "kind": "judge",
     "difficulty": "challenge",
     "essentiality": "must_know",
@@ -5463,7 +5463,7 @@
   },
   {
     "id": "l100-048",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "challenge",
     "essentiality": "advanced",
@@ -5481,7 +5481,7 @@
   },
   {
     "id": "l100-049",
-    "direction": "后端",
+    "direction": "SQL 与数据库",
     "kind": "single",
     "difficulty": "challenge",
     "essentiality": "must_know",
@@ -5691,7 +5691,7 @@
   },
   {
     "id": "l100-061",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -5709,7 +5709,7 @@
   },
   {
     "id": "l100-062",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -5727,7 +5727,7 @@
   },
   {
     "id": "l100-063",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "judge",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -5761,7 +5761,7 @@
   },
   {
     "id": "l100-065",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -5779,7 +5779,7 @@
   },
   {
     "id": "l100-066",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -5797,7 +5797,7 @@
   },
   {
     "id": "l100-067",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "judge",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -5813,7 +5813,7 @@
   },
   {
     "id": "l100-068",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "single",
     "difficulty": "challenge",
     "essentiality": "must_know",
@@ -5831,7 +5831,7 @@
   },
   {
     "id": "l100-069",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "single",
     "difficulty": "challenge",
     "essentiality": "advanced",
@@ -5867,7 +5867,7 @@
   },
   {
     "id": "l100-071",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "judge",
     "difficulty": "challenge",
     "essentiality": "advanced",
@@ -5901,7 +5901,7 @@
   },
   {
     "id": "l100-073",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "single",
     "difficulty": "challenge",
     "essentiality": "must_know",
@@ -5919,7 +5919,7 @@
   },
   {
     "id": "l100-074",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "single",
     "difficulty": "challenge",
     "essentiality": "must_know",
@@ -5937,7 +5937,7 @@
   },
   {
     "id": "l100-075",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "judge",
     "difficulty": "challenge",
     "essentiality": "must_know",
@@ -5953,7 +5953,7 @@
   },
   {
     "id": "l100-076",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "must_know",
@@ -5971,7 +5971,7 @@
   },
   {
     "id": "l100-077",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "must_know",
@@ -5989,7 +5989,7 @@
   },
   {
     "id": "l100-078",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "must_know",
@@ -6007,7 +6007,7 @@
   },
   {
     "id": "l100-079",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "judge",
     "difficulty": "basic",
     "essentiality": "must_know",
@@ -6041,7 +6041,7 @@
   },
   {
     "id": "l100-081",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -6059,7 +6059,7 @@
   },
   {
     "id": "l100-082",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -6077,7 +6077,7 @@
   },
   {
     "id": "l100-083",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "judge",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -6111,7 +6111,7 @@
   },
   {
     "id": "l100-085",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -6129,7 +6129,7 @@
   },
   {
     "id": "l100-086",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -6147,7 +6147,7 @@
   },
   {
     "id": "l100-087",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -6165,7 +6165,7 @@
   },
   {
     "id": "l100-088",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "judge",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -6181,7 +6181,7 @@
   },
   {
     "id": "l100-089",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -6217,7 +6217,7 @@
   },
   {
     "id": "l100-091",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "judge",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -6233,7 +6233,7 @@
   },
   {
     "id": "l100-092",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -6251,7 +6251,7 @@
   },
   {
     "id": "l100-093",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "challenge",
     "essentiality": "must_know",
@@ -6269,7 +6269,7 @@
   },
   {
     "id": "l100-094",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "challenge",
     "essentiality": "must_know",
@@ -6339,7 +6339,7 @@
   },
   {
     "id": "l100-098",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "challenge",
     "essentiality": "advanced",
@@ -6357,7 +6357,7 @@
   },
   {
     "id": "l100-099",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "judge",
     "difficulty": "challenge",
     "essentiality": "advanced",
@@ -10667,7 +10667,7 @@
   },
   {
     "id": "iq380-245",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "single",
     "difficulty": "challenge",
     "essentiality": "must_know",
@@ -10685,7 +10685,7 @@
   },
   {
     "id": "iq380-246",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -10703,7 +10703,7 @@
   },
   {
     "id": "iq380-247",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "judge",
     "difficulty": "challenge",
     "essentiality": "must_know",
@@ -10719,7 +10719,7 @@
   },
   {
     "id": "iq380-248",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -10807,7 +10807,7 @@
   },
   {
     "id": "iq380-253",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -10825,7 +10825,7 @@
   },
   {
     "id": "iq380-254",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -10843,7 +10843,7 @@
   },
   {
     "id": "iq380-255",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -10861,7 +10861,7 @@
   },
   {
     "id": "iq380-256",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "judge",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -10949,7 +10949,7 @@
   },
   {
     "id": "iq380-261",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -10967,7 +10967,7 @@
   },
   {
     "id": "iq380-262",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -10985,7 +10985,7 @@
   },
   {
     "id": "iq380-263",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "judge",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -11001,7 +11001,7 @@
   },
   {
     "id": "iq380-264",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -11019,7 +11019,7 @@
   },
   {
     "id": "iq380-265",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -11037,7 +11037,7 @@
   },
   {
     "id": "iq380-266",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -11055,7 +11055,7 @@
   },
   {
     "id": "iq380-267",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "judge",
     "difficulty": "challenge",
     "essentiality": "advanced",
@@ -11071,7 +11071,7 @@
   },
   {
     "id": "iq380-268",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "single",
     "difficulty": "challenge",
     "essentiality": "advanced",
@@ -11229,7 +11229,7 @@
   },
   {
     "id": "iq380-277",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -11299,7 +11299,7 @@
   },
   {
     "id": "iq380-281",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -11317,7 +11317,7 @@
   },
   {
     "id": "iq380-282",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -11351,7 +11351,7 @@
   },
   {
     "id": "iq380-284",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "must_know",
@@ -11369,7 +11369,7 @@
   },
   {
     "id": "iq380-285",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "single",
     "difficulty": "challenge",
     "essentiality": "must_know",
@@ -11387,7 +11387,7 @@
   },
   {
     "id": "iq380-286",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -11405,7 +11405,7 @@
   },
   {
     "id": "iq380-287",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "judge",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -11421,7 +11421,7 @@
   },
   {
     "id": "iq380-288",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -11439,7 +11439,7 @@
   },
   {
     "id": "iq380-289",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "single",
     "difficulty": "challenge",
     "essentiality": "advanced",
@@ -11457,7 +11457,7 @@
   },
   {
     "id": "iq380-290",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "single",
     "difficulty": "challenge",
     "essentiality": "advanced",
@@ -11475,7 +11475,7 @@
   },
   {
     "id": "iq380-291",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "judge",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -11491,7 +11491,7 @@
   },
   {
     "id": "iq380-292",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "single",
     "difficulty": "challenge",
     "essentiality": "advanced",
@@ -11509,7 +11509,7 @@
   },
   {
     "id": "iq380-293",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -11527,7 +11527,7 @@
   },
   {
     "id": "iq380-294",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "single",
     "difficulty": "challenge",
     "essentiality": "advanced",
@@ -11545,7 +11545,7 @@
   },
   {
     "id": "iq380-295",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "judge",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -11561,7 +11561,7 @@
   },
   {
     "id": "iq380-296",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "single",
     "difficulty": "challenge",
     "essentiality": "advanced",
@@ -11579,7 +11579,7 @@
   },
   {
     "id": "iq380-297",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -11613,7 +11613,7 @@
   },
   {
     "id": "iq380-299",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "nice_to_know",
@@ -11631,7 +11631,7 @@
   },
   {
     "id": "iq380-300",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "must_know",
@@ -11649,7 +11649,7 @@
   },
   {
     "id": "iq380-301",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -11667,7 +11667,7 @@
   },
   {
     "id": "iq380-302",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "judge",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -11683,7 +11683,7 @@
   },
   {
     "id": "iq380-303",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -11701,7 +11701,7 @@
   },
   {
     "id": "iq380-304",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -11719,7 +11719,7 @@
   },
   {
     "id": "iq380-305",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "judge",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -11735,7 +11735,7 @@
   },
   {
     "id": "iq380-306",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -11753,7 +11753,7 @@
   },
   {
     "id": "iq380-307",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -11771,7 +11771,7 @@
   },
   {
     "id": "iq380-308",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -11789,7 +11789,7 @@
   },
   {
     "id": "iq380-309",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "judge",
     "difficulty": "basic",
     "essentiality": "must_know",
@@ -11805,7 +11805,7 @@
   },
   {
     "id": "iq380-310",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -11823,7 +11823,7 @@
   },
   {
     "id": "iq380-311",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -11841,7 +11841,7 @@
   },
   {
     "id": "iq380-312",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -11859,7 +11859,7 @@
   },
   {
     "id": "iq380-313",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "judge",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -11875,7 +11875,7 @@
   },
   {
     "id": "iq380-314",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -11893,7 +11893,7 @@
   },
   {
     "id": "iq380-315",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -11911,7 +11911,7 @@
   },
   {
     "id": "iq380-316",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "must_know",
@@ -11929,7 +11929,7 @@
   },
   {
     "id": "iq380-317",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "judge",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -11945,7 +11945,7 @@
   },
   {
     "id": "iq380-318",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -11963,7 +11963,7 @@
   },
   {
     "id": "iq380-319",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -11981,7 +11981,7 @@
   },
   {
     "id": "iq380-320",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -11999,7 +11999,7 @@
   },
   {
     "id": "iq380-321",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "must_know",
@@ -12017,7 +12017,7 @@
   },
   {
     "id": "iq380-322",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "judge",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -12033,7 +12033,7 @@
   },
   {
     "id": "iq380-323",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -12051,7 +12051,7 @@
   },
   {
     "id": "iq380-324",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "challenge",
     "essentiality": "must_know",
@@ -12069,7 +12069,7 @@
   },
   {
     "id": "iq380-325",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -12087,7 +12087,7 @@
   },
   {
     "id": "iq380-326",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "judge",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -12103,7 +12103,7 @@
   },
   {
     "id": "iq380-327",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "challenge",
     "essentiality": "must_know",
@@ -12121,7 +12121,7 @@
   },
   {
     "id": "iq380-328",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "must_know",
@@ -12139,7 +12139,7 @@
   },
   {
     "id": "iq380-329",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "judge",
     "difficulty": "challenge",
     "essentiality": "advanced",
@@ -12155,7 +12155,7 @@
   },
   {
     "id": "iq380-330",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -12173,7 +12173,7 @@
   },
   {
     "id": "iq380-331",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "must_know",
@@ -12191,7 +12191,7 @@
   },
   {
     "id": "iq380-332",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -12209,7 +12209,7 @@
   },
   {
     "id": "iq380-333",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "judge",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -12225,7 +12225,7 @@
   },
   {
     "id": "iq380-334",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "challenge",
     "essentiality": "advanced",
@@ -12243,7 +12243,7 @@
   },
   {
     "id": "iq380-335",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "must_know",
@@ -12261,7 +12261,7 @@
   },
   {
     "id": "iq380-336",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -12279,7 +12279,7 @@
   },
   {
     "id": "iq380-337",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -12297,7 +12297,7 @@
   },
   {
     "id": "iq380-338",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "judge",
     "difficulty": "basic",
     "essentiality": "must_know",
@@ -12313,7 +12313,7 @@
   },
   {
     "id": "iq380-339",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -12383,7 +12383,7 @@
   },
   {
     "id": "iq380-343",
-    "direction": "前端",
+    "direction": "后端",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -12453,7 +12453,7 @@
   },
   {
     "id": "iq380-347",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "single",
     "difficulty": "challenge",
     "essentiality": "advanced",
@@ -12471,7 +12471,7 @@
   },
   {
     "id": "iq380-348",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -12489,7 +12489,7 @@
   },
   {
     "id": "iq380-349",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -12507,7 +12507,7 @@
   },
   {
     "id": "iq380-350",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "single",
     "difficulty": "challenge",
     "essentiality": "advanced",
@@ -12559,7 +12559,7 @@
   },
   {
     "id": "iq380-353",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "challenge",
     "essentiality": "must_know",
@@ -12611,7 +12611,7 @@
   },
   {
     "id": "iq380-356",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "challenge",
     "essentiality": "must_know",
@@ -12663,7 +12663,7 @@
   },
   {
     "id": "iq380-359",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -12681,7 +12681,7 @@
   },
   {
     "id": "iq380-360",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -12717,7 +12717,7 @@
   },
   {
     "id": "iq380-362",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "judge",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -12733,7 +12733,7 @@
   },
   {
     "id": "iq380-363",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "challenge",
     "essentiality": "advanced",
@@ -12769,7 +12769,7 @@
   },
   {
     "id": "iq380-365",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "challenge",
     "essentiality": "must_know",
@@ -12787,7 +12787,7 @@
   },
   {
     "id": "iq380-366",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "judge",
     "difficulty": "challenge",
     "essentiality": "advanced",
@@ -12873,7 +12873,7 @@
   },
   {
     "id": "iq380-371",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "single",
     "difficulty": "challenge",
     "essentiality": "must_know",
@@ -12927,7 +12927,7 @@
   },
   {
     "id": "iq380-374",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "judge",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -12943,7 +12943,7 @@
   },
   {
     "id": "iq380-375",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "nice_to_know",
@@ -12961,7 +12961,7 @@
   },
   {
     "id": "iq380-376",
-    "direction": "后端",
+    "direction": "中间件与运维",
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "must_know",
@@ -12997,7 +12997,7 @@
   },
   {
     "id": "iq380-378",
-    "direction": "后端",
+    "direction": "AI 工程",
     "kind": "single",
     "difficulty": "challenge",
     "essentiality": "advanced",

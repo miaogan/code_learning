@@ -359,3 +359,42 @@ def test_explanation_letter_refs_agree_with_answer(bank_rows: list[dict[str, Any
                 )
     assert not offenders, f"解析字母引用与答案冲突：{offenders}"
 
+
+def test_r17_every_direction_has_all_three_essentiality_tiers(
+    bank_rows: list[dict[str, Any]],
+) -> None:
+    """r17：方向重归类后，七方向的必备度三档必须齐全（全库口径，不只 legacy 80 题）。
+
+    重归类前「SQL 与数据库」「中间件与运维」缺 `nice_to_know`；把挂在后端的通用题
+    按主题迁过去后自然补齐。这条把成果钉成不变量，防止以后回退或新方向漏配。
+    """
+    expected = set(rules.ESSENTIALITIES)
+    offenders = []
+    for direction in rules.DIRECTIONS:
+        tiers = {
+            str(row["essentiality"])
+            for row in bank_rows
+            if str(row["direction"]) == direction
+        }
+        if not expected <= tiers:
+            offenders.append((direction, sorted(expected - tiers)))
+    assert not offenders, f"存在必备度三档不齐的方向（缺失档位）：{offenders}"
+
+
+def test_r17_language_direction_mapping_holds(
+    bank_rows: list[dict[str, Any]],
+) -> None:
+    """r17：带语言的题必须留在 `LANGUAGE_DIRECTION` 指定的方向，通用题才允许自由归类。
+
+    重归类只应改动 `language == ""` 的行；若误把 python/java/go 或 js/ts/vue3 题
+    迁到别的方向，`is_language_allowed()` 会直接判否，避免「按语言筛选」漏题。
+    """
+    offenders = [
+        str(row["id"])
+        for row in bank_rows
+        if not rules.is_language_allowed(
+            str(row.get("language") or ""), str(row["direction"])
+        )
+    ]
+    assert not offenders, f"语言与方向不自洽（带语言题被迁到了错方向）：{offenders}"
+

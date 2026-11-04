@@ -32,7 +32,7 @@
 - 来源：ai-eng 103 / algo 30 / fe-interview 20 / iq380 379 / local100 100 / mw 76 / seed 260 / sql 50 / tiji 20
 - 题型：judge 203 / multiple 122 / single 701 / text 12
 - 语言：(空) 553 / css 40 / go 74 / html 36 / java 84 / js 46 / python 86 / react 45 / ts 32 / vue3 42
-- 方向：AI 工程 103 / SQL 与数据库 50 / 中间件与运维 76 / 前端 267 / 后端 423 / 算法与数据结构 86 / 计算机基础 33
+- 方向：AI 工程 157 / SQL 与数据库 62 / 中间件与运维 151 / 前端 265 / 后端 276 / 算法与数据结构 86 / 计算机基础 41
 - 难度：basic 332 / challenge 216 / intermediate 490
 - 必备度：advanced 293 / must_know 611 / nice_to_know 134
 

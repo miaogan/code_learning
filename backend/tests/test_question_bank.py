@@ -45,6 +45,15 @@ LEGACY_DIRECTIONS = ("前端", "后端", "算法与数据结构", "计算机基�
 #: 存量题 id 前缀：r6 分布断言的适用范围（r11 起新增题走 `test_question_bank_quality.py`）。
 LEGACY_PREFIXES = ("fe-", "be-", "al-", "cs-")
 
+#: r17 方向重归类：存量 80 题会按主题迁到新方向（如 be-q2 索引 → SQL 与数据库），
+#: 因此「四组各 20 道」的不变量必须钉在**稳定的 id 前缀**上，而不是可变的 direction 标签。
+LEGACY_PREFIX_DIRECTION = {
+    "fe-": "前端",
+    "be-": "后端",
+    "al-": "算法与数据结构",
+    "cs-": "计算机基础",
+}
+
 
 def _seed_rows() -> list[dict[str, Any]]:
     return question_bank.load_seed()
@@ -204,14 +213,17 @@ def test_intermediate_tier_is_the_declared_twelve() -> None:
 
 
 def test_each_direction_has_all_three_essentiality_tiers() -> None:
-    """AC-2（存量口径）：四方向各 20；每方向 `must_know`=5 ∈[4,10] 且三档皆非空、覆盖 ≥2 种 kind。
+    """AC-2（存量口径）：四组各 20；每组 `must_know`=5 ∈[4,10] 且三档皆非空、覆盖 ≥2 种 kind。
 
     r11 扩容后某方向总数会 >20（AC-3 明确允许），因此「==20」只对存量题成立，方向总量只要求 ≥20。
+    r17 起存量题按主题重新归类，分组口径由 direction 改为 id 前缀：前缀是稳定身份，
+    而 direction 是可变标签；语义仍是「r6 的四组存量题各 20 道、分层结构不变」。
     """
     legacy = _legacy_rows()
     rows = _seed_rows()
     for direction in LEGACY_DIRECTIONS:
-        rows_dir = [row for row in legacy if row.get("direction") == direction]
+        prefix = next(p for p, name in LEGACY_PREFIX_DIRECTION.items() if name == direction)
+        rows_dir = [row for row in legacy if str(row["id"]).startswith(prefix)]
         assert len(rows_dir) == EXPECTED_DIRECTION_COUNT, f"{direction} 存量题量 {len(rows_dir)} ≠ 20"
         assert len([row for row in rows if row.get("direction") == direction]) >= EXPECTED_DIRECTION_COUNT
         tiers = Counter(str(row["essentiality"]) for row in rows_dir)
