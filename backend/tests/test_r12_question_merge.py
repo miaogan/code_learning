@@ -66,10 +66,13 @@ R13_SEED_BYTES = 191537
 #: 同一轮全库审查中 `al-q17` 的解析事实错误也落在存量行，基线再次迁移。
 #: r17 方向重归类又改了 17 道存量行的 `direction`（等长替换之外还有字段值变化），
 #: 属有意为之的分类修正，基线随之迁移；已确认所有带语言的行方向与 `LANGUAGE_DIRECTION` 一致。
-R13_SEED_SHA256 = "022a706209330d13b16ca4e0d41289a601d0062eaa88397d9e830e11db39e884"
+#: r18（新增「研发工程实践」方向 50 题）：这 50 题同为 `language=""` 的通用题，
+#: 加入 `""` 桶后按最低计数位置轮转再次改变存量通用题的选项位置序，等长改写使
+#: `R13_SEED_BYTES` 仍为 191537，但 sha256 随桶内轮转态漂移，故在此刷新基线。
+R13_SEED_SHA256 = "5a1e0ec2d3a4254b6bb4b2c8531ec3f091570ada77614e0a18867384484acf49"
 
 #: 合并后的期望规模与来源分布（TECH-CHANGE §3.4 逐项）。门禁是唯一断言点，故允许字面量。
-EXPECTED_TOTAL = 1038
+EXPECTED_TOTAL = 1088
 EXPECTED_SOURCES = {
     "seed": 260,
     "tiji": 20,
@@ -80,6 +83,7 @@ EXPECTED_SOURCES = {
     "mw": 76,
     "sql": 50,
     "algo": 30,
+    "devprac": 50,
 }
 
 _EXPLANATION = "这是一段足够长的解析文本，用于满足解析非空与长度门槛的断言。"
@@ -426,8 +430,8 @@ def test_merge_is_idempotent_byte_identical() -> None:
     """`--write` 可重复：每次重算都得到同一串字节，且与磁盘上的 seed 一致（`--check` 成立）。"""
     first, stats = qm.build_seed()
     assert qm.dumps(first).encode("utf-8") == qm.SEED_PATH.read_bytes(), "重算结果与磁盘 seed 不一致"
-    assert stats["total"]["added"] == 778, "按素材重算应恒报 778 条新增（上一批不当作存量）"
-    assert stats["total"]["read"] == 778
+    assert stats["total"]["added"] == 828, "按素材重算应恒报 828 条新增（上一批不当作存量）"
+    assert stats["total"]["read"] == 828
     assert stats["total"]["literal_dup"] == 0
     assert stats["total"]["near_dup"] == 0
     assert stats["total"]["out_of_range"] == 0
@@ -518,7 +522,7 @@ def test_seed_source_enum_and_counts() -> None:
 
 # --- ⑨ 回滚 -----------------------------------------------------------------
 def test_rollback_deletes_only_batch_sources(tmp_db: Path) -> None:
-    """回滚只删本批 8 个来源（1038 → 260），且幂等（再跑一次删 0 行）。绝不碰存量行。"""
+    """回滚只删本批 9 个来源（1088 → 260），且幂等（再跑一次删 0 行）。绝不碰存量行。"""
     total = question_bank.ensure_seeded()
     assert total == EXPECTED_TOTAL, f"导入后总量 {total} ≠ {EXPECTED_TOTAL}"
 
@@ -531,7 +535,7 @@ def test_rollback_deletes_only_batch_sources(tmp_db: Path) -> None:
     assert len(legacy_ids) == EXPECTED_SOURCES["seed"]
 
     removed = qm.rollback()
-    assert removed == EXPECTED_TOTAL - EXPECTED_SOURCES["seed"], "回滚删除的必须是本批 778 行"
+    assert removed == EXPECTED_TOTAL - EXPECTED_SOURCES["seed"], "回滚删除的必须是本批 828 行"
     assert repository.count_questions() == EXPECTED_SOURCES["seed"]
     assert qm.rollback() == 0, "回滚必须幂等（未导入 / 已删过 → 0）"
 

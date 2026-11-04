@@ -259,7 +259,7 @@ def test_generated_bank_has_no_ai_placeholder(bank_rows: list[dict[str, Any]]) -
 
 
 # ---------------------------------------------------------------------------
-# r12 · 题库素材合并（260 → 1038）—— **只追加**，上面 r11 的断言一字不改
+# r12 · 题库素材合并（260 → 1088）—— **只追加**，上面 r11 的断言一字不改
 #
 # 为什么零处改基数：r11 的题量类断言全部收敛在「前缀子集」（`fe-/be-/al-/cs-` 存量 +
 # 九个语言前缀）或按 `len(bank_rows)` 动态推导，本批新前缀（`tiji-` / `l100-` / `iq380-` /
@@ -268,7 +268,7 @@ def test_generated_bank_has_no_ai_placeholder(bank_rows: list[dict[str, Any]]) -
 # ---------------------------------------------------------------------------
 
 #: r12 新增来源闭集（与 `question_merge.SOURCES` 同一口径；门禁是唯一断言点故写字面量）。
-R12_SOURCES = ("tiji", "local100", "iq380", "fe-interview", "ai-eng", "mw", "sql", "algo")
+R12_SOURCES = ("tiji", "local100", "iq380", "fe-interview", "ai-eng", "mw", "sql", "algo", "devprac")
 #: 每来源条数：`seed` 是存量 260 行（种子不写 `source`，读侧缺省 `'seed'`）。
 R12_SOURCE_COUNTS = {
     "seed": 260,
@@ -280,13 +280,14 @@ R12_SOURCE_COUNTS = {
     "mw": 76,
     "sql": 50,
     "algo": 30,
+    "devprac": 50,
 }
-#: 合并后总量（= 存量 260 + 本批 778）。
-R12_TOTAL = 1038
+#: 合并后总量（= 存量 260 + 本批 828）。
+R12_TOTAL = 1088
 
 
 def test_r12_source_enum_and_per_source_counts(bank_rows: list[dict[str, Any]]) -> None:
-    """r12：来源只允许「存量缺省 seed + 本批 4 个」，且每来源条数与素材一一对应。"""
+    """r12：来源只允许「存量缺省 seed + 已登记的各批来源」，且每来源条数与素材一一对应。"""
     counts = Counter(str(row.get("source") or "seed") for row in bank_rows)
     assert dict(counts) == R12_SOURCE_COUNTS, f"来源分布不符：{dict(counts)}"
     assert set(counts) <= {"seed", *R12_SOURCES}, "出现了未登记的来源"
@@ -298,8 +299,8 @@ def test_r12_source_enum_and_per_source_counts(bank_rows: list[dict[str, Any]]) 
             )
 
 
-def test_r12_total_after_merge_is_1038(bank_rows: list[dict[str, Any]]) -> None:
-    """r12：合并后总量恰 1038（260 存量 + 778 新增），且 778 道全是客观题。"""
+def test_r12_total_after_merge_is_1088(bank_rows: list[dict[str, Any]]) -> None:
+    """r12：合并后总量恰 1088（260 存量 + 828 新增），且 828 道全是客观题。"""
     assert len(bank_rows) == R12_TOTAL, f"题库总量 {len(bank_rows)} ≠ {R12_TOTAL}"
     merged = [row for row in bank_rows if str(row.get("source") or "") in R12_SOURCES]
     assert len(merged) == R12_TOTAL - R12_SOURCE_COUNTS["seed"]

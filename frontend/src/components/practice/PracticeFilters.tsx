@@ -104,7 +104,7 @@ export function PracticeFilters({
           />
           <p className="sc-qa-hint">
             通用 = 与具体语言无关的题（算法与数据结构 / 计算机基础 / AI 工程 / 中间件与运维 /
-            SQL 与数据库，language 为空）
+            SQL 与数据库 / 研发工程实践，language 为空）
           </p>
         </div>
       </div>

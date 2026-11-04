@@ -59,7 +59,7 @@ MAX_EXAM_QUESTIONS = 12
 # 闭集只此一份：`backend/app/schemas.py` 的 `ExamDifficulty` / `QuestionEssentiality` Literal
 # 与这里逐字对齐（双向断言见 `tests/test_engineering_gates.py::test_closed_sets_single_source`）；
 # 可调阈值**不在这里**，见 `config.Settings` 的三个熟练度字段。
-DIRECTIONS: tuple[str, ...] = ("前端", "后端", "算法与数据结构", "计算机基础", "AI 工程", "中间件与运维", "SQL 与数据库")
+DIRECTIONS: tuple[str, ...] = ("前端", "后端", "算法与数据结构", "计算机基础", "AI 工程", "中间件与运维", "SQL 与数据库", "研发工程实践")
 DIFFICULTIES: tuple[str, ...] = ("basic", "intermediate", "challenge")
 ESSENTIALITIES: tuple[str, ...] = ("must_know", "advanced", "nice_to_know")
 #: 组卷兜底阶梯：L1 最优 → L6 全库兜底，**顺序即优先级**，任何一层都不得因过滤而返回 400。

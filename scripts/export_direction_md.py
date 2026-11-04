@@ -47,6 +47,13 @@ CATEGORY_MAP = {
     "ds": "哈希/栈/队列",
     "tree": "链表与树遍历",
     "bit": "位运算入门",
+    # 研发工程实践
+    "git": "Git 与版本控制",
+    "cicd": "CI/CD 与流水线",
+    "req": "需求对接与协作",
+    "test": "测试与质量",
+    "review": "代码评审与规范",
+    "release": "发布与故障协作",
 }
 KIND_LABEL = {"single": "单选", "multiple": "多选", "judge": "判断"}
 DIFF_LABEL = {"basic": "基础", "intermediate": "进阶", "challenge": "挑战"}

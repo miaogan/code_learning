@@ -468,6 +468,73 @@
         {"name": "分布式数据库", "required": 3},
         {"name": "数据安全", "required": 3}
       ]
+    },
+    {
+      "role": "研发效能工程师",
+      "direction": "研发工程实践",
+      "level": "初级",
+      "years_min": 0,
+      "years_max": 2,
+      "must_have": ["Git 基础", "协作规范", "需求理解"],
+      "skills": [
+        {"name": "Git 基础", "required": 2},
+        {"name": "协作规范", "required": 2},
+        {"name": "需求理解", "required": 1},
+        {"name": "CI 基础", "required": 1},
+        {"name": "单元测试基础", "required": 1},
+        {"name": "文档与留痕", "required": 1}
+      ]
+    },
+    {
+      "role": "研发效能工程师",
+      "direction": "研发工程实践",
+      "level": "中级",
+      "years_min": 2,
+      "years_max": 5,
+      "must_have": ["分支策略", "CI 流水线", "需求拆解"],
+      "skills": [
+        {"name": "分支策略", "required": 3},
+        {"name": "CI 流水线", "required": 3},
+        {"name": "需求拆解", "required": 2},
+        {"name": "自动化测试", "required": 2},
+        {"name": "代码评审", "required": 2},
+        {"name": "构建产物管理", "required": 1},
+        {"name": "接口契约协作", "required": 2}
+      ]
+    },
+    {
+      "role": "研发效能工程师",
+      "direction": "研发工程实践",
+      "level": "高级",
+      "years_min": 5,
+      "years_max": 10,
+      "must_have": ["研发流程设计", "质量门禁体系", "发布与回滚"],
+      "skills": [
+        {"name": "研发流程设计", "required": 4},
+        {"name": "质量门禁体系", "required": 3},
+        {"name": "发布与回滚", "required": 3},
+        {"name": "灰度与特性开关", "required": 3},
+        {"name": "跨团队协作", "required": 2},
+        {"name": "效能度量", "required": 2},
+        {"name": "变更风险评估", "required": 2}
+      ]
+    },
+    {
+      "role": "研发效能工程师",
+      "direction": "研发工程实践",
+      "level": "专家",
+      "years_min": 10,
+      "years_max": 99,
+      "must_have": ["工程效能架构", "组织级流程治理", "技术决策与团队"],
+      "skills": [
+        {"name": "工程效能架构", "required": 4},
+        {"name": "组织级流程治理", "required": 4},
+        {"name": "技术决策与团队", "required": 4},
+        {"name": "效能度量体系", "required": 3},
+        {"name": "平台工程", "required": 3},
+        {"name": "变更管理", "required": 3},
+        {"name": "质量文化建设", "required": 3}
+      ]
     }
   ]
 }
