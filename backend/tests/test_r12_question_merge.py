@@ -48,22 +48,23 @@ R13_SEED_BYTES = 191135
 #: 都已落在这 260 行上（行序/行数/来源不变），故基线由 r11 → r13 → r14 逐轮迁移：
 #: 真要再动存量行，必须同时改这个常量并在任务夹留痕。
 #:
-#: r15（本次「AI 工程」方向）：新增 78 道 `language=""` 的 aieng-* 题。它们与 al-/cs- 同处
-#: `""` 语言桶，会使 `question_shuffle.apply()` 的「按最低计数位置轮转」在该桶里重新分配，
-#: 进而**只改变存量里通用方向题的选项位置序**（题干/解析/正确项文本、答案正确性不变），
-#: 等长改写使 `R13_SEED_BYTES` 仍为 191135，但 sha256 随之漂移。这是全局均衡的确定性副作用，
-#: 已确认重算幂等（重跑 `--write` 首末两遍 first-260 字节一致），故在此同步刷新基线。
-R13_SEED_SHA256 = "fad64057f8a1a2bc0253df3d0ff3e6df98db0ad068bfc7cd1c90d0eee9ea6e90"
+#: r15（本次「AI 工程」方向）：先新增 78 道、后追加 25 道「实战场景」题，均为 `language=""`
+#: 的 aieng-* 题。它们与 al-/cs- 同处 `""` 语言桶，会使 `question_shuffle.apply()` 的
+#: 「按最低计数位置轮转」在该桶里重新分配，进而**只改变存量里通用方向题的选项位置序**
+#: （题干/解析/正确项文本、答案正确性不变）。等长改写使 `R13_SEED_BYTES` 仍为 191135，
+#: 但 sha256 随桶内轮转态漂移。这是全局均衡的确定性副作用，已确认重算幂等
+#: （重跑 `--write` 首末两遍 first-260 字节一致），故在此同步刷新基线。
+R13_SEED_SHA256 = "c78406f58d81e41a356f61a647be2aeba6e5f62806c69b7bab1561180b4ca1f8"
 
 #: 合并后的期望规模与来源分布（TECH-CHANGE §3.4 逐项）。门禁是唯一断言点，故允许字面量。
-EXPECTED_TOTAL = 857
+EXPECTED_TOTAL = 882
 EXPECTED_SOURCES = {
     "seed": 260,
     "tiji": 20,
     "local100": 100,
     "iq380": 379,
     "fe-interview": 20,
-    "ai-eng": 78,
+    "ai-eng": 103,
 }
 
 _EXPLANATION = "这是一段足够长的解析文本，用于满足解析非空与长度门槛的断言。"
@@ -385,7 +386,7 @@ def test_merge_prefers_source_priority_then_longer_explanation_then_sha1() -> No
 
 # --- ⑦ 幂等与字节级序列化 -----------------------------------------------------
 def test_dumps_reproduces_current_seed_bytes() -> None:
-    """`dumps()` 逐字节复现已提交 seed；前 260 行仍是 r13 基线的 192073 字节。"""
+    """`dumps()` 逐字节复现已提交 seed；前 260 行仍是冻结基线（R13_SEED_BYTES 字节）。"""
     raw = qm.SEED_PATH.read_bytes()
     rows = json.loads(raw.decode("utf-8"))
     assert len(rows) == EXPECTED_TOTAL
@@ -410,8 +411,8 @@ def test_merge_is_idempotent_byte_identical() -> None:
     """`--write` 可重复：每次重算都得到同一串字节，且与磁盘上的 seed 一致（`--check` 成立）。"""
     first, stats = qm.build_seed()
     assert qm.dumps(first).encode("utf-8") == qm.SEED_PATH.read_bytes(), "重算结果与磁盘 seed 不一致"
-    assert stats["total"]["added"] == 597, "按素材重算应恒报 597 条新增（上一批不当作存量）"
-    assert stats["total"]["read"] == 597
+    assert stats["total"]["added"] == 622, "按素材重算应恒报 622 条新增（上一批不当作存量）"
+    assert stats["total"]["read"] == 622
     assert stats["total"]["literal_dup"] == 0
     assert stats["total"]["near_dup"] == 0
     assert stats["total"]["out_of_range"] == 0

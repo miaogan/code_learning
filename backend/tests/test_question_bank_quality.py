@@ -276,10 +276,10 @@ R12_SOURCE_COUNTS = {
     "local100": 100,
     "iq380": 379,
     "fe-interview": 20,
-    "ai-eng": 78,
+    "ai-eng": 103,
 }
-#: 合并后总量（= 存量 260 + 本批 597）。
-R12_TOTAL = 857
+#: 合并后总量（= 存量 260 + 本批 622）。
+R12_TOTAL = 882
 
 
 def test_r12_source_enum_and_per_source_counts(bank_rows: list[dict[str, Any]]) -> None:
