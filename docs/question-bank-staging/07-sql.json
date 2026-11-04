@@ -1,0 +1,1438 @@
+[
+  {
+    "n": 1,
+    "id": "sql-select-1",
+    "language": "",
+    "direction": "SQL 与数据库",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "SQL 中用于对查询结果去重的关键字是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "DISTINCT"
+      },
+      {
+        "key": "B",
+        "text": "UNIQUE"
+      },
+      {
+        "key": "C",
+        "text": "GROUP BY"
+      },
+      {
+        "key": "D",
+        "text": "HAVING"
+      }
+    ],
+    "answer": "A",
+    "explanation": "DISTINCT 对结果行去重；UNIQUE 是建约束用，不是查询去重关键字。"
+  },
+  {
+    "n": 2,
+    "id": "sql-select-2",
+    "language": "",
+    "direction": "SQL 与数据库",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "SQL 中 UNION 与 UNION ALL 的主要区别是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "UNION 合并后去重，UNION ALL 保留全部含重复"
+      },
+      {
+        "key": "B",
+        "text": "UNION 保留重复，UNION ALL 去重"
+      },
+      {
+        "key": "C",
+        "text": "两者完全等价、无任何差别"
+      },
+      {
+        "key": "D",
+        "text": "UNION 只能用于两张表"
+      }
+    ],
+    "answer": "A",
+    "explanation": "UNION 会去重（常伴排序开销），UNION ALL 直接拼接保留重复、更快；能用 ALL 时优先 ALL。"
+  },
+  {
+    "n": 3,
+    "id": "sql-select-3",
+    "language": "",
+    "direction": "SQL 与数据库",
+    "kind": "judge",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "在 SQL 中用 `WHERE col = NULL` 可以正确筛选出 col 为空的记录。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "错误",
+    "explanation": "NULL 与任何值（含 NULL）用 = 比较结果是 UNKNOWN，WHERE 只保留为真的行，故一行也查不出；判断空值必须用 IS NULL / IS NOT NULL。"
+  },
+  {
+    "n": 4,
+    "id": "sql-select-4",
+    "language": "",
+    "direction": "SQL 与数据库",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "ORDER BY 对多个列排序时，排序优先级是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "按列出现的先后顺序"
+      },
+      {
+        "key": "B",
+        "text": "按列名的字母顺序"
+      },
+      {
+        "key": "C",
+        "text": "按列的数据类型"
+      },
+      {
+        "key": "D",
+        "text": "随机，不固定"
+      }
+    ],
+    "answer": "A",
+    "explanation": "先按第一个列排序，第一列相等时再看第二列，依此类推。"
+  },
+  {
+    "n": 5,
+    "id": "sql-select-5",
+    "language": "",
+    "direction": "SQL 与数据库",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "LIMIT 10 OFFSET 20 表示？",
+    "options": [
+      {
+        "key": "A",
+        "text": "跳过 20 行，取 10 行"
+      },
+      {
+        "key": "B",
+        "text": "跳过 10 行，取 20 行"
+      },
+      {
+        "key": "C",
+        "text": "取第 10 到 20 行"
+      },
+      {
+        "key": "D",
+        "text": "取前 10 行再偏移"
+      }
+    ],
+    "answer": "A",
+    "explanation": "OFFSET 先跳过指定行数，LIMIT 再取条数；这也是常规分页写法（第 3 页、每页 10）。"
+  },
+  {
+    "n": 6,
+    "id": "sql-select-6",
+    "language": "",
+    "direction": "SQL 与数据库",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "SELECT 语句的逻辑执行顺序，正确的是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "FROM→WHERE→GROUP BY→HAVING→SELECT→ORDER BY→LIMIT"
+      },
+      {
+        "key": "B",
+        "text": "SELECT→FROM→WHERE→GROUP BY→ORDER BY→LIMIT"
+      },
+      {
+        "key": "C",
+        "text": "FROM→GROUP BY→WHERE→SELECT→HAVING→LIMIT"
+      },
+      {
+        "key": "D",
+        "text": "WHERE→FROM→SELECT→GROUP BY→HAVING→ORDER BY"
+      }
+    ],
+    "answer": "A",
+    "explanation": "逻辑上先 FROM/WHERE 取行、GROUP BY/HAVING 分组、SELECT 投影、ORDER BY 排序、最后 LIMIT。"
+  },
+  {
+    "n": 7,
+    "id": "sql-select-7",
+    "language": "",
+    "direction": "SQL 与数据库",
+    "kind": "judge",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "BETWEEN a AND b 是左闭右开区间，不包含端点 b。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "错误",
+    "explanation": "BETWEEN 是闭区间（两端都含），等价于 >= a AND <= b；对数字和日期都如此。"
+  },
+  {
+    "n": 8,
+    "id": "sql-select-8",
+    "language": "",
+    "direction": "SQL 与数据库",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "LIKE 中 `%` 与 `_` 的含义分别是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "% 匹配任意长度，_ 匹配单个字符"
+      },
+      {
+        "key": "B",
+        "text": "% 匹配单个字符，_ 匹配任意长度"
+      },
+      {
+        "key": "C",
+        "text": "两者都匹配任意长度"
+      },
+      {
+        "key": "D",
+        "text": "两者都匹配单个字符"
+      }
+    ],
+    "answer": "A",
+    "explanation": "% 匹配零或多个字符，_ 匹配恰好一个字符；注意前导通配（如 '%x'）会让索引失效。"
+  },
+  {
+    "n": 9,
+    "id": "sql-join-1",
+    "language": "",
+    "direction": "SQL 与数据库",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "INNER JOIN 返回的结果是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "两表中连接条件匹配的行"
+      },
+      {
+        "key": "B",
+        "text": "左表全部行、右表不匹配补空"
+      },
+      {
+        "key": "C",
+        "text": "右表全部行、左表不匹配补空"
+      },
+      {
+        "key": "D",
+        "text": "两表的完整笛卡尔积组合"
+      }
+    ],
+    "answer": "A",
+    "explanation": "INNER JOIN 只保留两表都能按 ON 条件匹配上的行，不匹配的一律丢弃。"
+  },
+  {
+    "n": 10,
+    "id": "sql-join-2",
+    "language": "",
+    "direction": "SQL 与数据库",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "LEFT JOIN 的特点是什么？",
+    "options": [
+      {
+        "key": "A",
+        "text": "保留左表全部行，右表不匹配补 NULL"
+      },
+      {
+        "key": "B",
+        "text": "保留右表全部行，左表不匹配补 NULL"
+      },
+      {
+        "key": "C",
+        "text": "只保留两表都匹配的行"
+      },
+      {
+        "key": "D",
+        "text": "返回两表的笛卡尔积"
+      }
+    ],
+    "answer": "A",
+    "explanation": "LEFT JOIN 以左表为主，匹配不到右表时右表列填 NULL；RIGHT JOIN 则相反。"
+  },
+  {
+    "n": 11,
+    "id": "sql-join-3",
+    "language": "",
+    "direction": "SQL 与数据库",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "FULL OUTER JOIN 的语义是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "保留两表全部行，缺失一侧补 NULL"
+      },
+      {
+        "key": "B",
+        "text": "只保留两表都有的行"
+      },
+      {
+        "key": "C",
+        "text": "只保留左表全部行"
+      },
+      {
+        "key": "D",
+        "text": "两表做笛卡尔积"
+      }
+    ],
+    "answer": "A",
+    "explanation": "FULL OUTER JOIN 同时保留左右表所有行，任一侧缺失都用 NULL 补齐（部分数据库需变通实现）。"
+  },
+  {
+    "n": 12,
+    "id": "sql-join-4",
+    "language": "",
+    "direction": "SQL 与数据库",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "CROSS JOIN 产生的结果是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "两表的笛卡尔积（行数相乘）"
+      },
+      {
+        "key": "B",
+        "text": "只保留两表匹配的行"
+      },
+      {
+        "key": "C",
+        "text": "只保留左表全部行"
+      },
+      {
+        "key": "D",
+        "text": "两表按主键合并"
+      }
+    ],
+    "answer": "A",
+    "explanation": "CROSS JOIN 无连接条件，结果行数 = 左表行数 × 右表行数；大表慎用。"
+  },
+  {
+    "n": 13,
+    "id": "sql-join-5",
+    "language": "",
+    "direction": "SQL 与数据库",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "LEFT JOIN 时把右表的过滤条件写在 WHERE 里，通常会？",
+    "options": [
+      {
+        "key": "A",
+        "text": "把左连接退化成内连接（只留匹配行）"
+      },
+      {
+        "key": "B",
+        "text": "结果与写在 ON 里完全一致"
+      },
+      {
+        "key": "C",
+        "text": "自动补全右表缺失的行"
+      },
+      {
+        "key": "D",
+        "text": "直接报语法错误"
+      }
+    ],
+    "answer": "A",
+    "explanation": "WHERE 对右表列过滤会剔除 NULL 行，等价于内连接；想保留左表应把条件下推到 ON。"
+  },
+  {
+    "n": 14,
+    "id": "sql-join-6",
+    "language": "",
+    "direction": "SQL 与数据库",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "自连接（表与自身 JOIN）典型用于？",
+    "options": [
+      {
+        "key": "A",
+        "text": "同一表内行与行的层级/比较（如员工与经理）"
+      },
+      {
+        "key": "B",
+        "text": "把两张结构不同的表合并在一起"
+      },
+      {
+        "key": "C",
+        "text": "只能用于删除历史数据"
+      },
+      {
+        "key": "D",
+        "text": "替代 GROUP BY 做分组"
+      }
+    ],
+    "answer": "A",
+    "explanation": "给同一表起两个别名做自连接，可表达父子、前后、对比等行间关系。"
+  },
+  {
+    "n": 15,
+    "id": "sql-join-7",
+    "language": "",
+    "direction": "SQL 与数据库",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "JOIN ... USING(col) 与 ON t1.col = t2.col 的主要区别是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "USING 自动合并同名列且结果只出现一次"
+      },
+      {
+        "key": "B",
+        "text": "USING 不支持任何连接"
+      },
+      {
+        "key": "C",
+        "text": "二者完全相同、无差异"
+      },
+      {
+        "key": "D",
+        "text": "ON 只能用于全连接"
+      }
+    ],
+    "answer": "A",
+    "explanation": "USING 指定同名列并合并为单列；ON 更灵活，可写任意条件且两列都会保留。"
+  },
+  {
+    "n": 16,
+    "id": "sql-agg-1",
+    "language": "",
+    "direction": "SQL 与数据库",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "GROUP BY 的作用是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "把行按列值分组后做聚合"
+      },
+      {
+        "key": "B",
+        "text": "对结果整体排序"
+      },
+      {
+        "key": "C",
+        "text": "去重整行数据"
+      },
+      {
+        "key": "D",
+        "text": "过滤不满足条件的行"
+      }
+    ],
+    "answer": "A",
+    "explanation": "GROUP BY 按指定列把行分组，再对每组做 COUNT/SUM/AVG 等聚合。"
+  },
+  {
+    "n": 17,
+    "id": "sql-agg-2",
+    "language": "",
+    "direction": "SQL 与数据库",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "COUNT(*) 与 COUNT(列) 对 NULL 的差异是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "COUNT(*) 计所有行，COUNT(列) 跳过 NULL"
+      },
+      {
+        "key": "B",
+        "text": "两者结果永远相同"
+      },
+      {
+        "key": "C",
+        "text": "COUNT(列) 会把 NULL 记为 0"
+      },
+      {
+        "key": "D",
+        "text": "COUNT(*) 会跳过 NULL 行"
+      }
+    ],
+    "answer": "A",
+    "explanation": "COUNT(*) 统计行数；COUNT(col) 只统计 col 非 NULL 的行，有 NULL 时两者会不同。"
+  },
+  {
+    "n": 18,
+    "id": "sql-agg-3",
+    "language": "",
+    "direction": "SQL 与数据库",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "HAVING 的作用是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "对 GROUP BY 后的分组做过滤"
+      },
+      {
+        "key": "B",
+        "text": "对原始表逐行过滤每一行"
+      },
+      {
+        "key": "C",
+        "text": "对最终结果整体排序输出"
+      },
+      {
+        "key": "D",
+        "text": "对最终结果进行去重处理"
+      }
+    ],
+    "answer": "A",
+    "explanation": "HAVING 作用于分组之后，可对聚合值（如 COUNT(*) > 1）做过滤。"
+  },
+  {
+    "n": 19,
+    "id": "sql-agg-4",
+    "language": "",
+    "direction": "SQL 与数据库",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "SUM、AVG 等聚合函数会把 NULL 当作 0 参与计算，所以 AVG 恒等于「总和 ÷ 总行数」。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "错误",
+    "explanation": "聚合函数直接忽略 NULL：AVG 的分母是非 NULL 行数，不是总行数；NULL 多时平均值会明显偏离「总和÷总行数」。"
+  },
+  {
+    "n": 20,
+    "id": "sql-agg-5",
+    "language": "",
+    "direction": "SQL 与数据库",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "COUNT(DISTINCT col) 的含义是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "统计 col 去重后的非 NULL 行数"
+      },
+      {
+        "key": "B",
+        "text": "统计 col 的总行数"
+      },
+      {
+        "key": "C",
+        "text": "统计 col 为 NULL 的行数"
+      },
+      {
+        "key": "D",
+        "text": "对 col 求和"
+      }
+    ],
+    "answer": "A",
+    "explanation": "COUNT(DISTINCT col) 先去重再计数，且忽略 NULL；常用于算 UV/去重用户数。"
+  },
+  {
+    "n": 21,
+    "id": "sql-agg-6",
+    "language": "",
+    "direction": "SQL 与数据库",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "查询里有 GROUP BY 时，SELECT 中的非聚合列都应出现在 GROUP BY 中（或经聚合）。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "正确",
+    "explanation": "否则非聚合列取值不确定（标准 SQL 直接报错，部分数据库宽松但语义不可靠）。"
+  },
+  {
+    "n": 22,
+    "id": "sql-subq-1",
+    "language": "",
+    "direction": "SQL 与数据库",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "WHERE col IN (子查询) 的语义是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "col 等于子查询结果集中任一值"
+      },
+      {
+        "key": "B",
+        "text": "col 大于子查询所有值"
+      },
+      {
+        "key": "C",
+        "text": "col 必须等于全部值"
+      },
+      {
+        "key": "D",
+        "text": "col 与子查询无关系"
+      }
+    ],
+    "answer": "A",
+    "explanation": "IN 是「属于集合」，col 命中子查询任一值即为真；NOT IN 遇到 NULL 需格外小心。"
+  },
+  {
+    "n": 23,
+    "id": "sql-subq-2",
+    "language": "",
+    "direction": "SQL 与数据库",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "EXISTS 与 IN 相比，通常的优势是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "遇到匹配即可短路，且对 NULL 更安全"
+      },
+      {
+        "key": "B",
+        "text": "总是比 IN 更慢"
+      },
+      {
+        "key": "C",
+        "text": "只能用于 DELETE"
+      },
+      {
+        "key": "D",
+        "text": "结果一定不同"
+      }
+    ],
+    "answer": "A",
+    "explanation": "EXISTS 只需判断存在即短路，且不像 NOT IN 那样被 NULL 干扰，相关子查询常更稳。"
+  },
+  {
+    "n": 24,
+    "id": "sql-subq-3",
+    "language": "",
+    "direction": "SQL 与数据库",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "相关子查询（correlated subquery）的特点是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "子查询引用外层查询的列、按外层行逐次执行"
+      },
+      {
+        "key": "B",
+        "text": "与外层查询完全独立"
+      },
+      {
+        "key": "C",
+        "text": "只能出现在 SELECT 列表"
+      },
+      {
+        "key": "D",
+        "text": "必须用 UNION 连接"
+      }
+    ],
+    "answer": "A",
+    "explanation": "相关子查询依赖外层当前行，可能逐行执行；数据量大时要注意性能。"
+  },
+  {
+    "n": 25,
+    "id": "sql-subq-4",
+    "language": "",
+    "direction": "SQL 与数据库",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "WITH ... AS (CTE) 的主要作用是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "把复杂查询拆成可读、可复用的临时结果"
+      },
+      {
+        "key": "B",
+        "text": "创建一张永久存在的物理表"
+      },
+      {
+        "key": "C",
+        "text": "显式开启一个事务"
+      },
+      {
+        "key": "D",
+        "text": "为列创建索引"
+      }
+    ],
+    "answer": "A",
+    "explanation": "CTE 是语句内的命名子查询，提升可读性与复用；部分库可被优化器内联。"
+  },
+  {
+    "n": 26,
+    "id": "sql-subq-5",
+    "language": "",
+    "direction": "SQL 与数据库",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "标量子查询返回的是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "单行单列的一个值"
+      },
+      {
+        "key": "B",
+        "text": "多行多列的结果集"
+      },
+      {
+        "key": "C",
+        "text": "一个布尔值"
+      },
+      {
+        "key": "D",
+        "text": "一张临时表"
+      }
+    ],
+    "answer": "A",
+    "explanation": "标量子查询恰返回一行一列，可放在 SELECT/WHERE 中当作一个值使用，多行会报错。"
+  },
+  {
+    "n": 27,
+    "id": "sql-subq-6",
+    "language": "",
+    "direction": "SQL 与数据库",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "递归 CTE（WITH RECURSIVE）常用于？",
+    "options": [
+      {
+        "key": "A",
+        "text": "处理树形/层级结构（如组织架构、BOM）"
+      },
+      {
+        "key": "B",
+        "text": "只是简单地做多表连接查询"
+      },
+      {
+        "key": "C",
+        "text": "仅用于实现分页功能"
+      },
+      {
+        "key": "D",
+        "text": "替代索引来加速查询"
+      }
+    ],
+    "answer": "A",
+    "explanation": "递归 CTE 先取锚点行，再反复迭代直到不再产生新行，适合层级/树结构遍历。"
+  },
+  {
+    "n": 28,
+    "id": "sql-window-1",
+    "language": "",
+    "direction": "SQL 与数据库",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "ROW_NUMBER、RANK、DENSE_RANK 三者的区别是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "ROW_NUMBER 不并列，RANK 并列跳号，DENSE_RANK 并列不跳号"
+      },
+      {
+        "key": "B",
+        "text": "ROW_NUMBER 并列跳号，RANK 不并列，DENSE_RANK 并列不跳号"
+      },
+      {
+        "key": "C",
+        "text": "ROW_NUMBER 不并列，RANK 并列不跳号，DENSE_RANK 并列跳号"
+      },
+      {
+        "key": "D",
+        "text": "三者都并列跳号，仅数值不同"
+      }
+    ],
+    "answer": "A",
+    "explanation": "举例（值相同）：ROW_NUMBER 给 1,2,3；RANK 给 1,1,3（跳号）；DENSE_RANK 给 1,1,2（不跳号）。"
+  },
+  {
+    "n": 29,
+    "id": "sql-window-2",
+    "language": "",
+    "direction": "SQL 与数据库",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "OVER(PARTITION BY dept) 的作用是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "按 dept 分组、在每组内做窗口计算"
+      },
+      {
+        "key": "B",
+        "text": "按 dept 对结果排序"
+      },
+      {
+        "key": "C",
+        "text": "只保留 dept 这一列"
+      },
+      {
+        "key": "D",
+        "text": "删除重复的 dept"
+      }
+    ],
+    "answer": "A",
+    "explanation": "PARTITION BY 把行划成互不影响的窗口，聚合/排名在各自分区内独立计算。"
+  },
+  {
+    "n": 30,
+    "id": "sql-window-3",
+    "language": "",
+    "direction": "SQL 与数据库",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "SUM(amount) OVER (ORDER BY dt) 会得到？",
+    "options": [
+      {
+        "key": "A",
+        "text": "按日期累计的滚动求和"
+      },
+      {
+        "key": "B",
+        "text": "每行都等于总和"
+      },
+      {
+        "key": "C",
+        "text": "只返回最后一行"
+      },
+      {
+        "key": "D",
+        "text": "对日期求和"
+      }
+    ],
+    "answer": "A",
+    "explanation": "带 ORDER BY 的窗口聚合默认是累积帧（从首行到当前行），即滚动累计值。"
+  },
+  {
+    "n": 31,
+    "id": "sql-window-4",
+    "language": "",
+    "direction": "SQL 与数据库",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "LAG/LEAD 窗口函数用于？",
+    "options": [
+      {
+        "key": "A",
+        "text": "取当前行前/后一行的值做对比"
+      },
+      {
+        "key": "B",
+        "text": "对行号重新编号"
+      },
+      {
+        "key": "C",
+        "text": "计算累计排名"
+      },
+      {
+        "key": "D",
+        "text": "对分组求和"
+      }
+    ],
+    "answer": "A",
+    "explanation": "LAG 取前一行、LEAD 取后一行，常用于同比/环比、相邻差值等分析。"
+  },
+  {
+    "n": 32,
+    "id": "sql-window-5",
+    "language": "",
+    "direction": "SQL 与数据库",
+    "kind": "judge",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "窗口函数不能直接写在 WHERE 子句里做过滤，通常要包一层子查询或 CTE。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "正确",
+    "explanation": "WHERE 在窗口计算之前执行，故需用子查询/CTE 先算出窗口列，再在外层过滤。"
+  },
+  {
+    "n": 33,
+    "id": "sql-window-6",
+    "language": "",
+    "direction": "SQL 与数据库",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "RANK 遇到并列名次后，后续编号的特点是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "并列占位、后续名次跳号（如 1,1,3）"
+      },
+      {
+        "key": "B",
+        "text": "并列不占位、后续不跳号（1,1,2）"
+      },
+      {
+        "key": "C",
+        "text": "并列后名次归零"
+      },
+      {
+        "key": "D",
+        "text": "并列时随机编号"
+      }
+    ],
+    "answer": "A",
+    "explanation": "RANK 按位次编号并跳号（1,1,3）；不跳号的是 DENSE_RANK（1,1,2）。"
+  },
+  {
+    "n": 34,
+    "id": "sql-index-1",
+    "language": "",
+    "direction": "SQL 与数据库",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "B-tree 索引最擅长的查询是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "等值与范围查询（=、>、BETWEEN、排序）"
+      },
+      {
+        "key": "B",
+        "text": "模糊前导通配 LIKE '%x'"
+      },
+      {
+        "key": "C",
+        "text": "对列做函数后再比较"
+      },
+      {
+        "key": "D",
+        "text": "任意正则匹配"
+      }
+    ],
+    "answer": "A",
+    "explanation": "B-tree 有序，天然适合等值/范围/排序；前导通配、列上函数会让它失效。"
+  },
+  {
+    "n": 35,
+    "id": "sql-index-2",
+    "language": "",
+    "direction": "SQL 与数据库",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "联合索引 (a,b,c) 的「最左前缀」意味着？",
+    "options": [
+      {
+        "key": "A",
+        "text": "查询须从 a 开始连续使用才能真正命中索引"
+      },
+      {
+        "key": "B",
+        "text": "可跳过 a、直接用 b 和 c 命中"
+      },
+      {
+        "key": "C",
+        "text": "任意列顺序都能命中"
+      },
+      {
+        "key": "D",
+        "text": "只能查 a 一列"
+      }
+    ],
+    "answer": "A",
+    "explanation": "联合索引按 a→b→c 有序，要用到索引需从最左列 a 起连续前缀（a、a+b、a+b+c）。"
+  },
+  {
+    "n": 36,
+    "id": "sql-index-3",
+    "language": "",
+    "direction": "SQL 与数据库",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "覆盖索引（covering index）指的是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "查询所需列全在索引里、无需回表"
+      },
+      {
+        "key": "B",
+        "text": "索引覆盖了所有表"
+      },
+      {
+        "key": "C",
+        "text": "把整表复制进索引"
+      },
+      {
+        "key": "D",
+        "text": "对主键外所有列建索引"
+      }
+    ],
+    "answer": "A",
+    "explanation": "当 SELECT 的列都被索引包含时可只读索引、免回表，显著提速。"
+  },
+  {
+    "n": 37,
+    "id": "sql-index-4",
+    "language": "",
+    "direction": "SQL 与数据库",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "下列哪些写法容易导致索引失效？",
+    "options": [
+      {
+        "key": "A",
+        "text": "对索引列使用函数或计算"
+      },
+      {
+        "key": "B",
+        "text": "隐式类型转换（字符串列传数字）"
+      },
+      {
+        "key": "C",
+        "text": "前导通配 LIKE '%abc'"
+      },
+      {
+        "key": "D",
+        "text": "按索引最左列做等值查询"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "函数/隐式转换/前导通配都会让 B-tree 无法定位；按最左列等值查询恰恰能用上索引。"
+  },
+  {
+    "n": 38,
+    "id": "sql-index-5",
+    "language": "",
+    "direction": "SQL 与数据库",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "聚簇索引与非聚簇索引的主要区别是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "聚簇按索引键决定行物理顺序，非聚簇另存索引项"
+      },
+      {
+        "key": "B",
+        "text": "两者存储结构完全一致"
+      },
+      {
+        "key": "C",
+        "text": "非聚簇索引不能用于查询"
+      },
+      {
+        "key": "D",
+        "text": "聚簇索引只能建在主键之外"
+      }
+    ],
+    "answer": "A",
+    "explanation": "聚簇索引叶子即数据行（如 InnoDB 主键），非聚簇索引叶子是主键/行指针，通常需回表。"
+  },
+  {
+    "n": 39,
+    "id": "sql-index-6",
+    "language": "",
+    "direction": "SQL 与数据库",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "EXPLAIN 的主要用途是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "查看查询的执行计划与是否走索引"
+      },
+      {
+        "key": "B",
+        "text": "直接执行并修改数据"
+      },
+      {
+        "key": "C",
+        "text": "给表加索引"
+      },
+      {
+        "key": "D",
+        "text": "统计表行数"
+      }
+    ],
+    "answer": "A",
+    "explanation": "EXPLAIN 展示访问方式、是否命中索引与估算代价；EXPLAIN ANALYZE 还会真实执行并给耗时。"
+  },
+  {
+    "n": 40,
+    "id": "sql-index-7",
+    "language": "",
+    "direction": "SQL 与数据库",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "索引并非越多越好：过多索引会拖慢写入并占用更多存储。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "正确",
+    "explanation": "每次写入都要维护相关索引，索引越多写放大越重、空间越大；应按查询模式取舍。"
+  },
+  {
+    "n": 41,
+    "id": "sql-tx-1",
+    "language": "",
+    "direction": "SQL 与数据库",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "事务 ACID 包含哪些特性？",
+    "options": [
+      {
+        "key": "A",
+        "text": "原子性（Atomicity）"
+      },
+      {
+        "key": "B",
+        "text": "一致性（Consistency）"
+      },
+      {
+        "key": "C",
+        "text": "隔离性（Isolation）"
+      },
+      {
+        "key": "D",
+        "text": "并发性（Concurrency）"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "ACID = 原子性/一致性/隔离性/持久性；带 D 的应是持久性（Durability），并发性不是 ACID 成员。"
+  },
+  {
+    "n": 42,
+    "id": "sql-tx-2",
+    "language": "",
+    "direction": "SQL 与数据库",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "READ COMMITTED 能防止哪种异常？",
+    "options": [
+      {
+        "key": "A",
+        "text": "脏读（读到未提交数据）"
+      },
+      {
+        "key": "B",
+        "text": "幻读（范围出现新行）"
+      },
+      {
+        "key": "C",
+        "text": "不可重复读"
+      },
+      {
+        "key": "D",
+        "text": "以上都不能防止"
+      }
+    ],
+    "answer": "A",
+    "explanation": "READ COMMITTED 只读已提交数据，能防脏读；仍可能出现不可重复读与幻读，更强需可重复读/可串行化。"
+  },
+  {
+    "n": 43,
+    "id": "sql-tx-3",
+    "language": "",
+    "direction": "SQL 与数据库",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "MySQL(InnoDB) 与 PostgreSQL 的默认事务隔离级别分别是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "MySQL 可重复读、PostgreSQL 读已提交"
+      },
+      {
+        "key": "B",
+        "text": "两者都是可重复读"
+      },
+      {
+        "key": "C",
+        "text": "两者都是读已提交"
+      },
+      {
+        "key": "D",
+        "text": "MySQL 读已提交、PostgreSQL 可重复读"
+      }
+    ],
+    "answer": "A",
+    "explanation": "InnoDB 默认 REPEATABLE READ（配合 MVCC 减少幻读），PostgreSQL 默认 READ COMMITTED。"
+  },
+  {
+    "n": 44,
+    "id": "sql-tx-4",
+    "language": "",
+    "direction": "SQL 与数据库",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "行级锁相比表级锁的特点是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "锁粒度更细、并发更高但管理开销更大"
+      },
+      {
+        "key": "B",
+        "text": "锁粒度更粗、并发更低"
+      },
+      {
+        "key": "C",
+        "text": "两者完全相同"
+      },
+      {
+        "key": "D",
+        "text": "行锁不需要事务"
+      }
+    ],
+    "answer": "A",
+    "explanation": "行锁只锁涉及行、并发高，但锁数量多、管理开销大且更易死锁；表锁相反。"
+  },
+  {
+    "n": 45,
+    "id": "sql-tx-5",
+    "language": "",
+    "direction": "SQL 与数据库",
+    "kind": "judge",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "两事务以相反顺序加锁同一批资源，可能引发死锁；统一加锁顺序有助于避免。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "正确",
+    "explanation": "交叉等待会形成环导致死锁；统一加锁顺序、缩短事务可显著降低风险。"
+  },
+  {
+    "n": 46,
+    "id": "sql-design-1",
+    "language": "",
+    "direction": "SQL 与数据库",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "第三范式（3NF）要求消除的是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "非主属性对其它非主属性的传递依赖"
+      },
+      {
+        "key": "B",
+        "text": "消除表里所有冗余字段"
+      },
+      {
+        "key": "C",
+        "text": "主键的唯一性约束"
+      },
+      {
+        "key": "D",
+        "text": "表之间的外键关联"
+      }
+    ],
+    "answer": "A",
+    "explanation": "1NF 原子列、2NF 消除部分依赖、3NF 消除传递依赖；目的是减少冗余与更新异常。"
+  },
+  {
+    "n": 47,
+    "id": "sql-design-2",
+    "language": "",
+    "direction": "SQL 与数据库",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "主键（PRIMARY KEY）与唯一约束（UNIQUE）的区别是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "主键非空且每表一个，唯一约束可多个且允许 NULL"
+      },
+      {
+        "key": "B",
+        "text": "主键可多个，唯一约束每表仅一个"
+      },
+      {
+        "key": "C",
+        "text": "两者完全等价、可互换使用"
+      },
+      {
+        "key": "D",
+        "text": "主键允许 NULL，唯一约束不允许"
+      }
+    ],
+    "answer": "A",
+    "explanation": "主键唯一且非空、每表仅一个；UNIQUE 可建多个、且通常允许多个 NULL（依数据库而定）。"
+  },
+  {
+    "n": 48,
+    "id": "sql-design-3",
+    "language": "",
+    "direction": "SQL 与数据库",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "反范式（适度冗余）是为减少多表连接、提升读取性能的取舍。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "正确",
+    "explanation": "反范式用冗余换读取性能/简化查询，代价是写入维护与一致性成本，需权衡。"
+  },
+  {
+    "n": 49,
+    "id": "sql-perf-1",
+    "language": "",
+    "direction": "SQL 与数据库",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "N+1 查询问题指的是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "先查 1 次列表，再对每行各查 1 次关联数据"
+      },
+      {
+        "key": "B",
+        "text": "一次查询返回 1 行"
+      },
+      {
+        "key": "C",
+        "text": "总是比 JOIN 更快"
+      },
+      {
+        "key": "D",
+        "text": "只发生在写操作中"
+      }
+    ],
+    "answer": "A",
+    "explanation": "典型于 ORM 懒加载：1 次取列表 + N 次逐条取关联，应改为 JOIN/批量 IN 预取。"
+  },
+  {
+    "n": 50,
+    "id": "sql-perf-2",
+    "language": "",
+    "direction": "SQL 与数据库",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "深分页（LIMIT 100000, 20）性能差，常见的优化是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "用基于游标/上次最大主键的 keyset 分页"
+      },
+      {
+        "key": "B",
+        "text": "把 LIMIT 调得更大"
+      },
+      {
+        "key": "C",
+        "text": "改用 SELECT *"
+      },
+      {
+        "key": "D",
+        "text": "加更多 ORDER BY 列"
+      }
+    ],
+    "answer": "A",
+    "explanation": "深 OFFSET 需扫描并丢弃大量行；keyset（WHERE id > 上次最大 id LIMIT n）可稳定提速。"
+  }
+]

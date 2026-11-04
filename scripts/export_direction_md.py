@@ -27,6 +27,26 @@ CATEGORY_MAP = {
     "dk": "Docker",
     "k8s": "Kubernetes",
     "mq": "消息队列与通用运维",
+    # SQL 与数据库
+    "select": "基础查询与过滤",
+    "join": "JOIN 连接",
+    "agg": "聚合与分组",
+    "subq": "子查询与 CTE",
+    "window": "窗口函数",
+    "index": "索引与执行计划",
+    "tx": "事务与锁",
+    "design": "范式与设计",
+    "perf": "性能优化",
+    # 基础算法（并入「算法与数据结构」方向时按需导出）
+    "complexity": "复杂度与基础",
+    "sort": "排序",
+    "search": "二分与查找",
+    "twoptr": "双指针与滑动窗口",
+    "recursion": "递归与回溯",
+    "dp": "动态规划入门",
+    "ds": "哈希/栈/队列",
+    "tree": "链表与树遍历",
+    "bit": "位运算入门",
 }
 KIND_LABEL = {"single": "单选", "multiple": "多选", "judge": "判断"}
 DIFF_LABEL = {"basic": "基础", "intermediate": "进阶", "challenge": "挑战"}

@@ -53,10 +53,10 @@ R13_SEED_BYTES = 191135
 #: （题干/解析/正确项文本、答案正确性不变）。等长改写使 `R13_SEED_BYTES` 仍为 191135，
 #: 但 sha256 随桶内轮转态漂移。这是全局均衡的确定性副作用，已确认重算幂等
 #: （重跑 `--write` 首末两遍 first-260 字节一致），故在此同步刷新基线。
-R13_SEED_SHA256 = "b5b42c2af22dc6d30c7d04cbe37a29622ef3ddc55868346ded00605dbe0ccaaa"
+R13_SEED_SHA256 = "43b2ce3c012ca1dc7d6025fe0e30f42a0a784a85afde02b85a69c3a2129ba59f"
 
 #: 合并后的期望规模与来源分布（TECH-CHANGE §3.4 逐项）。门禁是唯一断言点，故允许字面量。
-EXPECTED_TOTAL = 958
+EXPECTED_TOTAL = 1038
 EXPECTED_SOURCES = {
     "seed": 260,
     "tiji": 20,
@@ -65,6 +65,8 @@ EXPECTED_SOURCES = {
     "fe-interview": 20,
     "ai-eng": 103,
     "mw": 76,
+    "sql": 50,
+    "algo": 30,
 }
 
 _EXPLANATION = "这是一段足够长的解析文本，用于满足解析非空与长度门槛的断言。"
@@ -411,8 +413,8 @@ def test_merge_is_idempotent_byte_identical() -> None:
     """`--write` 可重复：每次重算都得到同一串字节，且与磁盘上的 seed 一致（`--check` 成立）。"""
     first, stats = qm.build_seed()
     assert qm.dumps(first).encode("utf-8") == qm.SEED_PATH.read_bytes(), "重算结果与磁盘 seed 不一致"
-    assert stats["total"]["added"] == 698, "按素材重算应恒报 698 条新增（上一批不当作存量）"
-    assert stats["total"]["read"] == 698
+    assert stats["total"]["added"] == 778, "按素材重算应恒报 778 条新增（上一批不当作存量）"
+    assert stats["total"]["read"] == 778
     assert stats["total"]["literal_dup"] == 0
     assert stats["total"]["near_dup"] == 0
     assert stats["total"]["out_of_range"] == 0
@@ -503,7 +505,7 @@ def test_seed_source_enum_and_counts() -> None:
 
 # --- ⑨ 回滚 -----------------------------------------------------------------
 def test_rollback_deletes_only_batch_sources(tmp_db: Path) -> None:
-    """回滚只删本批 5 个来源（857 → 260），且幂等（再跑一次删 0 行）。绝不碰存量行。"""
+    """回滚只删本批 8 个来源（1038 → 260），且幂等（再跑一次删 0 行）。绝不碰存量行。"""
     total = question_bank.ensure_seeded()
     assert total == EXPECTED_TOTAL, f"导入后总量 {total} ≠ {EXPECTED_TOTAL}"
 
@@ -516,7 +518,7 @@ def test_rollback_deletes_only_batch_sources(tmp_db: Path) -> None:
     assert len(legacy_ids) == EXPECTED_SOURCES["seed"]
 
     removed = qm.rollback()
-    assert removed == EXPECTED_TOTAL - EXPECTED_SOURCES["seed"], "回滚删除的必须是本批 698 行"
+    assert removed == EXPECTED_TOTAL - EXPECTED_SOURCES["seed"], "回滚删除的必须是本批 778 行"
     assert repository.count_questions() == EXPECTED_SOURCES["seed"]
     assert qm.rollback() == 0, "回滚必须幂等（未导入 / 已删过 → 0）"
 

@@ -41,7 +41,7 @@ from .. import repository
 from . import question_bank, rules
 
 #: 本批来源闭集（顺序即报表与批次落盘顺序）。
-SOURCES: tuple[str, ...] = ("tiji", "local100", "iq380", "fe-interview", "ai-eng", "mw")
+SOURCES: tuple[str, ...] = ("tiji", "local100", "iq380", "fe-interview", "ai-eng", "mw", "sql", "algo")
 
 #: 来源 → 素材文件名（`docs/question-bank-staging/` 下的可复现输入，必须随仓库提交）。
 STAGING_FILES: dict[str, str] = {
@@ -51,6 +51,8 @@ STAGING_FILES: dict[str, str] = {
     "fe-interview": "04-fe-interview20.json",
     "ai-eng": "05-ai-engineering78.json",
     "mw": "06-middleware.json",
+    "sql": "07-sql.json",
+    "algo": "08-basic-algo.json",
 }
 
 #: 来源 → 种子 id 前缀（避开 legacy `fe-/be-/al-/cs-` 与 r11 九个语言前缀，保证
@@ -65,6 +67,8 @@ ID_PREFIX: dict[str, str] = {
     "fe-interview": "fei-",
     "ai-eng": "aieng-",
     "mw": "mw-",
+    "sql": "sql-",
+    "algo": "algo-",
 }
 
 #: 近重复口径：字符 n-gram 的 Jaccard 下界（常量只在这里，别处不得再写一个阈值）。
@@ -73,7 +77,7 @@ NEAR_DUP_JACCARD = 0.62
 
 #: 批内冲突取舍的来源优先级（高 → 低），与 `SOURCES` 顺序一致但**语义不同**：
 #: 前者决定谁赢，后者决定写盘顺序。
-SOURCE_PRIORITY: tuple[str, ...] = ("tiji", "local100", "iq380", "fe-interview", "ai-eng", "mw")
+SOURCE_PRIORITY: tuple[str, ...] = ("tiji", "local100", "iq380", "fe-interview", "ai-eng", "mw", "sql", "algo")
 
 #: 判断题的固定选项（与存量 seed 的 36 道逐字一致：前端按 options 原样渲染，文案不可改）。
 #: 素材里 4 条 key 是中文（`正确`/`错误`）、其余 116 条 key 已是 A/B —— 一律按本常量重建。

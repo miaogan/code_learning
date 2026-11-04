@@ -1,0 +1,838 @@
+[
+  {
+    "n": 1,
+    "id": "algo-complexity-1",
+    "language": "",
+    "direction": "算法与数据结构",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "在有序数组上二分查找的时间复杂度是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "O(log n)"
+      },
+      {
+        "key": "B",
+        "text": "O(n)"
+      },
+      {
+        "key": "C",
+        "text": "O(n log n)"
+      },
+      {
+        "key": "D",
+        "text": "O(1)"
+      }
+    ],
+    "answer": "A",
+    "explanation": "每次折半，比较次数与 log₂n 成正比，故为 O(log n)。"
+  },
+  {
+    "n": 2,
+    "id": "algo-complexity-2",
+    "language": "",
+    "direction": "算法与数据结构",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "快速排序的平均时间复杂度是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "O(n log n)"
+      },
+      {
+        "key": "B",
+        "text": "O(n)"
+      },
+      {
+        "key": "C",
+        "text": "O(n²)"
+      },
+      {
+        "key": "D",
+        "text": "O(log n)"
+      }
+    ],
+    "answer": "A",
+    "explanation": "平均与最优为 O(n log n)，最坏（如已有序且取端点基准）退化为 O(n²)。"
+  },
+  {
+    "n": 3,
+    "id": "algo-complexity-3",
+    "language": "",
+    "direction": "算法与数据结构",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "哈希表查找的平均时间复杂度是 O(1)。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "正确",
+    "explanation": "良好哈希且负载因子可控时平均 O(1)；冲突严重退化时会接近 O(n)。"
+  },
+  {
+    "n": 4,
+    "id": "algo-sort-1",
+    "language": "",
+    "direction": "算法与数据结构",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "下列哪种排序算法是稳定的？",
+    "options": [
+      {
+        "key": "A",
+        "text": "归并排序"
+      },
+      {
+        "key": "B",
+        "text": "快速排序"
+      },
+      {
+        "key": "C",
+        "text": "堆排序"
+      },
+      {
+        "key": "D",
+        "text": "选择排序"
+      }
+    ],
+    "answer": "A",
+    "explanation": "归并排序稳定；快排/堆排/选择排序通常不稳定（相等元素相对次序可能改变）。"
+  },
+  {
+    "n": 5,
+    "id": "algo-sort-2",
+    "language": "",
+    "direction": "算法与数据结构",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "快速排序的最坏时间复杂度通常出现在？",
+    "options": [
+      {
+        "key": "A",
+        "text": "已基本有序且取端点为基准"
+      },
+      {
+        "key": "B",
+        "text": "数据完全随机分布"
+      },
+      {
+        "key": "C",
+        "text": "元素全部互不相同"
+      },
+      {
+        "key": "D",
+        "text": "数据量很小的数组"
+      }
+    ],
+    "answer": "A",
+    "explanation": "取端点作基准且数据已有序时分区极不均衡，退化为 O(n²)；随机基准可缓解。"
+  },
+  {
+    "n": 6,
+    "id": "algo-sort-3",
+    "language": "",
+    "direction": "算法与数据结构",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "归并排序的空间复杂度为 O(n)，且是稳定排序。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "正确",
+    "explanation": "归并需额外 O(n) 辅助数组，合并时相等元素保持原序，故稳定。"
+  },
+  {
+    "n": 7,
+    "id": "algo-sort-4",
+    "language": "",
+    "direction": "算法与数据结构",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "堆排序构建初始堆的时间复杂度是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "O(n)"
+      },
+      {
+        "key": "B",
+        "text": "O(n log n)"
+      },
+      {
+        "key": "C",
+        "text": "O(log n)"
+      },
+      {
+        "key": "D",
+        "text": "O(n²)"
+      }
+    ],
+    "answer": "A",
+    "explanation": "自底向上建堆为 O(n)；之后每次取堆顶再调整，整体排序为 O(n log n)。"
+  },
+  {
+    "n": 8,
+    "id": "algo-search-1",
+    "language": "",
+    "direction": "算法与数据结构",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "二分查找能正确工作的前提是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "数组有序"
+      },
+      {
+        "key": "B",
+        "text": "数组无序"
+      },
+      {
+        "key": "C",
+        "text": "元素都是字符串"
+      },
+      {
+        "key": "D",
+        "text": "数组长度是偶数"
+      }
+    ],
+    "answer": "A",
+    "explanation": "二分依赖有序性来判定收缩方向；无序数组需先排序或改用哈希/线性查找。"
+  },
+  {
+    "n": 9,
+    "id": "algo-search-2",
+    "language": "",
+    "direction": "算法与数据结构",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "二分查找（循环实现）的区间更新通常是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "mid 命中即返回，否则据大小收缩 low 或 high"
+      },
+      {
+        "key": "B",
+        "text": "每次都把搜索区间整体翻倍扩大"
+      },
+      {
+        "key": "C",
+        "text": "从数组两端同时向中间遍历"
+      },
+      {
+        "key": "D",
+        "text": "先整体排序再做一轮线性扫描"
+      }
+    ],
+    "answer": "A",
+    "explanation": "比较 a[mid] 与目标：小了抬 low、大了降 high，区间不断折半直至命中或越界。"
+  },
+  {
+    "n": 10,
+    "id": "algo-search-3",
+    "language": "",
+    "direction": "算法与数据结构",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "在有序数组中找第一个 >= target 的位置，常用哪种二分？",
+    "options": [
+      {
+        "key": "A",
+        "text": "二分查找下界（lower_bound）"
+      },
+      {
+        "key": "B",
+        "text": "用哈希表统计每个元素频次"
+      },
+      {
+        "key": "C",
+        "text": "用双指针从两端相向移动"
+      },
+      {
+        "key": "D",
+        "text": "先冒泡排序再逐个取值"
+      }
+    ],
+    "answer": "A",
+    "explanation": "下界二分在 a[mid] >= target 时收缩右界，最终得第一个满足条件的位置。"
+  },
+  {
+    "n": 11,
+    "id": "algo-search-4",
+    "language": "",
+    "direction": "算法与数据结构",
+    "kind": "judge",
+    "difficulty": "basic",
+    "essentiality": "advanced",
+    "stem": "二分查找只能用于数组，不能用于其他结构或单调函数。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "错误",
+    "explanation": "错误：二分的本质是「单调性」上的折半，可用于二分答案、单调函数、平衡 BST 等。"
+  },
+  {
+    "n": 12,
+    "id": "algo-twoptr-1",
+    "language": "",
+    "direction": "算法与数据结构",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "有序数组中求两数之和等于目标，常用？",
+    "options": [
+      {
+        "key": "A",
+        "text": "左右双指针从两端向中间"
+      },
+      {
+        "key": "B",
+        "text": "暴力两重循环枚举"
+      },
+      {
+        "key": "C",
+        "text": "先排序再去重"
+      },
+      {
+        "key": "D",
+        "text": "按位异或"
+      }
+    ],
+    "answer": "A",
+    "explanation": "和偏小移动左指针、偏大移动右指针，O(n) 内找到答案（数组已有序的前提下）。"
+  },
+  {
+    "n": 13,
+    "id": "algo-twoptr-2",
+    "language": "",
+    "direction": "算法与数据结构",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "滑动窗口最适合解决哪类问题？",
+    "options": [
+      {
+        "key": "A",
+        "text": "连续子数组/子串的区间最值或计数"
+      },
+      {
+        "key": "B",
+        "text": "树的最短路径"
+      },
+      {
+        "key": "C",
+        "text": "图的强连通分量"
+      },
+      {
+        "key": "D",
+        "text": "全排列的生成"
+      }
+    ],
+    "answer": "A",
+    "explanation": "窗口在满足「单调可维护」的区间条件上做右扩左缩，适合连续子段统计。"
+  },
+  {
+    "n": 14,
+    "id": "algo-twoptr-3",
+    "language": "",
+    "direction": "算法与数据结构",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "滑动窗口「右扩左缩」的典型判定是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "满足条件时收缩左界、否则扩张右界"
+      },
+      {
+        "key": "B",
+        "text": "左右界同时向中间移动"
+      },
+      {
+        "key": "C",
+        "text": "只扩张右界、从不收缩"
+      },
+      {
+        "key": "D",
+        "text": "只收缩左界、从不扩张"
+      }
+    ],
+    "answer": "A",
+    "explanation": "右界负责纳入新元素，一旦窗口满足约束就移动左界缩小，直到不再满足。"
+  },
+  {
+    "n": 15,
+    "id": "algo-twoptr-4",
+    "language": "",
+    "direction": "算法与数据结构",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "滑动窗口内维护的状态（如频次计数）必须在左界收缩时同步更新。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "正确",
+    "explanation": "否则窗口状态与实际区间不一致，会导致判断错误；左右移动都要维护同一份状态。"
+  },
+  {
+    "n": 16,
+    "id": "algo-recursion-1",
+    "language": "",
+    "direction": "算法与数据结构",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "一个正确的递归算法必须包含的两部分是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "基础情形（终止条件）与递推关系"
+      },
+      {
+        "key": "B",
+        "text": "循环与条件分支"
+      },
+      {
+        "key": "C",
+        "text": "栈与队列结构"
+      },
+      {
+        "key": "D",
+        "text": "哈希与排序算法"
+      }
+    ],
+    "answer": "A",
+    "explanation": "没有终止条件会无限递归；递推关系把大问题化为更小的同类子问题。"
+  },
+  {
+    "n": 17,
+    "id": "algo-recursion-2",
+    "language": "",
+    "direction": "算法与数据结构",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "回溯法（backtracking）的核心操作是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "做出选择→递归→撤销选择"
+      },
+      {
+        "key": "B",
+        "text": "只递归、从不撤销"
+      },
+      {
+        "key": "C",
+        "text": "只做记忆化存储"
+      },
+      {
+        "key": "D",
+        "text": "用循环替换所有递归"
+      }
+    ],
+    "answer": "A",
+    "explanation": "回溯在递归前后分别「选择」与「撤销选择」，从而系统地枚举并剪枝。"
+  },
+  {
+    "n": 18,
+    "id": "algo-recursion-3",
+    "language": "",
+    "direction": "算法与数据结构",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "递归过深可能导致栈溢出，可改为迭代或使用显式栈。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "正确",
+    "explanation": "每层递归占用调用栈空间，深度过大溢出；迭代/显式栈可避免。"
+  },
+  {
+    "n": 19,
+    "id": "algo-dp-1",
+    "language": "",
+    "direction": "算法与数据结构",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "动态规划适合的问题通常具有？",
+    "options": [
+      {
+        "key": "A",
+        "text": "最优子结构与重叠子问题"
+      },
+      {
+        "key": "B",
+        "text": "只能分治、不能重叠"
+      },
+      {
+        "key": "C",
+        "text": "必须是线性结构"
+      },
+      {
+        "key": "D",
+        "text": "无需定义状态"
+      }
+    ],
+    "answer": "A",
+    "explanation": "最优子结构保证可递推，重叠子问题使「记忆化/表格」能避免重复计算。"
+  },
+  {
+    "n": 20,
+    "id": "algo-dp-2",
+    "language": "",
+    "direction": "算法与数据结构",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "动态规划与分治的关键区别是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "DP 会缓存重叠子问题的结果"
+      },
+      {
+        "key": "B",
+        "text": "DP 不做任何重复计算"
+      },
+      {
+        "key": "C",
+        "text": "分治一定比 DP 更快"
+      },
+      {
+        "key": "D",
+        "text": "两者完全相同"
+      }
+    ],
+    "answer": "A",
+    "explanation": "分治的子问题通常互不重叠；DP 针对重叠子问题缓存结果（自底向上或记忆化）。"
+  },
+  {
+    "n": 21,
+    "id": "algo-dp-3",
+    "language": "",
+    "direction": "算法与数据结构",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "0-1 背包中 dp[j] 通常表示？",
+    "options": [
+      {
+        "key": "A",
+        "text": "容量为 j 时能取得的最大价值"
+      },
+      {
+        "key": "B",
+        "text": "物品数量为 j 时的总重量"
+      },
+      {
+        "key": "C",
+        "text": "第 j 个物品的价值"
+      },
+      {
+        "key": "D",
+        "text": "容量为 j 时的物品个数"
+      }
+    ],
+    "answer": "A",
+    "explanation": "dp[j] = 容量 j 下的最优价值，逐个物品更新；一维时容量需倒序以保证 0-1。"
+  },
+  {
+    "n": 22,
+    "id": "algo-dp-4",
+    "language": "",
+    "direction": "算法与数据结构",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "一维 0-1 背包用一维数组时，容量维度需倒序遍历，避免同一物品被重复选入。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "正确",
+    "explanation": "倒序遍历保证 dp[j] 用到的是「上一轮」的值，等价于每件物品只用一次。"
+  },
+  {
+    "n": 23,
+    "id": "algo-ds-1",
+    "language": "",
+    "direction": "算法与数据结构",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "用哈希表统计元素频次，平均查找开销是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "O(1)"
+      },
+      {
+        "key": "B",
+        "text": "O(n)"
+      },
+      {
+        "key": "C",
+        "text": "O(log n)"
+      },
+      {
+        "key": "D",
+        "text": "O(n²)"
+      }
+    ],
+    "answer": "A",
+    "explanation": "哈希平均 O(1) 完成插入/查找/更新，是频次统计与去重的常用结构。"
+  },
+  {
+    "n": 24,
+    "id": "algo-ds-2",
+    "language": "",
+    "direction": "算法与数据结构",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "括号匹配问题最适合用哪种数据结构？",
+    "options": [
+      {
+        "key": "A",
+        "text": "栈"
+      },
+      {
+        "key": "B",
+        "text": "队列"
+      },
+      {
+        "key": "C",
+        "text": "堆"
+      },
+      {
+        "key": "D",
+        "text": "哈希表"
+      }
+    ],
+    "answer": "A",
+    "explanation": "左括号入栈、右括号出栈比对，栈的 LIFO 正好匹配括号的嵌套顺序。"
+  },
+  {
+    "n": 25,
+    "id": "algo-ds-3",
+    "language": "",
+    "direction": "算法与数据结构",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "用两个栈可以实现一个？",
+    "options": [
+      {
+        "key": "A",
+        "text": "队列"
+      },
+      {
+        "key": "B",
+        "text": "堆"
+      },
+      {
+        "key": "C",
+        "text": "图"
+      },
+      {
+        "key": "D",
+        "text": "并查集"
+      }
+    ],
+    "answer": "A",
+    "explanation": "一个入栈、一个出栈，倒腾两次即可实现先进先出，即用两个栈模拟队列。"
+  },
+  {
+    "n": 26,
+    "id": "algo-ds-4",
+    "language": "",
+    "direction": "算法与数据结构",
+    "kind": "judge",
+    "difficulty": "basic",
+    "essentiality": "advanced",
+    "stem": "哈希表处理冲突时，链地址法与开放寻址法是常见策略。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "正确",
+    "explanation": "链地址法把冲突元素串成链表；开放寻址法按探测序列找空位，各有取舍。"
+  },
+  {
+    "n": 27,
+    "id": "algo-tree-1",
+    "language": "",
+    "direction": "算法与数据结构",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "二叉树的前序遍历顺序是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "根→左→右"
+      },
+      {
+        "key": "B",
+        "text": "左→根→右"
+      },
+      {
+        "key": "C",
+        "text": "左→右→根"
+      },
+      {
+        "key": "D",
+        "text": "右→根→左"
+      }
+    ],
+    "answer": "A",
+    "explanation": "前序「根左右」、中序「左根右」、后序「左右根」；层序则按层 BFS。"
+  },
+  {
+    "n": 28,
+    "id": "algo-tree-2",
+    "language": "",
+    "direction": "算法与数据结构",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "二叉搜索树（BST）的中序遍历结果是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "升序有序序列"
+      },
+      {
+        "key": "B",
+        "text": "降序有序序列"
+      },
+      {
+        "key": "C",
+        "text": "随机无序序列"
+      },
+      {
+        "key": "D",
+        "text": "按层排列的序列"
+      }
+    ],
+    "answer": "A",
+    "explanation": "BST 左<根<右，中序遍历「左根右」天然得到升序序列。"
+  },
+  {
+    "n": 29,
+    "id": "algo-tree-3",
+    "language": "",
+    "direction": "算法与数据结构",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "判断链表是否有环常用快慢指针（Floyd 判圈）法。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "正确",
+    "explanation": "快指针每次两步、慢指针一步，若有环必相遇；相遇后可再求环入口。"
+  },
+  {
+    "n": 30,
+    "id": "algo-bit-1",
+    "language": "",
+    "direction": "算法与数据结构",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "表达式 x & (x - 1) 的作用是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "清除 x 最低位的 1"
+      },
+      {
+        "key": "B",
+        "text": "把 x 整体置零"
+      },
+      {
+        "key": "C",
+        "text": "取出 x 的最高位"
+      },
+      {
+        "key": "D",
+        "text": "对 x 按位取反"
+      }
+    ],
+    "answer": "A",
+    "explanation": "x-1 会把最低位的 1 变 0、其后变 1，再与 x 按位与即清除最低位的 1（可用于数 1 的个数）。"
+  }
+]

@@ -401,6 +401,73 @@
         {"name": "安全与合规", "required": 3},
         {"name": "技术决策与团队", "required": 3}
       ]
+    },
+    {
+      "role": "数据库工程师",
+      "direction": "SQL 与数据库",
+      "level": "初级",
+      "years_min": 0,
+      "years_max": 2,
+      "must_have": ["SQL 基础", "数据库设计", "索引基础"],
+      "skills": [
+        {"name": "SQL 基础", "required": 2},
+        {"name": "数据库设计", "required": 2},
+        {"name": "索引基础", "required": 1},
+        {"name": "事务基础", "required": 1},
+        {"name": "MySQL/PostgreSQL", "required": 1},
+        {"name": "范式与约束", "required": 1}
+      ]
+    },
+    {
+      "role": "数据库工程师",
+      "direction": "SQL 与数据库",
+      "level": "中级",
+      "years_min": 2,
+      "years_max": 5,
+      "must_have": ["复杂 SQL", "索引与执行计划", "事务与锁"],
+      "skills": [
+        {"name": "复杂 SQL", "required": 3},
+        {"name": "索引与执行计划", "required": 3},
+        {"name": "事务与锁", "required": 2},
+        {"name": "性能优化", "required": 2},
+        {"name": "分库分表入门", "required": 1},
+        {"name": "备份恢复", "required": 2},
+        {"name": "存储过程与触发器", "required": 1}
+      ]
+    },
+    {
+      "role": "数据库工程师",
+      "direction": "SQL 与数据库",
+      "level": "高级",
+      "years_min": 5,
+      "years_max": 10,
+      "must_have": ["SQL 调优", "高并发数据库设计", "分布式数据库"],
+      "skills": [
+        {"name": "SQL 调优", "required": 4},
+        {"name": "高并发数据库设计", "required": 3},
+        {"name": "分布式数据库", "required": 3},
+        {"name": "分库分表", "required": 3},
+        {"name": "主从复制与高可用", "required": 3},
+        {"name": "数据迁移", "required": 2},
+        {"name": "查询优化器", "required": 2}
+      ]
+    },
+    {
+      "role": "数据库工程师",
+      "direction": "SQL 与数据库",
+      "level": "专家",
+      "years_min": 10,
+      "years_max": 99,
+      "must_have": ["数据库架构", "数据治理与合规", "技术决策与团队"],
+      "skills": [
+        {"name": "数据库架构", "required": 4},
+        {"name": "数据治理与合规", "required": 4},
+        {"name": "数据中台与湖仓", "required": 3},
+        {"name": "容量与成本规划", "required": 3},
+        {"name": "技术决策与团队", "required": 3},
+        {"name": "分布式数据库", "required": 3},
+        {"name": "数据安全", "required": 3}
+      ]
     }
   ]
 }
