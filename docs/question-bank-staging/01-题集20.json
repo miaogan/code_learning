@@ -35,7 +35,7 @@
     "kind": "single",
     "difficulty": "basic",
     "essentiality": "must_know",
-    "stem": "```js const a = [1, 2, 3]; const b = a.map(x => x * 2); ```",
+    "stem": "下面这段代码执行后，`a` 的值是？\n```js\nconst a = [1, 2, 3];\nconst b = a.map(x => x * 2);\n```",
     "options": [
       {
         "key": "A",
@@ -209,7 +209,7 @@
     "kind": "single",
     "difficulty": "intermediate",
     "essentiality": "advanced",
-    "stem": "```js console.log(0.1 + 0.2 === 0.3); ```",
+    "stem": "下面这行代码在浏览器控制台输出什么？\n```js\nconsole.log(0.1 + 0.2 === 0.3);\n```",
     "options": [
       {
         "key": "A",

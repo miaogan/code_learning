@@ -1308,13 +1308,13 @@
     "language": "python",
     "prompt": "下面这段代码的输出是？\n```python\ndef f(a, b=[]):\n    b.append(a)\n    return b\nprint(f(1), f(2))\n```",
     "options": [
-      { "key": "A", "text": "[1] [2]" },
-      { "key": "B", "text": "抛出 TypeError" },
-      { "key": "C", "text": "[1, 2] [1, 2]" },
-      { "key": "D", "text": "[1] [1, 2]" }
+      { "key": "A", "text": "[1] [1, 2]" },
+      { "key": "B", "text": "[1] [2]" },
+      { "key": "C", "text": "抛出 TypeError" },
+      { "key": "D", "text": "[1, 2] [1, 2]" }
     ],
     "answer": ["D"],
-    "explanation": "默认参数 b=[] 只在函数定义时求值一次，两次调用共享同一个列表：第一次返回 [1]，第二次在其上追加得到 [1, 2]。正确写法是默认 None 并在函数体内新建列表。"
+    "explanation": "默认参数 b=[] 只在函数定义时求值一次，两次调用共享同一个列表。更关键的是 print(f(1), f(2)) 先求值完两个参数再统一转字符串，此时两处引用都指向同一个已变成 [1, 2] 的列表，所以两个都打印 [1, 2]；若分两行 print 才会看到 [1] 与 [1, 2]。正确写法是默认 None 并在函数体内新建列表。"
   },
   {
     "id": "py-q2",
@@ -4312,7 +4312,7 @@
     "difficulty": "basic",
     "essentiality": "must_know",
     "language": "js",
-    "prompt": "```js const a = [1, 2, 3]; const b = a.map(x => x * 2); ```",
+    "prompt": "下面这段代码执行后，`a` 的值是？\n```js\nconst a = [1, 2, 3];\nconst b = a.map(x => x * 2);\n```",
     "options": [
       { "key": "A", "text": "[2, 4, 6]" },
       { "key": "B", "text": "[1, 2, 3]" },
@@ -4420,7 +4420,7 @@
     "difficulty": "intermediate",
     "essentiality": "advanced",
     "language": "js",
-    "prompt": "```js console.log(0.1 + 0.2 === 0.3); ```",
+    "prompt": "下面这行代码在浏览器控制台输出什么？\n```js\nconsole.log(0.1 + 0.2 === 0.3);\n```",
     "options": [
       { "key": "A", "text": "0.3" },
       { "key": "B", "text": "false" },
