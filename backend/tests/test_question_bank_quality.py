@@ -268,7 +268,7 @@ def test_generated_bank_has_no_ai_placeholder(bank_rows: list[dict[str, Any]]) -
 # ---------------------------------------------------------------------------
 
 #: r12 新增来源闭集（与 `question_merge.SOURCES` 同一口径；门禁是唯一断言点故写字面量）。
-R12_SOURCES = ("tiji", "local100", "iq380", "fe-interview", "ai-eng")
+R12_SOURCES = ("tiji", "local100", "iq380", "fe-interview", "ai-eng", "mw")
 #: 每来源条数：`seed` 是存量 260 行（种子不写 `source`，读侧缺省 `'seed'`）。
 R12_SOURCE_COUNTS = {
     "seed": 260,
@@ -277,9 +277,10 @@ R12_SOURCE_COUNTS = {
     "iq380": 379,
     "fe-interview": 20,
     "ai-eng": 103,
+    "mw": 76,
 }
-#: 合并后总量（= 存量 260 + 本批 622）。
-R12_TOTAL = 882
+#: 合并后总量（= 存量 260 + 本批 698）。
+R12_TOTAL = 958
 
 
 def test_r12_source_enum_and_per_source_counts(bank_rows: list[dict[str, Any]]) -> None:

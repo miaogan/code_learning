@@ -4,7 +4,7 @@
 
 四件事，全部在离线阶段做完，运行时零改动（`question_bank.ensure_seeded()` 仍负责入库）：
 
-1. **归一化**：`docs/question-bank-staging/` 的 4 份素材 → 种子行。越界只走「映射纠正」或
+1. **归一化**：`docs/question-bank-staging/` 的各份素材 → 种子行。越界只走「映射纠正」或
    「整条丢弃并记账」，不做静默改；方向归一只经 `rules.direction_of_language()` 派生
    （`dir = direction_of_language(language) or 原 direction`），本文件**不复述**方向表。
 2. **去重**：题干归一化（NFKC → 去空白 → 去非文字符号，与 r11 测试侧口径逐字一致）后与存量
@@ -41,7 +41,7 @@ from .. import repository
 from . import question_bank, rules
 
 #: 本批来源闭集（顺序即报表与批次落盘顺序）。
-SOURCES: tuple[str, ...] = ("tiji", "local100", "iq380", "fe-interview", "ai-eng")
+SOURCES: tuple[str, ...] = ("tiji", "local100", "iq380", "fe-interview", "ai-eng", "mw")
 
 #: 来源 → 素材文件名（`docs/question-bank-staging/` 下的可复现输入，必须随仓库提交）。
 STAGING_FILES: dict[str, str] = {
@@ -50,6 +50,7 @@ STAGING_FILES: dict[str, str] = {
     "iq380": "03-七方向379题.json",
     "fe-interview": "04-fe-interview20.json",
     "ai-eng": "05-ai-engineering78.json",
+    "mw": "06-middleware.json",
 }
 
 #: 来源 → 种子 id 前缀（避开 legacy `fe-/be-/al-/cs-` 与 r11 九个语言前缀，保证
@@ -63,6 +64,7 @@ ID_PREFIX: dict[str, str] = {
     "iq380": "iq380-",
     "fe-interview": "fei-",
     "ai-eng": "aieng-",
+    "mw": "mw-",
 }
 
 #: 近重复口径：字符 n-gram 的 Jaccard 下界（常量只在这里，别处不得再写一个阈值）。
@@ -71,7 +73,7 @@ NEAR_DUP_JACCARD = 0.62
 
 #: 批内冲突取舍的来源优先级（高 → 低），与 `SOURCES` 顺序一致但**语义不同**：
 #: 前者决定谁赢，后者决定写盘顺序。
-SOURCE_PRIORITY: tuple[str, ...] = ("tiji", "local100", "iq380", "fe-interview", "ai-eng")
+SOURCE_PRIORITY: tuple[str, ...] = ("tiji", "local100", "iq380", "fe-interview", "ai-eng", "mw")
 
 #: 判断题的固定选项（与存量 seed 的 36 道逐字一致：前端按 options 原样渲染，文案不可改）。
 #: 素材里 4 条 key 是中文（`正确`/`错误`）、其余 116 条 key 已是 A/B —— 一律按本常量重建。

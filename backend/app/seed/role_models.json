@@ -334,6 +334,73 @@
         {"name": "评估与安全", "required": 3},
         {"name": "团队与技术规划", "required": 3}
       ]
+    },
+    {
+      "role": "中间件与运维工程师",
+      "direction": "中间件与运维",
+      "level": "初级",
+      "years_min": 0,
+      "years_max": 2,
+      "must_have": ["Linux 基础", "Docker 基础", "SQL/数据库运维"],
+      "skills": [
+        {"name": "Linux 基础", "required": 2},
+        {"name": "Docker 基础", "required": 2},
+        {"name": "SQL/数据库运维", "required": 2},
+        {"name": "网络基础", "required": 1},
+        {"name": "Shell/脚本", "required": 1},
+        {"name": "监控告警入门", "required": 1}
+      ]
+    },
+    {
+      "role": "中间件与运维工程师",
+      "direction": "中间件与运维",
+      "level": "中级",
+      "years_min": 2,
+      "years_max": 5,
+      "must_have": ["Docker 与容器编排", "Nginx 反向代理", "Redis 缓存"],
+      "skills": [
+        {"name": "Docker 与容器编排", "required": 3},
+        {"name": "Kubernetes 运维", "required": 2},
+        {"name": "Nginx 反向代理", "required": 3},
+        {"name": "Redis 缓存", "required": 2},
+        {"name": "PostgreSQL 运维", "required": 2},
+        {"name": "消息队列", "required": 1},
+        {"name": "CI/CD 流水线", "required": 2}
+      ]
+    },
+    {
+      "role": "中间件与运维工程师",
+      "direction": "中间件与运维",
+      "level": "高级",
+      "years_min": 5,
+      "years_max": 10,
+      "must_have": ["Kubernetes 架构", "高可用与容灾", "可观测性体系"],
+      "skills": [
+        {"name": "Kubernetes 架构", "required": 4},
+        {"name": "高可用与容灾", "required": 3},
+        {"name": "可观测性体系", "required": 3},
+        {"name": "分布式系统", "required": 3},
+        {"name": "性能调优", "required": 3},
+        {"name": "数据库运维与备份", "required": 3},
+        {"name": "安全与合规", "required": 2}
+      ]
+    },
+    {
+      "role": "中间件与运维工程师",
+      "direction": "中间件与运维",
+      "level": "专家",
+      "years_min": 10,
+      "years_max": 99,
+      "must_have": ["基础设施架构", "SRE 体系", "技术决策与团队"],
+      "skills": [
+        {"name": "基础设施架构", "required": 4},
+        {"name": "SRE 体系", "required": 4},
+        {"name": "多集群与混合云", "required": 3},
+        {"name": "成本与容量规划", "required": 4},
+        {"name": "数据库与存储架构", "required": 3},
+        {"name": "安全与合规", "required": 3},
+        {"name": "技术决策与团队", "required": 3}
+      ]
     }
   ]
 }

@@ -126,6 +126,7 @@ const DIRECTION_LABEL = {
   算法与数据结构: '算法与数据结构',
   计算机基础: '计算机基础',
   'AI 工程': 'AI 工程',
+  '中间件与运维': '中间件与运维',
 } satisfies Record<Exclude<PracticeDirectionFilter, 'all'>, string>
 
 /** 方向 chip 组：四方向 + 全部（唯一来源是 `DIRECTION_LABEL`，不在函数内重复字面量）。 */

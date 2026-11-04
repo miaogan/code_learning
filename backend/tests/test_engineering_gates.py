@@ -162,7 +162,7 @@ R6_TOUCHED = (
 )
 
 #: 方向闭集（rules.DIRECTIONS 的期望值；散落即漂移）。
-DIRECTIONS = ("前端", "后端", "算法与数据结构", "计算机基础", "AI 工程")
+DIRECTIONS = ("前端", "后端", "算法与数据结构", "计算机基础", "AI 工程", "中间件与运维")
 
 SERVICES = APP_DIR / "services"
 

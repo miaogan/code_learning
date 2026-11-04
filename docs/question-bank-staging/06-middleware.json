@@ -1,0 +1,2094 @@
+[
+  {
+    "n": 1,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "PostgreSQL 的默认端口是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "3306"
+      },
+      {
+        "key": "B",
+        "text": "5432"
+      },
+      {
+        "key": "C",
+        "text": "6379"
+      },
+      {
+        "key": "D",
+        "text": "27017"
+      }
+    ],
+    "answer": "B",
+    "explanation": "5432 是 PostgreSQL 默认端口；3306 是 MySQL、6379 是 Redis、27017 是 MongoDB。"
+  },
+  {
+    "n": 2,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "关于事务的 ACID 特性，下列说法正确的有？",
+    "options": [
+      {
+        "key": "A",
+        "text": "原子性（Atomicity）：事务要么全成要么全不成"
+      },
+      {
+        "key": "B",
+        "text": "一致性（Consistency）：约束不被破坏"
+      },
+      {
+        "key": "C",
+        "text": "隔离性（Isolation）：并发事务互不干扰"
+      },
+      {
+        "key": "D",
+        "text": "持久性（Durability）：提交后不丢"
+      }
+    ],
+    "answer": "A,B,C,D",
+    "explanation": "ACID 是关系型事务的四要素；持久性由 WAL/落盘机制保证。"
+  },
+  {
+    "n": 3,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "B-tree 索引最适合哪种查询？",
+    "options": [
+      {
+        "key": "A",
+        "text": "等值查询与范围查询（=、>、BETWEEN、排序）"
+      },
+      {
+        "key": "B",
+        "text": "全文检索文本"
+      },
+      {
+        "key": "C",
+        "text": "仅随机访问"
+      },
+      {
+        "key": "D",
+        "text": "只能用于唯一约束"
+      }
+    ],
+    "answer": "A",
+    "explanation": "B-tree 是默认索引，擅长等值/范围与有序扫描；全文检索通常用 GIN + tsvector。"
+  },
+  {
+    "n": 4,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "PostgreSQL 默认的事务隔离级别是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "读已提交（READ COMMITTED）"
+      },
+      {
+        "key": "B",
+        "text": "可串行化（SERIALIZABLE）"
+      },
+      {
+        "key": "C",
+        "text": "读未提交（READ UNCOMMITTED）"
+      },
+      {
+        "key": "D",
+        "text": "无隔离"
+      }
+    ],
+    "answer": "A",
+    "explanation": "PG 默认 READ COMMITTED：防止脏读；更强隔离需在会话/事务中显式设置。"
+  },
+  {
+    "n": 5,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "MVCC（多版本并发控制）的核心价值是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "读不阻塞写、写不阻塞读：每个事务看自己的快照"
+      },
+      {
+        "key": "B",
+        "text": "彻底消除所有锁"
+      },
+      {
+        "key": "C",
+        "text": "仅用于主从复制"
+      },
+      {
+        "key": "D",
+        "text": "替代事务语义"
+      }
+    ],
+    "answer": "A",
+    "explanation": "MVCC 让读走历史快照、写追加新版本，从而读写互不阻塞，是 PG 高并发的基础。"
+  },
+  {
+    "n": 6,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "关于 EXPLAIN（不含 ANALYZE），下列说法正确的有？",
+    "options": [
+      {
+        "key": "A",
+        "text": "展示查询的执行计划"
+      },
+      {
+        "key": "B",
+        "text": "能看到是否走了索引"
+      },
+      {
+        "key": "C",
+        "text": "给出的是估算行数与代价"
+      },
+      {
+        "key": "D",
+        "text": "给出真实执行耗时"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "EXPLAIN 看计划与估算；要真实耗时与行数需 EXPLAIN ANALYZE（有实际执行开销）。"
+  },
+  {
+    "n": 7,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "PostgreSQL 流复制（物理/流复制）中，从库（standby）默认是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "只读，异步复制存在主从延迟"
+      },
+      {
+        "key": "B",
+        "text": "可读写"
+      },
+      {
+        "key": "C",
+        "text": "完全不能连接"
+      },
+      {
+        "key": "D",
+        "text": "与主库实时强一致零延迟"
+      }
+    ],
+    "answer": "A",
+    "explanation": "流复制备库默认只读，异步模式下主库提交后从库有延迟；同步复制可降延迟但有性能代价。"
+  },
+  {
+    "n": 8,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "VACUUM 用于回收已删除/更新行占用的空间，并防止事务 ID 回卷导致的数据损坏。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "正确",
+    "explanation": "PG 的 MVCC 会产生死元组，VACUUM 回收空间并冻结旧事务 ID；长期不 vacuum 会触发回卷保护停机。"
+  },
+  {
+    "n": 9,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "WAL（预写日志，Write-Ahead Logging）的主要作用是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "先写日志再改数据，保证崩溃后可恢复、保障持久性"
+      },
+      {
+        "key": "B",
+        "text": "直接加速查询"
+      },
+      {
+        "key": "C",
+        "text": "替代索引"
+      },
+      {
+        "key": "D",
+        "text": "仅用于审计"
+      }
+    ],
+    "answer": "A",
+    "explanation": "WAL 是崩溃恢复与持久性的基石：先落日志再应用修改，故障重放日志即可回放。"
+  },
+  {
+    "n": 10,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "关于表分区（partitioning），合理的收益包括？",
+    "options": [
+      {
+        "key": "A",
+        "text": "大表查询/维护更快（分区裁剪）"
+      },
+      {
+        "key": "B",
+        "text": "便于按时间归档或快速删除历史分区"
+      },
+      {
+        "key": "C",
+        "text": "可减小单分区上的索引体积"
+      },
+      {
+        "key": "D",
+        "text": "自动消除一切慢查询"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "分区通过裁剪提升效率并方便生命周期管理，但不会自动消除所有慢查询（仍需好索引与 SQL）。"
+  },
+  {
+    "n": 11,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "相比 JSON 类型，JSONB 的主要优势是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "二进制存储、去重键、支持 GIN 索引与高效查询"
+      },
+      {
+        "key": "B",
+        "text": "输出更快但无法查询"
+      },
+      {
+        "key": "C",
+        "text": "只能存字符串"
+      },
+      {
+        "key": "D",
+        "text": "不支持任何索引"
+      }
+    ],
+    "answer": "A",
+    "explanation": "JSONB 以解析后的二进制存储，支持 GIN 索引与字段级查询；JSON 仅保留文本原文。"
+  },
+  {
+    "n": 12,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "避免/处理数据库死锁的合理手段包括？",
+    "options": [
+      {
+        "key": "A",
+        "text": "统一多个事务访问资源的加锁顺序"
+      },
+      {
+        "key": "B",
+        "text": "缩短事务、减小锁粒度与持有时间"
+      },
+      {
+        "key": "C",
+        "text": "依赖数据库死锁检测后回滚其中一个事务"
+      },
+      {
+        "key": "D",
+        "text": "永远不会发生死锁，可忽略"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "统一加锁顺序与缩短事务能减少死锁；DB 也会检测并回滚代价小的一方，但不能据此放任。"
+  },
+  {
+    "n": 13,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "judge",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "连接池（如 pgbouncer）可复用数据库连接，显著降低频繁建连/断连的开销。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "正确",
+    "explanation": "短连接高并发下建连成本很高，连接池复用是 PG 生产部署的标配。"
+  },
+  {
+    "n": 14,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "关于 PostgreSQL 的复制，下列说法正确的有？",
+    "options": [
+      {
+        "key": "A",
+        "text": "流复制（物理）是块级，备库默认只读"
+      },
+      {
+        "key": "B",
+        "text": "逻辑复制可按表/库选择性发布，便于大版本迁移"
+      },
+      {
+        "key": "C",
+        "text": "异步复制存在主从延迟"
+      },
+      {
+        "key": "D",
+        "text": "复制可以完全替代备份"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "物理复制镜像块、逻辑复制更灵活；但复制不是备份（误删会同步），仍需独立备份。"
+  },
+  {
+    "n": 15,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "Redis 的默认端口是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "6379"
+      },
+      {
+        "key": "B",
+        "text": "5432"
+      },
+      {
+        "key": "C",
+        "text": "3306"
+      },
+      {
+        "key": "D",
+        "text": "11211"
+      }
+    ],
+    "answer": "A",
+    "explanation": "6379 是 Redis 默认端口；11211 是 Memcached。"
+  },
+  {
+    "n": 16,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "Redis 常见的数据结构包括？",
+    "options": [
+      {
+        "key": "A",
+        "text": "String / Hash"
+      },
+      {
+        "key": "B",
+        "text": "List / Set"
+      },
+      {
+        "key": "C",
+        "text": "Sorted Set（有序集合）"
+      },
+      {
+        "key": "D",
+        "text": "Bitmap / HyperLogLog / Stream"
+      }
+    ],
+    "answer": "A,B,C,D",
+    "explanation": "Redis 是多数据结构存储：字符串、哈希、列表、集合、有序集合，以及位图、HLL、Stream 等。"
+  },
+  {
+    "n": 17,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "Sorted Set（ZSet）最典型的使用场景是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "按分数排序的排行榜 / 延迟队列"
+      },
+      {
+        "key": "B",
+        "text": "仅缓存整页 HTML"
+      },
+      {
+        "key": "C",
+        "text": "仅发布订阅"
+      },
+      {
+        "key": "D",
+        "text": "仅做简单计数器"
+      }
+    ],
+    "answer": "A",
+    "explanation": "ZSet 按 score 排序且可范围取TopN，是实时排行榜、延迟队列的首选。"
+  },
+  {
+    "n": 18,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "RDB 与 AOF 两种持久化的主要区别是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "RDB 是定时快照，AOF 记录写命令流水"
+      },
+      {
+        "key": "B",
+        "text": "两者完全相同"
+      },
+      {
+        "key": "C",
+        "text": "RDB 记录命令、AOF 是快照"
+      },
+      {
+        "key": "D",
+        "text": "AOF 只能存内存"
+      }
+    ],
+    "answer": "A",
+    "explanation": "RDB 紧凑快照、恢复快但可能丢较多数据；AOF 记录写命令、更耐用但文件大。"
+  },
+  {
+    "n": 19,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "应对缓存穿透 / 击穿 / 雪崩的合理手段包括？",
+    "options": [
+      {
+        "key": "A",
+        "text": "布隆过滤器或缓存空值防穿透"
+      },
+      {
+        "key": "B",
+        "text": "热点 key 互斥重建 / 逻辑过期防击穿"
+      },
+      {
+        "key": "C",
+        "text": "过期时间加随机量与限流防雪崩"
+      },
+      {
+        "key": "D",
+        "text": "让缓存永不过期即可"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "三类问题根因不同：穿透是查不存在的数据、击穿是单热点失效、雪崩是批量同时失效；D 反而放大风险。"
+  },
+  {
+    "n": 20,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "用 Redis 实现分布式锁，最关键的是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "加锁原子性（SET key val NX）且只有持有者能释放"
+      },
+      {
+        "key": "B",
+        "text": "用 GET 再 SET 两步即可"
+      },
+      {
+        "key": "C",
+        "text": "锁无需过期时间"
+      },
+      {
+        "key": "D",
+        "text": "任意客户端都能释放该锁"
+      }
+    ],
+    "answer": "A",
+    "explanation": "原子加锁（SET NX）+ 唯一标识校验释放 + 合理过期，是安全分布式锁的要点；两步 GET/SET 非原子。"
+  },
+  {
+    "n": 21,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "Redis 核心命令执行是单线程的，因此一个超大 key 或慢命令会阻塞其他请求。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "正确",
+    "explanation": "执行模型单线程（6.x 后 IO 多线程但仍单线程执行），大 key、慢查询会拖垮整体吞吐，应避免。"
+  },
+  {
+    "n": 22,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "内存淘汰策略（如 LRU/LFU）在什么情况下触发？",
+    "options": [
+      {
+        "key": "A",
+        "text": "使用内存达到 maxmemory 上限时"
+      },
+      {
+        "key": "B",
+        "text": "每次写入之前"
+      },
+      {
+        "key": "C",
+        "text": "仅在重启时"
+      },
+      {
+        "key": "D",
+        "text": "永不发生"
+      }
+    ],
+    "answer": "A",
+    "explanation": "当内存触及 maxmemory，Redis 按策略（noeviction/LRU/LFU/random/ttl）淘汰键；noeviction 会拒绝写入。"
+  },
+  {
+    "n": 23,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "HyperLogLog 主要解决什么问题？",
+    "options": [
+      {
+        "key": "A",
+        "text": "海量元素的基数（去重计数，如 UV）估算，且内存极小"
+      },
+      {
+        "key": "B",
+        "text": "精确去重计数"
+      },
+      {
+        "key": "C",
+        "text": "有序排行榜"
+      },
+      {
+        "key": "D",
+        "text": "消息队列"
+      }
+    ],
+    "answer": "A",
+    "explanation": "HLL 以约 12KB 估算上亿基数，误差可控，是 PV/UV 统计的省内存方案；它给的是近似值。"
+  },
+  {
+    "n": 24,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "Pipeline（管道）的主要作用是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "批量发送命令、减少多次网络 RTT"
+      },
+      {
+        "key": "B",
+        "text": "替代事务语义"
+      },
+      {
+        "key": "C",
+        "text": "保证原子性"
+      },
+      {
+        "key": "D",
+        "text": "加速磁盘 IO"
+      }
+    ],
+    "answer": "A",
+    "explanation": "Pipeline 把多条命令合并收发，降低网络往返开销；它不等于事务（无回滚），也不保证原子。"
+  },
+  {
+    "n": 25,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "Redis Cluster 通过 16384 个槽（slot）分片实现水平扩展，且要求多数主节点可用。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "正确",
+    "explanation": "Cluster 把 keyspace 分到 16384 槽并由主节点持有，故障转移需多数派，是 Redis 横向扩展方案。"
+  },
+  {
+    "n": 26,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "关于 Redis 持久化与数据安全，下列说法正确的有？",
+    "options": [
+      {
+        "key": "A",
+        "text": "AOF 的 everysec 在性能与最多丢约 1 秒间权衡"
+      },
+      {
+        "key": "B",
+        "text": "RDB 可能丢失最近一次快照之后的写入"
+      },
+      {
+        "key": "C",
+        "text": "主从 + 哨兵可提升可用性，但不等于备份"
+      },
+      {
+        "key": "D",
+        "text": "有了持久化就保证零数据丢失"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "持久化降低丢失概率但不保证零丢失；主从/哨兵解决高可用而非备份，仍需独立备份策略。"
+  },
+  {
+    "n": 27,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "Pub/Sub（发布订阅）的消息模型特点是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "发布即推送、无持久化、离线订阅者收不到历史消息"
+      },
+      {
+        "key": "B",
+        "text": "可靠的持久化队列"
+      },
+      {
+        "key": "C",
+        "text": "自动事务回滚"
+      },
+      {
+        "key": "D",
+        "text": "仅本地进程内"
+      }
+    ],
+    "answer": "A",
+    "explanation": "Pub/Sub 是实时广播、不落盘；需要可靠消费应改用 Stream 或外部 MQ。"
+  },
+  {
+    "n": 28,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "judge",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "把 Redis 当持久数据库使用时，需要配置合适的持久化与内存/淘汰策略，否则重启或淘汰会丢数据。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "正确",
+    "explanation": "Redis 以内存为主，若持久化/策略不当，重启或触发淘汰都会丢数据；按场景选型很重要。"
+  },
+  {
+    "n": 29,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "反向代理与正向代理的主要区别是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "反向代理代表服务端、对客户端透明，常用于负载均衡"
+      },
+      {
+        "key": "B",
+        "text": "正向代理代表服务端"
+      },
+      {
+        "key": "C",
+        "text": "两者完全相同"
+      },
+      {
+        "key": "D",
+        "text": "反向代理只能做缓存"
+      }
+    ],
+    "answer": "A",
+    "explanation": "正向代理代表客户端（如科学上网/内网出网），反向代理代表服务端（如 Nginx 前置后端）。"
+  },
+  {
+    "n": 30,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "Nginx 负载均衡的常用策略包括？",
+    "options": [
+      {
+        "key": "A",
+        "text": "轮询（round-robin）"
+      },
+      {
+        "key": "B",
+        "text": "最少连接（least_conn）"
+      },
+      {
+        "key": "C",
+        "text": "IP 哈希（ip_hash）做会话保持"
+      },
+      {
+        "key": "D",
+        "text": "随机且永不均衡"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "轮询、最少连接、ip_hash 等是常见后端分发策略；还可加权与第三方一致性哈希。"
+  },
+  {
+    "n": 31,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "Nginx 的 location 匹配优先级，正确的是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "= 精确匹配 > ^~ 前缀 > 正则(~) > 普通前缀"
+      },
+      {
+        "key": "B",
+        "text": "正则优先级最低"
+      },
+      {
+        "key": "C",
+        "text": "按配置文件书写顺序随意"
+      },
+      {
+        "key": "D",
+        "text": "普通前缀永远最高"
+      }
+    ],
+    "answer": "A",
+    "explanation": "精确匹配 = 最高，其次 ^~ 前缀，再次正则，最后普通前缀；理解顺序才能正确路由。"
+  },
+  {
+    "n": 32,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "Nginx 作为 HTTPS 接入层通常负责？",
+    "options": [
+      {
+        "key": "A",
+        "text": "TLS 终止（卸载），之后以明文转发内网后端"
+      },
+      {
+        "key": "B",
+        "text": "替代应用业务逻辑"
+      },
+      {
+        "key": "C",
+        "text": "仅做 DNS 解析"
+      },
+      {
+        "key": "D",
+        "text": "仅记录日志"
+      }
+    ],
+    "answer": "A",
+    "explanation": "TLS 终止在 Nginx 完成，内网用 HTTP 减少后端加解密开销；证书与安全策略集中管理。"
+  },
+  {
+    "n": 33,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "Nginx 通常采用一个 master 进程管理多个 worker 进程，worker 数常设为 CPU 核数。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "正确",
+    "explanation": "master 负责信号/配置加载，worker 处理连接；worker 数与核数对齐以充分利用多核。"
+  },
+  {
+    "n": 34,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "提升 Nginx 静态资源服务性能的做法包括？",
+    "options": [
+      {
+        "key": "A",
+        "text": "开启 gzip 压缩"
+      },
+      {
+        "key": "B",
+        "text": "设置长缓存 Cache-Control"
+      },
+      {
+        "key": "C",
+        "text": "开启 sendfile 零拷贝"
+      },
+      {
+        "key": "D",
+        "text": "关闭所有缓冲与缓存"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "gzip、长缓存与 sendfile 都能显著提速静态服务；D 反而降低性能。"
+  },
+  {
+    "n": 35,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "upstream 模块的主要作用是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "定义一组后端服务器，供 proxy_pass 引用做负载均衡"
+      },
+      {
+        "key": "B",
+        "text": "仅做 DNS 解析"
+      },
+      {
+        "key": "C",
+        "text": "只用于静态文件"
+      },
+      {
+        "key": "D",
+        "text": "替代 SSL 配置"
+      }
+    ],
+    "answer": "A",
+    "explanation": "upstream 把后端池抽象出来，配合负载均衡策略与健康检查，是反向代理的核心配置。"
+  },
+  {
+    "n": 36,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "启用 keepalive 连接复用可以降低与后端建连的 TCP 握手开销。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "正确",
+    "explanation": "与后端保持长连接避免每次请求三次握手，是高并发反向代理的常见优化。"
+  },
+  {
+    "n": 37,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "返回 502 Bad Gateway 通常意味着？",
+    "options": [
+      {
+        "key": "A",
+        "text": "网关/代理收到后端无效或不可达的响应"
+      },
+      {
+        "key": "B",
+        "text": "请求的资源不存在"
+      },
+      {
+        "key": "C",
+        "text": "纯客户端参数错误"
+      },
+      {
+        "key": "D",
+        "text": "静态文件缺失"
+      }
+    ],
+    "answer": "A",
+    "explanation": "502 是网关错误：Nginx 作为代理却从上游拿到非法响应/连接失败；排查后端健康与网络。"
+  },
+  {
+    "n": 38,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "把 Nginx 当作 API 网关的合理用法包括？",
+    "options": [
+      {
+        "key": "A",
+        "text": "反向代理 + 负载均衡"
+      },
+      {
+        "key": "B",
+        "text": "限流（limit_req / limit_conn）"
+      },
+      {
+        "key": "C",
+        "text": "TLS 终止与统一入口"
+      },
+      {
+        "key": "D",
+        "text": "用它替代业务数据库"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "Nginx 适合做入口、均衡、限流与 TLS；但不应越俎代庖承担业务存储职责。"
+  },
+  {
+    "n": 39,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "镜像（image）与容器（container）的关系是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "镜像是只读模板，容器是其运行实例"
+      },
+      {
+        "key": "B",
+        "text": "两者完全相同"
+      },
+      {
+        "key": "C",
+        "text": "容器是镜像的备份文件"
+      },
+      {
+        "key": "D",
+        "text": "镜像必须运行起来才存在"
+      }
+    ],
+    "answer": "A",
+    "explanation": "镜像不可变、是分层模板；容器是镜像加可写层后的运行态，可被创建/启动/销毁。"
+  },
+  {
+    "n": 40,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "Dockerfile 中 COPY 与 ADD 的主要区别是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "COPY 仅复制本地文件；ADD 还能解压归档与拉取远程 URL"
+      },
+      {
+        "key": "B",
+        "text": "两者完全相同"
+      },
+      {
+        "key": "C",
+        "text": "ADD 只能复制本地文件"
+      },
+      {
+        "key": "D",
+        "text": "COPY 能自动解压"
+      }
+    ],
+    "answer": "A",
+    "explanation": "最佳实践用 COPY（语义清晰、可预期）；ADD 的自动解压/远程下载易带来意外，慎用。"
+  },
+  {
+    "n": 41,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "ENTRYPOINT 与 CMD 的主要区别是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "ENTRYPOINT 定义可执行程序，CMD 提供默认参数"
+      },
+      {
+        "key": "B",
+        "text": "两者完全相同"
+      },
+      {
+        "key": "C",
+        "text": "CMD 必须存在、ENTRYPOINT 可选"
+      },
+      {
+        "key": "D",
+        "text": "ENTRYPOINT 不能接收参数"
+      }
+    ],
+    "answer": "A",
+    "explanation": "ENTRYPOINT 固定容器主进程、CMD 作默认参数；运行时命令行参数会覆盖 CMD。"
+  },
+  {
+    "n": 42,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "关于 Docker 镜像分层与写时复制（COW），下列说法正确的有？",
+    "options": [
+      {
+        "key": "A",
+        "text": "相同基础层可在镜像间共享，节省存储与传输"
+      },
+      {
+        "key": "B",
+        "text": "容器读写发生在可写层，不污染只读镜像层"
+      },
+      {
+        "key": "C",
+        "text": "镜像层只读、不可变"
+      },
+      {
+        "key": "D",
+        "text": "每次修改都会拷贝整个镜像"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "分层+COW 让镜像可复用、启动快；修改只落在容器可写层，不影响只读层。"
+  },
+  {
+    "n": 43,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "多阶段构建（multi-stage build）的主要目的是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "把编译工具留在构建阶段，最终镜像只留运行所需，显著减小体积"
+      },
+      {
+        "key": "B",
+        "text": "单纯加快网络"
+      },
+      {
+        "key": "C",
+        "text": "替代镜像仓库"
+      },
+      {
+        "key": "D",
+        "text": "只能用于 Go 项目"
+      }
+    ],
+    "answer": "A",
+    "explanation": "多阶段构建只把产物拷入精简的最终镜像，剥离编译器/依赖，是减镜像体积的关键手段。"
+  },
+  {
+    "n": 44,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "数据卷（volume）比 bind mount 更适合数据持久化与跨容器共享，且生命周期独立于容器。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "正确",
+    "explanation": "volume 由 Docker 管理、与容器解耦、便于备份与共享；bind mount 直接挂宿主机路径，移植性较差。"
+  },
+  {
+    "n": 45,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "默认的 bridge 网络模式的作用是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "容器在网桥内互通、通过端口映射访问宿主机"
+      },
+      {
+        "key": "B",
+        "text": "与宿主机完全共享网络栈"
+      },
+      {
+        "key": "C",
+        "text": "容器不能联网"
+      },
+      {
+        "key": "D",
+        "text": "仅用于 Windows"
+      }
+    ],
+    "answer": "A",
+    "explanation": "bridge 是默认网络，容器各有独立网络命名空间并通过网桥通信；host 模式才共享宿主机网络栈。"
+  },
+  {
+    "n": 46,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "Docker 可对容器施加的资源限制包括？",
+    "options": [
+      {
+        "key": "A",
+        "text": "CPU 配额 / 核数限制"
+      },
+      {
+        "key": "B",
+        "text": "内存上限"
+      },
+      {
+        "key": "C",
+        "text": "磁盘 IO 权重"
+      },
+      {
+        "key": "D",
+        "text": "容器无法限制任何资源"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "通过 cgroups 可限 CPU、内存、IO 等；不设限的容器可能拖垮宿主机其他负载。"
+  },
+  {
+    "n": 47,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "在容器中用 root 运行并挂载宿主机敏感目录（如 /、/var/run/docker.sock）会带来严重安全风险。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "正确",
+    "explanation": "root + 挂载敏感路径可能逃逸到宿主机；生产应降权运行并最小化挂载。"
+  },
+  {
+    "n": 48,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "docker-compose 最适合的场景是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "单机编排多个互联容器及其网络/卷依赖"
+      },
+      {
+        "key": "B",
+        "text": "跨集群大规模调度"
+      },
+      {
+        "key": "C",
+        "text": "替代 Kubernetes 全部能力"
+      },
+      {
+        "key": "D",
+        "text": "仅用于构建镜像"
+      }
+    ],
+    "answer": "A",
+    "explanation": "compose 用声明式文件把多容器应用一键拉起，适合单机/开发；集群调度交给 K8s。"
+  },
+  {
+    "n": 49,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "Docker Registry 的作用是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "集中存储与分发镜像"
+      },
+      {
+        "key": "B",
+        "text": "运行容器"
+      },
+      {
+        "key": "C",
+        "text": "替代数据库"
+      },
+      {
+        "key": "D",
+        "text": "做负载均衡"
+      }
+    ],
+    "answer": "A",
+    "explanation": "Registry（如 Docker Hub、私有 Harbor）负责镜像的版本化存储与拉取分发。"
+  },
+  {
+    "n": 50,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "镜像标签 latest 是易变的、不保证内容稳定，生产环境应钉具体版本标签。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "正确",
+    "explanation": "latest 会随推送漂移，回滚与可复现性差；生产应锁定 digest 或明确版本标签。"
+  },
+  {
+    "n": 51,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "减小镜像体积的常见手段包括？",
+    "options": [
+      {
+        "key": "A",
+        "text": "使用多阶段构建"
+      },
+      {
+        "key": "B",
+        "text": "选用精简基础镜像（alpine / distroless）"
+      },
+      {
+        "key": "C",
+        "text": "合并 RUN 并清理包缓存"
+      },
+      {
+        "key": "D",
+        "text": "把全部源码塞进单层"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "精简基础镜像、多阶段与层合并能显著降体积；D 反而增大层且无收益。"
+  },
+  {
+    "n": 52,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "容器健康检查（HEALTHCHECK）的作用是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "让编排器感知容器应用层是否真正就绪/存活"
+      },
+      {
+        "key": "B",
+        "text": "仅检查进程是否存活"
+      },
+      {
+        "key": "C",
+        "text": "替代日志收集"
+      },
+      {
+        "key": "D",
+        "text": "仅用于网络探测"
+      }
+    ],
+    "answer": "A",
+    "explanation": "HEALTHCHECK 探测应用真实可用性（如 HTTP 探活），比“进程在”更能反映就绪状态。"
+  },
+  {
+    "n": 53,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "Kubernetes 中 Pod 的概念是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "最小调度单位，可包含一个或多个共享网络/存储的容器"
+      },
+      {
+        "key": "B",
+        "text": "等同于虚拟机"
+      },
+      {
+        "key": "C",
+        "text": "仅是一种存储对象"
+      },
+      {
+        "key": "D",
+        "text": "是负载均衡器"
+      }
+    ],
+    "answer": "A",
+    "explanation": "Pod 是 K8s 调度与资源管理的最小单元，同 Pod 内容器共享 IP 与卷。"
+  },
+  {
+    "n": 54,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "Deployment 的主要作用是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "管理 ReplicaSet/Pod 副本数，并支持滚动更新与回滚"
+      },
+      {
+        "key": "B",
+        "text": "仅存储配置"
+      },
+      {
+        "key": "C",
+        "text": "替代 Service"
+      },
+      {
+        "key": "D",
+        "text": "只做 DNS 解析"
+      }
+    ],
+    "answer": "A",
+    "explanation": "Deployment 声明期望副本与版本，控制器维持副本并负责无损升级/回滚。"
+  },
+  {
+    "n": 55,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "Kubernetes Service 的常见类型包括？",
+    "options": [
+      {
+        "key": "A",
+        "text": "ClusterIP（集群内访问）"
+      },
+      {
+        "key": "B",
+        "text": "NodePort（节点端口）"
+      },
+      {
+        "key": "C",
+        "text": "LoadBalancer（云负载均衡）"
+      },
+      {
+        "key": "D",
+        "text": "只有 Ingress 一种"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "Service 暴露方式主要为 ClusterIP/NodePort/LoadBalancer；Ingress 是七层路由，不是 Service 类型。"
+  },
+  {
+    "n": 56,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "按域名/路径做 HTTP 路由暴露服务，通常用？",
+    "options": [
+      {
+        "key": "A",
+        "text": "Ingress"
+      },
+      {
+        "key": "B",
+        "text": "ConfigMap"
+      },
+      {
+        "key": "C",
+        "text": "Secret"
+      },
+      {
+        "key": "D",
+        "text": "Namespace"
+      }
+    ],
+    "answer": "A",
+    "explanation": "Ingress 提供七层（域名/路径）路由与 TLS，统一入口；Service 解决四层发现与负载。"
+  },
+  {
+    "n": 57,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "ConfigMap 与 Secret 的主要区别是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "ConfigMap 存普通配置，Secret 存敏感数据（口令/密钥）且可加密/收紧权限"
+      },
+      {
+        "key": "B",
+        "text": "两者完全相同"
+      },
+      {
+        "key": "C",
+        "text": "Secret 只能存日志"
+      },
+      {
+        "key": "D",
+        "text": "把密码放 ConfigMap 更安全"
+      }
+    ],
+    "answer": "A",
+    "explanation": "Secret 面向敏感信息、有静态加密与访问收敛；敏感配置不应误放 ConfigMap。"
+  },
+  {
+    "n": 58,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "Namespace 用于多环境/多租户隔离资源，但默认网络仍互通（需用 NetworkPolicy 限制）。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "正确",
+    "explanation": "Namespace 是逻辑隔离边界而非网络隔离；跨命名空间默认仍可达，需 NetworkPolicy 显式约束。"
+  },
+  {
+    "n": 59,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "Horizontal Pod Autoscaler（HPA）扩缩容的依据通常是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "CPU/内存或自定义指标自动扩缩副本"
+      },
+      {
+        "key": "B",
+        "text": "只能手动"
+      },
+      {
+        "key": "C",
+        "text": "仅按时间"
+      },
+      {
+        "key": "D",
+        "text": "完全随机"
+      }
+    ],
+    "answer": "A",
+    "explanation": "HPA 依据指标（CPU、QPS 等）自动增减副本，应对负载波动；需配 requests 才能计算使用率。"
+  },
+  {
+    "n": 60,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "liveness 与 readiness 探针的区别是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "liveness 失败会重启容器"
+      },
+      {
+        "key": "B",
+        "text": "readiness 失败会把 Pod 从 Service 后端摘除"
+      },
+      {
+        "key": "C",
+        "text": "两者都用于探测，但目的不同"
+      },
+      {
+        "key": "D",
+        "text": "readiness 失败也会重启容器"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "liveness 探活（失败重启），readiness 探就绪（失败摘流量不重启）；二者不可混淆。"
+  },
+  {
+    "n": 61,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "有状态服务（如数据库、中间件）通常更适合用哪种工作负载？",
+    "options": [
+      {
+        "key": "A",
+        "text": "StatefulSet（稳定网络标识与持久化卷）"
+      },
+      {
+        "key": "B",
+        "text": "普通 Deployment"
+      },
+      {
+        "key": "C",
+        "text": "仅 Job"
+      },
+      {
+        "key": "D",
+        "text": "仅 ConfigMap"
+      }
+    ],
+    "answer": "A",
+    "explanation": "StatefulSet 提供稳定的 Pod 名/网络标识与按序滚动，配合 PVC 适合有状态中间件。"
+  },
+  {
+    "n": 62,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "持久化存储的抽象层级是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "PV（集群存储资源）与 PVC（用户存储申请）解耦存储实现"
+      },
+      {
+        "key": "B",
+        "text": "直接挂载节点固定路径"
+      },
+      {
+        "key": "C",
+        "text": "仅内存临时存储"
+      },
+      {
+        "key": "D",
+        "text": "用 Secret 存数据"
+      }
+    ],
+    "answer": "A",
+    "explanation": "PV/PVC 把“存储供给”与“使用”解耦，应用只声明 PVC，底层可以是云盘/NFS/本地盘。"
+  },
+  {
+    "n": 63,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "judge",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "etcd 是 Kubernetes 的分布式键值存储，保存集群全部状态，是一致性与高可用的关键组件。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "正确",
+    "explanation": "K8s 所有对象与状态都落在 etcd；etcd 的多数派可用与数据健康直接决定集群可用性。"
+  },
+  {
+    "n": 64,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "滚动更新（rolling update）的优点包括？",
+    "options": [
+      {
+        "key": "A",
+        "text": "逐步替换 Pod、实现低/零停机"
+      },
+      {
+        "key": "B",
+        "text": "可配置最大不可用/超出量平滑过渡"
+      },
+      {
+        "key": "C",
+        "text": "可一键回滚到旧 ReplicaSet"
+      },
+      {
+        "key": "D",
+        "text": "必须整批停服再切换"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "滚动更新逐批替换并可控比例，配合健康检查实现平滑发布与快速回滚；D 违背其初衷。"
+  },
+  {
+    "n": 65,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "Pod 长时间处于 Pending（调度失败），可能的原因包括？",
+    "options": [
+      {
+        "key": "A",
+        "text": "节点资源不足 / 亲和性不符 / 污点无容忍 / 配额限制 / 镜像拉取失败等"
+      },
+      {
+        "key": "B",
+        "text": "仅网络配置问题"
+      },
+      {
+        "key": "C",
+        "text": "仅镜像缺失"
+      },
+      {
+        "key": "D",
+        "text": "仅命名空间不存在"
+      }
+    ],
+    "answer": "A",
+    "explanation": "Pending 多为不可调度：资源、亲和/污点、PVC 绑定、配额、镜像拉取等都可能导致。"
+  },
+  {
+    "n": 66,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "提升 Kubernetes 集群安全与稳定的实践包括？",
+    "options": [
+      {
+        "key": "A",
+        "text": "基于 RBAC 的最小权限授权"
+      },
+      {
+        "key": "B",
+        "text": "为容器设置 resources requests/limits"
+      },
+      {
+        "key": "C",
+        "text": "镜像漏洞扫描与准入控制"
+      },
+      {
+        "key": "D",
+        "text": "关闭所有探针与限流"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "RBAC、资源约束、镜像与准入管控是基线；D 削弱可用性与可观测性，适得其反。"
+  },
+  {
+    "n": 67,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "Kafka 与 RabbitMQ 的典型定位区别是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "Kafka 擅长高吞吐日志/事件流，RabbitMQ 擅长低延迟路由与复杂 exchange"
+      },
+      {
+        "key": "B",
+        "text": "两者完全一样"
+      },
+      {
+        "key": "C",
+        "text": "都只做 RPC 调用"
+      },
+      {
+        "key": "D",
+        "text": "都不可持久化"
+      }
+    ],
+    "answer": "A",
+    "explanation": "Kafka 面向高吞吐、可重放的流；RabbitMQ 面向灵活路由、低延迟的消息投递。"
+  },
+  {
+    "n": 68,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "Kafka 中 topic 与 partition 的关系是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "topic 可分为多个 partition，分区内消息有序、可并行消费"
+      },
+      {
+        "key": "B",
+        "text": "同一 topic 全局严格有序"
+      },
+      {
+        "key": "C",
+        "text": "partition 等同于 topic"
+      },
+      {
+        "key": "D",
+        "text": "二者毫无关系"
+      }
+    ],
+    "answer": "A",
+    "explanation": "partition 是并行与伸缩单元，单分区内保序；跨分区不保证全局顺序。"
+  },
+  {
+    "n": 69,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "关于消费组（consumer group），下列说法正确的有？",
+    "options": [
+      {
+        "key": "A",
+        "text": "同组内消费者分担不同分区，实现并行消费"
+      },
+      {
+        "key": "B",
+        "text": "组内可水平扩展提升消费能力"
+      },
+      {
+        "key": "C",
+        "text": "不同组可独立、重复消费同一 topic"
+      },
+      {
+        "key": "D",
+        "text": "一个组只能有一个消费者"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "消费组实现“发布-订阅 + 队列”语义：组内竞争、组间广播；分区数限制了组内并行度。"
+  },
+  {
+    "n": 70,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "消息投递语义通常包括？",
+    "options": [
+      {
+        "key": "A",
+        "text": "至少一次 / 至多一次 / 精确一次（exactly-once）三种常见语义"
+      },
+      {
+        "key": "B",
+        "text": "只有 exactly-once 一种，无需处理重复"
+      },
+      {
+        "key": "C",
+        "text": "重复无害，不需要幂等"
+      },
+      {
+        "key": "D",
+        "text": "仅 at-most-once"
+      }
+    ],
+    "answer": "A",
+    "explanation": "多数 MQ 至少实现 at-least-once，精准一次需配合消费端幂等/事务；幂等设计很重要。"
+  },
+  {
+    "n": 71,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "消息积压（backlog）激增时，合理的处理方式是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "扩容消费者实例或增加分区数"
+      },
+      {
+        "key": "B",
+        "text": "优化消费逻辑、提升单条处理速度"
+      },
+      {
+        "key": "C",
+        "text": "紧急场景临时多实例突击消费"
+      },
+      {
+        "key": "D",
+        "text": "无视即可，系统会自愈"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "积压需从“消费能力”与“处理逻辑”两端入手扩缩与优化；D 只会导致延迟持续恶化。"
+  },
+  {
+    "n": 72,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "死信队列（DLQ）的主要用途是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "收容多次消费失败的消息，便于隔离与排查"
+      },
+      {
+        "key": "B",
+        "text": "单纯加速消费"
+      },
+      {
+        "key": "C",
+        "text": "替代主业务队列"
+      },
+      {
+        "key": "D",
+        "text": "仅用于打印日志"
+      }
+    ],
+    "answer": "A",
+    "explanation": "DLQ 把处理失败的消息隔离，避免阻塞主队列，同时保留现场供复盘与重试。"
+  },
+  {
+    "n": 73,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "引入消息队列可以解耦生产者与消费者、削峰填谷，但带来的是最终一致性而非强一致。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "正确",
+    "explanation": "异步解耦提升弹性，但跨服务数据需容忍短暂不一致，并用对账/补偿保证最终一致。"
+  },
+  {
+    "n": 74,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "在 Linux 上排查 CPU/内存瓶颈常用的命令是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "top/htop、free、vmstat、iostat"
+      },
+      {
+        "key": "B",
+        "text": "仅 ping"
+      },
+      {
+        "key": "C",
+        "text": "仅 ls"
+      },
+      {
+        "key": "D",
+        "text": "仅 cat /etc/hostname"
+      }
+    ],
+    "answer": "A",
+    "explanation": "top/free/vmstat/iostat 分别对应 CPU、内存、整体与磁盘 IO，是性能排查基础工具。"
+  },
+  {
+    "n": 75,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "CI/CD 流水线的目标包括？",
+    "options": [
+      {
+        "key": "A",
+        "text": "自动化构建/测试/部署"
+      },
+      {
+        "key": "B",
+        "text": "快速反馈与可重复的发布过程"
+      },
+      {
+        "key": "C",
+        "text": "把质量门禁前置、降低人工出错"
+      },
+      {
+        "key": "D",
+        "text": "完全替代代码评审"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "CI/CD 用自动化与门禁提升交付速度与稳定性；评审仍重要，不能被流水线取代。"
+  },
+  {
+    "n": 76,
+    "language": "",
+    "direction": "中间件与运维",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "监控告警应覆盖“四大黄金指标”：延迟、流量、错误率与饱和度。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "正确",
+    "explanation": "RED/USE 与四大黄金指标（延迟、流量、错误、饱和度）是服务可观测性的核心维度。"
+  }
+]

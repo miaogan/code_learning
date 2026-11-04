@@ -38,6 +38,10 @@ EXPECTED_DIRECTION_COUNT = 20
 EXPECTED_KINDS = {"single": 48, "multiple": 20, "text": 12}
 EXPECTED_ESSENTIALITY = {"must_know": 20, "advanced": 20, "nice_to_know": 40}
 
+#: 原始四方向（存量 260 题覆盖，各 20 道）：r11 起的 staging 来源（AI 工程 / 中间件与运维等）
+#: 无存量题，不适用「每方向 == 20 道存量」的结构不变量，故该不变量只收敛到这四个方向。
+LEGACY_DIRECTIONS = ("前端", "后端", "算法与数据结构", "计算机基础")
+
 #: 存量题 id 前缀：r6 分布断言的适用范围（r11 起新增题走 `test_question_bank_quality.py`）。
 LEGACY_PREFIXES = ("fe-", "be-", "al-", "cs-")
 
@@ -206,7 +210,7 @@ def test_each_direction_has_all_three_essentiality_tiers() -> None:
     """
     legacy = _legacy_rows()
     rows = _seed_rows()
-    for direction in rules.DIRECTIONS:
+    for direction in LEGACY_DIRECTIONS:
         rows_dir = [row for row in legacy if row.get("direction") == direction]
         assert len(rows_dir) == EXPECTED_DIRECTION_COUNT, f"{direction} 存量题量 {len(rows_dir)} ≠ 20"
         assert len([row for row in rows if row.get("direction") == direction]) >= EXPECTED_DIRECTION_COUNT

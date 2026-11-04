@@ -372,19 +372,30 @@ def test_recent_papers_covering_most_of_bank_still_creates_paper(
 ) -> None:
     """极端场景②：近 3 卷覆盖池子大半 → 逐卷退回历史题（L4）后仍 200，绝不 400。
 
-    卷面大小按「题库总量 − 8」三等分推导（r11 起题库固定 260 题，不能再用 72 这样的字面量），
-    留下的 8 道小于 `MIN_EXAM_QUESTIONS`，因此 L1 必然凑不出卷、只能靠 L4 放回历史题。
+    预留 `MIN_EXAM_QUESTIONS - 1` 道不覆盖，3 卷把其余题三等分（余数摊进首卷），
+    使剩题恒小于 `MIN_EXAM_QUESTIONS`、L1 必然凑不出卷、只能靠 L4 放回历史题；
+    与题库总量及 N mod 3 无关，题库继续增长也不会破此前提。
     """
     profile = profile_factory()
     repository.insert_profile(profile)
     questions = repository.list_questions()
-    spare = rules.MIN_EXAM_QUESTIONS - 2  # 预留 8 道不覆盖：L1 凑不出 10 题
-    per_paper = (len(questions) - spare) // 3
+    # 预留 MIN_EXAM_QUESTIONS-1 道不覆盖，保证 L1 凑不出卷、必然落到 L4 退回历史题。
+    # 3 卷覆盖量取「总量 − 预留」后三等分，余数摊进首卷，使剩题恒为预留值
+    #（与题库总量 / N mod 3 无关，避免题库增长后剩题回弹到 >= MIN_EXAM_QUESTIONS）。
+    reserve = rules.MIN_EXAM_QUESTIONS - 1
+    to_cover = len(questions) - reserve
+    per_paper = to_cover // 3
+    rem = to_cover % 3
     assert per_paper >= rules.MIN_OBJECTIVE_QUESTIONS, f"题库过小，无法构造历史覆盖：{len(questions)}"
     pool = [str(q["id"]) for q in questions]
-    chunks: list[list[str]] = [pool[index * per_paper : (index + 1) * per_paper] for index in range(3)]
+    first = per_paper + rem
+    chunks: list[list[str]] = [
+        pool[0:first],
+        pool[first : first + per_paper],
+        pool[first + per_paper : first + 2 * per_paper],
+    ]
     covered = {qid for chunk in chunks for qid in chunk}
-    assert len(covered) == per_paper * 3, f"3 卷应覆盖 {per_paper * 3} 道，实际 {len(covered)}"
+    assert len(covered) == to_cover, f"3 卷应覆盖 {to_cover} 道，实际 {len(covered)}"
     assert len(questions) - len(covered) < rules.MIN_EXAM_QUESTIONS, "剩题足以在 L1 出卷，前提不成立"
     # 最旧一卷必须自足（≥8 客观 + ≥2 方向），否则 L4 首个子步骤就该继续往后放松。
     oldest = [q for q in questions if q["id"] in chunks[0]]
