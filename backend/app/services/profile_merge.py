@@ -18,6 +18,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import NamedTuple
 
+# 显式再导出：`services/profile.py` 从这里取 `ProfileWithMerge`（契约真源在 schemas）。
 from ..schemas import (
     Evidence,
     Profile,
@@ -25,7 +26,6 @@ from ..schemas import (
     ProfileMergeSummary,
     ProfileProject,
     ProfileSkill,
-    # 显式再导出：`services/profile.py` 从这里取 `ProfileWithMerge`（契约真源在 schemas）。
     ProfileWithMerge as ProfileWithMerge,
 )
 

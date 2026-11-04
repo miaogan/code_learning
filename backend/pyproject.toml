@@ -5,6 +5,15 @@ src = ["app", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
+# E501 按显示宽度计，中文注释一个字算 2 列；本仓库注释以中文为主，行宽门槛由评审把关，
+# 这里不做机械强制（其余 E 类规则照常生效）。
+ignore = ["E501"]
+
+[tool.ruff.lint.isort]
+# 本仓库没有安装为包，isort 需显式声明第一方模块；否则 `app` 会被并进第三方段。
+known-first-party = ["app"]
+# 显式再导出（`X as X`）与同源导入合并进同一括号块，避免 isort 拆成两段 import。
+combine-as-imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

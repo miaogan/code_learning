@@ -246,7 +246,7 @@ def test_attempts_by_question_groups_and_sorts() -> None:
     assert all(
         earlier.answered_at <= later.answered_at
         for items in grouped.values()
-        for earlier, later in zip(items, items[1:])
+        for earlier, later in zip(items, items[1:], strict=False)
     )
     assert attempts_by_question([]) == {}
 

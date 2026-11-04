@@ -865,7 +865,7 @@ def apply(rows: Sequence[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[st
             position = min(KEYS, key=lambda key: slots_of_language[key])
             slots = [key for key in KEYS if key != position]
             mapping: dict[str, str] = {answer_key: position}
-            for slot, opt in zip(slots, distractors):
+            for slot, opt in zip(slots, distractors, strict=False):
                 mapping[str(opt["key"])] = slot
             slots_of_language[position] += 1
         else:

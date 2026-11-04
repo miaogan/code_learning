@@ -15,9 +15,7 @@ import pytest
 from app import repository
 from app.errors import AI_SCHEMA_INVALID, AI_UNAVAILABLE, VALIDATION_ERROR, AppError
 from app.schemas import InterviewSettings, InterviewSettingsPatch
-from app.services import diagnosis, history
-from app.services import interview as interview_service
-from app.services import rules
+from app.services import diagnosis, history, interview as interview_service, rules
 
 #: 结构合格的计划：5 技术 + 3 项目（8 题、0 挑战），与 rules 下限逐项贴合。
 VALID_KINDS = ["technical"] * rules.MIN_TECHNICAL_QUESTIONS + ["project"] * (

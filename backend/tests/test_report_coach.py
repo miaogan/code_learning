@@ -15,14 +15,18 @@ import json
 from typing import Any
 
 import pytest
-from test_report_service import VALID_KINDS, _bad_score_responder, _prepare_runs
 
 from app import repository
 from app.schemas import Report
-from app.services import coach_copy, diagnosis, exam as exam_service, rules
-from app.services import weakness as weakness_service
-from app.services.ai import AIClient
+from app.services import (
+    coach_copy,
+    diagnosis,
+    exam as exam_service,
+    rules,
+    weakness as weakness_service,
+)
 from app.services.diagnosis import _CoachCopyDraft
+from test_report_service import VALID_KINDS, _bad_score_responder, _prepare_runs
 
 
 def _build(run_ids: list[str], client: Any = None) -> Report:

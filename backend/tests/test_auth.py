@@ -14,13 +14,6 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from app import repository
-from app.auth import COOKIE_NAME, hash_password, new_session_token, session_expiry
-from app.config import get_settings
-from app.context import reset_current_user_id, set_current_user_id
-from app.errors import AI_KEY_REQUIRED, AI_QUOTA_EXCEEDED
-from app.main import app
-from app.services import login_guard, user_ai
 from fastapi.testclient import TestClient
 from tests.conftest import (
     TEST_SECRET_KEY,
@@ -29,6 +22,14 @@ from tests.conftest import (
     TEST_USER_KEY,
     TEST_USER_PASSWORD,
 )
+
+from app import repository
+from app.auth import COOKIE_NAME, hash_password, new_session_token, session_expiry
+from app.config import get_settings
+from app.context import reset_current_user_id, set_current_user_id
+from app.errors import AI_KEY_REQUIRED, AI_QUOTA_EXCEEDED
+from app.main import app
+from app.services import login_guard, user_ai
 
 RESUME_TEXT = (
     "教育经历\n2019-2023 计算机科学与技术\n"

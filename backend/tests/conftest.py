@@ -17,6 +17,8 @@ from typing import Any
 from uuid import uuid4
 
 import pytest
+from fastapi.testclient import TestClient
+
 from app import repository
 from app.auth import COOKIE_NAME, hash_password, new_session_token, session_expiry
 from app.config import get_settings
@@ -25,7 +27,6 @@ from app.main import app
 from app.schemas import Evidence, Profile, ProfileProject, ProfileSkill, SkillStatus
 from app.services import user_ai
 from app.services.ai import AIClient
-from fastapi.testclient import TestClient
 
 SEED_PATH = Path(__file__).resolve().parent.parent / "app" / "seed" / "questions.json"
 

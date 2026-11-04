@@ -7,15 +7,12 @@ import re
 from typing import Any
 
 import pytest
-from conftest import drive_session
 
 from app import repository
 from app.errors import AI_UNAVAILABLE, AppError
 from app.schemas import Report, Shortfall
-from app.services import diagnosis
-from app.services import exam as exam_service
-from app.services import interview as interview_service
-from app.services import rules
+from app.services import diagnosis, exam as exam_service, interview as interview_service, rules
+from conftest import drive_session
 
 VALID_KINDS = ["technical"] * rules.MIN_TECHNICAL_QUESTIONS + ["project"] * (
     rules.MIN_INTERVIEW_QUESTIONS - rules.MIN_TECHNICAL_QUESTIONS

@@ -21,11 +21,8 @@ from pathlib import Path
 from typing import get_args
 
 from app.schemas import ExamKind, Profile
+from app.services import exam_selector, interview as interview_service, question_bank, rules
 from app.services.ai import AIClient
-from app.services import exam_selector
-from app.services import interview as interview_service
-from app.services import question_bank
-from app.services import rules
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 APP_DIR = REPO_ROOT / "backend" / "app"
@@ -667,7 +664,7 @@ def _dict_items(tree: ast.Module, name: str) -> dict[str, ast.expr | None]:
         if isinstance(value, ast.Dict):
             return {
                 key.value: item
-                for key, item in zip(value.keys, value.values)
+                for key, item in zip(value.keys, value.values, strict=False)
                 if isinstance(key, ast.Constant) and isinstance(key.value, str)
             }
     return {}
@@ -723,7 +720,7 @@ def test_r9_json_mode_closed_set_single_source() -> None:
         f"JsonMode 闭集变成了 {sorted(literal_values)}（只允许 json_object / none）"
     )
     assert set(get_args(JsonMode)) == literal_values
-    assert JSON_MODES == frozenset(get_args(JsonMode)), (
+    assert frozenset(get_args(JsonMode)) == JSON_MODES, (
         f"JSON_MODES {sorted(JSON_MODES)} 不再等于 get_args(JsonMode)"
     )
     assert DEFAULT_JSON_MODE in JSON_MODES
@@ -1018,7 +1015,7 @@ def test_r11_language_direction_single_source() -> None:
         "前端 + 后端必须恰好覆盖具体语言（``''`` 通用题不归属任何方向）"
     )
     expected_map = {**{lang: "前端" for lang in frontend}, **{lang: "后端" for lang in backend}}
-    assert rules.LANGUAGE_DIRECTION == expected_map, (
+    assert expected_map == rules.LANGUAGE_DIRECTION, (
         f"LANGUAGE_DIRECTION 必须由两份语言元组派生，实际 {rules.LANGUAGE_DIRECTION}"
     )
 

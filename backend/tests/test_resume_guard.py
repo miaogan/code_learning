@@ -1,8 +1,9 @@
 """上传守卫（AC-1）：白名单 / 空文件 / 体积上限 / 失败不写库。"""
 
-from app.config import get_settings
 from fastapi.testclient import TestClient
 from pytest import MonkeyPatch
+
+from app.config import get_settings
 
 RESUME_TEXT = (
     "教育经历\n2019-2023 计算机科学与技术\n"

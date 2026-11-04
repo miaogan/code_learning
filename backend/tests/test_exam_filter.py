@@ -20,8 +20,7 @@ from uuid import uuid4
 
 from app import repository
 from app.schemas import ExamRun
-from app.services import exam as exam_service
-from app.services import exam_selector, proficiency, question_bank, rules
+from app.services import exam as exam_service, exam_selector, proficiency, question_bank, rules
 
 # --- 受控小题库构造 -------------------------------------------------------
 

@@ -37,8 +37,13 @@ from app.schemas import (
     ProfileSkill,
     ResumeMeta,
 )
-from app.services import interview as interview_service
-from app.services import profile_merge, resume_polish, role_fit, rules
+from app.services import (
+    interview as interview_service,
+    profile_merge,
+    resume_polish,
+    role_fit,
+    rules,
+)
 from app.services.profile import PROFILE_SYSTEM, verify_quotes
 
 #: 数据看板项目的溯源片段：与 conftest 的 `RESUME_TEXT` 逐字对应（`verify_quotes` 用）。

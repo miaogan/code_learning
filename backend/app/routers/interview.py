@@ -21,9 +21,11 @@ from ..schemas import (
     InterviewTurn,
 )
 from ..services import user_ai
-from ..services.interview import create_run as create_interview_run
-from ..services.interview import load_session
-from ..services.interview import score_answer as score_interview_answer
+from ..services.interview import (
+    create_run as create_interview_run,
+    load_session,
+    score_answer as score_interview_answer,
+)
 
 router = APIRouter(
     prefix="/api/interviews", tags=["interview"], dependencies=[Depends(current_user)]

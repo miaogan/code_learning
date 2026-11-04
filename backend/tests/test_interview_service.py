@@ -11,8 +11,7 @@ from pydantic import ValidationError
 from app import repository
 from app.errors import AI_SCHEMA_INVALID, NOT_FOUND, AppError
 from app.schemas import InterviewQuestion, ScoreResult
-from app.services import interview as interview_service
-from app.services import rules
+from app.services import interview as interview_service, rules
 
 VALID_KINDS = ["technical"] * rules.MIN_TECHNICAL_QUESTIONS + ["project"] * (
     rules.MIN_INTERVIEW_QUESTIONS - rules.MIN_TECHNICAL_QUESTIONS

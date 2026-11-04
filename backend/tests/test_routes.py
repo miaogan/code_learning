@@ -5,14 +5,12 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-import pytest
 from fastapi.testclient import TestClient
 
 from app import repository
 from app.errors import AI_SCHEMA_INVALID, AI_UNAVAILABLE, AppError
 from app.schemas import Course, Report, ResumeMeta, Shortfall
-from app.services import exam as exam_service
-from app.services import rules
+from app.services import exam as exam_service, rules
 
 OBJECTIVE_KINDS = frozenset(rules.OBJECTIVE_KINDS)  # 闭集只在 rules.py（r11：含 judge）
 VALID_KINDS = ["technical"] * rules.MIN_TECHNICAL_QUESTIONS + ["project"] * (

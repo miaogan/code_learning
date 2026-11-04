@@ -16,16 +16,19 @@ import asyncio
 from typing import Any
 
 import pytest
-from conftest import drive_session
 from fastapi.testclient import TestClient
 
 from app import repository
 from app.errors import AI_UNAVAILABLE, VALIDATION_ERROR, AppError
 from app.schemas import TimelineComparison, TimelineEvent, TimelineMetrics
-from app.services import diagnosis
-from app.services import exam as exam_service
-from app.services import interview as interview_service
-from app.services import rules, timeline
+from app.services import (
+    diagnosis,
+    exam as exam_service,
+    interview as interview_service,
+    rules,
+    timeline,
+)
+from conftest import drive_session
 
 #: 与 `test_interview_service` 同一套合法配比（8 题：5 技术 + 3 项目）。
 INTERVIEW_KINDS = ["technical"] * rules.MIN_TECHNICAL_QUESTIONS + ["project"] * (

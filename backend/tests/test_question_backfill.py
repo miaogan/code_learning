@@ -118,7 +118,7 @@ def test_ordered_keywords_are_longest_first() -> None:
     """长词优先是全局全序：任何一对相邻项都满足「不短于」，且语言序稳定。"""
     ordered = ordered_keywords()
     assert ordered, "关键词表不得为空"
-    for (left, left_lang), (right, right_lang) in zip(ordered, ordered[1:]):
+    for (left, left_lang), (right, right_lang) in zip(ordered, ordered[1:], strict=False):
         assert len(left) >= len(right), f"长词优先被破坏：{left!r} 在 {right!r} 之前"
         if len(left) == len(right):
             assert rules.LANGUAGES.index(left_lang) <= rules.LANGUAGES.index(right_lang)

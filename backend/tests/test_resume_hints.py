@@ -13,7 +13,7 @@ from typing import Any
 
 import pytest
 
-from app.schemas import Profile, PolishSuggestion
+from app.schemas import PolishSuggestion, Profile
 from app.services import resume_hints, resume_polish
 from app.services.ai import AIClient
 from app.services.coach_copy import RESUME_AI_FALLBACK, RESUME_NO_TEXT, SECTION_LABEL

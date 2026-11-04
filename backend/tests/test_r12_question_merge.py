@@ -26,8 +26,7 @@ import pytest
 
 from app import repository
 from app.config import get_settings
-from app.services import question_bank, rules
-from app.services import question_merge as qm
+from app.services import question_bank, question_merge as qm, rules
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = BACKEND_ROOT.parent

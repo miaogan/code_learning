@@ -22,7 +22,6 @@ from app.schemas import (
     PracticeAnswerRequest,
     PracticeAnswerResult,
     PracticeDifficultyFilter,
-    PracticeDirectionFilter,
     PracticeEssentialityFilter,
     PracticeLanguageFilter,
     PracticeLimit,
