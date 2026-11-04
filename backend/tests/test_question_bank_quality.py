@@ -322,3 +322,40 @@ def test_r12_generic_directions_stay_language_free(bank_rows: list[dict[str, Any
         offenders = [row["id"] for row in rows if str(row.get("language") or "")]
         assert not offenders, f"{direction} 应恒为通用题（language 空串），越界：{offenders}"
 
+
+#: r17 防回归：解析里点名「X 为/是干扰项」时，X 绝不能是答案。
+#: 起因：选项重排后 `classify_refs` 的邻近去重会把紧跟在「正确项为 A、C、D」后面的
+#: 独立引用「B 为干扰项」当成集合的一部分吞掉——既不重映射、也不判为「判角不可靠」，
+#: 于是 tiji-014/015 的解析出现「B、C、D 正确且 B 是干扰项」的自相矛盾。
+_DISTRACTOR_REF = re.compile(
+    r"(?<![A-Za-z0-9_])([ABCD])(?![A-Za-z0-9_])"
+    r"\s*(?:项|选项)?\s*(?:是|为|作为)?[^，。；]{0,12}?干扰项"
+)
+#: 「正确项为 A、C、D」这类集合句，字母集合必须逐项等于 answer。
+#: 分隔符只认 `、` / `和`；逗号是句子边界（如「正确项为 B、A、D，C 为干扰项」）。
+_CORRECT_SET_REF = re.compile(r"正确项(?:为|是|包括)\s*([ABCD](?:\s*[、和]\s*[ABCD])*)")
+
+
+def test_explanation_letter_refs_agree_with_answer(bank_rows: list[dict[str, Any]]) -> None:
+    """r17：解析里的字母判角必须与答案自洽，防止重排后字母指向错项。
+
+    只钉两类无歧义的表述（「X 是干扰项」恒负、「正确项为 …」恒等于答案集合），
+    不碰「X 错误」这类在「以下说法错误的是」题面下极性反转的点评，避免误报。
+    """
+    offenders: list[tuple[str, str, str, list[str]]] = []
+    for row in bank_rows:
+        explanation = str(row.get("explanation") or "")
+        answer = {str(key) for key in row.get("answer") or []}
+        for match in _DISTRACTOR_REF.finditer(explanation):
+            if match.group(1) in answer:
+                offenders.append(
+                    (str(row["id"]), "干扰项被标为答案", match.group(0)[:30], sorted(answer))
+                )
+        for match in _CORRECT_SET_REF.finditer(explanation):
+            letters = set(re.findall(r"[ABCD]", match.group(1)))
+            if letters != answer:
+                offenders.append(
+                    (str(row["id"]), "正确项集合与答案不符", sorted(letters), sorted(answer))
+                )
+    assert not offenders, f"解析字母引用与答案冲突：{offenders}"
+

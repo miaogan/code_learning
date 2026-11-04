@@ -936,7 +936,7 @@
       { "key": "D", "text": "堆排序" }
     ],
     "answer": ["B"],
-    "explanation": "归并排序稳定且最坏也是 O(n log n)，适合大数据量；快排与堆排不稳定，选择排序虽然稳定但复杂度 O(n^2)，规模大时不可用。"
+    "explanation": "归并排序稳定且最坏也是 O(n log n)，适合大数据量；快排、堆排与选择排序都不稳定（选择排序的交换会打乱相等元素的相对次序），且选择排序复杂度为 O(n^2)，规模大时不可用。"
   },
   {
     "id": "al-q18",
@@ -4536,7 +4536,7 @@
       { "key": "D", "text": "DELETE" }
     ],
     "answer": ["B", "C", "D"],
-    "explanation": "HTTP 规范中 GET、PUT、DELETE 被定义为幂等（多次相同请求效果一致）；POST 语义用于创建资源，不保证幂等（重复提交可能产生多个资源）。因此正确项为 B、C、D，B 为干扰项。",
+    "explanation": "HTTP 规范中 GET、PUT、DELETE 被定义为幂等（多次相同请求效果一致）；POST 语义用于创建资源，不保证幂等（重复提交可能产生多个资源）。因此正确项为 B、C、D，POST 是唯一的干扰项。",
     "source": "tiji"
   },
   {
@@ -4554,7 +4554,7 @@
       { "key": "D", "text": "tuple" }
     ],
     "answer": ["A", "B", "C"],
-    "explanation": "list、dict、set 均为可变类型，创建后可修改其内容；tuple 是不可变类型，创建后不能增删改元素。因此正确项为 C、B、A，B 是常见被误认为可变的干扰项。",
+    "explanation": "list、dict、set 均为可变类型，创建后可修改其内容；tuple 是不可变类型，创建后不能增删改元素。因此正确项为 C、B、A，tuple 才是唯一不可变的干扰项。",
     "source": "tiji"
   },
   {

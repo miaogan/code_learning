@@ -403,7 +403,7 @@
       }
     ],
     "answer": "A,C,D",
-    "explanation": "HTTP 规范中 GET、PUT、DELETE 被定义为幂等（多次相同请求效果一致）；POST 语义用于创建资源，不保证幂等（重复提交可能产生多个资源）。因此正确项为 A、C、D，B 为干扰项。"
+    "explanation": "HTTP 规范中 GET、PUT、DELETE 被定义为幂等（多次相同请求效果一致）；POST 语义用于创建资源，不保证幂等（重复提交可能产生多个资源）。因此正确项为 A、C、D，POST 是唯一的干扰项。"
   },
   {
     "n": 15,
@@ -432,7 +432,7 @@
       }
     ],
     "answer": "A,C,D",
-    "explanation": "list、dict、set 均为可变类型，创建后可修改其内容；tuple 是不可变类型，创建后不能增删改元素。因此正确项为 A、C、D，B 是常见被误认为可变的干扰项。"
+    "explanation": "list、dict、set 均为可变类型，创建后可修改其内容；tuple 是不可变类型，创建后不能增删改元素。因此正确项为 A、C、D，tuple 才是唯一不可变的干扰项。"
   },
   {
     "n": 16,
