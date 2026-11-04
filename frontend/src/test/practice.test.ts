@@ -18,6 +18,7 @@ import {
   languageChips,
   limitChips,
   limitLabel,
+  parsePracticeSearch,
   promptPreview,
   relaxSuggestions,
   wrongTabLabel,
@@ -154,5 +155,39 @@ describe('practice 文案与纯逻辑', () => {
       scope: 'all',
       limit: 10,
     })
+  })
+})
+
+describe('parsePracticeSearch（7 天计划的筛选链接 → 首渲染筛选）', () => {
+  it('缺省 / 无关参数一律回落默认筛选', () => {
+    expect(parsePracticeSearch('')).toEqual(DEFAULT_PRACTICE_FILTERS)
+    expect(parsePracticeSearch('?foo=bar')).toEqual(DEFAULT_PRACTICE_FILTERS)
+  })
+
+  it('闭集内的方向 / 难度 / 必备度 / 范围 / 题量原样生效', () => {
+    expect(
+      parsePracticeSearch(
+        '?direction=前端&difficulty=basic&essentiality=must_know&scope=wrong&limit=0',
+      ),
+    ).toEqual({
+      language: 'all',
+      direction: '前端',
+      difficulty: 'basic',
+      essentiality: 'must_know',
+      scope: 'wrong',
+      limit: 0,
+    })
+  })
+
+  it('空串语言是闭集成员（通用），不能被当成「全部」', () => {
+    expect(parsePracticeSearch('?language=').language).toBe('')
+  })
+
+  it('越界值全部回落默认，且不抛错', () => {
+    expect(
+      parsePracticeSearch(
+        '?direction=不存在&difficulty=extreme&essentiality=legendary&scope=done&limit=7&language=rust',
+      ),
+    ).toEqual(DEFAULT_PRACTICE_FILTERS)
   })
 })

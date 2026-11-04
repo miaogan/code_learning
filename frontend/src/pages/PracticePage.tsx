@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { ApiError, api } from '../api/client'
 import type {
   PracticeAnswerResult,
@@ -22,8 +23,9 @@ import { InlineError } from '../components/ui/InlineError'
 import { PhaseLoader } from '../components/ui/PhaseLoader'
 import {
   ANSWER_ERROR_MESSAGE,
-  DEFAULT_PRACTICE_FILTERS,
+  DIFFICULTY_LABEL,
   EMPTY_BANK_REASON,
+  ESSENTIALITY_LABEL,
   LANGUAGE_LABEL,
   NEED_ANSWER_MESSAGE,
   NO_HIT_MESSAGE,
@@ -31,6 +33,7 @@ import {
   STATS_ERROR_MESSAGE,
   answerText,
   filtersLabel,
+  parsePracticeSearch,
   wrongTabLabel,
   type PracticeFiltersState,
 } from '../lib/practice'
@@ -58,9 +61,11 @@ function messageOf(error: unknown, fallback: string): string {
  * 4. 提交前页面**零答案信息**（题单响应本身不含 answer/explanation）。
  */
 export default function PracticePage() {
+  // 报告页「7 天计划」的专项练习链接带筛选参数：首渲染按 query 落到对应筛选，其余入口仍走默认值。
+  const { search } = useLocation()
   const [tab, setTab] = useState<Tab>('practice')
   const [view, setView] = useState<View>('setup')
-  const [filters, setFilters] = useState<PracticeFiltersState>(DEFAULT_PRACTICE_FILTERS)
+  const [filters, setFilters] = useState<PracticeFiltersState>(() => parsePracticeSearch(search))
 
   const [paper, setPaper] = useState<PracticePaper | null>(null)
   const [index, setIndex] = useState(0)
@@ -358,6 +363,9 @@ export default function PracticePage() {
         >
           <p className="sc-qa-question-tags">
             <Chip label={LANGUAGE_LABEL[current.language]} />
+            {current.direction !== '' ? <Chip label={current.direction} tone="direction" /> : null}
+            <Chip label={DIFFICULTY_LABEL[current.difficulty]} />
+            <Chip label={ESSENTIALITY_LABEL[current.essentiality]} />
           </p>
           <ExamQuestionCard
             index={index}

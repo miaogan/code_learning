@@ -4047,3 +4047,196 @@ input:not([type='radio']):not([type='checkbox']):not([type='file']):disabled {
   }
 }
 
+/* ---------- 调研改造 · 逐题复盘 + 7 天补短板计划（append-only；只用 tokens 变量） ---------- */
+
+.sc-review-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.sc-review-group + .sc-review-group {
+  margin-top: var(--sp-4);
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--border-hair);
+}
+
+.sc-review-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-4);
+  background: var(--bg-inset);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-8);
+}
+
+.sc-review-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.sc-review-score {
+  margin-left: auto;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--accent-soft);
+}
+
+.sc-review-prompt {
+  margin: 0;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--text-primary);
+  white-space: pre-wrap;
+}
+
+.sc-review-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  padding-top: var(--sp-2);
+  border-top: 1px solid var(--border-hair);
+}
+
+.sc-review-label {
+  margin: 0;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+}
+
+.sc-review-text {
+  margin: 0;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+}
+
+.sc-review-text.is-hint {
+  color: var(--text-tertiary);
+}
+
+.sc-plan-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sc-plan-day {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-4);
+  background: var(--bg-inset);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-8);
+}
+
+.sc-plan-day.is-done {
+  border-color: var(--success-line-55);
+  background: var(--success-tint-10);
+}
+
+.sc-plan-dayhead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.sc-plan-daynum {
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--accent-soft);
+}
+
+.sc-plan-daytitle {
+  margin: 0;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.sc-plan-check {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-left: auto;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+  cursor: pointer;
+}
+
+.sc-plan-check input {
+  accent-color: var(--accent);
+}
+
+.sc-plan-focus {
+  margin: 0;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--text-secondary);
+}
+
+.sc-plan-tasks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+.sc-plan-task {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--bg-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-6);
+  text-decoration: none;
+  transition:
+    border-color var(--fast) var(--ease),
+    background var(--fast) var(--ease);
+}
+
+.sc-plan-task:hover,
+.sc-plan-task:focus-visible {
+  border-color: var(--accent-line-30);
+  background: var(--accent-wash-06);
+}
+
+.sc-plan-task.is-static {
+  border-style: dashed;
+  background: transparent;
+}
+
+.sc-plan-tasklabel {
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--text-primary);
+}
+
+.sc-plan-taskmeta {
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+}
+
+@media (max-width: 640px) {
+  .sc-plan-check {
+    margin-left: 0;
+  }
+
+  .sc-plan-task {
+    flex: 1 1 100%;
+  }
+}
+

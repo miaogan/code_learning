@@ -268,3 +268,49 @@ export const WRONG_BOOK_EMPTY_REASON = '练习里答错的题会自动进来，�
 export const NEED_ANSWER_MESSAGE = '先选一个答案，再提交'
 /** 统计请求失败（命中行降级文案）。 */
 export const STATS_ERROR_MESSAGE = '题库统计读取失败，可稍后重试'
+
+/**
+ * 从 `/practice` 的 URL query 解析初始筛选（报告页「7 天计划」的专项练习链接用）。
+ * 只接受闭集内取值：未知 / 非法 / 缺省一律回落默认值，不抛错、不让页面白屏。
+ */
+export function parsePracticeSearch(search: string): PracticeFiltersState {
+  const params = new URLSearchParams(search)
+  const languages = new Set<string>(languageChips().map((chip) => chip.value))
+  const directions = new Set<string>(directionChips().map((chip) => chip.value))
+  const difficulties = new Set<string>(difficultyChips().map((chip) => chip.value))
+  const essentialities = new Set<string>(essentialityChips().map((chip) => chip.value))
+  const scopes = new Set<string>(scopeChips().map((chip) => chip.value))
+
+  const language = params.get('language')
+  const direction = params.get('direction')
+  const difficulty = params.get('difficulty')
+  const essentiality = params.get('essentiality')
+  const scope = params.get('scope')
+  const limitRaw = params.get('limit')
+  const limit = limitRaw === null ? null : Number(limitRaw)
+
+  return {
+    language:
+      language !== null && languages.has(language)
+        ? (language as PracticeLanguageFilter)
+        : DEFAULT_PRACTICE_FILTERS.language,
+    direction:
+      direction !== null && directions.has(direction)
+        ? (direction as PracticeDirectionFilter)
+        : DEFAULT_PRACTICE_FILTERS.direction,
+    difficulty:
+      difficulty !== null && difficulties.has(difficulty)
+        ? (difficulty as PracticeDifficultyFilter)
+        : DEFAULT_PRACTICE_FILTERS.difficulty,
+    essentiality:
+      essentiality !== null && essentialities.has(essentiality)
+        ? (essentiality as PracticeEssentialityFilter)
+        : DEFAULT_PRACTICE_FILTERS.essentiality,
+    scope:
+      scope !== null && scopes.has(scope) ? (scope as PracticeScope) : DEFAULT_PRACTICE_FILTERS.scope,
+    limit:
+      limit !== null && limitChips().some((chip) => chip.value === limit)
+        ? (limit as PracticeLimit)
+        : DEFAULT_PRACTICE_FILTERS.limit,
+  }
+}
