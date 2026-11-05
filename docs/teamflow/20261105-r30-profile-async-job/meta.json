@@ -1,0 +1,8 @@
+{
+  "id": "20261105-r30-profile-async-job",
+  "title": "画像生成异步化：服务端后台任务 + 前端轮询，生成期间离开不再中断",
+  "status": "done",
+  "createdAt": "2026-11-05T15:20:00+08:00",
+  "owner": "dev",
+  "tags": ["profile", "async", "upload", "ux"]
+}

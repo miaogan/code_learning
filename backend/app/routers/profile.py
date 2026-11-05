@@ -10,16 +10,26 @@
 
 from __future__ import annotations
 
+import asyncio
+import uuid
 from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends
 
 from .. import repository
+from ..context import set_current_user_id
 from ..deps import CurrentUser, current_user
 from ..errors import NOT_FOUND, AppError
-from ..schemas import Profile, ProfilePatch, ProfileWithMerge
+from ..schemas import (
+    Profile,
+    ProfileJobStarted,
+    ProfileJobStatus,
+    ProfilePatch,
+    ProfileWithMerge,
+)
 from ..services import user_ai
+from ..services.ai import AIClient
 from ..services.profile import generate_profile
 from ..services.profile_merge import backfill_evidence
 
@@ -66,6 +76,119 @@ async def create_profile(resume_id: str, user: CurrentUser) -> ProfileWithMerge:
         captured_at=str(meta.get("created_at") or ""),
         client=client,
     )
+
+
+# --- 异步画像任务（r30）-------------------------------------------------------
+
+#: 运行中的后台任务引用：asyncio 文档要求任务创建后必须保存引用，
+#: 否则任务可能被垃圾回收中途回收（终态不落库、轮询永远 running）。
+_PENDING_JOBS: set[asyncio.Task[None]] = set()
+
+
+def _job_error_message(exc: Exception) -> str:
+    """后台任务的失败原因：业务异常直接用中文 message，其余一律收敛成通用提示。
+
+    任务在事件循环里独立跑，异常不会再经过全局错误处理器 —— 不在这里兜住，
+    任务就会无声消失，前端轮询永远停在 running。
+    """
+    if isinstance(exc, AppError):
+        return exc.message
+    return "画像生成失败，请稍后重试"
+
+
+async def _run_profile_job(
+    job_id: str,
+    resume_id: str,
+    text: str,
+    meta: dict[str, Any],
+    client: AIClient,
+    user_id: str,
+) -> None:
+    """后台任务体：成功落 `ProfileWithMerge` JSON，失败落中文原因 —— 两种终态都必须可见。"""
+    set_current_user_id(user_id)
+    try:
+        result = await generate_profile(
+            resume_id,
+            text,
+            file_name=str(meta.get("file_name") or ""),
+            captured_at=str(meta.get("created_at") or ""),
+            client=client,
+        )
+        repository.finish_profile_job(job_id, result.model_dump_json(), user_id=user_id)
+    except Exception as exc:  # noqa: BLE001 - 任何失败都要落库可见，见 _job_error_message
+        repository.fail_profile_job(job_id, _job_error_message(exc), user_id=user_id)
+
+
+@router.post(
+    "/resumes/{resume_id}/profile/async",
+    response_model=ProfileJobStarted,
+    summary="依据简历生成或合并画像（后台任务，凭 job_id 轮询）",
+)
+async def create_profile_async(resume_id: str, user: CurrentUser) -> ProfileJobStarted:
+    text = repository.get_document_text(resume_id)
+    if text is None:
+        raise AppError(NOT_FOUND, "没有找到这份简历，请重新上传后再生成画像", status=404)
+    meta = _document_meta(resume_id)
+    stats = repository.get_document_stats(resume_id) or {}
+    client = user_ai.client_for(user, "light")
+
+    job_id = uuid.uuid4().hex
+    repository.insert_profile_job(
+        job_id,
+        resume_id,
+        file_name=str(stats.get("file_name") or meta.get("file_name") or ""),
+        chars=int(stats.get("chars") or 0),
+        sections=int(stats.get("sections") or 0),
+    )
+    # Task 会拷贝请求上下文，但任务体里仍显式 set_current_user_id 兜底（仓储层写状态用）。
+    task = asyncio.create_task(
+        _run_profile_job(job_id, resume_id, text, meta, client, user["id"])
+    )
+    _PENDING_JOBS.add(task)
+    task.add_done_callback(_PENDING_JOBS.discard)
+    return ProfileJobStarted(job_id=job_id)
+
+
+def _job_status_of(row: dict[str, Any]) -> ProfileJobStatus:
+    result_json = str(row.get("result") or "")
+    result = (
+        ProfileWithMerge.model_validate_json(result_json) if result_json.strip() else None
+    )
+    return ProfileJobStatus(
+        job_id=str(row["job_id"]),
+        document_id=str(row["document_id"]),
+        file_name=str(row["file_name"]),
+        chars=int(row["chars"]),
+        sections=int(row["sections"]),
+        status=str(row["status"]),
+        error=str(row["error"]),
+        result=result,
+        created_at=str(row["created_at"]),
+    )
+
+
+@router.get(
+    "/profile-jobs/latest",
+    response_model=ProfileJobStatus,
+    summary="最近一次画像生成任务（回上传页自动接上进度用）",
+)
+def read_latest_profile_job() -> ProfileJobStatus:
+    row = repository.latest_profile_job()
+    if row is None:
+        raise AppError(NOT_FOUND, "还没有画像生成任务", status=404)
+    return _job_status_of(row)
+
+
+@router.get(
+    "/profile-jobs/{job_id}",
+    response_model=ProfileJobStatus,
+    summary="查询画像生成任务状态",
+)
+def read_profile_job(job_id: str) -> ProfileJobStatus:
+    row = repository.get_profile_job(job_id)
+    if row is None:
+        raise AppError(NOT_FOUND, "没有找到这个画像生成任务", status=404)
+    return _job_status_of(row)
 
 
 @router.patch("/profiles/{profile_id}", response_model=Profile, summary="编辑画像条目")

@@ -465,6 +465,29 @@ export interface ProfileWithMerge extends Profile {
 }
 
 /* ------------------------------------------------------------------ *
+ * r30 契约 · 异步画像任务（后台生成 + 前端轮询）
+ * ------------------------------------------------------------------ */
+
+/** `POST /api/resumes/{id}/profile/async` 的响应：任务已受理，凭 `job_id` 轮询。 */
+export interface ProfileJobStarted {
+  job_id: string
+  status: 'running'
+}
+
+/** 画像生成任务状态：`completed` 时 `result` 是完整 `ProfileWithMerge`（含一次性合并摘要）。 */
+export interface ProfileJobStatus {
+  job_id: string
+  document_id: string
+  file_name: string
+  chars: number
+  sections: number
+  status: 'running' | 'completed' | 'failed'
+  error: string
+  result: ProfileWithMerge | null
+  created_at: string
+}
+
+/* ------------------------------------------------------------------ *
  * r3 契约 · 简历 AI 润色（TECHNICAL §3）
  * ------------------------------------------------------------------ */
 

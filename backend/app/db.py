@@ -61,6 +61,25 @@ CREATE TABLE IF NOT EXISTS reports (
 CREATE INDEX IF NOT EXISTS idx_runs_kind_created ON runs (kind, created_at);
 CREATE INDEX IF NOT EXISTS idx_reports_created ON reports (created_at);
 
+-- r30 异步画像任务：画像生成从「同步阻塞 30 秒」改为「后台任务 + 前端轮询」。
+-- status ∈ running | completed | failed；result 存 ProfileWithMerge 的 JSON
+-- （含一次性 merge_summary，轮询拿到即完成交付）。
+CREATE TABLE IF NOT EXISTS profile_jobs (
+    id          TEXT PRIMARY KEY,
+    user_id     TEXT NOT NULL DEFAULT 'default',
+    document_id TEXT NOT NULL,
+    file_name   TEXT NOT NULL,
+    chars       INTEGER NOT NULL,
+    sections    INTEGER NOT NULL,
+    status      TEXT NOT NULL,
+    error       TEXT NOT NULL DEFAULT '',
+    result      TEXT NOT NULL DEFAULT '',
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_profile_jobs_user ON profile_jobs (user_id, created_at);
+
 -- r3 成长时间线：事件以 JSON 快照定格（重算报告不回写事件，分数不漂移）。
 -- 唯一性写两处、语义等价：表内 `UNIQUE (type, ref_id)` 让「建表即唯一」（新库形态），
 -- 显式索引让「既有库 / 半升级状态」也一定唯一（CREATE TABLE IF NOT EXISTS 不会补约束）。

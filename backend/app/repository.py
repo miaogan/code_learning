@@ -103,6 +103,26 @@ def get_document_text(document_id: str) -> str | None:
     return None if document is None else str(document["text"])
 
 
+def get_document_stats(document_id: str) -> dict[str, Any] | None:
+    """文档展示元信息（file_name / chars / sections），查不到 `None`。
+
+    异步画像任务（r30）受理时用它把展示元信息定格进 `profile_jobs` 行，
+    轮询响应无需再回查 documents 表。
+    """
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT file_name, chars, sections FROM documents WHERE id = ? AND user_id = ?",
+            (document_id, _uid()),
+        ).fetchone()
+    if row is None:
+        return None
+    return {
+        "file_name": str(row["file_name"]),
+        "chars": int(row["chars"]),
+        "sections": int(row["sections"]),
+    }
+
+
 # --- profiles ------------------------------------------------------------
 
 _PROFILE_UPSERT = (
@@ -153,6 +173,89 @@ def latest_profile() -> Profile | None:
             (_uid(),),
         ).fetchone()
     return None if row is None else _profile_of(row)
+
+
+# --- profile_jobs（r30 异步画像任务）---------------------------------------
+
+
+def insert_profile_job(
+    job_id: str,
+    document_id: str,
+    file_name: str,
+    chars: int,
+    sections: int,
+) -> None:
+    """受理一个画像生成后台任务（status=running）。
+
+    受理发生在请求上下文里，`_uid()` 即当前用户；后台任务写状态时显式传
+    `user_id`（见 `finish_profile_job` / `fail_profile_job`），不依赖 ContextVar
+    在 `asyncio.create_task` 里的隐式传播。
+    """
+    with connection() as conn:
+        conn.execute(
+            "INSERT INTO profile_jobs "
+            "(id, user_id, document_id, file_name, chars, sections, status, error, result, "
+            " created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, '', '', ?, ?)",
+            (job_id, _uid(), document_id, file_name, chars, sections, "running", _now(), _now()),
+        )
+
+
+def get_profile_job(job_id: str) -> dict[str, Any] | None:
+    """按 id 读任务行（当前用户隔离），查不到 `None`。"""
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT id, user_id, document_id, file_name, chars, sections, status, error, "
+            "result, created_at, updated_at FROM profile_jobs WHERE id = ? AND user_id = ?",
+            (job_id, _uid()),
+        ).fetchone()
+    return None if row is None else _job_dict(row)
+
+
+def latest_profile_job() -> dict[str, Any] | None:
+    """当前用户最近一次画像任务（任意状态）：前端「回到上传页自动接上进度」用。"""
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT id, user_id, document_id, file_name, chars, sections, status, error, "
+            "result, created_at, updated_at FROM profile_jobs "
+            "WHERE user_id = ? ORDER BY created_at DESC LIMIT 1",
+            (_uid(),),
+        ).fetchone()
+    return None if row is None else _job_dict(row)
+
+
+def finish_profile_job(job_id: str, result_json: str, *, user_id: str) -> None:
+    """后台任务成功：写入 `ProfileWithMerge` JSON（含一次性 merge_summary）。"""
+    with connection() as conn:
+        conn.execute(
+            "UPDATE profile_jobs SET status = 'completed', result = ?, updated_at = ? "
+            "WHERE id = ? AND user_id = ?",
+            (result_json, _now(), job_id, user_id),
+        )
+
+
+def fail_profile_job(job_id: str, error: str, *, user_id: str) -> None:
+    """后台任务失败：落中文原因供轮询端展示；任务本身不重试（前端重试=重新受理）。"""
+    with connection() as conn:
+        conn.execute(
+            "UPDATE profile_jobs SET status = 'failed', error = ?, updated_at = ? "
+            "WHERE id = ? AND user_id = ?",
+            (error, _now(), job_id, user_id),
+        )
+
+
+def _job_dict(row: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "job_id": row["id"],
+        "document_id": row["document_id"],
+        "file_name": row["file_name"],
+        "chars": row["chars"],
+        "sections": row["sections"],
+        "status": row["status"],
+        "error": row["error"],
+        "result": str(row["result"]) if row["result"] else "",
+        "created_at": row["created_at"],
+    }
 
 
 # --- runs ----------------------------------------------------------------

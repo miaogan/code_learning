@@ -18,6 +18,8 @@ import type {
   Me,
   PasswordChangeRequest,
   Profile,
+  ProfileJobStarted,
+  ProfileJobStatus,
   ProfilePatch,
   ProfileWithMerge,
   PolishFullRequest,
@@ -183,6 +185,20 @@ export const api = {
       method: 'POST',
       signal,
     }),
+
+  /** r30：同一条链路的异步版 —— 只受理，立即返回 `job_id`，真正的生成在服务端后台跑。 */
+  generateProfileAsync: (resumeId: string): Promise<ProfileJobStarted> =>
+    request<ProfileJobStarted>(`/api/resumes/${encodeURIComponent(resumeId)}/profile/async`, {
+      method: 'POST',
+    }),
+
+  /** r30：轮询画像任务状态；`completed` 时 `result` 带一次性合并摘要。 */
+  getProfileJob: (jobId: string, signal?: AbortSignal): Promise<ProfileJobStatus> =>
+    request<ProfileJobStatus>(`/api/profile-jobs/${encodeURIComponent(jobId)}`, { signal }),
+
+  /** r30：最近一次画像任务（回上传页自动接上进度）；没有任务时 404。 */
+  latestProfileJob: (signal?: AbortSignal): Promise<ProfileJobStatus> =>
+    request<ProfileJobStatus>('/api/profile-jobs/latest', { signal }),
 
   /** 成长时间线（r3）：服务端已按 `occurred_at` 倒序 + 已算好 `comparison`。 */
   timeline: (limit = 20, signal?: AbortSignal): Promise<TimelineEvent[]> =>

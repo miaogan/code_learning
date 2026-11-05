@@ -47,6 +47,9 @@
 - 2026-11-05：学习模块新增阅读进度（r25）：小节级已读记录（`sc.learn.<userId>` 按账号隔离的 localStorage）、目录页进度条与「继续学习」入口、文章页 `#tutorial-<sectionId>` 断点续读；进度只记「读过」不记「掌握」，不进后端、不计成绩（产物见 `docs/teamflow/20261105-r25-learn-progress/`）。
 - 2026-11-05：文章页新增章内目录（r26）：`TutorialToc` 在宽屏常驻右栏、窄屏折叠，当前小节由第二条 IntersectionObserver 观察带（视口上部 40%）推导并高亮，已读小节打 ✓ 且与进度条同源；报告页方向卡的「站内教程」入口显示已读完章数（产物见 `docs/teamflow/20261105-r26-learn-toc/`）。
 - 2026-11-05：无简历引导修复（r27）：「未上传简历」弹框会话标记迁 `sessionStorage`（修 StrictMode 双跑不弹 / 整页刷新重弹），登出清理只认「已登录 → null」跳变；上传页与成绩趋势空态加免简历出口（练习 / 教程），门禁旁路扩为练习 + 教程（产物见 `docs/teamflow/20261105-r27-noprofile-guidance/`）。
+- 2026-11-05：学习模块第三批内容扩充（r28）：8 方向各增 1 章（TypeScript 类型系统、认证与会话、范式与反范式、Docker 基础、二叉树与递归、IO 模型与零拷贝、Agent 与工具调用、重构与坏味道），教程扩到 32 章（基础 11 / 进阶 13 / 高级 8），纯内容不改逻辑（产物见 `docs/teamflow/20261105-r28-learn-content-batch3/`）。
+- 2026-11-05：上传页中途离开保护（r29）：上传/生成中刷新或关闭走浏览器原生提示、站内链接先确认再跳，卸载兜底中止在途请求（r30 异步化后拦截收窄到文件上传窗口）（产物见 `docs/teamflow/20261105-r29-upload-leave-guard/`）。
+- 2026-11-05：画像生成异步化（r30）：新增 `profile_jobs` 表与 `POST /api/resumes/{id}/profile/async`（`asyncio.create_task` 后台跑 `generate_profile`，终态落库可见）、`GET /api/profile-jobs/{job_id}`（轮询）与 `GET /api/profile-jobs/latest`（回上传页自动接上）；同步 POST 契约不变。上传页生成阶段改为 2 秒轮询，离开页面任务照跑、回来自动接上，离开保护收窄到文件上传窗口；一次性 `merge_summary` 随任务落库不因异步丢失（产物见 `docs/teamflow/20261105-r30-profile-async-job/`）。
 
 <!-- teamflow:begin -->
 ## TeamFlow 托管区（本块由 TeamFlow 自动维护，团队请勿手改）

@@ -643,6 +643,31 @@ class ProfileWithMerge(Profile):
     merge_summary: ProfileMergeSummary | None = None
 
 
+class ProfileJobStarted(BaseModel):
+    """`POST /api/resumes/{id}/profile/async` 响应：任务已受理，凭 `job_id` 轮询（r30）。"""
+
+    job_id: str
+    status: str = "running"
+
+
+class ProfileJobStatus(BaseModel):
+    """`GET /api/profile-jobs/{job_id}` 响应：任务状态 + 终态结果（r30）。
+
+    `completed` 时 `result` 是完整 `ProfileWithMerge`（含一次性 `merge_summary`，
+    后台完成也不丢「本次合并」摘要）；`failed` 时 `error` 是可直接展示的中文原因。
+    """
+
+    job_id: str
+    document_id: str
+    file_name: str
+    chars: int
+    sections: int
+    status: str  # running | completed | failed
+    error: str = ""
+    result: ProfileWithMerge | None = None
+    created_at: str
+
+
 # --- 简历润色（r3 AC-8 ~ AC-13）----------------------------------------------
 
 

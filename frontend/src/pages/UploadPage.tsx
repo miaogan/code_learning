@@ -1,25 +1,37 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ChangeEvent, DragEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { ApiError, api } from '../api/client'
 import type { ProfileMergeSummary, ResumeMeta } from '../api/types'
 import { mergeSummaryText } from '../components/profile/mergeModel'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { Chip } from '../components/ui/Chip'
+import { ConfirmModal } from '../components/ui/ConfirmModal'
 import { InlineError } from '../components/ui/InlineError'
 import { PhaseLoader } from '../components/ui/PhaseLoader'
 import { RingProgress } from '../components/ui/RingProgress'
 import { formatChars } from '../lib/format'
+import {
+  PROFILE_JOB_POLL_MS,
+  isJobRunning,
+  jobFailureMessage,
+  jobToResumeMeta,
+  shouldReattach,
+} from '../lib/profileJob'
 import { useAsync } from '../lib/useAsync'
 import { setFlow } from '../state/flow'
 
 const MAX_BYTES = 10 * 1024 * 1024
 const ACCEPTED = ['.pdf', '.docx', '.txt']
 
-/** idle →（上传）→（生成/合并画像）→ done；任一步失败进 error 并记住失败在哪一步（重试只重跑那一步）。 */
-/** paused = 简历已上传解析，用户取消了画像生成；可继续生成或重新上传。 */
-type Phase = 'idle' | 'uploading' | 'profiling' | 'paused' | 'done' | 'error'
+/**
+ * 页面阶段（r30 行为变更）：idle →（上传解析，仍同步等待）→ profiling（服务端后台任务，
+ * 本页只轮询，可随时离开）→ done；任一步失败进 error 并记住失败在哪一步（重试只重跑那一步）。
+ * 旧版 profiling 阶段的 paused（取消后可续）随同步等待一起移除：后台任务没有「取消」，
+ * 离开不丢进度，回来自动接上。
+ */
+type Phase = 'idle' | 'uploading' | 'profiling' | 'done' | 'error'
 
 interface Failure {
   message: string
@@ -45,30 +57,41 @@ function validateLocally(file: File): string | null {
 }
 
 /**
- * 上传页（r3 行为变更，TECHNICAL §10-1）：上传成功后**立即**生成/合并画像。
- * 既有实现上传完直接跳 `/profile` 读 `latestProfile`，首份画像永远生成不出来（死链）；
- * r3 的 AC-6 以「上传 → 生成/合并」为入口，合并摘要随 `location.state` 一次性带给画像页。
+ * 上传页。r3：上传成功后立即生成/合并画像；r30：画像生成改为服务端后台任务 ——
+ * 受理即返回 `job_id`，本页每 2 秒轮询，生成期间离开页面任务照跑，回来自动接上。
+ * 因此离开保护只保留在「文件上传中」这个秒级窗口；画像生成阶段不再拦截导航。
  */
 export default function UploadPage() {
   const navigate = useNavigate()
+  const { pathname } = useLocation()
   const inputRef = useRef<HTMLInputElement>(null)
+  /** 只保护文件上传这一段在途请求；画像任务在服务端，卸载不需要（也不应该）中止它。 */
   const abortRef = useRef<AbortController | null>(null)
   const [phase, setPhase] = useState<Phase>('idle')
   const [dragOver, setDragOver] = useState(false)
   const [picked, setPicked] = useState<File | null>(null)
   const [meta, setMeta] = useState<ResumeMeta | null>(null)
-  /** meta 的镜像：取消时在 abort 回调里判断「简历是否已解析」，避免把已上传的 resume_id 丢掉。 */
+  /** meta 的镜像：失败重试时取 resume_id 重新受理画像任务。 */
   const metaRef = useRef<ResumeMeta | null>(null)
+  const [jobId, setJobId] = useState<string | null>(null)
   const [merge, setMerge] = useState<ProfileMergeSummary | null>(null)
   const [failure, setFailure] = useState<Failure | null>(null)
   const [uploadSec, setUploadSec] = useState(0)
   const [profileSec, setProfileSec] = useState(0)
+  /** 上传中点了站内链接：先确认再跳（画像生成阶段不拦截，任务在服务端跑）。 */
+  const [pendingLeave, setPendingLeave] = useState<string | null>(null)
+  /** 重接入只跑一次（StrictMode 双跑会被 ref 挡住，避免重复请求与状态踩踏）。 */
+  const reattachRef = useRef(false)
+  /** phase 的镜像：重接入的异步回调里判断「用户是否已经又开始了新动作」。 */
+  const phaseRef = useRef<Phase>(phase)
+  phaseRef.current = phase
 
   // 回访识别：已有画像的用户（换设备/重新登录后）不必再传一份简历，首页给「继续」入口。
   // 没有画像时接口报 PROFILE_MISSING，这里按「新用户」处理，不显示任何错误。
   const savedProfileAsync = useAsync((signal) => api.latestProfile(signal), [])
   // data 是「最近一次成功值」（重载期间保留）：生成成功后再 reload，页头与回访摘要卡不闪空。
   const saved = savedProfileAsync.data
+  const reloadSavedProfile = savedProfileAsync.reload
   // 只有「没有画像」（404）才按新用户处理；其它错误必须显式报错并给重试，不能假装是新用户。
   const savedError =
     savedProfileAsync.status === 'error' && savedProfileAsync.error?.status !== 404
@@ -88,29 +111,127 @@ export default function UploadPage() {
     return () => window.clearInterval(timer)
   }, [phase])
 
-  /** 上传之后的第二步：生成/合并画像；失败只影响本步（简历已在服务端，重试不必重传）。 */
-  const buildProfile = async (resumeId: string, controller: AbortController): Promise<void> => {
-    setPhase('profiling')
-    try {
-      const generated = await api.generateProfile(resumeId, controller.signal)
-      setMerge(generated.merge_summary ?? null)
-      setFlow({ hasResume: true, hasProfile: true })
-      setPhase('done')
-      // 生成成功后重读最新画像：清掉上一次非 404 的读取错误，并让页头/回访卡立即反映新画像。
-      void savedProfileAsync.reload()
-    } catch (err) {
-      if (controller.signal.aborted) {
-        // 取消但简历已解析：停在 paused，保留 resume_id 供「继续生成」。
-        setPhase(metaRef.current === null ? 'idle' : 'paused')
-        return
-      }
-      setFailure({
-        message: err instanceof ApiError ? err.message : '画像生成失败，请稍后重试',
-        stage: 'profile',
-        retryable: true,
-      })
-      setPhase('error')
+  const busy = phase === 'uploading' || phase === 'profiling'
+
+  // 文件上传中（秒级窗口）离开会丢进度：刷新/关闭走浏览器原生提示，站内链接先确认 ——
+  // 与笔试页（作答中离开）、润色页（生成中离开）同一套写法。
+  // 画像生成阶段**不拦截**：那是服务端后台任务（r30），离开照跑，回来自动接上。
+  useEffect(() => {
+    if (phase !== 'uploading') {
+      setPendingLeave(null)
+      return
     }
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    const onClickCapture = (event: MouseEvent) => {
+      const target = event.target instanceof Element ? event.target.closest('a[href]') : null
+      if (!target) return
+      const href = target.getAttribute('href')
+      if (!href || href.startsWith('#') || /^[a-z]+:/i.test(href) || href === pathname) return
+      event.preventDefault()
+      event.stopPropagation()
+      setPendingLeave(href)
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    document.addEventListener('click', onClickCapture, true)
+    return () => {
+      window.removeEventListener('beforeunload', onBeforeUnload)
+      document.removeEventListener('click', onClickCapture, true)
+    }
+  }, [phase, pathname])
+
+  // 兜底：卸载时文件上传仍在途（确认离开后的跳转、登出）一律中止；
+  // 画像后台任务不在中止范围 —— 它就是要活在页面之外。
+  useEffect(() => () => abortRef.current?.abort(), [])
+
+  // r30 重接入：回到上传页时若还有在后台跑的画像任务，直接接上轮询。
+  // completed/failed 的历史任务不重放（shouldReattach 只认 running），
+  // 完成态走 savedProfile 读路径呈现「已有画像」摘要卡。
+  useEffect(() => {
+    if (reattachRef.current) return
+    reattachRef.current = true
+    api
+      .latestProfileJob()
+      .then((job) => {
+        if (!shouldReattach(job) || phaseRef.current !== 'idle') return
+        const resumed = jobToResumeMeta(job)
+        setPicked(null)
+        setMeta(resumed)
+        metaRef.current = resumed
+        setPhase('profiling')
+        setJobId(job.job_id)
+      })
+      .catch(() => {
+        /* 404 = 没有任务，正常新用户路径；其它错误也静默 —— 生成不是本页必现状态 */
+      })
+  }, [])
+
+  // r30 轮询：每 2 秒查一次任务状态。网络抖动继续轮（不轻易判死）；
+  // 404 说明任务行没了，如实报错。轮询随卸载/终态自动停止，任务本身在服务端照跑。
+  useEffect(() => {
+    if (jobId === null) return
+    let stopped = false
+    let timer = 0
+    const poll = async () => {
+      try {
+        const job = await api.getProfileJob(jobId)
+        if (stopped) return
+        if (isJobRunning(job)) {
+          timer = window.setTimeout(() => void poll(), PROFILE_JOB_POLL_MS)
+          return
+        }
+        setJobId(null)
+        if (job.status === 'completed' && job.result !== null) {
+          // 后台完成也带一次性 merge_summary（r3 的「本次合并」摘要不因异步而丢）。
+          setMerge(job.result.merge_summary ?? null)
+          setFlow({ hasResume: true, hasProfile: true })
+          setPhase('done')
+          void reloadSavedProfile()
+        } else {
+          setFailure({ message: jobFailureMessage(job), stage: 'profile', retryable: true })
+          setPhase('error')
+        }
+      } catch (err) {
+        if (stopped) return
+        if (err instanceof ApiError && err.status === 404) {
+          setJobId(null)
+          setFailure({
+            message: '后台任务已不存在，请重新生成画像',
+            stage: 'profile',
+            retryable: true,
+          })
+          setPhase('error')
+          return
+        }
+        timer = window.setTimeout(() => void poll(), PROFILE_JOB_POLL_MS)
+      }
+    }
+    timer = window.setTimeout(() => void poll(), PROFILE_JOB_POLL_MS)
+    return () => {
+      stopped = true
+      window.clearTimeout(timer)
+    }
+  }, [jobId, reloadSavedProfile])
+
+  /** 画像生成（r30 起为后台任务）：受理即返回，状态由轮询 effect 接管。 */
+  const startProfileJob = (resumeId: string) => {
+    setFailure(null)
+    setMerge(null)
+    setProfileSec(0)
+    setPhase('profiling')
+    api
+      .generateProfileAsync(resumeId)
+      .then((started) => setJobId(started.job_id))
+      .catch((err: unknown) => {
+        setFailure({
+          message: err instanceof ApiError ? err.message : '画像生成受理失败，请稍后重试',
+          stage: 'profile',
+          retryable: true,
+        })
+        setPhase('error')
+      })
   }
 
   const upload = async (file: File) => {
@@ -136,12 +257,12 @@ export default function UploadPage() {
       setMeta(result)
       metaRef.current = result
       setFlow({ hasResume: true })
-      // 第二步的失败由 buildProfile 内部处理，不会落到这里的 catch（只有上传解析失败才进这里）。
-      await buildProfile(result.resume_id, controller)
+      // 解析完成后画像在服务端后台生成，这里不再同步等待（r30）。
+      startProfileJob(result.resume_id)
     } catch (err) {
       if (controller.signal.aborted) {
-        // 取消但简历已解析：停在 paused，保留 resume_id 供「继续生成」。
-        setPhase(metaRef.current === null ? 'idle' : 'paused')
+        // 上传被打断 = 简历没入库，直接回 idle，用户重选文件即可。
+        setPhase('idle')
         return
       }
       setFailure({
@@ -159,29 +280,26 @@ export default function UploadPage() {
       if (picked) void upload(picked)
       return
     }
-    if (meta === null) {
+    const current = metaRef.current
+    if (current === null) {
       setPhase('idle')
       return
     }
-    const controller = new AbortController()
-    abortRef.current = controller
-    void buildProfile(meta.resume_id, controller)
+    startProfileJob(current.resume_id)
   }
 
-  /** 取消：只中止请求；若简历已解析，abort 回调会把页面停在 paused（可继续生成），不丢 resume_id。 */
+  /** 取消（仅文件上传窗口）：中止在途请求，简历未入库，回到 idle 重选文件即可。 */
   const cancel = () => {
     abortRef.current?.abort()
     setUploadSec(0)
-    setProfileSec(0)
   }
 
-  /** paused 状态的出口：用已解析的 resume_id 重跑第二步，不必重新上传文件。 */
-  const resumeBuilding = () => {
-    const current = metaRef.current
-    if (current === null) return
-    const controller = new AbortController()
-    abortRef.current = controller
-    void buildProfile(current.resume_id, controller)
+  /** 确认离开：中止在途上传再跳转；简历未入库则重传，已入库则重新上传会走合并，不重复计费。 */
+  const confirmLeave = () => {
+    const href = pendingLeave
+    setPendingLeave(null)
+    abortRef.current?.abort()
+    if (href !== null) navigate(href)
   }
 
   const reset = () => {
@@ -190,6 +308,7 @@ export default function UploadPage() {
     setPicked(null)
     setMeta(null)
     setMerge(null)
+    setJobId(null)
     setFailure(null)
     setPhase('idle')
   }
@@ -219,8 +338,6 @@ export default function UploadPage() {
   const toPolish = () => {
     navigate('/polish', { state: { fromUpload: true } })
   }
-
-  const busy = phase === 'uploading' || phase === 'profiling'
 
   return (
     <section>
@@ -292,7 +409,7 @@ export default function UploadPage() {
       <div className="sc-chips">
         <Chip label="PDF / DOCX / TXT" />
         <Chip label="≤10MB" />
-        <Chip label="解析约 30 秒" />
+        <Chip label="解析约 30 秒 · 生成在后台进行" />
       </div>
 
       {/* 新用户引导（r27）：练习与教程不依赖画像，先把这两个免简历入口摆在首屏，
@@ -352,30 +469,17 @@ export default function UploadPage() {
                 elapsedSec={profileSec}
                 title={meta ? `${meta.file_name} · 正在生成可溯源画像` : undefined}
               />
-              <div className="sc-actions">
-                <Button variant="ghost" size="sm" onClick={cancel}>
-                  取消
-                </Button>
-              </div>
-            </div>
-          </Card>
-        </div>
-      ) : null}
-
-      {phase === 'paused' && meta ? (
-        <div className="sc-actions">
-          <Card>
-            <div className="sc-upload-summary">
-              <p className="sc-file-name">{meta.file_name}</p>
-              <p className="sc-summary-meta">
-                {`简历已解析完成（抽取 ${formatChars(meta.chars)} · ${meta.sections} 章节），画像生成已取消。`}
+              {/* r30：任务在服务端跑，离开本页不会中断 —— 给出口而不是给拦截。 */}
+              <p className="sc-meta-line">
+                画像在后台生成，离开本页不会中断，回来后会自动接上进度。
               </p>
-              <p className="sc-meta-line">可以继续生成画像，不需要重新上传简历。</p>
               <div className="sc-btn-row">
-                <Button onClick={resumeBuilding}>继续生成画像</Button>
-                <Button variant="secondary" onClick={reset}>
-                  重新上传
-                </Button>
+                <Link className="sc-btn sc-btn--secondary" to="/practice">
+                  先去练习
+                </Link>
+                <Link className="sc-btn sc-btn--secondary" to="/learn">
+                  看站内教程
+                </Link>
               </div>
             </div>
           </Card>
@@ -418,6 +522,15 @@ export default function UploadPage() {
           </Card>
         </div>
       ) : null}
+      <ConfirmModal
+        open={pendingLeave !== null}
+        title="简历还在上传，离开会中断"
+        message="上传中断后需要重新选择文件再传一次。刷新或关闭页面同样会中断。"
+        confirmLabel="仍然离开"
+        cancelLabel="留在本页"
+        onConfirm={confirmLeave}
+        onCancel={() => setPendingLeave(null)}
+      />
     </section>
   )
 }
