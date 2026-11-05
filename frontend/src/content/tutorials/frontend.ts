@@ -6,6 +6,7 @@ export const FRONTEND_CHAPTERS: TutorialChapter[] = [
     id: 'fe-event-loop',
     title: 'JavaScript 事件循环与异步',
     direction: '前端',
+    level: '进阶',
     summary: '一张调用栈、微任务队列、宏任务队列的调度图，讲清 setTimeout 与 Promise 的执行顺序。',
     sections: [
       {
@@ -129,6 +130,7 @@ export const FRONTEND_CHAPTERS: TutorialChapter[] = [
     id: 'fe-react-render',
     title: 'React 状态与渲染',
     direction: '前端',
+    level: '基础',
     summary: '从「状态变化 → 重新渲染」讲清 useState、useEffect 与受控组件的边界，避免把状态写成副作用。',
     sections: [
       {
@@ -243,6 +245,136 @@ export const FRONTEND_CHAPTERS: TutorialChapter[] = [
               {
                 question: '列表渲染为什么要 key？',
                 answer: 'key 让 React 在多次渲染之间识别同一个条目，复用与移动节点；用索引作 key 在插入/删除时容易错位。',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'fe-render-performance',
+    title: '渲染性能与浏览器原理',
+    direction: '前端',
+    level: '高级',
+    summary: '从样式计算到合成层，讲清一次改属性会触发哪几个阶段，再用「分片渲染 + 虚拟列表」把长列表卡顿按下去。',
+    sections: [
+      {
+        id: 'pipeline',
+        title: '渲染流水线：从样式到像素',
+        blocks: [
+          {
+            kind: 'text',
+            text: '浏览器把 DOM 变成屏幕像素要经过五个阶段：样式计算 → 布局（Layout）→ 绘制（Paint）→ 合成（Composite）。改不同的属性，跳过的阶段不同，代价能差一个数量级。',
+          },
+          {
+            kind: 'table',
+            headers: ['改动类型', '触发阶段', '典型属性', '代价'],
+            rows: [
+              ['几何属性', '布局 + 绘制 + 合成', 'width / height / margin / font-size', '最高，整棵子树可能要重排'],
+              ['外观属性', '绘制 + 合成', 'color / background / box-shadow', '中，重绘区域越大越慢'],
+              ['合成属性', '仅合成', 'transform / opacity', '最低，交给 GPU 合成线程'],
+              ['触发滚动/布局读取', '强制同步布局', 'offsetHeight / getBoundingClientRect', '最坏，可能引发读写交替的抖动'],
+            ],
+          },
+          {
+            kind: 'note',
+            tone: 'info',
+            title: '动画为什么优先用 transform',
+            text: 'transform 与 opacity 的动画可以在合成线程上完成，不阻塞主线程；改 left / top 每帧都要重排重绘，主线程一忙就掉帧。',
+          },
+        ],
+      },
+      {
+        id: 'cost',
+        title: '重排、重绘与合成层',
+        blocks: [
+          {
+            kind: 'text',
+            text: '「重排」是重新计算几何位置，「重绘」是重新填色，两者都可能波及整页。合成层把页面切成独立的图层，图层内的变化不影响其他图层——这是用 transform 做动画更流畅的根本原因。',
+          },
+          {
+            kind: 'list',
+            items: [
+              '提升为合成层的手段：transform: translateZ(0)、will-change: transform、position: fixed、video / canvas。',
+              '图层不是越多越好：每个层都要占显存，层数过多会让合成与内存都变慢。',
+              '批量读写：先把需要读的布局值一次性读完，再统一写样式，避免「读 → 写 → 读」交替。',
+              '长任务优先拆片：一帧内超过 50ms 的任务会明显掉帧。',
+            ],
+          },
+          {
+            kind: 'note',
+            tone: 'warn',
+            title: 'will-change 不要常驻',
+            text: 'will-change 应当「用前加、用完撤」。常年挂在大量元素上会持续占用显存，反而拖慢滚动。',
+          },
+        ],
+      },
+      {
+        id: 'example',
+        title: '长列表卡顿怎么定位与修',
+        blocks: [
+          {
+            kind: 'text',
+            text: '先定位再优化：用 Performance 面板录一段滚动，看 Long Task 落在哪。常见结论是「一次渲染上千行 + 每行读布局」。修法有两条：只渲染视口内的行（虚拟列表），以及把大批量更新拆到多个帧。',
+          },
+          {
+            kind: 'code',
+            language: 'ts',
+            caption: '按帧分片处理大数组（不阻塞渲染）',
+            code: [
+              'function processInChunks<T>(items: T[], handle: (item: T) => void): Promise<void> {',
+              '  return new Promise((resolve) => {',
+              '    let index = 0',
+              '    const step = () => {',
+              '      const deadline = performance.now() + 8   // 单帧只占 8ms，留出渲染余量',
+              '      while (index < items.length && performance.now() < deadline) {',
+              '        handle(items[index])',
+              '        index += 1',
+              '      }',
+              '      if (index < items.length) requestAnimationFrame(step)',
+              '      else resolve()',
+              '    }',
+              '    requestAnimationFrame(step)',
+              '  })',
+              '}',
+            ].join('\n'),
+          },
+          {
+            kind: 'list',
+            ordered: true,
+            items: [
+              '虚拟列表：只渲染「视口高度 / 行高 + 缓冲」这么多行，其余用占位高度撑开滚动条。',
+              '分片更新：把一次处理一万条拆成每帧几百条，主线程始终有窗口响应输入。',
+              '稳定 key 与记忆化：行组件用 memo、key 用业务 ID，滚动时不做无谓重渲染。',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'pitfalls',
+        title: '常见坑与自测',
+        blocks: [
+          {
+            kind: 'note',
+            tone: 'warn',
+            title: '循环里读写布局 = 强制同步布局',
+            text: '在同一个循环里先 el.style.height = ... 再读 el.offsetHeight，会让浏览器每次都立刻重排来返回准确值，复杂度从 O(1) 次重排变成 O(n) 次。把读与写分成两轮循环。',
+          },
+          {
+            kind: 'qa',
+            items: [
+              {
+                question: '为什么改 transform 比改 top 流畅？',
+                answer: 'transform 只影响合成阶段，可在合成线程完成；改 top 会触发布局与绘制，必须占用主线程，主线程一忙就掉帧。',
+              },
+              {
+                question: '页面滚动卡顿，先看什么？',
+                answer: '先看有没有滚动监听里做重活（节流/被动监听 passive）、有没有大图与阴影导致重绘、有没有在滚动时读取布局；再用 Performance 面板确认 Long Task 的位置。',
+              },
+              {
+                question: '虚拟列表的坑在哪？',
+                answer: '行高不定时无法估算总高度；用键盘查找、页内搜索、锚点跳转都要自己补；快速滚动时缓冲区太小会出现白屏。',
               },
             ],
           },

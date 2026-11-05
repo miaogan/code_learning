@@ -2,19 +2,46 @@ import { describe, expect, it } from 'vitest'
 import {
   ALL_TUTORIAL_CHAPTERS,
   TUTORIAL_DIRECTIONS,
+  TUTORIAL_LEVELS,
+  activeSectionIndex,
   chapterById,
   chapterHref,
   chapterNeighbors,
   chaptersInDirection,
+  chaptersInScope,
+  filterChaptersByLevel,
+  levelsInChapters,
   parseLearnDirection,
+  parseLearnLevel,
   tutorialHref,
 } from '../lib/tutorials'
+import type { TutorialLevel } from '../lib/tutorialTypes'
 
 describe('教程内容完整性', () => {
-  it('每个方向都有章节，章节总数与方向数对得上', () => {
-    expect(TUTORIAL_DIRECTIONS).toHaveLength(5)
+  it('覆盖题库全部 8 个方向，每个方向至少 2 章', () => {
+    expect(TUTORIAL_DIRECTIONS).toHaveLength(8)
     TUTORIAL_DIRECTIONS.forEach((direction) => {
       expect(chaptersInDirection(direction).length).toBeGreaterThanOrEqual(2)
+    })
+    // 方向闭集之外不应有章节（写错方向的章节会在这里暴露）
+    expect(ALL_TUTORIAL_CHAPTERS).toHaveLength(
+      TUTORIAL_DIRECTIONS.reduce(
+        (total, direction) => total + chaptersInDirection(direction).length,
+        0,
+      ),
+    )
+  })
+
+  it('目录顺序 = 方向顺序 × 难度顺序（内容文件可任意追加，顺序由元数据决定）', () => {
+    const directionOrder = ALL_TUTORIAL_CHAPTERS.map((chapter) =>
+      TUTORIAL_DIRECTIONS.indexOf(chapter.direction),
+    )
+    expect(directionOrder).toEqual([...directionOrder].sort((a, b) => a - b))
+    TUTORIAL_DIRECTIONS.forEach((direction) => {
+      const ranks = chaptersInDirection(direction).map((chapter) =>
+        TUTORIAL_LEVELS.indexOf(chapter.level),
+      )
+      expect(ranks).toEqual([...ranks].sort((a, b) => a - b))
     })
   })
 
@@ -60,6 +87,56 @@ describe('教程内容完整性', () => {
   })
 })
 
+describe('难度档位', () => {
+  it('难度只取闭集内的三档，且三档都有真实章节', () => {
+    const levels = new Set(ALL_TUTORIAL_CHAPTERS.map((chapter) => chapter.level))
+    levels.forEach((level) => expect(TUTORIAL_LEVELS).toContain(level))
+    TUTORIAL_LEVELS.forEach((level) => {
+      expect(ALL_TUTORIAL_CHAPTERS.some((chapter) => chapter.level === level)).toBe(true)
+    })
+  })
+
+  it('每个方向三档齐全：基础 / 进阶 / 高级都有内容', () => {
+    TUTORIAL_DIRECTIONS.forEach((direction) => {
+      expect(levelsInChapters(chaptersInDirection(direction))).toEqual(TUTORIAL_LEVELS)
+    })
+  })
+
+  it('levelsInChapters 只返回真实存在的档位，并按由易到难排序', () => {
+    const picked = ALL_TUTORIAL_CHAPTERS.slice(0, 2).map((chapter) => chapter.level)
+    const unique = Array.from(new Set(picked))
+    expect(levelsInChapters(ALL_TUTORIAL_CHAPTERS.slice(0, 2))).toEqual(
+      TUTORIAL_LEVELS.filter((level) => unique.includes(level)),
+    )
+    expect(levelsInChapters([])).toEqual([])
+  })
+
+  it('filterChaptersByLevel：all 原样返回，其余只留该档', () => {
+    const all: TutorialLevel[] = ['基础', '进阶', '高级']
+    all.forEach((level) => {
+      const filtered = filterChaptersByLevel(ALL_TUTORIAL_CHAPTERS, level)
+      expect(filtered.length).toBeGreaterThan(0)
+      filtered.forEach((chapter) => expect(chapter.level).toBe(level))
+    })
+    expect(filterChaptersByLevel(ALL_TUTORIAL_CHAPTERS, 'all')).toHaveLength(
+      ALL_TUTORIAL_CHAPTERS.length,
+    )
+  })
+
+  it('第一级 + 第二级组合：结果同时满足方向与难度', () => {
+    TUTORIAL_DIRECTIONS.forEach((direction) => {
+      levelsInChapters(chaptersInDirection(direction)).forEach((level) => {
+        const hit = filterChaptersByLevel(chaptersInDirection(direction), level)
+        expect(hit.length).toBeGreaterThan(0)
+        hit.forEach((chapter) => {
+          expect(chapter.direction).toBe(direction)
+          expect(chapter.level).toBe(level)
+        })
+      })
+    })
+  })
+})
+
 describe('教程索引纯函数', () => {
   it('按 ID 取章节；未知 ID 返回 undefined', () => {
     const first = ALL_TUTORIAL_CHAPTERS[0]
@@ -69,17 +146,41 @@ describe('教程索引纯函数', () => {
 
   it('方向筛选只认闭集，未知方向返回空数组', () => {
     expect(chaptersInDirection('前端').length).toBeGreaterThan(0)
-    expect(chaptersInDirection('中间件与运维')).toEqual([])
+    expect(chaptersInDirection('不存在的方向')).toEqual([])
+    expect(chaptersInScope('all')).toHaveLength(ALL_TUTORIAL_CHAPTERS.length)
+    expect(chaptersInScope('后端')).toEqual(chaptersInDirection('后端'))
   })
 
-  it('URL 解析与链接拼接：非法方向回落 all，all 不写参数', () => {
+  it('URL 解析：非法方向 / 非法难度一律回落 all', () => {
     expect(parseLearnDirection('?direction=后端')).toBe('后端')
     expect(parseLearnDirection('?direction=')).toBe('all')
     expect(parseLearnDirection('?direction=不存在')).toBe('all')
+    expect(parseLearnLevel('?level=高级')).toBe('高级')
+    expect(parseLearnLevel('?level=')).toBe('all')
+    expect(parseLearnLevel('?level=中级')).toBe('all')
+  })
+
+  it('链接拼接：默认值不写参数，方向与难度同时生效', () => {
     expect(tutorialHref()).toBe('/learn')
     expect(tutorialHref('all')).toBe('/learn')
-    expect(tutorialHref('算法与数据结构')).toBe('/learn?direction=%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84')
+    expect(tutorialHref(null, 'all')).toBe('/learn')
+    expect(tutorialHref('算法与数据结构')).toBe(
+      '/learn?direction=%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84',
+    )
+    expect(tutorialHref('后端', '进阶')).toBe(
+      '/learn?direction=%E5%90%8E%E7%AB%AF&level=%E8%BF%9B%E9%98%B6',
+    )
+    expect(tutorialHref('all', '基础')).toBe('/learn?level=%E5%9F%BA%E7%A1%80')
     expect(chapterHref('fe-event-loop')).toBe('/learn/fe-event-loop')
+  })
+
+  it('每个方向的链接都能被解析回来（含带空格的方向名）', () => {
+    TUTORIAL_DIRECTIONS.forEach((direction) => {
+      const href = tutorialHref(direction, '高级')
+      const query = href.slice(href.indexOf('?') + 1)
+      expect(parseLearnDirection(query)).toBe(direction)
+      expect(parseLearnLevel(query)).toBe('高级')
+    })
   })
 
   it('前后邻居在边界处为 null，中间章节互相衔接', () => {
@@ -89,5 +190,27 @@ describe('教程索引纯函数', () => {
     expect(chapterNeighbors(last.id).next).toBeNull()
     expect(chapterNeighbors(first.id).next).toBe(ALL_TUTORIAL_CHAPTERS[1])
     expect(chapterNeighbors('no-such-chapter')).toEqual({ prev: null, next: null })
+  })
+})
+
+describe('章内目录高亮', () => {
+  it('取最后一个顶边越过判定线的小节：滚到第几节就亮第几节', () => {
+    // 页首：只有第 1 节的顶边越过了 40% 线
+    expect(activeSectionIndex([260, 900, 1600, 2300], 360)).toBe(0)
+    // 滚到第 3 节：前三节的顶边都越线，取最后一个（不是还在带里的第 2 节尾巴）
+    expect(activeSectionIndex([-400, -180, 120, 900], 360)).toBe(2)
+    // 全部越过 → 最后一节
+    expect(activeSectionIndex([-100, -50, -20, -10], 360)).toBe(3)
+  })
+
+  it('一节都还没开始时回落到第 0 节，目录不至于全灰', () => {
+    expect(activeSectionIndex([500, 900, 1400], 360)).toBe(0)
+    expect(activeSectionIndex([], 360)).toBe(0)
+  })
+
+  it('目录锚点与正文小节一一对应（`#tutorial-<sectionId>` 必须落在真实节点上）', () => {
+    ALL_TUTORIAL_CHAPTERS[0].sections.forEach((section) => {
+      expect(section.id).toMatch(/^[a-z0-9-]+$/)
+    })
   })
 })

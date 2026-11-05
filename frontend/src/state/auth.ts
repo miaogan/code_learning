@@ -3,6 +3,7 @@ import { useSyncExternalStore } from 'react'
 import { api, setUnauthorizedHandler } from '../api/client'
 import type { Me } from '../api/types'
 import { bindFlowToUser } from './flow'
+import { bindLearnProgressToUser } from './learnProgress'
 
 export type AuthStatus = 'loading' | 'authed' | 'anonymous'
 
@@ -17,8 +18,10 @@ const listeners = new Set<() => void>()
 
 function emit(next: AuthState): void {
   current = next
-  // 进度标记跟随账号：登录切换用户、登出回匿名，都要重读各自的 localStorage。
-  bindFlowToUser(next.me === null ? null : next.me.id)
+  // 本地痕迹跟随账号：登录切换用户、登出回匿名，都要重读各自的 localStorage。
+  const userId = next.me === null ? null : next.me.id
+  bindFlowToUser(userId)
+  bindLearnProgressToUser(userId)
   listeners.forEach((listener) => listener())
 }
 

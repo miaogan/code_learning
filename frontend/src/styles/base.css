@@ -289,6 +289,25 @@ a {
   color: var(--accent-soft);
 }
 
+/* 难度标签：方向用 accent 蓝，难度用「绿 / 中性 / 黄」三档色序，同卡片并排也不混淆 */
+.sc-chip--level-basic {
+  background: var(--success-tint-10);
+  border-color: var(--success-line-55);
+  color: var(--success);
+}
+
+.sc-chip--level-mid {
+  background: var(--overlay-06);
+  border-color: var(--border-subtle);
+  color: var(--text-secondary);
+}
+
+.sc-chip--level-high {
+  background: var(--warn-tint-12);
+  border-color: var(--warn-line-35);
+  color: var(--warn);
+}
+
 .sc-chip.is-clickable {
   cursor: pointer;
   transition: background-color var(--fast) var(--ease);
@@ -4252,8 +4271,10 @@ input:not([type='radio']):not([type='checkbox']):not([type='file']):disabled {
 }
 
 /* ---------- 目录页 ---------- */
+/* 两级筛选卡（方向 → 难度）复用练习页的 .sc-qa-filters / .sc-qa-filter-row，
+   卡片间距交给 .sc-learn-page 的 gap，这里不再额外加 margin。 */
 .sc-learn-grid {
-  margin-top: var(--sp-4);
+  margin-top: 0;
 }
 
 .sc-learn-chapter {
@@ -4286,6 +4307,129 @@ input:not([type='radio']):not([type='checkbox']):not([type='file']):disabled {
   color: var(--accent);
 }
 
+/* ---------- 阅读进度（r25）：目录卡片 / 继续学习 / 文章页共用一条细进度条 ---------- */
+.sc-learn-track {
+  display: block;
+  height: var(--sp-1);
+  border-radius: var(--radius-4);
+  background: var(--overlay-06);
+  overflow: hidden;
+}
+
+.sc-learn-trackfill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width var(--fast) var(--ease);
+}
+
+/* 读完换成绿色：颜色不是唯一信息，旁边总有「已读完」文字兜底。 */
+.sc-learn-track.is-done .sc-learn-trackfill {
+  background: var(--success);
+}
+
+.sc-learn-statline {
+  margin: var(--sp-2) 0 0;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+}
+
+/* 继续学习：整块可点，层级介于页头与筛选卡之间 */
+.sc-learn-resume {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-5);
+  background: var(--accent-wash-06);
+  border: 1px solid var(--accent-line-30);
+  border-radius: var(--radius-12);
+  color: inherit;
+  text-decoration: none;
+  transition: border-color var(--fast) var(--ease);
+}
+
+.sc-learn-resume:hover {
+  border-color: var(--accent);
+}
+
+.sc-learn-resumehead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+
+.sc-learn-resumekicker {
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  letter-spacing: 0.04em;
+  color: var(--accent);
+}
+
+.sc-learn-resumetitle {
+  font-size: var(--fs-card);
+  line-height: var(--lh-card);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.sc-learn-resumemeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-secondary);
+}
+
+.sc-learn-resumego {
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--accent);
+}
+
+/* 进度条限宽：拉满整卡读起来像分隔线，丢掉「进度」的语义 */
+.sc-learn-resume .sc-learn-track {
+  max-width: 240px;
+}
+
+.sc-learn-chapterread {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.sc-learn-chapterread .sc-learn-track {
+  flex: 0 1 180px;
+}
+
+.sc-learn-chapterstate {
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+}
+
+.sc-learn-readline {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  margin: 0;
+}
+
+.sc-learn-readline .sc-learn-track {
+  flex: 1;
+  max-width: 240px;
+}
+
+.sc-learn-readlabel {
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+}
+
 /* ---------- 文章页：面包屑 / 小节 / 正文块 ---------- */
 .sc-learn-crumb {
   display: flex;
@@ -4309,6 +4453,126 @@ input:not([type='radio']):not([type='checkbox']):not([type='file']):disabled {
   display: flex;
   flex-direction: column;
   gap: var(--sp-6);
+}
+
+/* 正文 + 章内目录（r26）：窄屏放正文上方并默认折叠，宽屏挪到右栏常驻 */
+.sc-learn-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-4);
+  align-items: start;
+}
+
+.sc-learn-toc {
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-12);
+}
+
+.sc-learn-tocsummary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.sc-learn-toccount {
+  color: var(--text-tertiary);
+}
+
+.sc-learn-toclist {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  margin: var(--sp-3) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sc-learn-tocitem {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  padding: var(--sp-1) var(--sp-2);
+  border-radius: var(--radius-4);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+
+.sc-learn-tocitem:hover {
+  background: var(--overlay-04);
+  color: var(--text-primary);
+}
+
+/* 当前小节：底色 + 左侧序号变色，不只靠颜色（`aria-current` 已标出位置） */
+.sc-learn-tocitem.is-active {
+  background: var(--accent-tint);
+  color: var(--accent-soft);
+}
+
+.sc-learn-tocnum {
+  flex: 0 0 auto;
+  width: 16px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-meta);
+  color: var(--text-tertiary);
+}
+
+.sc-learn-tocitem.is-active .sc-learn-tocnum {
+  color: var(--accent);
+}
+
+.sc-learn-toctext {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.sc-learn-tocmark {
+  color: var(--success);
+}
+
+@media (min-width: 1280px) {
+  .sc-learn-layout {
+    grid-template-columns: minmax(0, 1fr) 220px;
+    grid-template-areas: 'main toc';
+    gap: var(--sp-6);
+  }
+
+  .sc-learn-layout > .sc-learn-article {
+    grid-area: main;
+  }
+
+  /* 常驻栏跟着正文滚动：4 节的长文里，跳到哪一节不需要回顶 */
+  .sc-learn-layout > .sc-learn-toc {
+    grid-area: toc;
+    position: sticky;
+    top: calc(var(--topbar-h) + var(--sp-4));
+    padding: var(--sp-4);
+  }
+
+  /* 宽屏不需要折叠：summary 退化成标题行 */
+  .sc-learn-tocsummary {
+    cursor: default;
+  }
+
+  .sc-learn-tocsummary::marker {
+    content: '';
+  }
+
+  .sc-learn-tocsummary::-webkit-details-marker {
+    display: none;
+  }
+
+  .sc-learn-toclist {
+    margin-top: var(--sp-2);
+  }
 }
 
 .sc-learn-section {

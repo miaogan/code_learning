@@ -7,7 +7,9 @@ import {
   GUIDANCE_LEGACY_NOTICE,
   buildGuidance,
 } from '../../lib/guidance'
+import { progressView } from '../../lib/learnProgress'
 import { chaptersInDirection, tutorialHref } from '../../lib/tutorials'
+import { useLearnProgress } from '../../state/learnProgress'
 import { Card } from '../ui/Card'
 
 export interface LearningDirectionCardProps {
@@ -24,6 +26,8 @@ export interface LearningDirectionCardProps {
  */
 export function LearningDirectionCard({ report }: LearningDirectionCardProps) {
   const directions = useMemo(() => buildGuidance(report), [report])
+  // 报告页也要能看出「推荐的方向读到哪了」，否则回到学习页才知道进度。
+  const progress = useLearnProgress()
 
   if (report.role_fit === null) {
     return (
@@ -55,7 +59,11 @@ export function LearningDirectionCard({ report }: LearningDirectionCardProps) {
       </div>
 
       {directions.map((item) => {
-        const chapterCount = chaptersInDirection(item.direction).length
+        const chapters = chaptersInDirection(item.direction)
+        const chapterCount = chapters.length
+        const doneCount = chapters.filter(
+          (chapter) => progressView(progress.chapters[chapter.id], chapter).status === 'done',
+        ).length
         return (
           <div className="sc-profile-dim" key={item.direction}>
             <p className="sc-role-target">
@@ -90,7 +98,11 @@ export function LearningDirectionCard({ report }: LearningDirectionCardProps) {
               {chapterCount > 0 ? (
                 <Link className="sc-plan-task" to={tutorialHref(item.direction)}>
                   <span className="sc-plan-tasklabel">站内教程</span>
-                  <span className="sc-plan-taskmeta">{`${chapterCount} 章 · 概念到自测`}</span>
+                  <span className="sc-plan-taskmeta">
+                    {doneCount > 0
+                      ? `${chapterCount} 章 · 已读完 ${doneCount}`
+                      : `${chapterCount} 章 · 概念到自测`}
+                  </span>
                 </Link>
               ) : null}
               {item.courses.map((course) =>

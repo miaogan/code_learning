@@ -6,6 +6,7 @@ export const ALGORITHM_CHAPTERS: TutorialChapter[] = [
     id: 'algo-complexity',
     title: '时间复杂度与空间复杂度',
     direction: '算法与数据结构',
+    level: '基础',
     summary: '用增长趋势而不是秒数衡量算法：常见复杂度、循环嵌套与递归的估算方法。',
     sections: [
       {
@@ -127,6 +128,7 @@ export const ALGORITHM_CHAPTERS: TutorialChapter[] = [
     id: 'algo-hash-pointer',
     title: '哈希表与双指针',
     direction: '算法与数据结构',
+    level: '进阶',
     summary: '两类最常用的降复杂度工具：哈希表用空间换时间，双指针利用有序性减少枚举。',
     sections: [
       {
@@ -237,6 +239,140 @@ export const ALGORITHM_CHAPTERS: TutorialChapter[] = [
               {
                 question: '链表判断环为什么快慢指针一定会相遇？',
                 answer: '进入环后，快指针每轮比慢指针多走一步，两者距离逐轮缩小 1，最终一定会重合。',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'algo-dp-graph',
+    title: '动态规划与图',
+    direction: '算法与数据结构',
+    level: '高级',
+    summary: '动态规划只需答对三问：状态是什么、怎么转移、边界在哪；图算法则按「边权与目标」挑 BFS / Dijkstra / 拓扑。',
+    sections: [
+      {
+        id: 'dp',
+        title: '动态规划的三问',
+        blocks: [
+          {
+            kind: 'text',
+            text: '动态规划不是背题，而是把一个「大问题」拆成「规模更小的同类问题」。动手写代码前先回答三问，答不上来就别急着写循环。',
+          },
+          {
+            kind: 'list',
+            ordered: true,
+            items: [
+              '状态是什么：dp[i] 的语义要能用一句话说清，例如「以 i 结尾的最长递增子序列长度」。',
+              '怎么转移：dp[i] 由哪些更小的状态推出来？这一步决定时间复杂度。',
+              '边界与答案：dp[0] 是什么？最终答案是 dp[n-1] 还是 max(dp)？',
+            ],
+          },
+          {
+            kind: 'table',
+            headers: ['题型特征', '状态维度', '典型题'],
+            rows: [
+              ['线性序列、只看前缀', '一维 dp[i]', '爬楼梯、最大子数组和、打家劫舍'],
+              ['两个序列/容量约束', '二维 dp[i][j]', '最长公共子序列、0-1 背包'],
+              ['区间合并、依赖子区间', '区间 dp[l][r]', '最长回文子串、石子合并'],
+              ['状态机（买/卖/冷却）', 'dp[i][状态]', '股票买卖系列'],
+            ],
+          },
+          {
+            kind: 'note',
+            tone: 'info',
+            title: '先写暴力递归，再记忆化',
+            text: '直接推 dp 数组容易写错转移方向。先用递归 + 记忆化把「状态 + 转移」写对，需要优化时再改成自底向上并按需滚动数组。',
+          },
+        ],
+      },
+      {
+        id: 'example',
+        title: '0-1 背包：二维到一维',
+        blocks: [
+          {
+            kind: 'text',
+            text: 'dp[j] 表示容量 j 能装下的最大价值。关键在逆序遍历容量：正序会让同一件物品被重复使用，那就变成完全背包了。',
+          },
+          {
+            kind: 'code',
+            language: 'python',
+            caption: '0-1 背包（一维滚动）',
+            code: [
+              'def max_value(capacity: int, weights: list[int], values: list[int]) -> int:',
+              '    dp = [0] * (capacity + 1)',
+              '    for w, v in zip(weights, values):',
+              '        # 逆序：保证每件物品只被选一次（正序 = 完全背包）',
+              '        for j in range(capacity, w - 1, -1):',
+              '            dp[j] = max(dp[j], dp[j - w] + v)',
+              '    return dp[capacity]',
+              '',
+              'print(max_value(5, [2, 3, 4], [3, 4, 5]))   # 8',
+            ].join('\n'),
+          },
+          {
+            kind: 'list',
+            items: [
+              '复杂度 O(n × capacity)：n 件物品 × 容量，空间压到 O(capacity)。',
+              '逆序是 0-1 背包的标记：写错方向不会报错，只会得到「物品可以无限取」的结果。',
+              '容量很大但物品少时，改用「按价值做下标」或 meet-in-the-middle。',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'graph',
+        title: '图算法按边权与目标挑',
+        blocks: [
+          {
+            kind: 'text',
+            text: '图题先问两件事：边有没有权重、要最短路径还是可达性/顺序。答案基本能锁定唯一一个算法，不用试。',
+          },
+          {
+            kind: 'table',
+            headers: ['场景', '算法', '复杂度', '备注'],
+            rows: [
+              ['无权最短路 / 层序', 'BFS', 'O(V + E)', '第一次访问即最短'],
+              ['连通块、环检测', 'DFS / 并查集', 'O(V + E) / O(α(V))', '并查集适合动态加边'],
+              ['依赖顺序（课程表）', '拓扑排序', 'O(V + E)', '有环则无解，队列空但仍有入度'],
+              ['非负权最短路', 'Dijkstra + 堆', 'O((V + E) log V)', '有负权边会失效'],
+              ['含负权边', 'Bellman-Ford / SPFA', 'O(VE)', '能检测负环'],
+            ],
+          },
+          {
+            kind: 'note',
+            tone: 'warn',
+            title: 'Dijkstra 不能有负权边',
+            text: '它假设「已确定的最短距离不会变小」。负权边会打破这个假设，出队即定稿的逻辑就错了。',
+          },
+        ],
+      },
+      {
+        id: 'pitfalls',
+        title: '常见坑与自测',
+        blocks: [
+          {
+            kind: 'note',
+            tone: 'warn',
+            title: '初始化写错，答案错一半',
+            text: '求最大值时 dp 初始化为 0 会把「不可达」当成「价值 0」；求最小值时初始化为 0 会让所有答案都变成 0。最大值用极小值、最小值用极大值，再单独处理起点。',
+          },
+          {
+            kind: 'qa',
+            items: [
+              {
+                question: '怎么判断一道题该用贪心还是动态规划？',
+                answer: '能证明「局部最优可推出全局最优」才用贪心；否则用 dp。举不出反例不等于能证明，面试里说不出证明就老实写 dp。',
+              },
+              {
+                question: '为什么背包一维写法要逆序？',
+                answer: '正序遍历时 dp[j - w] 可能已经被本轮更新过，等于同一件物品被选了多次；逆序保证读到的是上一轮的值。',
+              },
+              {
+                question: '拓扑排序怎么发现环？',
+                answer: 'Kahn 算法结束时若出队节点数小于总节点数，剩下的节点入度都不为 0，说明存在环。',
               },
             ],
           },

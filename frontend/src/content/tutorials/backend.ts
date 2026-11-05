@@ -6,6 +6,7 @@ export const BACKEND_CHAPTERS: TutorialChapter[] = [
     id: 'be-http-rest',
     title: 'HTTP 与 REST 接口设计',
     direction: '后端',
+    level: '基础',
     summary: '用资源和动作来设计接口：方法、状态码、幂等与统一错误结构，一次讲清。',
     sections: [
       {
@@ -122,6 +123,7 @@ export const BACKEND_CHAPTERS: TutorialChapter[] = [
     id: 'be-db-index',
     title: '数据库索引与事务',
     direction: '后端',
+    level: '进阶',
     summary: '索引为什么能加速、联合索引怎么排、事务隔离解决什么问题，配一条 EXPLAIN 示例。',
     sections: [
       {
@@ -241,6 +243,132 @@ export const BACKEND_CHAPTERS: TutorialChapter[] = [
               {
                 question: '事务回滚后自增 ID 会回退吗？',
                 answer: '通常不会。自增值一旦分配就前进，回滚只撤销数据变更，不撤销自增计数。',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'be-concurrency-idempotency',
+    title: '并发控制与接口幂等',
+    direction: '后端',
+    level: '高级',
+    summary: '「读-改-写」在并发下必然丢更新；三种解法各有代价，再叠加幂等键，才能让重试与双击都安全。',
+    sections: [
+      {
+        id: 'race',
+        title: '丢失更新是怎么发生的',
+        blocks: [
+          {
+            kind: 'text',
+            text: '库存 1，两个请求同时读到 1，各自算出 0 并写回——最终只扣了一次，或者卖出了两件。根因是「读」和「写」之间有窗口，而数据库默认不会替你关掉这个窗口。',
+          },
+          {
+            kind: 'table',
+            headers: ['解法', '做法', '优点', '代价'],
+            rows: [
+              ['原子更新', 'UPDATE … SET stock = stock - 1 WHERE stock >= 1', '一条 SQL、无锁等待', '只能表达简单算式，难做复杂校验'],
+              ['乐观锁', '读版本号，UPDATE … WHERE version = 读到的值', '不加锁、冲突才重试', '冲突多时重试成本高'],
+              ['悲观锁', 'SELECT … FOR UPDATE 先锁行', '逻辑最直观', '锁等待、死锁风险、吞吐受限'],
+            ],
+          },
+          {
+            kind: 'note',
+            tone: 'info',
+            title: '优先选能一条 SQL 解决的',
+            text: '`UPDATE … WHERE stock >= n` 影响行数为 0 就代表库存不足，天然并发安全。只有业务规则复杂到无法在一条 SQL 里表达时，才升级到乐观锁或悲观锁。',
+          },
+        ],
+      },
+      {
+        id: 'idempotency',
+        title: '幂等：让重复请求变成同一次',
+        blocks: [
+          {
+            kind: 'text',
+            text: '用户双击、网关重试、消息重投都会让同一个请求到达两次。幂等不是「别重试」，而是「重试也只有一个效果」。两个抓手：业务幂等键 + 唯一约束，以及带前置状态的状态机。',
+          },
+          {
+            kind: 'list',
+            items: [
+              '幂等键来自客户端或业务单号（订单号 + 操作类型），不要用请求 ID——重试时它会变。',
+              '用唯一索引兜底，而不是「先查再插」：两个请求同时查不到，还是会插两次。',
+              '状态机约束：UPDATE … WHERE status = \'待支付\'，影响 0 行说明状态已流转，直接返回成功。',
+              '幂等记录要有清理策略：保留覆盖最大重试窗口即可，不要无限增长。',
+            ],
+          },
+          {
+            kind: 'note',
+            tone: 'warn',
+            title: '幂等的边界是「副作用」',
+            text: '把「扣款」做成幂等，不等于把「发短信通知」也做成幂等。副作用类操作要单独判断，或统一放进幂等记录的处理结果里。',
+          },
+        ],
+      },
+      {
+        id: 'example',
+        title: '扣库存的三种写法',
+        blocks: [
+          {
+            kind: 'text',
+            text: '同一需求三种实现，看影响行数就知道结果。第三种把「幂等」与「状态校验」压进同一条 UPDATE，是生产里最常用的一档。',
+          },
+          {
+            kind: 'code',
+            language: 'sql',
+            caption: '从会超卖，到并发安全',
+            code: [
+              '-- 1) 先查再改：并发下必然超卖',
+              'SELECT stock FROM products WHERE id = :id;   -- 读到 1',
+              'UPDATE products SET stock = :stock - 1 WHERE id = :id;  -- 两个请求都写 0',
+              '',
+              '-- 2) 原子更新：影响行数为 0 即库存不足',
+              'UPDATE products SET stock = stock - 1',
+              'WHERE id = :id AND stock >= 1;',
+              '',
+              '-- 3) 幂等 + 状态机：同一订单只能扣一次',
+              'UPDATE orders',
+              'SET status = \'已扣减\', updated_at = :now',
+              'WHERE id = :order_id AND status = \'待扣减\';   -- 影响 0 行 = 已处理过',
+            ].join('\n'),
+          },
+          {
+            kind: 'table',
+            headers: ['写法', '并发安全', '重复请求', '适用'],
+            rows: [
+              ['先查再改', '否', '重复扣减', '单线程脚本，不可用于接口'],
+              ['原子更新', '是', '仍会重复扣减', '无线程/请求重试的简单场景'],
+              ['幂等 + 状态机', '是', '重复请求无副作用', '订单、支付、券核销'],
+            ],
+          },
+        ],
+      },
+      {
+        id: 'pitfalls',
+        title: '常见坑与自测',
+        blocks: [
+          {
+            kind: 'note',
+            tone: 'warn',
+            title: '分布式锁不等于幂等',
+            text: '锁只保证「同一时刻只有一个人在改」，请求串行执行两遍依然是两遍效果。锁还要处理续期与「删错别人的锁」（用值比对删除或 Lua 原子删除）。',
+          },
+          {
+            kind: 'qa',
+            items: [
+              {
+                question: '乐观锁冲突了怎么办？',
+                answer: '有限次重试（如 3 次）并加随机退避；冲突率长期很高说明热点太集中，应改为原子更新或把热点行拆开。',
+              },
+              {
+                question: '「先查幂等表再插入」为什么不够？',
+                answer: '查与插之间有窗口，两个并发请求会同时查不到。必须让唯一索引承担最终裁决，插入冲突即视为已处理。',
+              },
+              {
+                question: '如何在接口层快速判断重复提交？',
+                answer: '客户端带幂等键（或由业务参数哈希生成），网关/服务端按「用户 + 键」做短期去重，命中直接返回上次结果。',
               },
             ],
           },
