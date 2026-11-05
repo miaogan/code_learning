@@ -393,6 +393,7 @@ class FakeAI:
         model_cls: type[Any],
         *,
         timeout_s: float | None = None,
+        retry_unavailable: bool = False,
     ) -> Any:
         self.calls.append((system, user, timeout_s))
         if self.responder is None:
@@ -431,6 +432,7 @@ def patch_ai(monkeypatch: pytest.MonkeyPatch) -> Callable[[Responder], None]:
             model_cls: type[Any],
             *,
             timeout_s: float | None = None,
+            retry_unavailable: bool = False,
         ) -> Any:
             return model_cls.model_validate(responder(model_cls, user))
 

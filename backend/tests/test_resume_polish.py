@@ -80,6 +80,7 @@ def _install_ai(
         model_cls: type[Any],
         *,
         timeout_s: float | None = None,
+        retry_unavailable: bool = False,
     ) -> Any:
         calls.append(model_cls)
         return model_cls.model_validate(responder(model_cls, user))

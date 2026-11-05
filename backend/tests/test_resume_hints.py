@@ -44,6 +44,7 @@ def _install_ai(monkeypatch: pytest.MonkeyPatch, cases: tuple[dict[str, str], ..
         model_cls: type[Any],
         *,
         timeout_s: float | None = None,
+        retry_unavailable: bool = False,
     ) -> Any:
         seen.append(user)
         return model_cls.model_validate(_payload(cases))

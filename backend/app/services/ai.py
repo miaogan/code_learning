@@ -48,8 +48,13 @@ class AIClient:
         model_cls: type[ModelT],
         *,
         timeout_s: float | None = None,
+        retry_unavailable: bool = False,
     ) -> ModelT:
-        """结构化补全。`timeout_s` 缺省走 `runtime.timeout_s`（已合并档内/全局，TECHNICAL §5）。"""
+        """结构化补全。`timeout_s` 缺省走 `runtime.timeout_s`（已合并档内/全局，TECHNICAL §5）。
+
+        `retry_unavailable`（r34）：仅在**后台任务 / 非同步等待**的调用点开启 —— 超时、
+        5xx、429 这类 `retryable` 失败自动重来一次；前台交互调用不开启，避免用户等待翻倍。
+        """
         runtime = self._runtime
         if not runtime.ready:
             # 配置错只表现成带中文说明的 503，文案由 `config.resolve_ai` 提供，此处不另拼第二份。
@@ -58,7 +63,14 @@ class AIClient:
         prompt = user
         last_error: Exception | None = None
         for attempt in range(attempts):
-            content = await self._chat(system, prompt, timeout_s)
+            try:
+                content = await self._chat(system, prompt, timeout_s)
+            except AppError as exc:
+                # 不可重试的失败（鉴权 / 额度 / 参数）直接抛，重试只会重复扣配额。
+                if not (retry_unavailable and exc.retryable) or attempt + 1 >= attempts:
+                    raise
+                last_error = exc
+                continue
             payload = _extract_json_object(content)
             if payload is None:
                 last_error = ValueError("模型未返回 JSON 对象")
