@@ -344,7 +344,11 @@ def build_role_fit(
         fit.notice = coach_copy.ROLE_NO_MODEL
         return fit
 
-    fit.model = RoleModelRef(level=level.level, label=f"{level.role} · {level.level}")
+    fit.model = RoleModelRef(
+        level=level.level,
+        label=f"{level.role} · {level.level}",
+        direction=level.direction or None,
+    )
     must = set(level.must_have)
     items: list[RoleFitItem] = []
     for skill in level.skills:

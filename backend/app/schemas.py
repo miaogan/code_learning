@@ -506,6 +506,9 @@ class RoleModelRef(BaseModel):
 
     level: str = Field(description="初级 / 中级 / 高级 / 专家")
     label: str = Field(description="如「前端工程师 · 中级」")
+    direction: str | None = Field(
+        default=None, description="岗位方向（如「前端」），与课程 / 题库的 direction 同一闭集"
+    )
 
 
 class RoleFitItem(BaseModel):

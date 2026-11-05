@@ -6,6 +6,7 @@ import { scoreRingState } from '../components/interview/ScoreBadge'
 import { SettingsBar } from '../components/interview/SettingsBar'
 import { AnswerReview } from '../components/report/AnswerReview'
 import { CoachBlocks } from '../components/report/CoachBlocks'
+import { LearningDirectionCard } from '../components/report/LearningDirectionCard'
 import { ShortfallCard } from '../components/report/ShortfallCard'
 import { WeekPlan } from '../components/report/WeekPlan'
 import { Button } from '../components/ui/Button'
@@ -397,6 +398,9 @@ export default function ReportPage() {
 
             {/* 提升路线三块（r7）：DOM 必须在短板主轴之后（超长内容不抢首屏，AC-14） */}
             <CoachBlocks report={report} />
+
+            {/* 推荐学习方向：目标岗位方向 + 短板课程方向，排在补强块之后、逐题复盘之前 */}
+            <LearningDirectionCard report={report} />
 
             {/* 调研改造（boss / LeetCode 借鉴）：逐题复盘 → 7 天补短板计划，同样排在主轴之后 */}
             <AnswerReview runIds={report.run_ids} />

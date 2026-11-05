@@ -325,6 +325,8 @@ export interface RoleModelRef {
   level: string
   /** 如「前端工程师 · 中级」。 */
   label: string
+  /** 岗位方向（如「前端」），与课程 / 题库的 direction 同一闭集；旧报告为 null。 */
+  direction: string | null
 }
 
 /** 竞争力差距表的一行：要求 / 当前 / 差距全部可复算。 */
