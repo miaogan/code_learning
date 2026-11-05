@@ -7,6 +7,7 @@ import {
   GUIDANCE_LEGACY_NOTICE,
   buildGuidance,
 } from '../../lib/guidance'
+import { chaptersInDirection, tutorialHref } from '../../lib/tutorials'
 import { Card } from '../ui/Card'
 
 export interface LearningDirectionCardProps {
@@ -53,59 +54,68 @@ export function LearningDirectionCard({ report }: LearningDirectionCardProps) {
         <p className="sc-coach-meta">{`共 ${directions.length} 个方向`}</p>
       </div>
 
-      {directions.map((item) => (
-        <div className="sc-profile-dim" key={item.direction}>
-          <p className="sc-role-target">
-            <span>{item.kind === 'primary' ? '主攻方向' : '延伸方向'}</span>
-            <span>{item.direction}</span>
-          </p>
-          <p className="sc-coach-note">{item.summary}</p>
+      {directions.map((item) => {
+        const chapterCount = chaptersInDirection(item.direction).length
+        return (
+          <div className="sc-profile-dim" key={item.direction}>
+            <p className="sc-role-target">
+              <span>{item.kind === 'primary' ? '主攻方向' : '延伸方向'}</span>
+              <span>{item.direction}</span>
+            </p>
+            <p className="sc-coach-note">{item.summary}</p>
 
-          {item.skills.length > 0 ? (
-            <ol className="sc-role-prio" aria-label={`${item.direction}方向先补技能`}>
-              {item.skills.map((skill, index) => (
-                <li className="sc-role-prio-item" key={skill.name}>
-                  <span className="sc-prio-dot" aria-hidden="true">
-                    {index + 1}
+            {item.skills.length > 0 ? (
+              <ol className="sc-role-prio" aria-label={`${item.direction}方向先补技能`}>
+                {item.skills.map((skill, index) => (
+                  <li className="sc-role-prio-item" key={skill.name}>
+                    <span className="sc-prio-dot" aria-hidden="true">
+                      {index + 1}
+                    </span>
+                    <span>{skill.name}</span>
+                    <span className="sc-coach-meta">
+                      {`差 ${roleGapLabel(skill.gap)} 档${skill.must ? ' · 必备' : ''}`}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            ) : null}
+
+            {item.notice ? <p className="sc-coach-note">{item.notice}</p> : null}
+
+            <div className="sc-plan-tasks">
+              <Link className="sc-plan-task" to={item.practiceLink}>
+                <span className="sc-plan-tasklabel">{`${item.direction}专项练习 10 题`}</span>
+                <span className="sc-plan-taskmeta">方向筛选 · 全部难度</span>
+              </Link>
+              {chapterCount > 0 ? (
+                <Link className="sc-plan-task" to={tutorialHref(item.direction)}>
+                  <span className="sc-plan-tasklabel">站内教程</span>
+                  <span className="sc-plan-taskmeta">{`${chapterCount} 章 · 概念到自测`}</span>
+                </Link>
+              ) : null}
+              {item.courses.map((course) =>
+                course.url === null ? (
+                  <span className="sc-plan-task is-static" key={course.id}>
+                    <span className="sc-plan-tasklabel">{course.title}</span>
+                    <span className="sc-plan-taskmeta">{`${course.level} · 链接待更新`}</span>
                   </span>
-                  <span>{skill.name}</span>
-                  <span className="sc-coach-meta">
-                    {`差 ${roleGapLabel(skill.gap)} 档${skill.must ? ' · 必备' : ''}`}
-                  </span>
-                </li>
-              ))}
-            </ol>
-          ) : null}
-
-          {item.notice ? <p className="sc-coach-note">{item.notice}</p> : null}
-
-          <div className="sc-plan-tasks">
-            <Link className="sc-plan-task" to={item.practiceLink}>
-              <span className="sc-plan-tasklabel">{`${item.direction}专项练习 10 题`}</span>
-              <span className="sc-plan-taskmeta">方向筛选 · 全部难度</span>
-            </Link>
-            {item.courses.map((course) =>
-              course.url === null ? (
-                <span className="sc-plan-task is-static" key={course.id}>
-                  <span className="sc-plan-tasklabel">{course.title}</span>
-                  <span className="sc-plan-taskmeta">{`${course.level} · 链接待更新`}</span>
-                </span>
-              ) : (
-                <a
-                  className="sc-plan-task"
-                  key={course.id}
-                  href={course.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <span className="sc-plan-tasklabel">{course.title}</span>
-                  <span className="sc-plan-taskmeta">{`${course.level} · 课程`}</span>
-                </a>
-              ),
-            )}
+                ) : (
+                  <a
+                    className="sc-plan-task"
+                    key={course.id}
+                    href={course.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <span className="sc-plan-tasklabel">{course.title}</span>
+                    <span className="sc-plan-taskmeta">{`${course.level} · 课程`}</span>
+                  </a>
+                ),
+              )}
+            </div>
           </div>
-        </div>
-      ))}
+        )
+      })}
     </Card>
   )
 }
