@@ -84,6 +84,10 @@ async def create_profile(resume_id: str, user: CurrentUser) -> ProfileWithMerge:
 #: 否则任务可能被垃圾回收中途回收（终态不落库、轮询永远 running）。
 _PENDING_JOBS: set[asyncio.Task[None]] = set()
 
+#: running 任务行的停滞阈值（秒）：生成常态 30~90 秒，10 分钟仍未终态视为进程中断
+#: （服务重启 / 任务被回收），读路径上惰性标记为 failed，不再让前端无限轮询（r32）。
+_PROFILE_JOB_STALE_SECONDS = 10 * 60
+
 
 def _job_error_message(exc: Exception) -> str:
     """后台任务的失败原因：业务异常直接用中文 message，其余一律收敛成通用提示。
@@ -173,6 +177,7 @@ def _job_status_of(row: dict[str, Any]) -> ProfileJobStatus:
     summary="最近一次画像生成任务（回上传页自动接上进度用）",
 )
 def read_latest_profile_job() -> ProfileJobStatus:
+    repository.expire_stale_profile_jobs(_PROFILE_JOB_STALE_SECONDS)
     row = repository.latest_profile_job()
     if row is None:
         raise AppError(NOT_FOUND, "还没有画像生成任务", status=404)
@@ -185,6 +190,7 @@ def read_latest_profile_job() -> ProfileJobStatus:
     summary="查询画像生成任务状态",
 )
 def read_profile_job(job_id: str) -> ProfileJobStatus:
+    repository.expire_stale_profile_jobs(_PROFILE_JOB_STALE_SECONDS)
     row = repository.get_profile_job(job_id)
     if row is None:
         raise AppError(NOT_FOUND, "没有找到这个画像生成任务", status=404)

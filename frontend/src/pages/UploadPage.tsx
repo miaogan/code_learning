@@ -18,6 +18,7 @@ import {
   jobFailureMessage,
   jobToResumeMeta,
   shouldReattach,
+  shouldSurfaceFailure,
 } from '../lib/profileJob'
 import { useAsync } from '../lib/useAsync'
 import { setFlow } from '../state/flow'
@@ -147,21 +148,37 @@ export default function UploadPage() {
   useEffect(() => () => abortRef.current?.abort(), [])
 
   // r30 重接入：回到上传页时若还有在后台跑的画像任务，直接接上轮询。
-  // completed/failed 的历史任务不重放（shouldReattach 只认 running），
+  // completed 的历史任务不重放（shouldReattach 只认 running），
   // 完成态走 savedProfile 读路径呈现「已有画像」摘要卡。
+  // r32：最近一次任务是 failed 时必须明示原因 —— 否则「离开后任务在后台失败」
+  // 回来毫无痕迹，正是「上传失败却没报错」的主因；重试走 job.document_id。
   useEffect(() => {
     if (reattachRef.current) return
     reattachRef.current = true
     api
       .latestProfileJob()
       .then((job) => {
-        if (!shouldReattach(job) || phaseRef.current !== 'idle') return
-        const resumed = jobToResumeMeta(job)
-        setPicked(null)
-        setMeta(resumed)
-        metaRef.current = resumed
-        setPhase('profiling')
-        setJobId(job.job_id)
+        if (phaseRef.current !== 'idle') return
+        if (shouldReattach(job)) {
+          const resumed = jobToResumeMeta(job)
+          setPicked(null)
+          setMeta(resumed)
+          metaRef.current = resumed
+          setPhase('profiling')
+          setJobId(job.job_id)
+          return
+        }
+        if (shouldSurfaceFailure(job)) {
+          const resumed = jobToResumeMeta(job)
+          setMeta(resumed)
+          metaRef.current = resumed
+          setFailure({
+            message: jobFailureMessage(job),
+            stage: 'profile',
+            retryable: true,
+          })
+          setPhase('error')
+        }
       })
       .catch(() => {
         /* 404 = 没有任务，正常新用户路径；其它错误也静默 —— 生成不是本页必现状态 */
@@ -438,13 +455,13 @@ export default function UploadPage() {
       ) : null}
 
       {phase === 'uploading' ? (
-        <div className="sc-actions">
+        <div className="sc-actions is-block">
           <Card>
             <div className="sc-upload-summary">
               <RingProgress size={56} state="indeterminate" ariaLabel="解析中" />
               <PhaseLoader
                 phases={['上传简历', '解析简历 → 提取正文', 'AI 生成并合并画像']}
-                active={1}
+                active={0}
                 elapsedSec={uploadSec}
                 title={picked ? picked.name : undefined}
               />
@@ -459,7 +476,7 @@ export default function UploadPage() {
       ) : null}
 
       {phase === 'profiling' ? (
-        <div className="sc-actions">
+        <div className="sc-actions is-block">
           <Card>
             <div className="sc-upload-summary">
               <RingProgress size={56} state="indeterminate" ariaLabel="生成画像" />
@@ -487,7 +504,7 @@ export default function UploadPage() {
       ) : null}
 
       {phase === 'done' && meta ? (
-        <div className="sc-actions">
+        <div className="sc-actions is-block">
           <Card>
             <div className="sc-upload-summary">
               <p className="sc-file-name">{meta.file_name}</p>

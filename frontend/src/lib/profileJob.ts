@@ -23,6 +23,15 @@ export function shouldReattach(job: Pick<ProfileJobStatus, 'status'>): boolean {
   return job.status === 'running'
 }
 
+/**
+ * 最近一次任务失败时是否要在上传页明示（r32）：只要最近一次尝试是 failed 就如实展示——
+ * 用户离开后任务在后台失败、回来页面上却毫无痕迹，正是「上传失败却没报错」的主因。
+ * 重试或重新上传后 latest 会变掉，这条错误自然消失。
+ */
+export function shouldSurfaceFailure(job: Pick<ProfileJobStatus, 'status'>): boolean {
+  return job.status === 'failed'
+}
+
 /** 任务行 → 上传页卡片用的 ResumeMeta（接上后台任务时，文件信息全部来自任务行，不依赖本页状态）。 */
 export function jobToResumeMeta(job: ProfileJobStatus): ResumeMeta {
   return {

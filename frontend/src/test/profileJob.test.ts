@@ -6,6 +6,7 @@ import {
   jobFailureMessage,
   jobToResumeMeta,
   shouldReattach,
+  shouldSurfaceFailure,
 } from '../lib/profileJob'
 
 function job(overrides: Partial<ProfileJobStatus> = {}): ProfileJobStatus {
@@ -47,6 +48,12 @@ describe('profileJob 轮询语义', () => {
       chars: 1200,
       sections: 4,
     })
+  })
+
+  it('最近一次任务是 failed 时必须在上传页明示（r32）：completed/running 不明示', () => {
+    expect(shouldSurfaceFailure(job({ status: 'failed' }))).toBe(true)
+    expect(shouldSurfaceFailure(job({ status: 'running' }))).toBe(false)
+    expect(shouldSurfaceFailure(job({ status: 'completed' }))).toBe(false)
   })
 
   it('失败文案：后端中文原因优先，缺省给通用提示', () => {

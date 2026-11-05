@@ -50,6 +50,7 @@
 - 2026-11-05：学习模块第三批内容扩充（r28）：8 方向各增 1 章（TypeScript 类型系统、认证与会话、范式与反范式、Docker 基础、二叉树与递归、IO 模型与零拷贝、Agent 与工具调用、重构与坏味道），教程扩到 32 章（基础 11 / 进阶 13 / 高级 8），纯内容不改逻辑（产物见 `docs/teamflow/20261105-r28-learn-content-batch3/`）。
 - 2026-11-05：上传页中途离开保护（r29）：上传/生成中刷新或关闭走浏览器原生提示、站内链接先确认再跳，卸载兜底中止在途请求（r30 异步化后拦截收窄到文件上传窗口）（产物见 `docs/teamflow/20261105-r29-upload-leave-guard/`）。
 - 2026-11-05：画像生成异步化（r30）：新增 `profile_jobs` 表与 `POST /api/resumes/{id}/profile/async`（`asyncio.create_task` 后台跑 `generate_profile`，终态落库可见）、`GET /api/profile-jobs/{job_id}`（轮询）与 `GET /api/profile-jobs/latest`（回上传页自动接上）；同步 POST 契约不变。上传页生成阶段改为 2 秒轮询，离开页面任务照跑、回来自动接上，离开保护收窄到文件上传窗口；一次性 `merge_summary` 随任务落库不因异步丢失（产物见 `docs/teamflow/20261105-r30-profile-async-job/`）。
+- 2026-11-05：上传失败可见性（r32）：用户反馈「上传失败没有报错提示」——真实复验确认同步错误路径本就正常，洞在异步化之后：回上传页时 failed 的 latest 任务被静默忽略、服务重启留下永远 running 的僵尸任务行。修复：任务读路径惰性清扫（running 超过 10 分钟按 failed 落库中文原因），重接入时 failed 任务明示原因 + 重试（产物见 `docs/teamflow/20261105-r32-upload-failure-visibility/`）。
 
 <!-- teamflow:begin -->
 ## TeamFlow 托管区（本块由 TeamFlow 自动维护，团队请勿手改）

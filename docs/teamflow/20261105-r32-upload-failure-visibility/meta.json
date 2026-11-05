@@ -1,0 +1,8 @@
+{
+  "round": "r32",
+  "date": "2026-11-05",
+  "title": "上传失败可见性：后台任务失败/僵尸 running 在上传页明示",
+  "trigger": "用户反馈：简历上传会失败，没有报错信息的提示",
+  "status": "done",
+  "verification": "Playwright 真实浏览器复验（真后端 + sqlite 造 failed/僵尸任务行）+ 后端 570 passed / 1 skipped + ruff 全绿 + 前端 typecheck/lint/203 测试/build 全绿"
+}

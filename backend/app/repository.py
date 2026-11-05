@@ -12,7 +12,7 @@ import json
 import sqlite3
 import uuid
 from collections.abc import Sequence
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -222,6 +222,29 @@ def latest_profile_job() -> dict[str, Any] | None:
             (_uid(),),
         ).fetchone()
     return None if row is None else _job_dict(row)
+
+
+def expire_stale_profile_jobs(stale_seconds: int) -> int:
+    """把停滞的 running 任务行标记为 failed（惰性清扫），返回本次标记的行数。
+
+    后台任务活在进程内存里：uvicorn 重启 / 进程被杀后，没有任何代码会把任务行
+    推进到终态，行会永远停在 running —— 前端轮询与重接入都会无限等（r32）。
+    读路径上先做一次廉价清扫：`updated_at` 超过 `stale_seconds` 仍 running 的行
+    按失败落库（中文原因），轮询与重接入从此拿到确定的 failed 终态。
+    """
+    cutoff = (datetime.now(UTC) - timedelta(seconds=stale_seconds)).isoformat()
+    with connection() as conn:
+        cursor = conn.execute(
+            "UPDATE profile_jobs SET status = 'failed', error = ?, updated_at = ? "
+            "WHERE user_id = ? AND status = 'running' AND updated_at < ?",
+            (
+                "后台任务长时间没有进展（可能因服务重启而中断），请重新生成画像",
+                _now(),
+                _uid(),
+                cutoff,
+            ),
+        )
+        return cursor.rowcount
 
 
 def finish_profile_job(job_id: str, result_json: str, *, user_id: str) -> None:

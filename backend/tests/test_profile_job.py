@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
@@ -19,6 +20,7 @@ from fastapi.testclient import TestClient
 
 from app import repository
 from app.auth import COOKIE_NAME, hash_password, new_session_token, session_expiry
+from app.db import connection
 from app.errors import VALIDATION_ERROR, AppError
 from app.schemas import ResumeMeta
 
@@ -144,6 +146,34 @@ def test_latest_profile_job_and_empty_404(client: TestClient) -> None:
     assert body["job_id"] == "job-1"
     assert body["status"] == "running"
     assert body["result"] is None
+
+
+def test_stale_running_job_marked_failed_on_read(client: TestClient) -> None:
+    """r32 僵尸任务：服务重启后无人推进的 running 行，读一次就拿到 failed 终态。"""
+    repository.insert_profile_job("job-zombie", "res-1", "resume.txt", 100, 3)
+    stale_at = (datetime.now(UTC) - timedelta(seconds=11 * 60)).isoformat()
+    with connection() as conn:
+        conn.execute(
+            "UPDATE profile_jobs SET updated_at = ? WHERE id = 'job-zombie'", (stale_at,)
+        )
+
+    body = client.get("/api/profile-jobs/job-zombie").json()
+    assert body["status"] == "failed"
+    assert body["result"] is None
+    assert "重新生成画像" in body["error"]
+
+    # latest 读路径同样先清扫：前端重接入拿到的是确定终态，不会无限等。
+    latest = client.get("/api/profile-jobs/latest").json()
+    assert latest["job_id"] == "job-zombie"
+    assert latest["status"] == "failed"
+
+
+def test_fresh_running_job_not_expired(client: TestClient) -> None:
+    """正常的在途任务（updated_at 新鲜）不受清扫影响，轮询照常拿到 running。"""
+    repository.insert_profile_job("job-fresh", "res-1", "resume.txt", 100, 3)
+    body = client.get("/api/profile-jobs/job-fresh").json()
+    assert body["status"] == "running"
+    assert body["error"] == ""
 
 
 def test_profile_job_isolated_between_users(
