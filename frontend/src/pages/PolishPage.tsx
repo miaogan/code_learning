@@ -9,9 +9,9 @@ import { TargetRoleBar } from '../components/polish/TargetRoleBar'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { ConfirmModal } from '../components/ui/ConfirmModal'
-import { EmptyState } from '../components/ui/EmptyState'
 import { InlineError } from '../components/ui/InlineError'
 import { PhaseLoader } from '../components/ui/PhaseLoader'
+import { ResumeGate } from '../components/ui/ResumeGate'
 import { Toast } from '../components/ui/Toast'
 import { exportFileName } from '../lib/exportName'
 import {
@@ -393,10 +393,9 @@ export default function PolishPage() {
       ) : null}
 
       {!profilePending && profileMissing ? (
-        <EmptyState
+        <ResumeGate
           reason="先上传简历，才能做润色：润色需要先有一份技术画像，才知道该按什么目标岗位改。"
-          actionLabel="上传简历"
-          actionTo="/"
+          unlockLabel="回来润色简历"
         />
       ) : null}
 

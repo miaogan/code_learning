@@ -5,7 +5,7 @@ import { EmptyState } from '../ui/EmptyState'
 import { InlineError } from '../ui/InlineError'
 import { PhaseLoader } from '../ui/PhaseLoader'
 import { TimelineEvent } from './TimelineEvent'
-import { settingsTextOf } from './TrendTable'
+import { settingsTextOf } from './trendModel'
 
 export interface TimelineSectionProps {
   /**

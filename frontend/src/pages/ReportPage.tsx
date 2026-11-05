@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { ApiError, api } from '../api/client'
 import type { Report } from '../api/types'
-import { scoreRingState } from '../components/interview/ScoreBadge'
+import { scoreRingState } from '../components/interview/scoreModel'
 import { SettingsBar } from '../components/interview/SettingsBar'
 import { AnswerReview } from '../components/report/AnswerReview'
 import { CoachBlocks } from '../components/report/CoachBlocks'
@@ -14,6 +14,7 @@ import { Card } from '../components/ui/Card'
 import { EmptyState } from '../components/ui/EmptyState'
 import { InlineError } from '../components/ui/InlineError'
 import { PhaseLoader } from '../components/ui/PhaseLoader'
+import { ResumeGate } from '../components/ui/ResumeGate'
 import { RingProgress } from '../components/ui/RingProgress'
 import { Toast } from '../components/ui/Toast'
 import { polishRoleHref } from '../lib/coach'
@@ -409,10 +410,9 @@ export default function ReportPage() {
         ) : null}
 
         {!generating && !firstLoad && !requested && report === null && profileMissing ? (
-          <EmptyState
+          <ResumeGate
             reason="诊断报告要先有一份画像：上传简历后会自动解析技能与项目，再去做模拟面试或笔试，这里才会产出带证据的短板清单。"
-            actionLabel="上传简历"
-            actionTo="/"
+            unlockLabel="回来查看诊断报告"
           />
         ) : null}
 

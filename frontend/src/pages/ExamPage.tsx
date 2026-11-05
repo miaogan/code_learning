@@ -8,9 +8,9 @@ import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { Chip } from '../components/ui/Chip'
 import { ConfirmModal } from '../components/ui/ConfirmModal'
-import { EmptyState } from '../components/ui/EmptyState'
 import { InlineError } from '../components/ui/InlineError'
 import { PhaseLoader } from '../components/ui/PhaseLoader'
+import { ResumeGate } from '../components/ui/ResumeGate'
 import { RingProgress } from '../components/ui/RingProgress'
 import { filteredNotice, proficiencyRuleHint } from '../lib/examNotice'
 import { formatElapsed } from '../lib/format'
@@ -232,10 +232,9 @@ export default function ExamPage() {
       ) : null}
 
       {view === 'empty' ? (
-        <EmptyState
+        <ResumeGate
           reason="笔试按画像方向组卷（≥10 题，其中客观题 ≥8 道自动判分）。先上传简历并确认画像，再来笔试。"
-          actionLabel="上传简历"
-          actionTo="/"
+          unlockLabel="回来开始笔试"
         />
       ) : null}
 

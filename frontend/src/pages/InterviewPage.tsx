@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { ApiError, api } from '../api/client'
 import type {
   InterviewRun,
@@ -16,10 +16,9 @@ import type { SetupDraft, SetupSources } from '../components/interview/setupMode
 import { SessionSummary } from '../components/interview/SessionSummary'
 import { SettingsBar } from '../components/interview/SettingsBar'
 import { Button } from '../components/ui/Button'
-import { EmptyState } from '../components/ui/EmptyState'
 import { InlineError } from '../components/ui/InlineError'
-import { NoticeModal } from '../components/ui/NoticeModal'
 import { PhaseLoader } from '../components/ui/PhaseLoader'
+import { ResumeGate } from '../components/ui/ResumeGate'
 import { useAsync } from '../lib/useAsync'
 import { setFlow } from '../state/flow'
 
@@ -76,10 +75,6 @@ function sessionOf(run: InterviewRun): InterviewSession {
 export default function InterviewPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const runIdParam = searchParams.get('run_id')
-  const navigate = useNavigate()
-
-  /** 没有画像（404）时进入空态：首帧弹一次「未上传简历」，关掉后留在空态页可再去上传。 */
-  const [resumePromptDismissed, setResumePromptDismissed] = useState(false)
 
   const profileAsync = useAsync((signal) => api.latestProfile(signal), [])
   const createAbortRef = useRef<AbortController | null>(null)
@@ -346,21 +341,10 @@ export default function InterviewPage() {
     content = <PhaseLoader title="正在读取你的最新画像" phases={['读取画像']} active={0} />
   } else if (profileView === 'empty') {
     content = (
-      <>
-        <EmptyState
-          reason="模拟面试会依据你的画像出题（技术题 ≥5 · 项目深挖 ≥3 · 进阶 ≤20%）。先上传简历并确认画像，再来测评。"
-          actionLabel="上传简历"
-          actionTo="/"
-        />
-        <NoticeModal
-          open={!resumePromptDismissed}
-          title="未上传简历"
-          message="还没有检测到简历。模拟面试会依据你的技术画像出题，请先上传一份简历（PDF / DOCX / TXT，≤10MB）并确认画像。"
-          primaryLabel="去上传简历"
-          onPrimary={() => navigate('/')}
-          onClose={() => setResumePromptDismissed(true)}
-        />
-      </>
+      <ResumeGate
+        reason="模拟面试会依据你的画像出题（技术题 ≥5 · 项目深挖 ≥3 · 进阶 ≤20%）。先上传简历并确认画像，再来测评。"
+        unlockLabel="回来开始面试"
+      />
     )
   } else if (profileView === 'error') {
     content = (

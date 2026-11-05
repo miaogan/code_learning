@@ -3,7 +3,7 @@ import type { InterviewSessionQuestion, InterviewSettings } from '../../api/type
 import { formatScore } from '../../lib/format'
 import { Button } from '../ui/Button'
 import { RingProgress } from '../ui/RingProgress'
-import { scoreRingState } from './ScoreBadge'
+import { scoreRingState } from './scoreModel'
 import { averageOf, kindAverageOf, type QuestionKind } from './chatModel'
 
 const KINDS: QuestionKind[] = ['technical', 'project', 'challenge']

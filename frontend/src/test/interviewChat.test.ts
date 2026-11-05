@@ -9,7 +9,7 @@ import {
   scoreTier,
   settingsLine,
 } from '../components/interview/chatModel'
-import { settingsTextOf } from '../components/history/TrendTable'
+import { settingsTextOf } from '../components/history/trendModel'
 import { formatScore } from '../lib/format'
 
 /**

@@ -1,21 +1,10 @@
 import { useEffect, useState } from 'react'
 import { RingProgress } from '../ui/RingProgress'
-import type { RingState } from '../ui/RingProgress'
 import { formatScore } from '../../lib/format'
+import { scoreRingState } from './scoreModel'
 
 /** 出分揭示时长（DESIGN §0.6：得分环 0 → 目标 600ms ease-out）。 */
 const REVEAL_MS = 600
-
-/**
- * 得分档位：>7 绿 / 4–7 黄 / <4 红（DESIGN §2.3）。
- * 颜色与数字双通道：环色只是辅助，环内始终有数字，progress strip 复用同一档位。
- */
-export function scoreRingState(score: number): RingState {
-  if (!Number.isFinite(score)) return 'default'
-  if (score > 7) return 'success'
-  if (score >= 4) return 'warn'
-  return 'danger'
-}
 
 function prefersReducedMotion(): boolean {
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false

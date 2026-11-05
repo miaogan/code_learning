@@ -7,7 +7,7 @@
  */
 
 import type { InterviewSessionQuestion, InterviewSettings } from '../../api/types'
-import { scoreRingState } from './ScoreBadge'
+import { scoreRingState } from './scoreModel'
 
 /** 得分档位词的三档（与 ScoreBadge 的环形状态一一对应，不写第二套阈值）。 */
 export type ScoreTier = 'good' | 'mid' | 'low'

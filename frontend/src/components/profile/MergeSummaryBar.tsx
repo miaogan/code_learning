@@ -1,6 +1,7 @@
 import type { ProfileMergeSummary } from '../../api/types'
 import { Button } from '../ui/Button'
 import { Chip } from '../ui/Chip'
+import { mergeSummaryText } from './mergeModel'
 
 export interface MergeSummaryBarProps {
   summary: ProfileMergeSummary
@@ -10,11 +11,6 @@ export interface MergeSummaryBarProps {
   historyControls?: string[]
   /** 点击回调：展开历史分组 + 滚动进视口 + 焦点落到分组容器（由页面实现）。 */
   onViewHistory?: () => void
-}
-
-/** 「本次合并」正文（纯函数：页面、上传摘要行与检查器共用同一口径）。 */
-export function mergeSummaryText(summary: ProfileMergeSummary): string {
-  return `新增 ${summary.added} 项能力 · ${summary.historical} 项转为历史 · 证据 +${summary.evidence_added}`
 }
 
 /**
