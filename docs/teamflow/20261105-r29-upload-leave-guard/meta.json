@@ -1,0 +1,8 @@
+{
+  "id": "20261105-r29-upload-leave-guard",
+  "title": "上传页中途离开保护：刷新/站内导航不再静默中断",
+  "status": "done",
+  "createdAt": "2026-11-05T14:38:00+08:00",
+  "owner": "dev",
+  "tags": ["upload", "ux"]
+}
