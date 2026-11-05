@@ -1,0 +1,12 @@
+{
+  "round": "r36",
+  "date": "2026-11-05",
+  "title": "进度环弧线偏心甩出轨道修复 + 简历润色专用超时",
+  "trigger": "用户反馈「进度条还是有问题」且「简历润色也超时了」",
+  "status": "done",
+  "changed_files": [
+    "frontend/src/styles/base.css",
+    "backend/app/services/resume_polish.py"
+  ],
+  "verification": "Playwright 4 帧环形截图确认弧线贴轨旋转；真实润色请求 8.6s 返回 200；ruff + 相关后端测试 41 passed；前端 typecheck/lint/205 测试/build 全绿"
+}

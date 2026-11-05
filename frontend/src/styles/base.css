@@ -374,7 +374,11 @@ a {
   stroke: var(--success);
 }
 
-.sc-ring.is-indeterminate .sc-ring-value {
+/* r36 关键修复：不转 SVG 内部的 circle —— 实测 Chrome 对 SVG 子元素的 CSS transform
+   动画（无论 view-box 还是 fill-box 的 origin）都会让弧线绕偏心枢轴甩出轨道。
+   改为旋转 <svg> 根元素本身：常规盒模型，origin=center 严格是 56×56 的中心。
+   内部 circle 的 rotate(-90 28 28) 属性保留，determinate 弧的 12 点起点不受影响。 */
+.sc-ring.is-indeterminate {
   animation: sc-ring-spin 1.2s linear infinite;
   transform-origin: center;
 }
