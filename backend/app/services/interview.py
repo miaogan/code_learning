@@ -713,6 +713,37 @@ async def score_answer(
     )
 
 
+# --- 提前结束（用户主动放弃本场，零 AI 调用） --------------------------------
+
+
+def finish_run(run_id: str) -> InterviewSession:
+    """提前结束本场面试：置 `completed`、写时间线，返回会话镜像（幂等）。
+
+    与 `score_answer` 的结束路径共用落库形状，但有两处刻意不同：
+    - **不调用 AI**：结束不需要评分，轻能力用户也能随时退出；
+    - **不跑 `validate_session`**：该闸门要求整卷题量/配比达标，提前结束的发言数必然不足，
+      跑它会把一次正常操作误判成 502（结束闸门只服务于「答满最后一条」）。
+    已结束的会话直接返回当前镜像，前端重试不会拿到错误。
+    """
+    run = repository.get_run(run_id)
+    if run is None or str(run.get("kind") or "") != INTERVIEW_KIND:
+        raise AppError(NOT_FOUND, "没有找到这次面试记录，请先开始一次面试", status=404)
+
+    if str(run.get("status") or "") != RUN_COMPLETED:
+        payload: dict[str, Any] = dict(run.get("payload") or {})
+        entries = _entries(payload)
+        payload["current_id"] = None
+        payload["questions"] = entries
+        payload["answered_count"] = sum(1 for entry in entries if _score_of(entry) is not None)
+        payload["total"] = _total_of(payload, entries)
+        repository.save_run(run_id, payload, RUN_COMPLETED)
+        # 时间线是旁路：写失败自行返回 None，绝不打断结束动作。
+        timeline.record_run_event(
+            {"id": run_id, "kind": INTERVIEW_KIND, "payload": payload, "status": RUN_COMPLETED}
+        )
+    return load_session(run_id)
+
+
 # --- 会话读取（AC-9：刷新 / 重进恢复） --------------------------------------
 
 

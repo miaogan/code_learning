@@ -34,7 +34,7 @@ from ..schemas import (
 )
 from . import coach_copy, courses, resume_hints, role_fit, rules, weakness
 from .ai import AIClient
-from .history import _interviews_settings_of
+from .history import _interviews_settings_of, score_of
 from .markdown import SEVERITY_LABEL, format_score
 
 #: 严重度排序的单一出处（`rules.py`）；本文件只做转出，方便下游 `from .diagnosis import SEVERITY_ORDER`。
@@ -530,9 +530,14 @@ def _resolve_runs(run_ids: list[str] | None) -> list[dict[str, Any]]:
     auto: list[dict[str, Any]] = []
     for kind in ("interview", "exam"):
         for run in repository.list_runs(kind, limit=5):
-            if str(run.get("status") or "") == repository.RUN_COMPLETED:
-                auto.append(run)
-                break
+            if str(run.get("status") or "") != repository.RUN_COMPLETED:
+                continue
+            # 提前结束（一题未答）的会话也是 completed，但它没有任何可诊断的作答：
+            # 跳过它，别挡住最近一次真正有成绩的同类测评。
+            if score_of(kind, run.get("payload") or {}) is None:
+                continue
+            auto.append(run)
+            break
     if not auto:
         raise AppError(
             VALIDATION_ERROR,

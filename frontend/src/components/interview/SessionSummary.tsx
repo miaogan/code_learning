@@ -33,6 +33,8 @@ export function SessionSummary({ runId, questions, settings, onRestart }: Sessio
     .filter((score): score is number => typeof score === 'number')
   const answered = scores.length
   const avg = averageOf(scores)
+  // 提前结束可能一题未答：此时「0 分」是误导，均分一律显示破折号（不伪造成绩）。
+  const avgLabel = answered > 0 ? formatScore(avg) : '—'
 
   return (
     <section className="sc-iq-summary" aria-label="本场面试汇总">
@@ -40,14 +42,14 @@ export function SessionSummary({ runId, questions, settings, onRestart }: Sessio
         <RingProgress
           size={56}
           stroke={5}
-          value={avg}
+          value={answered > 0 ? avg : 0}
           max={10}
-          label={formatScore(avg)}
-          state={scoreRingState(avg)}
-          ariaLabel={`本场均分 ${formatScore(avg)} 分，满分 10 分`}
+          label={avgLabel}
+          state={answered > 0 ? scoreRingState(avg) : 'default'}
+          ariaLabel={answered > 0 ? `本场均分 ${avgLabel} 分，满分 10 分` : '本场还没有已评分的作答'}
         />
         <div className="sc-iq-summary-nums">
-          <p className="sc-iq-summary-avg">本场均分 {formatScore(avg)} / 10</p>
+          <p className="sc-iq-summary-avg">本场均分 {avgLabel} / 10</p>
           <p className="sc-iq-summary-sub">已答 {answered} 题 · 每题 0–10 分</p>
         </div>
       </div>
@@ -66,16 +68,20 @@ export function SessionSummary({ runId, questions, settings, onRestart }: Sessio
         })}
       </p>
 
-      <p className="sc-iq-summary-note">短板与课程由诊断报告统一给出。</p>
+      <p className="sc-iq-summary-note">
+        {answered > 0 ? '短板与课程由诊断报告统一给出。' : '本场一题未答，没有可汇总的成绩。'}
+      </p>
 
       <div className="sc-iq-summary-actions">
-        <Link
-          className="sc-btn sc-btn--primary"
-          to={`/report?run_ids=${encodeURIComponent(runId)}`}
-        >
-          去看诊断报告
-        </Link>
-        <Button variant="secondary" onClick={onRestart}>
+        {answered > 0 ? (
+          <Link
+            className="sc-btn sc-btn--primary"
+            to={`/report?run_ids=${encodeURIComponent(runId)}`}
+          >
+            去看诊断报告
+          </Link>
+        ) : null}
+        <Button variant={answered > 0 ? 'secondary' : 'primary'} onClick={onRestart}>
           重开一场
         </Button>
       </div>

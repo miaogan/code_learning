@@ -1,9 +1,11 @@
-"""模拟面试路由（r5）：开局 / 逐轮 / 会话回溯三条路由。
+"""模拟面试路由（r5）：开局 / 逐轮 / 提前结束 / 会话回溯四条路由。
 
 - 开局 `POST /api/interviews` 只返回第 1 条发言（`InterviewRun{settings, question, total}`），
   8 题计划留在 `payload.plan`（AC-4：不预先铺开题目列表）。
 - 逐轮 `POST /api/interviews/{run_id}/answers` 返回 `InterviewTurn`（`ScoreResult` 超集）：
   `score` / `comment` 与下一条发言同轮返回；失败一律 envelope 错误，**前端不得清空作答**。
+- 提前结束 `POST /api/interviews/{run_id}/finish` 返回会话镜像：**不调用 AI**，因此不走
+  heavy 能力闸门 —— 轻能力用户也能随时退出，未答题目不再计分。
 - 回溯 `GET /api/interviews/{run_id}` 返回整场会话镜像（AC-9 刷新 / 重进恢复）。
 - 分工：本层只做参数转发与错误映射，轮次编排 / 闸门 / 回写全在 `services.interview`。
 """
@@ -23,6 +25,7 @@ from ..schemas import (
 from ..services import user_ai
 from ..services.interview import (
     create_run as create_interview_run,
+    finish_run as finish_interview_run,
     load_session,
     score_answer as score_interview_answer,
 )
@@ -48,6 +51,15 @@ async def submit_answer(
 ) -> InterviewTurn:
     client = user_ai.client_for(user, "heavy")
     return await score_interview_answer(run_id, payload.question_id, payload.answer, client=client)
+
+
+@router.post(
+    "/{run_id}/finish",
+    response_model=InterviewSession,
+    summary="提前结束本场面试（不调用 AI，未答题目不再计分）",
+)
+def finish_run(run_id: str) -> InterviewSession:
+    return finish_interview_run(run_id)
 
 
 @router.get(

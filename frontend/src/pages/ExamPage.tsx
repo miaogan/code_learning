@@ -59,7 +59,10 @@ export default function ExamPage() {
   const attemptRef = useRef(0)
   const mountedRef = useRef(true)
 
+  // StrictMode 会挂载→卸载→再挂载：effect 体里重新置 true，否则开发态下响应全被守卫吞掉，
+  // 页面永远停在「正在依据画像组卷」（出卷/判分请求其实已 200 返回）。
   useEffect(() => {
+    mountedRef.current = true
     return () => {
       mountedRef.current = false
     }

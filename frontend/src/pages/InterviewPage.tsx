@@ -15,7 +15,9 @@ import { draftToPatch, prefillOf } from '../components/interview/setupModel'
 import type { SetupDraft, SetupSources } from '../components/interview/setupModel'
 import { SessionSummary } from '../components/interview/SessionSummary'
 import { SettingsBar } from '../components/interview/SettingsBar'
+import { AiHeavyNotice } from '../components/ui/AiHeavyNotice'
 import { Button } from '../components/ui/Button'
+import { ConfirmModal } from '../components/ui/ConfirmModal'
 import { InlineError } from '../components/ui/InlineError'
 import { PhaseLoader } from '../components/ui/PhaseLoader'
 import { ResumeGate } from '../components/ui/ResumeGate'
@@ -92,6 +94,10 @@ export default function InterviewPage() {
   const [restore, setRestore] = useState<RestoreState>({ status: 'idle', error: null })
   /** 「重新读取」计数：run_id 不变时靠它触发恢复 effect 重跑。 */
   const [restoreTick, setRestoreTick] = useState(0)
+  /** 提前结束（放弃本场）：确认弹框与在途状态。 */
+  const [finishOpen, setFinishOpen] = useState(false)
+  const [finishing, setFinishing] = useState(false)
+  const [finishError, setFinishError] = useState<string | null>(null)
 
   const profile = profileAsync.data
 
@@ -236,6 +242,28 @@ export default function InterviewPage() {
     }
   }
 
+  /**
+   * 提前结束本场（放弃）：后端只落状态、不调 AI，未答题目不再计分；
+   * 已答题目保留评分，结束后即可去诊断报告汇总本场（与答满后的结束态共用汇总块）。
+   */
+  const finishSession = async () => {
+    if (!session || finishing) return
+    setFinishing(true)
+    setFinishError(null)
+    try {
+      const ended = await api.finishInterview(session.run_id)
+      setSession(ended)
+      setAnswer('')
+      setTrack(EMPTY_TRACK)
+      setStage('ended')
+      setFlow({ hasInterview: true })
+    } catch (error) {
+      setFinishError(messageOf(error, '结束失败，请重试'))
+    } finally {
+      setFinishing(false)
+    }
+  }
+
   /** 重开一场：清会话与 ?run_id=，按当前画像重新预填。 */
   const restart = () => {
     createAbortRef.current?.abort()
@@ -245,6 +273,8 @@ export default function InterviewPage() {
     setTrack(EMPTY_TRACK)
     setStage('configure')
     setRestore({ status: 'idle', error: null })
+    setFinishOpen(false)
+    setFinishError(null)
     setSearchParams({}, { replace: true })
     const prefilled = prefillOf(profile)
     setDraft(prefilled.draft)
@@ -291,10 +321,22 @@ export default function InterviewPage() {
     const current = stage === 'ended' || session.status === 'completed' ? 'ended' : 'chat'
     content = (
       <div className="sc-iq-col">
-        <p className="sc-iq-meta">
-          已提出 {session.questions.length} 题 · 已答 {session.answered_count} 题
-          {current === 'ended' ? ' · 本场已结束' : ''}
-        </p>
+        <div className="sc-iq-topline">
+          <p className="sc-iq-meta">
+            已提出 {session.questions.length} 题 · 已答 {session.answered_count} 题
+            {current === 'ended' ? ' · 本场已结束' : ''}
+          </p>
+          {current === 'chat' ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={track.submitting || finishing}
+              onClick={() => setFinishOpen(true)}
+            >
+              结束本场面试
+            </Button>
+          ) : null}
+        </div>
         <SettingsBar settings={session.settings} />
         <ChatStream questions={session.questions} pending={track.submitting} />
         {current === 'ended' ? (
@@ -308,16 +350,25 @@ export default function InterviewPage() {
             />
           </>
         ) : (
-          <Composer
-            value={answer}
-            onChange={setAnswer}
-            onSubmit={() => void submitTurn()}
-            submitting={track.submitting}
-            disabled={track.submitting}
-            readonly={false}
-            elapsedS={track.elapsedS}
-            error={track.turnError}
-          />
+          <>
+            {finishError ? (
+              <InlineError
+                message={finishError}
+                onRetry={() => void finishSession()}
+                retryLabel="重试结束"
+              />
+            ) : null}
+            <Composer
+              value={answer}
+              onChange={setAnswer}
+              onSubmit={() => void submitTurn()}
+              submitting={track.submitting}
+              disabled={track.submitting}
+              readonly={false}
+              elapsedS={track.elapsedS}
+              error={track.turnError}
+            />
+          </>
         )}
       </div>
     )
@@ -380,7 +431,20 @@ export default function InterviewPage() {
           多轮对话式面试：每题 0–10 分与逐字点评长在你的回答里；首问之后每轮只出一道，失败不会清空你的答案
         </p>
       </header>
+      <AiHeavyNotice />
       {content}
+      <ConfirmModal
+        open={finishOpen}
+        title="结束本场面试"
+        message={`已答 ${session?.answered_count ?? 0} / ${session?.total ?? 0} 题。结束后面试置为已完成：已答题目保留评分，未答题目不再计分，可在诊断报告里汇总本场。`}
+        confirmLabel="结束本场"
+        cancelLabel="继续作答"
+        onConfirm={() => {
+          setFinishOpen(false)
+          void finishSession()
+        }}
+        onCancel={() => setFinishOpen(false)}
+      />
     </section>
   )
 }

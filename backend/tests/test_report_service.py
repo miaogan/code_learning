@@ -180,6 +180,26 @@ def test_build_report_without_any_run_rejected(tmp_db: Any, fake_ai: Any) -> Non
     assert excinfo.value.status in {400, 404}
 
 
+def test_auto_resolution_skips_finished_but_unanswered_run(
+    tmp_db: Any, profile_factory: Any, fake_ai: Any
+) -> None:
+    """提前结束（0 答）的会话也是 completed，但不得挤掉最近一次有成绩的同类测评。"""
+    profile = profile_factory()
+    repository.insert_profile(profile)
+
+    fake_ai.responder = _bad_score_responder
+    answered = asyncio.run(interview_service.create_run(profile.id, client=fake_ai))
+    turns = drive_session(answered, fake_ai, answer="答不上来")
+    assert turns[-1].next_question is None
+
+    empty = asyncio.run(interview_service.create_run(profile.id, client=fake_ai))
+    interview_service.finish_run(empty.run_id)
+
+    resolved = [run["id"] for run in diagnosis._resolve_runs(None)]
+    assert answered.run_id in resolved, "有成绩的那场必须被选中"
+    assert empty.run_id not in resolved, "0 答的完成态不可诊断，不得挤掉上一场"
+
+
 def test_report_aggregates_both_run_kinds(
     tmp_db: Any, profile_factory: Any, fake_ai: Any, seed_questions: list[dict[str, Any]]
 ) -> None:

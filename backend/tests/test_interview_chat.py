@@ -13,7 +13,7 @@ from typing import Any
 import pytest
 
 from app import repository
-from app.errors import AI_SCHEMA_INVALID, AI_UNAVAILABLE, VALIDATION_ERROR, AppError
+from app.errors import AI_SCHEMA_INVALID, AI_UNAVAILABLE, NOT_FOUND, VALIDATION_ERROR, AppError
 from app.schemas import InterviewSettings, InterviewSettingsPatch
 from app.services import diagnosis, history, interview as interview_service, rules
 
@@ -659,3 +659,61 @@ def test_report_carries_interview_settings(
         "payload": {"questions": []},
     }
     assert diagnosis.interview_settings_of([exam_like]) is None, "无面试 run → 报告不记设定"
+
+
+# --- 提前结束（用户主动放弃本场：零 AI 调用、不跑结束闸门） -------------------
+
+
+def test_finish_run_early_completes_without_ai(
+    tmp_db: Any, profile_factory: Any, fake_ai: Any
+) -> None:
+    """刚开局就放弃：未答一题也能结束，且结束动作不花一次 AI 调用。"""
+    profile = _seed_profile(profile_factory)
+    fake_ai.responder = _responder()
+    run = _create(fake_ai, profile.id, None)
+    calls_before = len(fake_ai.calls)
+
+    session = interview_service.finish_run(run.run_id)
+
+    assert len(fake_ai.calls) == calls_before, "结束不需要评分，不得调用 AI"
+    assert session.status == repository.RUN_COMPLETED
+    assert session.current_id is None
+    assert session.answered_count == 0
+    assert session.total == run.total, "分母仍是计划题量，不因提前结束缩水"
+    payload = _payload_of(run.run_id)
+    assert payload["current_id"] is None
+    assert len(payload["questions"]) == 1, "未答的题不铺开"
+    assert len(repository.list_timeline_events()) == 1, "结束态写 1 条时间线事件"
+
+
+def test_finish_run_keeps_answered_scores_and_is_idempotent(
+    tmp_db: Any, profile_factory: Any, fake_ai: Any
+) -> None:
+    """答了一题再放弃：分数保留、未答题目不计分；重复结束幂等（不重复写时间线）。"""
+    profile = _seed_profile(profile_factory)
+    fake_ai.responder = _responder()
+    run = _create(fake_ai, profile.id, None)
+    turn = asyncio.run(interview_service.score_answer(run.run_id, "iq-1", "作答", client=fake_ai))
+    assert turn.next_question is not None
+
+    session = interview_service.finish_run(run.run_id)
+
+    assert session.status == repository.RUN_COMPLETED
+    assert session.answered_count == 1
+    assert len(session.questions) == 2, "已答 1 条 + 已投放未答 1 条"
+    assert session.questions[0].score == turn.score
+    assert session.questions[1].score is None
+
+    calls_before = len(fake_ai.calls)
+    again = interview_service.finish_run(run.run_id)
+    assert again.status == repository.RUN_COMPLETED
+    assert again.answered_count == 1
+    assert len(fake_ai.calls) == calls_before
+    assert len(repository.list_timeline_events()) == 1, "幂等：不重复写时间线"
+
+
+def test_finish_run_unknown_404(tmp_db: Any) -> None:
+    with pytest.raises(AppError) as excinfo:
+        interview_service.finish_run("no-such-run")
+    assert excinfo.value.code == NOT_FOUND
+    assert excinfo.value.status == 404

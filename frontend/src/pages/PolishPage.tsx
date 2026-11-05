@@ -6,6 +6,7 @@ import { ComposePreview } from '../components/polish/ComposePreview'
 import { SegTabs } from '../components/polish/SegTabs'
 import { SuggestionCard, type SuggestionState } from '../components/polish/SuggestionCard'
 import { TargetRoleBar } from '../components/polish/TargetRoleBar'
+import { AiHeavyNotice } from '../components/ui/AiHeavyNotice'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { ConfirmModal } from '../components/ui/ConfirmModal'
@@ -387,6 +388,7 @@ export default function PolishPage() {
           AI 只改措辞与结构，不改事实与数字；逐条对比后可采纳，成稿随时可导出
         </p>
       </header>
+      <AiHeavyNotice />
 
       {profilePending ? (
         <PhaseLoader title="正在读取画像" phases={['读取画像与目标岗位']} active={0} />

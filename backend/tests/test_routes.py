@@ -234,6 +234,46 @@ def test_interview_bad_paper_maps_to_502(
     assert_chinese(error["message"])
 
 
+def test_interview_finish_early_is_idempotent(
+    client: TestClient,
+    patch_ai: Callable[[Any], None],
+    profile_factory: Callable[..., Any],
+    assert_chinese: Callable[[str], None],
+) -> None:
+    """提前结束：不调 AI、未答满也可结束；重复结束幂等，已答分数保留。"""
+    profile = profile_factory()
+    repository.insert_profile(profile)
+    patch_ai(_responder)
+
+    run = client.post("/api/interviews", json={"profile_id": profile.id}).json()
+    answered = client.post(
+        f"/api/interviews/{run['run_id']}/answers",
+        json={"question_id": run["question"]["id"], "answer": "我负责组件库重构"},
+    ).json()
+    assert answered["answered_count"] == 1
+
+    finished = client.post(f"/api/interviews/{run['run_id']}/finish")
+    assert finished.status_code == 200
+    session = finished.json()
+    assert session["status"] == "completed"
+    assert session["current_id"] is None
+    assert session["answered_count"] == 1, "已答分数保留，未答题目不计分"
+    assert session["total"] == run["total"]
+    assert session["questions"][0]["score"] == answered["score"]
+
+    again = client.post(f"/api/interviews/{run['run_id']}/finish")
+    assert again.status_code == 200
+    assert again.json() == session, "重复结束幂等，不重复写时间线"
+
+    restored = client.get(f"/api/interviews/{run['run_id']}")
+    assert restored.status_code == 200
+    assert restored.json()["status"] == "completed"
+
+    missing = client.post("/api/interviews/no-such-run/finish")
+    assert missing.status_code == 404
+    _assert_error(missing.json(), "NOT_FOUND", assert_chinese)
+
+
 # --- 笔试端点 -------------------------------------------------------------
 
 

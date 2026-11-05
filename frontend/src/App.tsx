@@ -100,7 +100,7 @@ export default function App() {
             {me.display_name}
           </Link>
           <Button variant="ghost" size="sm" onClick={() => void logout()}>
-            退出
+            退出登录
           </Button>
         </div>
       </header>

@@ -9,6 +9,7 @@ import { CoachBlocks } from '../components/report/CoachBlocks'
 import { LearningDirectionCard } from '../components/report/LearningDirectionCard'
 import { ShortfallCard } from '../components/report/ShortfallCard'
 import { WeekPlan } from '../components/report/WeekPlan'
+import { AiHeavyNotice } from '../components/ui/AiHeavyNotice'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { EmptyState } from '../components/ui/EmptyState'
@@ -117,6 +118,13 @@ function clipboardErrorMessage(error: unknown): string {
 export default function ReportPage() {
   const reportAsync = useAsync((signal) => api.latestReport(signal), [])
   const profileAsync = useAsync((signal) => api.latestProfile(signal), [])
+  /**
+   * 空态前置条件（权威判定）：history 只返回**已完成**的面试/笔试。
+   * 依据它把「生成诊断报告」换成「去完成一次测评」，避免按钮点了才收到 400
+   * （不用本地 flow 标记：换设备/清缓存时不失真）。
+   * 取 10 条且要求「有分数」：提前结束但一题未答的会话也是 completed，它不可诊断。
+   */
+  const historyAsync = useAsync(() => api.history(10), [])
 
   const [generated, setGenerated] = useState<Report | null>(null)
   const [generating, setGenerating] = useState(false)
@@ -166,6 +174,10 @@ export default function ReportPage() {
   const reportMissing = reportAsync.status === 'error' && reportAsync.error?.status === 404
   const profileMissing = profileAsync.status === 'error' && profileAsync.error?.status === 404
   const profilePending = profileAsync.status !== 'success' && profileAsync.status !== 'error'
+  /** history 已确认「没有一条带成绩的已完成测评」：此时生成必然 400/404，不给可点按钮。 */
+  const noCompletedRun =
+    historyAsync.status === 'success' &&
+    !(historyAsync.data ?? []).some((run) => run.score !== null)
   const firstLoad =
     (reportAsync.status === 'loading' && report === null) || (reportMissing && profilePending)
   /** 带 ?run_ids= 进来：本场报告还没出来（生成中/尚未开始）。 */
@@ -279,6 +291,7 @@ export default function ReportPage() {
           短板按严重度从高到低排序，每条都带题目证据、建议动作与推荐课程
         </p>
       </header>
+      <AiHeavyNotice />
 
       {/*
         本场设定条（AC-12 / DESIGN §2.6）：取参与本报告的最新面试设定，置于页头之下、正文之上。
@@ -436,11 +449,19 @@ export default function ReportPage() {
             {generateError ? (
               <InlineError message={generateError} onRetry={regenerate} retryLabel="重试" />
             ) : null}
-            <EmptyState
-              reason="还没有诊断报告：完成一轮面试或笔试后，这里会给出 3–5 条带题目证据的短板，按严重度排序并直连基础课程。"
-              actionLabel="生成诊断报告"
-              onAction={regenerate}
-            />
+            {noCompletedRun ? (
+              <EmptyState
+                reason="还没有可汇总的测评：先完成一轮模拟面试或笔试，再回来生成带题目证据的短板清单。"
+                actionLabel="去完成一次测评"
+                actionTo="/interview"
+              />
+            ) : (
+              <EmptyState
+                reason="还没有诊断报告：完成一轮面试或笔试后，这里会给出 3–5 条带题目证据的短板，按严重度排序并直连基础课程。"
+                actionLabel="生成诊断报告"
+                onAction={regenerate}
+              />
+            )}
             <div className="sc-btn-row">
               <p className="sc-meta-line">还没有作答记录？先完成一次测评</p>
               <Link className="sc-btn sc-btn--secondary" to="/interview">

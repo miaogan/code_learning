@@ -237,6 +237,13 @@ export const api = {
   getInterview: (runId: string, signal?: AbortSignal): Promise<InterviewSession> =>
     request<InterviewSession>(`/api/interviews/${encodeURIComponent(runId)}`, { signal }),
 
+  /** 提前结束本场面试（不调用 AI）：返回结束态的会话镜像，未答题目不再计分。 */
+  finishInterview: (runId: string): Promise<InterviewSession> =>
+    request<InterviewSession>(
+      `/api/interviews/${encodeURIComponent(runId)}/finish`,
+      jsonInit('POST', {}),
+    ),
+
   createExam: (payload: ExamCreateRequest): Promise<ExamRun> =>
     request<ExamRun>('/api/exams', jsonInit('POST', payload)),
 

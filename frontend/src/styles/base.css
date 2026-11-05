@@ -2442,6 +2442,15 @@ input:not([type='radio']):not([type='checkbox']):not([type='file']):disabled {
   color: var(--warn);
 }
 
+/* 会话顶行：进度文案 + 「结束本场面试」出口；窄屏换行但不挤压下方输入区 */
+.sc-iq-topline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+
 /* ---------- 本场设定摘要条（会话顶 / 报告顶共用；48 = 边框 1×2 + padding 12×2 + 正文 22） ---------- */
 .sc-settings-bar {
   display: flex;
@@ -4663,6 +4672,7 @@ input:not([type='radio']):not([type='checkbox']):not([type='file']):disabled {
 }
 
 .sc-learn-note.is-warn {
+  border-color: var(--warn-line-35);
   border-left-color: var(--warn);
   background: var(--warn-tint-12);
 }
@@ -4734,14 +4744,47 @@ input:not([type='radio']):not([type='checkbox']):not([type='file']):disabled {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-8);
   background: var(--bg-surface);
+  transition: background-color var(--fast) var(--ease), border-color var(--fast) var(--ease);
+}
+
+.sc-learn-qaitem:hover {
+  background: var(--overlay-04);
+  border-color: var(--border-strong);
+}
+
+.sc-learn-qaitem[open] {
+  border-color: var(--border-strong);
 }
 
 .sc-learn-question {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
   cursor: pointer;
   font-size: var(--fs-small);
   line-height: var(--lh-small);
   font-weight: 600;
   color: var(--text-primary);
+  list-style: none;
+}
+
+.sc-learn-question::marker {
+  content: '';
+}
+
+.sc-learn-question::-webkit-details-marker {
+  display: none;
+}
+
+/* 折叠 ▸ / 展开 ▾：颜色用 accent，跟「可交互」语义一致 */
+.sc-learn-question::before {
+  content: '▸';
+  flex: 0 0 auto;
+  color: var(--accent);
+}
+
+.sc-learn-qaitem[open] .sc-learn-question::before {
+  content: '▾';
 }
 
 .sc-learn-answer {
@@ -4771,6 +4814,17 @@ input:not([type='radio']):not([type='checkbox']):not([type='file']):disabled {
   flex-direction: column;
   gap: var(--sp-1);
   max-width: 48%;
+  padding: var(--sp-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-8);
+  background: var(--bg-surface);
+  text-decoration: none;
+  transition: border-color var(--fast) var(--ease), background-color var(--fast) var(--ease);
+}
+
+.sc-learn-pageritem:hover {
+  border-color: var(--border-strong);
+  background: var(--overlay-04);
 }
 
 .sc-learn-pageritem.is-next {
@@ -4801,4 +4855,31 @@ input:not([type='radio']):not([type='checkbox']):not([type='file']):disabled {
     margin-left: 0;
     text-align: left;
   }
+}
+
+/* ---------- 重能力前置提示（模拟面试 / 诊断报告 / 简历润色需要自己的 Key） ---------- */
+.sc-ai-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0 0 var(--sp-5);
+  padding: var(--sp-3);
+  border: 1px solid var(--warn-line-35);
+  border-left: 2px solid var(--warn);
+  border-radius: var(--radius-8);
+  background: var(--warn-tint-12);
+  color: var(--text-secondary);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+}
+
+.sc-ai-notice a {
+  font-weight: 600;
+}
+
+/* ---------- 学习模块提示块：浅底覆盖（基座只允许追加，故用后置规则而非改原声明） ---------- */
+.sc-learn-note {
+  border-color: var(--accent-line-30);
+  background: var(--accent-tint);
 }
