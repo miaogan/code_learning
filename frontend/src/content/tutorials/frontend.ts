@@ -1,6 +1,6 @@
 import type { TutorialChapter } from '../../lib/tutorialTypes'
 
-/** 前端方向：事件循环与异步、React 状态与渲染。 */
+/** 前端方向：事件循环与异步、React 状态与渲染、渲染性能、TypeScript 类型系统。 */
 export const FRONTEND_CHAPTERS: TutorialChapter[] = [
   {
     id: 'fe-event-loop',
@@ -375,6 +375,133 @@ export const FRONTEND_CHAPTERS: TutorialChapter[] = [
               {
                 question: '虚拟列表的坑在哪？',
                 answer: '行高不定时无法估算总高度；用键盘查找、页内搜索、锚点跳转都要自己补；快速滚动时缓冲区太小会出现白屏。',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'fe-typescript',
+    title: 'TypeScript 类型系统实战',
+    direction: '前端',
+    level: '进阶',
+    summary: '联合类型与收窄、判别联合与穷尽性检查，把「运行时才发现的错」提前到编译期。',
+    sections: [
+      {
+        id: 'model',
+        title: '类型是编译期的证明',
+        blocks: [
+          {
+            kind: 'text',
+            text: 'TypeScript 的价值不是「写注解」，而是把数据形状写进代码，让编译器在保存时就指出错误。前端最常见的运行时报错——undefined 的属性、拼错的后端字段、漏处理的分支——大多可以用类型把守住入口。',
+          },
+          {
+            kind: 'list',
+            items: [
+              '类型描述「数据长什么样」，接口契约（后端返回、props、localStorage 结构）都应该有类型。',
+              '类型系统的立场是「只添乱不如不写」：any 会关掉所有检查，unknown 才是安全起点。',
+              '编译期检查不等于运行时校验：接口返回仍可能和声明不符，边界数据要再校验一层。',
+              '类型要跟着重构走：改字段名时编译器报的每一处错，都是你本要手工排查的调用点。',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'narrowing',
+        title: '联合类型与收窄',
+        blocks: [
+          {
+            kind: 'text',
+            text: '「值可能是几种形状之一」用联合类型表达，再用判断把范围收窄到具体一种。收窄的关键是写出编译器能理解的条件——这就是判别联合（discriminated union）：给每种形状一个字面量标签字段。',
+          },
+          {
+            kind: 'table',
+            headers: ['写法', '效果', '注意'],
+            rows: [
+              ['A | B 联合类型', '值是 A 或 B，只能访问公共属性', '用前必须收窄'],
+              ['判别联合 + if (x.kind === …)', '分支内自动缩到对应形状', '标签用字面量类型，别用 string'],
+              ['类型守卫 is', '把收窄逻辑封装成可复用函数', '守卫内部要真的校验数据'],
+              ['as 断言', '强行改写类型', '绕过检查，仅限确有外部依据时'],
+            ],
+          },
+          {
+            kind: 'note',
+            tone: 'info',
+            title: 'never 的用途',
+            text: '把收窄后的剩余分支赋给 never 类型：联合里新增一种形状而某处 switch 没处理时，编译器立刻报错。这是「穷尽性检查」的标准写法。',
+          },
+        ],
+      },
+      {
+        id: 'example',
+        title: '用判别联合建模请求状态',
+        blocks: [
+          {
+            kind: 'text',
+            text: '「加载中不能读 data、失败时 message 才存在」这类约束，用四个带标签的分支表达后，编译器会替你拦住所有越界访问。',
+          },
+          {
+            kind: 'code',
+            language: 'ts',
+            caption: '判别联合 + 收窄',
+            code: [
+              'type RequestState<T> =',
+              '  | { status: "idle" }',
+              '  | { status: "loading" }',
+              '  | { status: "success"; data: T }',
+              '  | { status: "error"; message: string }',
+              '',
+              'function render(state: RequestState<string[]>) {',
+              '  switch (state.status) {',
+              '    case "idle": return null',
+              '    case "loading": return "加载中…"',
+              '    case "success": return state.data.join(", ")  // 只有这里有 data',
+              '    case "error": return `出错了：${state.message}`',
+              '    default: {',
+              '      const neverState: never = state  // 穷尽性检查',
+              '      return neverState',
+              '    }',
+              '  }',
+              '}',
+            ].join('\n'),
+          },
+          {
+            kind: 'list',
+            ordered: true,
+            items: [
+              '每个分支只带自己才有的字段，非法访问在编译期直接报错。',
+              '新增一种状态（如 refreshing）时，所有没处理它的 switch 都会编译失败。',
+              'UI 组件按 state.status 渲染，不再需要 isLoading && data 存在性双重判断。',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'pitfalls',
+        title: '常见坑与自测',
+        blocks: [
+          {
+            kind: 'note',
+            tone: 'warn',
+            title: 'as 断言是逃生门不是正门',
+            text: 'as 只说服编译器闭嘴，不改运行时行为。对接口返回用 as 断言等于放弃检查；正确做法是声明类型 + 在边界处运行时校验（手写或用 zod 这类库）。',
+          },
+          {
+            kind: 'qa',
+            items: [
+              {
+                question: 'unknown 和 any 有什么区别？',
+                answer: 'any 会传染：赋给谁都不再检查。unknown 用前必须收窄或断言，保持「先验证再使用」，是处理外部数据的安全类型。',
+              },
+              {
+                question: 'interface 和 type 怎么选？',
+                answer: '描述对象结构两者等价。需要联合、交叉、映射、条件类型时只能用 type；需要声明合并（全局扩展）时用 interface。团队统一一种为主即可。',
+              },
+              {
+                question: 'Partial、Pick、Omit 这些工具类型的场景？',
+                answer: 'Partial 用于「先有骨架再补全」的构建步骤；Pick/Omit 从大类型裁出小类型，避免同一形状写两份；需要新增字段时用交叉，别用 Omit 再补一遍。',
               },
             ],
           },

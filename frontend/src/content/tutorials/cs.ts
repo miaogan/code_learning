@@ -1,6 +1,6 @@
 import type { TutorialChapter } from '../../lib/tutorialTypes'
 
-/** 计算机基础方向：进程/线程/并发、TCP 与 HTTP。 */
+/** 计算机基础方向：进程/线程/并发、TCP 与 HTTP、IO 模型与零拷贝、内存与虚拟内存。 */
 export const CS_CHAPTERS: TutorialChapter[] = [
   {
     id: 'cs-process-thread',
@@ -371,6 +371,142 @@ export const CS_CHAPTERS: TutorialChapter[] = [
               {
                 question: 'swap 被大量使用为什么反而更慢？',
                 answer: '换出换入都要读写磁盘，比内存慢几个数量级；频繁抖动时 CPU 大量时间耗在等 IO 上，表现为整体卡死。',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'cs-io-model',
+    title: 'IO 模型与零拷贝',
+    direction: '计算机基础',
+    level: '进阶',
+    summary: '从「等数据」到「事件通知」，用 select/poll/epoll 的演进讲清高并发服务为什么不怕慢 IO，再看零拷贝省掉了什么。',
+    sections: [
+      {
+        id: 'models',
+        title: '阻塞到异步：五个台阶',
+        blocks: [
+          {
+            kind: 'text',
+            text: '一次网络读分两个阶段：等数据到达内核缓冲区、把数据从内核拷到用户空间。各 IO 模型的差别就在于这两个阶段里线程在干什么。',
+          },
+          {
+            kind: 'table',
+            headers: ['模型', '等数据时', '拷数据时', '一句话'],
+            rows: [
+              ['阻塞 IO', '线程挂起', '阻塞', '一连接一线程，连接多了线程耗尽'],
+              ['非阻塞 IO', '立刻返回，反复轮询', '阻塞', '轮询白烧 CPU，很少单用'],
+              ['IO 多路复用', 'select/epoll 帮你盯一批连接', '阻塞', '一个线程管上万连接的主流方案'],
+              ['信号驱动', '内核发信号', '阻塞', '信号处理麻烦，实际少用'],
+              ['异步 IO', '完全不管', '内核代劳', '理论最优，生态与成熟度有限'],
+            ],
+          },
+          {
+            kind: 'note',
+            tone: 'info',
+            title: 'Nginx/Redis 为什么快',
+            text: '它们都是「单线程（或少线程）+ IO 多路复用」的模型：不把线程耗在等待上，而是让内核在就绪时通知自己，线程永远在做正事。',
+          },
+        ],
+      },
+      {
+        id: 'multiplex',
+        title: 'select → epoll，以及零拷贝',
+        blocks: [
+          {
+            kind: 'list',
+            items: [
+              'select：每次调用把整批 fd 从用户态拷进内核，返回后还要逐个遍历；有 1024 上限。连接多、活跃少时开销全在「白扫」。',
+              'epoll：内核维护红黑树，就绪的 fd 挂到就绪链表，调用只取就绪列表——开销与总连接数无关，只与活跃数有关。',
+              '零拷贝：传统「读文件→发网络」要四次拷贝（磁盘→内核→用户→socket 缓冲→网卡）+ 四次上下文切换；sendfile 让数据全程不离开内核，直接从页缓存送进网卡缓冲。',
+              'Kafka 高吞吐、Nginx 静态文件快，零拷贝都是重要贡献之一。',
+            ],
+          },
+          {
+            kind: 'note',
+            tone: 'info',
+            title: 'epoll 的两种触发模式',
+            text: '水平触发（LT）：没处理完会反复通知，编程简单，是默认。边缘触发（ET）：只在状态变化时通知一次，必须一次性把数据读干净（循环读到 EAGAIN），少一次系统调用但容易漏读——Nginx 用 ET，多数库用 LT。',
+          },
+        ],
+      },
+      {
+        id: 'example',
+        title: '一个 epoll 回声服务器',
+        blocks: [
+          {
+            kind: 'text',
+            text: '二十行以内的单线程服务器，可以同时服务成百上千个连接——这就是多路复用的价值。每个连接 socket 都设为非阻塞，交给 epoll 监听。',
+          },
+          {
+            kind: 'code',
+            language: 'python',
+            caption: 'selectors（epoll 封装）回声服务器',
+            code: [
+              'import selectors, socket',
+              '',
+              'sel = selectors.DefaultSelector()',
+              'server = socket.socket()',
+              'server.bind(("0.0.0.0", 9000))',
+              'server.listen()',
+              'server.setblocking(False)',
+              'sel.register(server, selectors.EVENT_READ, accept)',
+              '',
+              'def accept(sock):',
+              '    conn, _ = sock.accept()',
+              '    conn.setblocking(False)',
+              '    sel.register(conn, selectors.EVENT_READ, read)',
+              '',
+              'def read(conn):',
+              '    data = conn.recv(4096)',
+              '    if data: conn.sendall(data)',
+              '    else:',
+              '        sel.unregister(conn)',
+              '        conn.close()',
+              '',
+              'while True:',
+              '    for key, _ in sel.select():',
+              '        key.data(key.fileobj)',
+            ].join('\n'),
+          },
+          {
+            kind: 'list',
+            ordered: true,
+            items: [
+              '主循环只有一行：select() 返回就绪的 fd，逐个回调。',
+              '没有任何线程在「等」：内核只把就绪的连接交出来。',
+              '真实生产实现还要处理半包/粘包、写缓冲与错误分支，这里只为演示骨架。',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'pitfalls',
+        title: '常见坑与自测',
+        blocks: [
+          {
+            kind: 'note',
+            tone: 'warn',
+            title: '多路复用不等于多核利用',
+            text: '单线程 epoll 只能吃满一个核。CPU 密集任务会卡住整个事件循环——这也是「Node 单线程却要 worker pool」「Redis 6 后加多线程 IO」的原因：事件循环管 IO，重活另外派发。',
+          },
+          {
+            kind: 'qa',
+            items: [
+              {
+                question: 'epoll 一定比 select 快吗？',
+                answer: '连接多且活跃比例低时优势巨大；连接少或几乎全活跃时差距不大（red-black tree 维护也有成本）。性能问题永远先量再选。',
+              },
+              {
+                question: 'ET 模式漏读会怎样？',
+                answer: '那批数据永远不会再通知你，连接“卡住”。所以 ET 必须循环读直到返回 EAGAIN/EWOULDBLOCK。',
+              },
+              {
+                question: 'sendfile 为什么不能用于 HTTPS？',
+                answer: 'TLS 加密发生在用户态，数据必须回到用户空间加密后再发出，零拷贝的“不过用户态”前提不成立。',
               },
             ],
           },

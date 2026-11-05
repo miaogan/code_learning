@@ -1,6 +1,6 @@
 import type { TutorialChapter } from '../../lib/tutorialTypes'
 
-/** 中间件与运维方向：缓存失效、消息队列语义、可观测性与线上排障。 */
+/** 中间件与运维方向：缓存失效、容器化与 Docker、消息队列语义、可观测性与线上排障。 */
 export const MIDDLEWARE_CHAPTERS: TutorialChapter[] = [
   {
     id: 'mw-cache-strategy',
@@ -374,6 +374,122 @@ export const MIDDLEWARE_CHAPTERS: TutorialChapter[] = [
               {
                 question: '告警风暴怎么治理？',
                 answer: '按服务聚合、设置抑制规则（上游故障时抑制下游告警）、分级路由（warning 进群、critical 才呼叫），并给每条告警配 runbook。',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'mw-docker',
+    title: '容器化与 Docker 基础',
+    direction: '中间件与运维',
+    level: '基础',
+    summary: '镜像、容器、分层与多阶段构建：为什么「在我机器上是好的」能被 Docker 治好，以及 Dockerfile 的常见写错方式。',
+    sections: [
+      {
+        id: 'why',
+        title: '镜像与容器',
+        blocks: [
+          {
+            kind: 'text',
+            text: '镜像是一个只读模板：打包了应用代码、运行时和依赖。容器是镜像的运行实例——启动时在镜像顶部加一层可写层，进程跑在里面。与传统虚拟机的区别：容器共享宿主内核，只隔离进程视图（命名空间）与资源配额（cgroup），所以启动是秒级、开销接近零。',
+          },
+          {
+            kind: 'list',
+            items: [
+              '镜像不可变：要更新就构建新镜像、换新容器，不要进容器里手改文件——那台机器从此不可复现。',
+              '一个容器一个进程：应用和 MySQL 分开跑，各自独立升级与伸缩。',
+              '容器是临时的：崩溃重启、扩缩容都会换实例，任何需要持久化的数据（数据库文件、上传文件）必须挂载卷或外置。',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'layers',
+        title: '分层与缓存',
+        blocks: [
+          {
+            kind: 'text',
+            text: 'Dockerfile 每条指令生成一层，层会被缓存复用：某层的输入没变，它之后的重建才会快。所以 Dockerfile 的排序原则只有一条：越常变的越靠后。',
+          },
+          {
+            kind: 'list',
+            items: [
+              '先 COPY package.json 再 npm ci，最后 COPY 源码：改代码不重装依赖，这是前端/后端镜像提速最明显的一招。',
+              '.dockerignore 与 .gitignore 同等重要：node_modules、.git 不进构建上下文，构建快且镜像小。',
+              '选小基础镜像（alpine/slim），镜像从 1GB 降到 150MB 量级，拉取部署都受益。',
+              '合并 RUN 指令、清理包管理缓存，减少无意义层数。',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'example',
+        title: '多阶段构建',
+        blocks: [
+          {
+            kind: 'text',
+            text: '构建期需要编译器与全部 devDependencies，运行期只需要产物——多阶段构建把两者分开，最终镜像里不留编译工具链。',
+          },
+          {
+            kind: 'code',
+            language: 'dockerfile',
+            caption: 'Node 应用多阶段 Dockerfile',
+            code: [
+              '# 构建阶段：装全部依赖并编译',
+              'FROM node:20 AS build',
+              'WORKDIR /app',
+              'COPY package*.json ./',
+              'RUN npm ci',
+              'COPY . .',
+              'RUN npm run build',
+              '',
+              '# 运行阶段：只带产物与生产依赖',
+              'FROM node:20-slim',
+              'WORKDIR /app',
+              'COPY --from=build /app/dist ./dist',
+              'COPY --from=build /app/node_modules ./node_modules',
+              'USER node',
+              'CMD ["node", "dist/server.js"]',
+            ].join('\n'),
+          },
+          {
+            kind: 'list',
+            ordered: true,
+            items: [
+              '依赖清单先拷、npm ci 先跑，源码改动不会触发依赖重装。',
+              'USER node 用非 root 跑进程，容器被攻破也拿不到宿主 root。',
+              'CMD 用 exec 形式，进程能正确接收 SIGTERM 优雅退出。',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'pitfalls',
+        title: '常见坑与自测',
+        blocks: [
+          {
+            kind: 'note',
+            tone: 'warn',
+            title: '把容器当虚拟机用',
+            text: '进容器手动装包、改配置、补依赖，下次重建全部丢失——容器随时可能被替换。任何变更都该落到 Dockerfile/编排文件里，重建即可复现。',
+          },
+          {
+            kind: 'qa',
+            items: [
+              {
+                question: '容器里的日志怎么收集？',
+                answer: '写 stdout/stderr，由 Docker 或编排系统的日志驱动收集；不要写容器本地文件——容器一删日志就没了。',
+              },
+              {
+                question: '镜像 tag 用 latest 有什么风险？',
+                answer: 'latest 是会漂移的引用，今天和明天拉到的可能不是同一个镜像，回滚也没依据。生产应使用不可变 tag（版本号或内容摘要）。',
+              },
+              {
+                question: '为什么容器里 JVM 内存参数要显式设置？',
+                answer: '老版本 JVM 看到的是宿主机内存而不是容器配额，堆按宿主机算会撞上 cgroup 限制被 OOM 杀掉。显式 -Xmx 或开容器感知。',
               },
             ],
           },

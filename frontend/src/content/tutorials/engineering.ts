@@ -1,6 +1,6 @@
 import type { TutorialChapter } from '../../lib/tutorialTypes'
 
-/** 研发工程实践方向：Git 与代码评审、测试分层与 CI 门禁。 */
+/** 研发工程实践方向：Git 与代码评审、重构与坏味道、测试分层与 CI、故障复盘与容量规划。 */
 export const ENGINEERING_CHAPTERS: TutorialChapter[] = [
   {
     id: 'eng-git-review',
@@ -364,6 +364,132 @@ export const ENGINEERING_CHAPTERS: TutorialChapter[] = [
               {
                 question: '容量规划里最容易忽略的是什么？',
                 answer: '依赖与连接池：本服务扩到 10 个实例，数据库连接数就变成 10 倍。扩容前先算下游能不能接住，否则只是把瓶颈往下游推。',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'eng-refactoring',
+    title: '重构与代码坏味道',
+    direction: '研发工程实践',
+    level: '进阶',
+    summary: '认得出才改得动：常见坏味道清单、小步重构的节奏，以及为什么「先补测试再动手」不是句口号。',
+    sections: [
+      {
+        id: 'smells',
+        title: '坏味道清单',
+        blocks: [
+          {
+            kind: 'text',
+            text: '坏味道不是 bug，而是「未来改起来会痛」的信号。重构不追求一次到位，而是闻到味道就顺手改一点。',
+          },
+          {
+            kind: 'table',
+            headers: ['坏味道', '信号', '常用手法'],
+            rows: [
+              ['超长函数', '一函数超过一屏，注释当分段工具', '提炼函数（按「做什么」命名）'],
+              ['重复代码', '两处几乎一样，改一处漏另一处', '提炼函数 / 上移到共同父级'],
+              ['发散式变化', '一个类因多种原因被反复修改', '按变化方向拆类'],
+              ['霏弹式修改', '改一个逻辑要跨五个文件小改', '把总在一起变化的东西聚在一起'],
+              ['依恋情结', '函数大量访问别的类的数据', '把函数搬去数据所在处'],
+              ['注释辩解', '注释在解释「为什么这么写」', '改名或提炼函数，让代码自解释'],
+            ],
+          },
+        ],
+      },
+      {
+        id: 'rules',
+        title: '小步重构的节奏',
+        blocks: [
+          {
+            kind: 'list',
+            ordered: true,
+            items: [
+              '先有安全网：要改的路径至少有测试；没有就先给现状写测试（快照测试也算）。',
+              '每次只做一种手法：提炼一个函数、搬一个字段——小到 30 秒能说清改了什么。',
+              '每步跑测试：坏了立刻回退，重构与修 bug 永远不混在一个提交里。',
+              '提交粒度跟随小步：reviewer 看到的是一串可独立理解的变换，而不是一坨大杂烩。',
+            ],
+          },
+          {
+            kind: 'note',
+            tone: 'info',
+            title: '分支策略',
+            text: '长时间脱离主干的「重构分支」最后几乎必然合并地狱。要么在主干上小步进行（feature toggle 隔离未完成部分），要么把重构限制在几天内。',
+          },
+        ],
+      },
+      {
+        id: 'example',
+        title: '提炼函数：一段真实的坏味道',
+        blocks: [
+          {
+            kind: 'text',
+            text: '同一个函数干校验、计价、通知三件事，是坏味道里最常见的一种。看提炼前后：',
+          },
+          {
+            kind: 'code',
+            language: 'ts',
+            caption: '重构前 → 重构后',
+            code: [
+              '// 重构前：注释当分段工具，三件事徯在一个函数里',
+              'function processOrder(order: Order) {',
+              '  // 校验',
+              '  if (!order.items.length) throw new Error("空订单")',
+              '  if (order.total > 100000) throw new Error("超额")',
+              '  // 计价',
+              '  const discount = order.total > 5000 ? 0.9 : 1',
+              '  const payable = Math.round(order.total * discount)',
+              '  // 通知',
+              '  notify(order.userEmail, `应付 ${payable}`)',
+              '}',
+              '',
+              '// 重构后：每步一个函数，名字即文档',
+              'function processOrder(order: Order) {',
+              '  validateOrder(order)',
+              '  const payable = calculatePayable(order)',
+              '  notifyPayable(order.userEmail, payable)',
+              '}',
+            ].join('\n'),
+          },
+          {
+            kind: 'list',
+            ordered: true,
+            items: [
+              '行数几乎没变，但每个函数名都成了可以引用的「概念」。',
+              '计价逻辑单测只需要构造订单，不再连带触发通知。',
+              '下一步可以把 discount 规则提炼成策略对象——现在它有了落点。',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'pitfalls',
+        title: '常见坑与自测',
+        blocks: [
+          {
+            kind: 'note',
+            tone: 'warn',
+            title: '「重写比重构快」的错觉',
+            text: '重写丢弃的不只是旧代码，还有隐含在代码里的业务规则与修过的坑。除非技术栈必须更换，否则先用测试锁定行为、再小步改，几乎总是更快的路。',
+          },
+          {
+            kind: 'qa',
+            items: [
+              {
+                question: '没有测试的遗留代码从哪里下手？',
+                answer: '选「改动频繁 + 相对独立」的模块，先写特征测试（记录当前行为，包括怪行为），再重构。别从核心最难的地方开刀。',
+              },
+              {
+                question: '重构和修 bug 为什么不能同一次提交？',
+                answer: '混在一起 reviewer 无法区分「行为变化」和「纯结构变化」，回滚时也会把修复一起丢掉。分开提交各自可独立验证。',
+              },
+              {
+                question: '怎么说服团队花时间重构？',
+                answer: '用数据说话：这个模块近三个月改了多少次、每次平均耗时多少，重构后的预期变化。把重构绑定在「正要改的功能」上做，成本最低、说服力最强。',
               },
             ],
           },

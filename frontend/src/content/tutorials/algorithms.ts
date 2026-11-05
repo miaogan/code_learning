@@ -1,6 +1,6 @@
 import type { TutorialChapter } from '../../lib/tutorialTypes'
 
-/** 算法与数据结构方向：复杂度分析、哈希表与双指针。 */
+/** 算法与数据结构方向：复杂度分析、哈希表与双指针、二叉树与递归、动态规划与图。 */
 export const ALGORITHM_CHAPTERS: TutorialChapter[] = [
   {
     id: 'algo-complexity',
@@ -373,6 +373,141 @@ export const ALGORITHM_CHAPTERS: TutorialChapter[] = [
               {
                 question: '拓扑排序怎么发现环？',
                 answer: 'Kahn 算法结束时若出队节点数小于总节点数，剩下的节点入度都不为 0，说明存在环。',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'algo-binary-tree',
+    title: '二叉树与递归',
+    direction: '算法与数据结构',
+    level: '基础',
+    summary: '四种遍历的写法与口诀、递归三问（子问题/返回值/终止条件），以及 BFS 与 DFS 的选择依据。',
+    sections: [
+      {
+        id: 'shape',
+        title: '结构与四种遍历',
+        blocks: [
+          {
+            kind: 'text',
+            text: '二叉树每个节点最多两个孩子。所有「访问顺序」的问题都归结为一句口诀：前中后序说的是「根」被访问的位置——前序根在前（根左右），中序根在中（左根右），后序根在后（左右根），层序则按深度从上到下逐层访问。',
+          },
+          {
+            kind: 'table',
+            headers: ['遍历', '顺序', '典型用途', '实现方式'],
+            rows: [
+              ['前序', '根 → 左 → 右', '复制树、序列化', '递归或显式栈'],
+              ['中序', '左 → 根 → 右', '二叉搜索树输出有序序列', '递归或显式栈'],
+              ['后序', '左 → 右 → 根', '先算子树再算根（如高度）', '递归'],
+              ['层序', '逐层从左到右', '最短层数、每层统计', '队列（BFS）'],
+            ],
+          },
+          {
+            kind: 'note',
+            tone: 'info',
+            title: '二叉搜索树（BST）',
+            text: '左子树所有节点 < 根 < 右子树所有节点。它的中序遍历就是升序序列——「BST + 中序」是排序类题目的固定组合。',
+          },
+        ],
+      },
+      {
+        id: 'recursion',
+        title: '递归三问',
+        blocks: [
+          {
+            kind: 'text',
+            text: '树是天然递归的结构：一棵树的问题总能拆成两棵子树的同样问题。写递归不靠灵感，固定回答三个问题就能落笔。',
+          },
+          {
+            kind: 'list',
+            ordered: true,
+            items: [
+              '子问题是什么？（例：树的最大深度 = max(左子树深度, 右子树深度) + 1）',
+              '函数返回什么？（例：返回以当前节点为根的子树高度）',
+              '终止条件是什么？（例：root 为 null 时返回 0——空树高度为 0）',
+            ],
+          },
+          {
+            kind: 'note',
+            tone: 'warn',
+            title: '先把终止条件写全',
+            text: '漏掉 null 分支是最常见的段错误来源。树题里「null 怎么办」往往就是答案的基准值（深度 0、节点数 0、路径和 0），先写它，再写递归式。',
+          },
+        ],
+      },
+      {
+        id: 'example',
+        title: '层序遍历与最大深度',
+        blocks: [
+          {
+            kind: 'text',
+            text: '两道最高频的树题各给出最小实现：层序用队列逐层处理；最大深度直接套递归三问。',
+          },
+          {
+            kind: 'code',
+            language: 'python',
+            caption: 'BFS 层序 + DFS 最大深度',
+            code: [
+              'from collections import deque',
+              '',
+              'def level_order(root):',
+              '    if root is None:',
+              '        return []',
+              '    result, queue = [], deque([root])',
+              '    while queue:',
+              '        level = []',
+              '        for _ in range(len(queue)):  # 固定本轮长度：队列边遍历边增长',
+              '            node = queue.popleft()',
+              '            level.append(node.val)',
+              '            if node.left: queue.append(node.left)',
+              '            if node.right: queue.append(node.right)',
+              '        result.append(level)',
+              '    return result',
+              '',
+              'def max_depth(root):  # 递归三问：子问题/返回值/终止条件',
+              '    if root is None:',
+              '        return 0',
+              '    return max(max_depth(root.left), max_depth(root.right)) + 1',
+            ].join('\n'),
+          },
+          {
+            kind: 'list',
+            ordered: true,
+            items: [
+              '层序里 for _ in range(len(queue)) 是「按层切分」的关键：进入循环前先冻结本轮队列长度。',
+              '两者复杂度都是 O(n)：每个节点进出各一次；递归深度最坏 O(n)（链状树），平衡树为 O(log n)。',
+              '求「最小深度」别照抄 max 改 min：叶子节点才算到底，单边斜树会掉进空分支。',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'pitfalls',
+        title: '常见坑与自测',
+        blocks: [
+          {
+            kind: 'note',
+            tone: 'warn',
+            title: '递归改迭代不是背模板',
+            text: '中序改迭代的关键是「用栈模拟到最左」：一路压左孩子，弹栈访问后转向右子树。理解「栈里存的是还没处理的根」比背三行模板可靠得多。',
+          },
+          {
+            kind: 'qa',
+            items: [
+              {
+                question: '怎么判断两棵树相同？',
+                answer: '递归：都为 null 相同；一边 null 不同；值相等且左右子树都相同才相同。三个终止条件缺一不可。',
+              },
+              {
+                question: 'BST 里删一个节点怎么处理两个孩子的情况？',
+                answer: '用右子树的最小节点（或左子树的最大节点）替换被删节点，再在对应子树里删掉那个替身。保持 BST 性质不变。',
+              },
+              {
+                question: '什么时候用 BFS 而不是 DFS？',
+                answer: '问「最短/最少步数」「逐层统计」用 BFS（队列天然按层）；问「路径/子树结构」「全部分支」用 DFS。BFS 找最短路快，是因为第一次到达就是最少步数。',
               },
             ],
           },

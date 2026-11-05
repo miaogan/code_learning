@@ -1,6 +1,6 @@
 import type { TutorialChapter } from '../../lib/tutorialTypes'
 
-/** AI 工程方向：注意力机制与 Transformer、检索增强生成（RAG）。 */
+/** AI 工程方向：大模型调用基础、Agent 与工具调用、检索增强生成、注意力机制。 */
 export const AI_CHAPTERS: TutorialChapter[] = [
   {
     id: 'ai-transformer',
@@ -374,6 +374,146 @@ export const AI_CHAPTERS: TutorialChapter[] = [
               {
                 question: '上下文塞满会怎样？',
                 answer: '有的接口直接报超长错误，有的会静默截断——被截掉的往往是中间部分或最早的指令，表现为「模型突然不听话」。要主动做长度预算。',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'ai-agent-tools',
+    title: 'Agent 与工具调用',
+    direction: 'AI 工程',
+    level: '进阶',
+    summary: '模型只会说不会做：把「说」变成「做」靠工具调用与循环，重点讲工具描述怎么写、循环怎么控风险。',
+    sections: [
+      {
+        id: 'loop',
+        title: 'Agent = 模型 + 工具 + 循环',
+        blocks: [
+          {
+            kind: 'text',
+            text: '大模型只能生成文本，自己查不了库、发不了请求。Agent 的做法是给模型一份「可调用的工具清单」，模型决定调哪个、传什么参数，程序执行后把结果拼回上下文，直到模型不再要工具、给出最终回答。没有神秘成分：就是「模型决策 + 程序执行」的循环。',
+          },
+          {
+            kind: 'list',
+            ordered: true,
+            items: [
+              '模型读到用户问题与工具清单，输出「我要调 search_docs，参数是 X」。',
+              '程序执行工具，把结果以 tool 角色消息追加进对话。',
+              '模型看着结果继续推理：够用就回答，不够就再调下一个工具。',
+              '循环有上限（步数/预算），防止模型无限自我对话烧钱。',
+            ],
+          },
+          {
+            kind: 'note',
+            tone: 'info',
+            title: '工具描述是给模型看的 API 文档',
+            text: '模型选工具全靠 name/description/参数说明。写「搜索文档」不如写「按关键词搜索内部技术文档，返回 Top-5 片段，适合查具体配置项」——描述越具体，选错工具的次数越少。',
+          },
+        ],
+      },
+      {
+        id: 'design',
+        title: '工具设计的四条规则',
+        blocks: [
+          {
+            kind: 'table',
+            headers: ['规则', '原因', '反例'],
+            rows: [
+              ['职责单一', '模型组合多个小工具比猜一个大工具的参数可靠', 'do_everything(action=...)'],
+              ['参数少而明确', '每个参数都是一次出错机会', '10 个可选参数的万能接口'],
+              ['返回简洁相关', '返回 5000 行 JSON 会挤爆上下文', '把整张表原样返回'],
+              ['错误信息可行动', '「参数无效」让模型乱猜；「date 应为 YYYY-MM-DD」让它能自我修正', '吞掉异常返回空'],
+            ],
+          },
+          {
+            kind: 'note',
+            tone: 'warn',
+            title: '危险工具必须加确认层',
+            text: '发邮件、转账、删数据这类不可逆操作，程序侧要二次确认或限定白名单，绝不能因为模型「决定了」就直接执行。模型输出的参数永远当不可信输入处理。',
+          },
+        ],
+      },
+      {
+        id: 'example',
+        title: '工具调用循环的骨架',
+        blocks: [
+          {
+            kind: 'text',
+            text: '核心代码不到三十行，重点是三个环节：工具白名单执行、结果回填、步数上限。',
+          },
+          {
+            kind: 'code',
+            language: 'python',
+            caption: 'function calling 最小循环',
+            code: [
+              'import json',
+              '',
+              'TOOLS = [{',
+              '  "type": "function",',
+              '  "function": {',
+              '    "name": "search_docs",',
+              '    "description": "按关键词搜索内部技术文档，返回 Top-5 片段",',
+              '    "parameters": {',
+              '      "type": "object",',
+              '      "properties": {"query": {"type": "string"}},',
+              '      "required": ["query"],',
+              '    },',
+              '  },',
+              '}]',
+              '',
+              'messages = [{"role": "user", "content": question}]',
+              'for _ in range(8):  # 步数上限，防无限循环',
+              '    resp = client.chat.completions.create(',
+              '        model="your-model", messages=messages, tools=TOOLS)',
+              '    msg = resp.choices[0].message',
+              '    messages.append(msg)',
+              '    if not msg.tool_calls:',
+              '        break  # 模型给出最终回答',
+              '    for call in msg.tool_calls:',
+              '        result = dispatch(call.function.name,  # 白名单分发',
+              '                          json.loads(call.function.arguments))',
+              '        messages.append({"role": "tool", "tool_call_id": call.id,',
+              '                         "content": json.dumps(result, ensure_ascii=False)})',
+            ].join('\n'),
+          },
+          {
+            kind: 'list',
+            ordered: true,
+            items: [
+              'dispatch 只允许白名单函数，参数先校验再执行——模型输出的参数当不可信输入。',
+              '工具结果必须作为 tool 消息回填，模型才能「看到」执行结果继续推理。',
+              '超过步数上限要给出明确降级回答，而不是静默截断。',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'pitfalls',
+        title: '常见坑与自测',
+        blocks: [
+          {
+            kind: 'note',
+            tone: 'warn',
+            title: '循环会放大一切小问题',
+            text: '一个模糊的工具描述会让模型连续调错五次，一次超长返回会把后续所有轮次的上下文撑爆。上 Agent 之前先把单次工具调用测稳，再开循环。',
+          },
+          {
+            kind: 'qa',
+            items: [
+              {
+                question: 'Agent 和普通「带 RAG 的问答」差在哪？',
+                answer: 'RAG 是固定流程（检索→生成）；Agent 由模型动态决定下一步做什么、做几步。流程能写死就不要用 Agent——更可控、更便宜、更好测。',
+              },
+              {
+                question: '怎么评估一个 Agent？',
+                answer: '拆开评：工具选择正确率、参数正确率、任务完成率、平均步数与成本。只看最终答案会掩盖「跃迁式答对」。',
+              },
+              {
+                question: '为什么要限制步数？',
+                answer: '模型可能陷入「调工具→不满意→再调」的循环；步数与费用上限是唯一可靠的剎车，必须程序侧强制。',
               },
             ],
           },

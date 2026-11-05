@@ -1,6 +1,6 @@
 import type { TutorialChapter } from '../../lib/tutorialTypes'
 
-/** 后端方向：HTTP/REST 接口设计、数据库索引与事务。 */
+/** 后端方向：HTTP/REST 接口设计、数据库索引与事务、并发与幂等、认证与会话。 */
 export const BACKEND_CHAPTERS: TutorialChapter[] = [
   {
     id: 'be-http-rest',
@@ -369,6 +369,129 @@ export const BACKEND_CHAPTERS: TutorialChapter[] = [
               {
                 question: '如何在接口层快速判断重复提交？',
                 answer: '客户端带幂等键（或由业务参数哈希生成），网关/服务端按「用户 + 键」做短期去重，命中直接返回上次结果。',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'be-auth-session',
+    title: '认证与会话管理',
+    direction: '后端',
+    level: '进阶',
+    summary: '从「HTTP 本身不记得谁是谁」出发，对比 Session 与 JWT 两条路线，把密码存储、令牌过期与注销讲透。',
+    sections: [
+      {
+        id: 'concept',
+        title: '认证解决什么问题',
+        blocks: [
+          {
+            kind: 'text',
+            text: 'HTTP 是无状态的：每个请求互相独立，服务端默认不知道「这个请求是谁发的」。认证（Authentication）解决「你是谁」，授权（Authorization）解决「你能做什么」。所有会话方案，本质都是在无状态协议上重新建立身份。',
+          },
+          {
+            kind: 'list',
+            items: [
+              '凭证：用户第一次出示的东西（密码、验证码、第三方授权码），验证通过后换取会话凭证。',
+              '会话凭证：后续请求随身携带的东西（Session ID 或 JWT），避免每次都出原始密码。',
+              '传输层：凭证放在 Cookie 或 Authorization 头里，全程必须 HTTPS，否则等于明文广播。',
+              '密码存储：只存慢哈希（bcrypt/argon2），绝不明文、不用 MD5/SHA1。',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'compare',
+        title: 'Session 与 JWT 的取舍',
+        blocks: [
+          {
+            kind: 'table',
+            headers: ['维度', 'Session（服务端存状态）', 'JWT（客户端存令牌）'],
+            rows: [
+              ['存储位置', '服务端（内存/Redis），客户端只拿 ID', '令牌本身在客户端，服务端只存密钥'],
+              ['注销', '删服务端记录即可，立刻生效', '难：只能等过期或维护黑名单'],
+              ['横向扩展', '共享存储（如 Redis）后无压力', '无状态天然易扩展'],
+              ['载荷', '不暴露给客户端', '仅 Base64 编码，任何人都可读，不能放敏感信息'],
+              ['典型场景', '传统 Web 应用、需要强制下线', '开放 API、多端/服务间调用'],
+            ],
+          },
+          {
+            kind: 'note',
+            tone: 'info',
+            title: '折中方案很常见',
+            text: '短效 JWT（15 分钟）+ 服务端可吊销的 refresh token，兼顾无状态校验与强制下线：access 丢了损失有限，refresh 泄露可在服务端作废。',
+          },
+        ],
+      },
+      {
+        id: 'example',
+        title: '注册、登录与令牌校验',
+        blocks: [
+          {
+            kind: 'text',
+            text: '三条铁律体现在代码里：注册只存慢哈希；登录成功才签短效令牌；每个受保护接口先验签名与过期，再谈业务。',
+          },
+          {
+            kind: 'code',
+            language: 'javascript',
+            caption: '最小认证流程（bcrypt + JWT）',
+            code: [
+              "import bcrypt from 'bcryptjs'",
+              "import jwt from 'jsonwebtoken'",
+              '',
+              '// 注册：cost 因子 12，只存哈希',
+              'const hash = await bcrypt.hash(password, 12)',
+              'await db.users.insert({ email, passwordHash: hash })',
+              '',
+              '// 登录：先比哈希，再签 15 分钟短效令牌',
+              'const ok = await bcrypt.compare(password, user.passwordHash)',
+              'if (!ok) throw new AuthError()',
+              'const token = jwt.sign({ sub: user.id }, SECRET, { expiresIn: "15m" })',
+              '',
+              '// 受保护接口：先验签，再取身份',
+              'function requireAuth(req) {',
+              '  const payload = jwt.verify(req.headers.authorization.slice(7), SECRET)',
+              '  req.userId = payload.sub',
+              '}',
+            ].join('\n'),
+          },
+          {
+            kind: 'list',
+            ordered: true,
+            items: [
+              'jwt.sign 的载荷只放 sub（用户 ID）与过期时间，不要塞邮箱、手机号等敏感字段。',
+              '校验放在中间件统一做，业务代码只读 req.userId，避免某个接口漏验。',
+              'refresh token 存库并带过期，注销时作废；access token 不落库，天然无状态。',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'pitfalls',
+        title: '常见坑与自测',
+        blocks: [
+          {
+            kind: 'note',
+            tone: 'warn',
+            title: 'JWT 签了不等于安全',
+            text: '常见事故：密钥写死在仓库里、alg 字段被篡改成 none 仍接受、把用户角色放进载荷且前端据此显示按钮（后端却不复核）。签名保证「没被改」，不保证「内容合理」，授权判断必须在服务端重新做。',
+          },
+          {
+            kind: 'qa',
+            items: [
+              {
+                question: '为什么密码要用 bcrypt 而不是 SHA256？',
+                answer: 'SHA256 太快，GPU 每秒能算几十亿次，撞库成本低；bcrypt/argon2 故意慢且可调 cost，把暴力破解拖到不可行。',
+              },
+              {
+                question: 'JWT 怎么实现「强制下线」？',
+                answer: '维护服务端黑名单（按 jti 或用户 + 签发时间），校验时多查一次；或者干脆改用可随时删除的 Session。',
+              },
+              {
+                question: 'Cookie 里放 token，怎么防 CSRF？',
+                answer: '浏览器会自动带 Cookie，第三方站点可借用户身份发请求。用 SameSite=Strict/Lax、CSRF Token，或把 token 放 Authorization 头由 JS 显式携带。',
               },
             ],
           },

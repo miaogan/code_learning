@@ -1,6 +1,6 @@
 import type { TutorialChapter } from '../../lib/tutorialTypes'
 
-/** SQL 与数据库方向：连接与 NULL 语义、窗口函数与执行计划。 */
+/** SQL 与数据库方向：连接与 NULL 语义、范式与反范式、窗口函数与执行计划、锁与隔离。 */
 export const SQL_CHAPTERS: TutorialChapter[] = [
   {
     id: 'sql-join-null',
@@ -400,6 +400,126 @@ export const SQL_CHAPTERS: TutorialChapter[] = [
               {
                 question: '可重复读下为什么我的读看不到别人刚提交的数据？',
                 answer: '快照在事务第一次读时建立，之后的普通读都读这个快照。需要看最新数据要用加锁读（FOR UPDATE）或切到读已提交。',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'sql-schema-design',
+    title: '表结构设计：范式与反范式',
+    direction: 'SQL 与数据库',
+    level: '基础',
+    summary: '用一张订单表演示三范式怎么拆、什么时候该故意冗余，以及冗余后的一致性怎么守。',
+    sections: [
+      {
+        id: 'why',
+        title: '范式在解决什么',
+        blocks: [
+          {
+            kind: 'text',
+            text: '把所有字段塞进一张大表，同一个事实会被重复存多份：客户电话跟着每张订单重复，改一次电话要改几百行，漏改一行数据就不一致。范式（Normalization）就是用「拆表 + 外键引用」让每个事实只存一份。',
+          },
+          {
+            kind: 'list',
+            items: [
+              '第一范式 1NF：字段不可再拆（不存「 hobby1, hobby2」这类逗号串）。',
+              '第二范式 2NF：非主键字段依赖整条主键，不依赖主键的一部分（订单项里不该存订单的客户名）。',
+              '第三范式 3NF：非主键字段之间不互相依赖（订单里存客户名，客户名依赖客户 ID 而不是订单）。',
+              '实践口径：OLTP 业务表一般做到 3NF 就停，继续拆收益小、JOIN 成本高。',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'rules',
+        title: '什么时候故意反范式',
+        blocks: [
+          {
+            kind: 'table',
+            headers: ['场景', '做法', '代价'],
+            rows: [
+              ['读多写少的报表', '宽表/汇总表，把 JOIN 结果提前算好', '写入要多维护一份，需定时刷新'],
+              ['历史快照', '下单时冗余商品名与价格', '商品改名不影响历史账单——这是业务正确，不是偷懒'],
+              ['计数类字段', '冗余 comment_count，写入时同步增减', '要在事务里更新，否则漂移'],
+            ],
+          },
+          {
+            kind: 'note',
+            tone: 'info',
+            title: '判断标准',
+            text: '范式解决「写入一致」，反范式解决「读取成本」。读写比例悬殊、且读取路径上的 JOIN 已经成为瓶颈时，才值得付冗余的维护代价。',
+          },
+        ],
+      },
+      {
+        id: 'example',
+        title: '订单项：引用还是快照',
+        blocks: [
+          {
+            kind: 'text',
+            text: '同一个订单项，两种设计都合法，服务的问题不同：范式版适合「当前商品信息永远看最新」，快照版适合「订单成立那一刻的事实不可变」。',
+          },
+          {
+            kind: 'code',
+            language: 'sql',
+            caption: '范式引用 vs 快照冗余',
+            code: [
+              '-- 范式：订单项只引用商品，商品改名后历史订单显示新名字',
+              'CREATE TABLE order_item (',
+              '  id BIGINT PRIMARY KEY,',
+              '  order_id BIGINT NOT NULL,',
+              '  product_id BIGINT NOT NULL REFERENCES product(id),',
+              '  quantity INT NOT NULL',
+              ');',
+              '',
+              '-- 快照：下单时把名字价格固定下来，历史账单不随商品漂移',
+              'CREATE TABLE order_item_snapshot (',
+              '  id BIGINT PRIMARY KEY,',
+              '  order_id BIGINT NOT NULL,',
+              '  product_name VARCHAR(128) NOT NULL,',
+              '  unit_price_cents INT NOT NULL,',
+              '  quantity INT NOT NULL',
+              ');',
+            ].join('\n'),
+          },
+          {
+            kind: 'list',
+            ordered: true,
+            items: [
+              '金额用整数分（cents）存储，不用浮点。',
+              '快照字段是「事实记录」，写入后不允许 UPDATE。',
+              '两种设计可以共存：当前列表 JOIN product，账单页读快照表。',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'pitfalls',
+        title: '常见坑与自测',
+        blocks: [
+          {
+            kind: 'note',
+            tone: 'warn',
+            title: '冗余字段必须有维护者',
+            text: '每个冗余字段都要回答「谁在什么时候更新它」。没有答案的冗余，三个月后必然和源数据不一致——反范式的成本从来不在设计图上，在每一次写入路径里。',
+          },
+          {
+            kind: 'qa',
+            items: [
+              {
+                question: '为什么「逗号分隔的 ID 串」是反模式？',
+                answer: '无法用外键约束、无法建索引、JOIN 要用字符串函数。正确做法是拆出关联表，一行一个关系。',
+              },
+              {
+                question: '三范式之后还要继续拆吗？',
+                answer: '一般不必。继续拆（BCNF 等）只在数据本身有特殊依赖时才有收益，业务库过度拆分只会让查询变难。',
+              },
+              {
+                question: '冗余的计数字段不准了怎么办？',
+                answer: '先在事务里补同步逻辑；存量修正用一条 GROUP BY 重算语句对齐，再用定时任务抽查偏差。',
               },
             ],
           },
