@@ -295,6 +295,15 @@ export default function UploadPage() {
         <Chip label="解析约 30 秒" />
       </div>
 
+      {/* 新用户引导（r27）：练习与教程不依赖画像，先把这两个免简历入口摆在首屏，
+          否则不想 / 不能立刻传简历的用户在首页找不到任何可做的事。 */}
+      {saved === null && savedError === null && phase === 'idle' ? (
+        <p className="sc-meta-line">
+          暂时没有简历？<Link to="/practice">在线练习</Link>和<Link to="/learn">站内教程</Link>
+          不需要简历，现在就能用。
+        </p>
+      ) : null}
+
       {failure !== null && phase === 'error' ? (
         <div className="sc-actions">
           <InlineError

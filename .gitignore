@@ -49,5 +49,10 @@ frontend/.htpasswd
 # 编辑器与系统
 .vscode/
 .idea/
+.trae/
 *.log
 .DS_Store
+
+# 本地工作台数据与备份包（不入库）
+.workbuddy/
+code_learning-src-*.zip

@@ -64,11 +64,24 @@ export default function HistoryPage() {
       ) : null}
 
       {isEmpty ? (
-        <EmptyState
-          reason="完成一次测评后，这里会出现你的成绩趋势 —— 可以对比前后两次是否真的补上了短板。"
-          actionLabel="开始测评"
-          actionTo="/exam"
-        />
+        <>
+          <EmptyState
+            reason="完成一次测评后，这里会出现你的成绩趋势 —— 可以对比前后两次是否真的补上了短板。"
+            actionLabel="开始测评"
+            actionTo="/exam"
+          />
+          {/* 旁路（r27）：测评依赖画像，没上传简历的用户点「开始测评」只会撞到门禁，
+              这里直接把上传与免画像出口摆在同一屏，省掉一跳。 */}
+          <div className="sc-btn-row">
+            <p className="sc-meta-line">还没上传简历？测评前需要先有画像：</p>
+            <Link className="sc-btn sc-btn--secondary" to="/">
+              去上传简历
+            </Link>
+            <Link className="sc-btn sc-btn--secondary" to="/practice">
+              先去练习
+            </Link>
+          </div>
+        </>
       ) : null}
 
       {rows !== null && rows.length > 0 ? (

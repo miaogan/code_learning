@@ -5,6 +5,9 @@
 - 画像的每条技能与项目都带 `sourceQuote`（简历原文），可溯源、可编辑。
 - 每道题有得分，每条短板能指回具体题目（如 `Q3 · 4/10`）。
 - 每条短板直接挂 1–3 门基础课程，点开即学。
+- 站内教程覆盖题库全部 8 个方向（前端 / 后端 / SQL 与数据库 / 中间件与运维 / 算法与数据结构 / 计算机基础 / AI 工程 / 研发工程实践），每章标「基础 / 进阶 / 高级」，读完可直接跳到对应方向的专项练习。
+- 阅读进度按小节记录（本地、按账号隔离）：目录页有「继续学习」入口与每章进度，点进去直接落在上次读到的那一节。
+- 文章页带章内目录：宽屏常驻右栏、窄屏折叠；当前小节随滚动高亮，读过的节打 ✓，点击即跳到该节锚点。
 
 > **当前版本**：0.1.0，需求 `20261031-r1-dev-skill-coach` 交付四步闭环：上传解析 → 画像（每条带 `sourceQuote`、可逐条编辑）→ 模拟面试逐题评分 / 笔试题智判分 → 短板报告（证据可溯源 + 课程直链）→ 历史对比与 `.md` 导出。端点契约见 [TECHNICAL §2](./docs/teamflow/20261031-r1-dev-skill-coach/TECHNICAL.md)，架构见 [ARCHITECTURE](./docs/teamflow/architecture/ARCHITECTURE.md)。
 >
@@ -86,7 +89,7 @@ git reset --hard 32487b4 && git clean -fdx
 ## 目录
 
 ```
-frontend/   React 18 + Vite 5 + TypeScript（6 页线性向导 + 设计 token）
+frontend/   React 18 + Vite 5 + TypeScript（5 步向导 + 学习 / 练习等工具页 + 设计 token）
 backend/    FastAPI + SQLite（app/routers、app/services、app/seed）
 docs/teamflow/   架构总览、产品记忆、每需求一个任务夹
 ```

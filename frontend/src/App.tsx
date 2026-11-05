@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { Link, Route, Routes, useLocation } from 'react-router-dom'
 import { AiKeyModal } from './components/ui/AiKeyModal'
 import { Button } from './components/ui/Button'
@@ -50,8 +50,13 @@ export default function App() {
   }, [])
 
   // 登出 / 被踢回登录页时清掉 AI 能力提示与「未上传简历」会话标记，避免下一位用户看到上一轮的旧弹框。
+  // 注意只认「已登录 → null」的跳变：启动首帧 auth.me 尚未知（也是 null），不能当作登出，
+  // 否则每次整页刷新都会把会话引导标记清掉，「只弹一次」就失效了。
+  const prevMeRef = useRef<string | null | undefined>(undefined)
   useEffect(() => {
-    if (auth.me === null) {
+    const prev = prevMeRef.current
+    prevMeRef.current = auth.me === null ? null : auth.me.id
+    if (auth.me === null && prev !== null && prev !== undefined) {
       dismissKeyRequired()
       resetResumePrompt()
     }
