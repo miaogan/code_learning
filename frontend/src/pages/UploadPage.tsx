@@ -15,7 +15,8 @@ import { formatChars } from '../lib/format'
 import {
   PROFILE_JOB_POLL_MS,
   isJobRunning,
-  jobFailureMessage,
+  jobElapsedSec,
+  jobFailureNotice,
   jobToResumeMeta,
   shouldReattach,
   shouldSurfaceFailure,
@@ -166,6 +167,8 @@ export default function UploadPage() {
           metaRef.current = resumed
           setPhase('profiling')
           setJobId(job.job_id)
+          // r35：秒数从任务真实起点起算，不从 0 重计（不然刚回来就「已用 1s」）。
+          setProfileSec(jobElapsedSec(job))
           return
         }
         if (shouldSurfaceFailure(job)) {
@@ -173,7 +176,7 @@ export default function UploadPage() {
           setMeta(resumed)
           metaRef.current = resumed
           setFailure({
-            message: jobFailureMessage(job),
+            message: jobFailureNotice(job),
             stage: 'profile',
             retryable: true,
           })
@@ -207,7 +210,7 @@ export default function UploadPage() {
           setPhase('done')
           void reloadSavedProfile()
         } else {
-          setFailure({ message: jobFailureMessage(job), stage: 'profile', retryable: true })
+          setFailure({ message: jobFailureNotice(job), stage: 'profile', retryable: true })
           setPhase('error')
         }
       } catch (err) {
@@ -458,13 +461,15 @@ export default function UploadPage() {
         <div className="sc-actions is-block">
           <Card>
             <div className="sc-upload-summary">
-              <RingProgress size={56} state="indeterminate" ariaLabel="解析中" />
-              <PhaseLoader
-                phases={['上传简历', '解析简历 → 提取正文', 'AI 生成并合并画像']}
-                active={0}
-                elapsedSec={uploadSec}
-                title={picked ? picked.name : undefined}
-              />
+              <div className="sc-upload-progress">
+                <RingProgress size={56} state="indeterminate" ariaLabel="解析中" />
+                <PhaseLoader
+                  phases={['上传简历', '解析简历 → 提取正文', 'AI 生成并合并画像']}
+                  active={0}
+                  elapsedSec={uploadSec}
+                  title={picked ? picked.name : undefined}
+                />
+              </div>
               <div className="sc-actions">
                 <Button variant="ghost" size="sm" onClick={cancel}>
                   取消
@@ -479,13 +484,15 @@ export default function UploadPage() {
         <div className="sc-actions is-block">
           <Card>
             <div className="sc-upload-summary">
-              <RingProgress size={56} state="indeterminate" ariaLabel="生成画像" />
-              <PhaseLoader
-                phases={['上传简历', '解析简历 → 提取正文', 'AI 生成并合并画像']}
-                active={2}
-                elapsedSec={profileSec}
-                title={meta ? `${meta.file_name} · 正在生成可溯源画像` : undefined}
-              />
+              <div className="sc-upload-progress">
+                <RingProgress size={56} state="indeterminate" ariaLabel="生成画像" />
+                <PhaseLoader
+                  phases={['上传简历', '解析简历 → 提取正文', 'AI 生成并合并画像']}
+                  active={2}
+                  elapsedSec={profileSec}
+                  title={meta ? `${meta.file_name} · 正在生成可溯源画像` : undefined}
+                />
+              </div>
               {/* r30：任务在服务端跑，离开本页不会中断 —— 给出口而不是给拦截。 */}
               <p className="sc-meta-line">
                 画像在后台生成，离开本页不会中断，回来后会自动接上进度。

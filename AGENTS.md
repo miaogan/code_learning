@@ -51,6 +51,9 @@
 - 2026-11-05：上传页中途离开保护（r29）：上传/生成中刷新或关闭走浏览器原生提示、站内链接先确认再跳，卸载兜底中止在途请求（r30 异步化后拦截收窄到文件上传窗口）（产物见 `docs/teamflow/20261105-r29-upload-leave-guard/`）。
 - 2026-11-05：画像生成异步化（r30）：新增 `profile_jobs` 表与 `POST /api/resumes/{id}/profile/async`（`asyncio.create_task` 后台跑 `generate_profile`，终态落库可见）、`GET /api/profile-jobs/{job_id}`（轮询）与 `GET /api/profile-jobs/latest`（回上传页自动接上）；同步 POST 契约不变。上传页生成阶段改为 2 秒轮询，离开页面任务照跑、回来自动接上，离开保护收窄到文件上传窗口；一次性 `merge_summary` 随任务落库不因异步丢失（产物见 `docs/teamflow/20261105-r30-profile-async-job/`）。
 - 2026-11-05：上传失败可见性（r32）：用户反馈「上传失败没有报错提示」——真实复验确认同步错误路径本就正常，洞在异步化之后：回上传页时 failed 的 latest 任务被静默忽略、服务重启留下永远 running 的僵尸任务行。修复：任务读路径惰性清扫（running 超过 10 分钟按 failed 落库中文原因），重接入时 failed 任务明示原因 + 重试（产物见 `docs/teamflow/20261105-r32-upload-failure-visibility/`）。
+- 2026-11-05：失败提示语义与时效（r33）：用户反馈「后台接口只有 200 但还是失败」——异步任务端点 200 仅代表受理/查询成功，成败在 body.status；r32 的 failed 提示无时效导致历史失败永久常驻。修复：`shouldSurfaceFailure` 加 24 小时窗口（过期旧失败不打扰、时间不可解仍提示），失败文案改为「简历已上传成功，但画像生成失败：<原因>」（产物见 `docs/teamflow/20261105-r33-failure-notice-window/`）。
+- 2026-11-05：画像生成超时治理（r34）：用户实测「AI 服务响应超时」——画像生成输出大 JSON，吃全局 20s 超时（实测 1048 字简历已需 11s），且超时不在重试范围。修复：`generate_profile` 用专用 `PROFILE_TIMEOUT_S=120s` 并开启 `retry_unavailable`（超时/5xx/429 自动重试一次；鉴权/额度不重试；前台交互调用默认不重试）（产物见 `docs/teamflow/20261105-r34-profile-timeout/`）。
+- 2026-11-05：上传页进度卡左右布局（r35）：用户反馈进度条展示仍有 bug——`.sc-upload-summary` 是 column flex，环形进度作为直接子项独占一行贴左上角，文字全部竖挤在下、卡片右半边空白（上传中/生成中/重接入三态皆然）。修复：新增 `.sc-upload-progress`（环在左垂直居中、阶段文字在右），两处进度卡包裹；同时修重接入「已用秒数」从 0 重计——新增 `jobElapsedSec`（按任务行 `created_at` 起算，不可解/未来时间戳按 0）（产物见 `docs/teamflow/20261105-r35-upload-progress-layout/`）。
 
 <!-- teamflow:begin -->
 ## TeamFlow 托管区（本块由 TeamFlow 自动维护，团队请勿手改）

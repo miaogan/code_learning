@@ -1,0 +1,14 @@
+{
+  "round": "r35",
+  "date": "2026-11-05",
+  "title": "上传页进度卡左右布局 + 重接入秒数从真实起点起算",
+  "trigger": "用户反馈「还是前端的那个上传简历的进度条的问题，还是有展示 bug」",
+  "status": "done",
+  "changed_files": [
+    "frontend/src/styles/base.css",
+    "frontend/src/pages/UploadPage.tsx",
+    "frontend/src/lib/profileJob.ts",
+    "frontend/src/test/profileJob.test.ts"
+  ],
+  "verification": "Playwright mock 全条上传 API 截图走查（上传中/生成中/完成/重接入 4 态）；前端 typecheck / lint / 205 测试 / build 全绿"
+}

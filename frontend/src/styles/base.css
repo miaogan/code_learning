@@ -724,6 +724,15 @@ a {
   gap: var(--sp-2);
 }
 
+/* r35：进度态（上传中 / 生成中）的环 + 阶段文字左右布局 ——
+   之前环作为 summary 的直接子项独占一行贴在左上角，文字全部竖挤在下面，
+   卡片右半边大片空白，视觉上像坏掉而不是「进行中」。 */
+.sc-upload-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
 .sc-file-name {
   margin: 0;
   font-size: var(--fs-card);
