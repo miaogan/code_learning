@@ -293,7 +293,7 @@ def test_exam_create_submit_and_resubmit_400(
     paper = created.json()
     assert len(paper["questions"]) >= rules.MIN_EXAM_QUESTIONS
     for question in paper["questions"]:
-        assert set(question) == {"id", "kind", "direction", "prompt", "options"}
+        assert set(question) == {"id", "kind", "direction", "sub_direction", "prompt", "options"}
 
     answers = {
         question["id"]: (

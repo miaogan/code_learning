@@ -113,6 +113,7 @@ REPORT_PATH = (
 _STRING_KEYS: tuple[str, ...] = (
     "id",
     "direction",
+    "sub_direction",
     "kind",
     "difficulty",
     "essentiality",
@@ -459,6 +460,9 @@ def build_seed(
         candidates.append(row)
 
     merged, delta = merge_rows(existing, candidates)
+    # 二级方向是「人工/脚本标注」的存量信息，素材里没有：按 id 沿用既有 seed 的标注，
+    # 缺省或越出其方向闭集时落到该方向的通用兜底（闭集口径只有 rules.SUBDIRECTIONS 一份）。
+    _carry_sub_directions(merged, raw)
     _fold(stats, delta)
     stats["total"] = _totals(stats)
     stats["existing"] = len(existing)
@@ -470,6 +474,19 @@ def build_seed(
     merged, shuffle_metrics = question_shuffle.apply(merged)
     stats["shuffle"] = shuffle_metrics
     return merged, stats
+
+
+def _carry_sub_directions(rows: list[dict[str, Any]], raw: Sequence[dict[str, Any]]) -> None:
+    """按 id 沿用既有 seed 的 `sub_direction`；缺失或越界时落到该方向的通用兜底（原地写入）。"""
+    tagged = {str(row.get("id") or ""): row.get("sub_direction") for row in raw}
+    for row in rows:
+        direction = str(row.get("direction") or "")
+        inherited = tagged.get(str(row.get("id") or ""))
+        row["sub_direction"] = (
+            inherited
+            if rules.is_valid_sub_direction(direction, inherited) and inherited is not None
+            else rules.generic_sub_direction_of(direction)
+        )
 
 
 def _totals(stats: dict[str, Any]) -> dict[str, int]:
