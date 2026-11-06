@@ -26,8 +26,9 @@ from typing import Any
 
 import pytest
 
-from app import repository
-from app.services import question_bank, rules
+from app.core import repository
+from app.services.assessment import question_bank
+from app.services.report import rules
 
 #: 新增 180 题的 id 前缀 → 语言（AC-3 的断言范围是「新增种子」）。
 NEW_ID_LANGUAGE: dict[str, str] = {

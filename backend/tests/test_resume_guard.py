@@ -3,7 +3,7 @@
 from fastapi.testclient import TestClient
 from pytest import MonkeyPatch
 
-from app.config import get_settings
+from app.core.config import get_settings
 
 RESUME_TEXT = (
     "教育经历\n2019-2023 计算机科学与技术\n"

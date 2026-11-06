@@ -7,10 +7,11 @@ from typing import Any
 
 import pytest
 
-from app import repository
-from app.errors import NOT_FOUND, AppError
+from app.core import repository
+from app.core.errors import NOT_FOUND, AppError
 from app.schemas import ExamAnswers, ExamResult
-from app.services import exam as exam_service, rules
+from app.services.assessment import exam as exam_service
+from app.services.report import rules
 
 OBJECTIVE_KINDS = frozenset(rules.OBJECTIVE_KINDS)  # 闭集只在 rules.py：测试不得再抄一份字面量
 

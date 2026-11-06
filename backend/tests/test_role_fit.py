@@ -16,9 +16,10 @@ from pathlib import Path
 
 import pytest
 
-from app.errors import VALIDATION_ERROR, AppError
+from app.core.errors import VALIDATION_ERROR, AppError
 from app.schemas import Evidence, InterviewSettings, Profile, ProfileProject, ProfileSkill
-from app.services import coach_copy, role_fit, rules
+from app.services.report import role_fit, rules
+from app.services.resume import coach_copy
 
 
 @pytest.fixture(autouse=True)

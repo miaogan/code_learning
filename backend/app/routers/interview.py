@@ -14,16 +14,16 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 
-from ..deps import CurrentUser, current_user
-from ..schemas import (
+from app.deps import CurrentUser, current_user
+from app.schemas import (
     AnswerRequest,
     InterviewCreateRequest,
     InterviewRun,
     InterviewSession,
     InterviewTurn,
 )
-from ..services import user_ai
-from ..services.interview import (
+from app.services.ai import user_ai
+from app.services.interview.interview import (
     create_run as create_interview_run,
     finish_run as finish_interview_run,
     load_session,

@@ -8,10 +8,11 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from app import repository
-from app.errors import AI_SCHEMA_INVALID, NOT_FOUND, AppError
+from app.core import repository
+from app.core.errors import AI_SCHEMA_INVALID, NOT_FOUND, AppError
 from app.schemas import InterviewQuestion, ScoreResult
-from app.services import interview as interview_service, rules
+from app.services.interview import interview as interview_service
+from app.services.report import rules
 
 VALID_KINDS = ["technical"] * rules.MIN_TECHNICAL_QUESTIONS + ["project"] * (
     rules.MIN_INTERVIEW_QUESTIONS - rules.MIN_TECHNICAL_QUESTIONS

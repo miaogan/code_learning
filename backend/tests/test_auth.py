@@ -23,13 +23,14 @@ from tests.conftest import (
     TEST_USER_PASSWORD,
 )
 
-from app import repository
-from app.auth import COOKIE_NAME, hash_password, new_session_token, session_expiry
-from app.config import get_settings
-from app.context import reset_current_user_id, set_current_user_id
-from app.errors import AI_KEY_REQUIRED, AI_QUOTA_EXCEEDED
+from app.core import repository
+from app.core.auth import COOKIE_NAME, hash_password, new_session_token, session_expiry
+from app.core.config import get_settings
+from app.core.context import reset_current_user_id, set_current_user_id
+from app.core.errors import AI_KEY_REQUIRED, AI_QUOTA_EXCEEDED
 from app.main import app
-from app.services import login_guard, user_ai
+from app.services import login_guard
+from app.services.ai import user_ai
 
 RESUME_TEXT = (
     "教育经历\n2019-2023 计算机科学与技术\n"

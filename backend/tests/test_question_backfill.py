@@ -19,8 +19,7 @@ from typing import Any
 
 import pytest
 
-from app.services import rules
-from app.services.question_backfill import (
+from app.services.assessment.question_backfill import (
     BACKFILL_KEYWORDS,
     backfill_seed,
     dumps,
@@ -28,6 +27,7 @@ from app.services.question_backfill import (
     ordered_keywords,
     question_text,
 )
+from app.services.report import rules
 
 #: 存量题 id 前缀（fe-/be-/al-/cs-）：它们才是「回填」的对象，新题的语言是人工写死的。
 LEGACY_PREFIXES = ("fe-", "be-", "al-", "cs-")
@@ -199,7 +199,7 @@ def test_backfill_returns_new_objects() -> None:
 
 def test_seed_languages_match_algorithm() -> None:
     """AC-2 收口：种子内 80 道存量题的语言必须等于当前算法的输出（禁止手改）。"""
-    from app.services.question_bank import SEED_PATH, load_seed
+    from app.services.assessment.question_bank import SEED_PATH, load_seed
 
     rows = load_seed(SEED_PATH)
     legacy = [row for row in rows if str(row["id"]).startswith(LEGACY_PREFIXES)]
@@ -214,7 +214,7 @@ def test_seed_languages_match_algorithm() -> None:
 
 def test_seed_is_fully_backfilled() -> None:
     """种子内每道题都有 language 键（含显式留空的 `""`），且取值落在闭集内。"""
-    from app.services.question_bank import SEED_PATH, load_seed
+    from app.services.assessment.question_bank import SEED_PATH, load_seed
 
     for row in load_seed(SEED_PATH):
         assert "language" in row, f"{row['id']} 缺少 language 键"

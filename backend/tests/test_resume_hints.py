@@ -14,9 +14,9 @@ from typing import Any
 import pytest
 
 from app.schemas import PolishSuggestion, Profile
-from app.services import resume_hints, resume_polish
-from app.services.ai import AIClient
-from app.services.coach_copy import RESUME_AI_FALLBACK, RESUME_NO_TEXT, SECTION_LABEL
+from app.services.ai.ai import AIClient
+from app.services.resume import resume_hints, resume_polish
+from app.services.resume.coach_copy import RESUME_AI_FALLBACK, RESUME_NO_TEXT, SECTION_LABEL
 
 #: 超长正文行（> ANCHOR_MAX）：锚点必须退化成它的前 40 字逐字切片。
 LONG_LINE = (

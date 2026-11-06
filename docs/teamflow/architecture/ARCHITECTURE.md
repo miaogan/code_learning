@@ -71,12 +71,11 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
    ├─ app/
    │  ├─ __init__.py
    │  ├─ main.py                      # app 工厂、lifespan 建库、CORS、异常处理器、GET /health *
-   │  ├─ config.py                    # pydantic-settings：AI_* / DB_PATH / 上传上限 *
-   │  ├─ db.py                        # sqlite3 连接 + 7 表 create-if-not-exists *
-   │  ├─ errors.py                    # AppError → 统一错误 envelope（中文 message）*
-   │  ├─ schemas.py                   # Profile / Question / Report / Course / ErrorBody *
-   │  ├─ routers/                     # resume / profile / interview / exam / report / courses / history *
-   │  ├─ services/                    # parser / ai / profile / interview / exam / diagnosis / courses *
+   │  ├─ core/                        # 基础设施：config / db / errors / repository / auth / context / observability *
+   │  ├─ schemas.py                   # Profile / Question / Report / Course / ErrorBody *（契约硬约束，留顶层）
+   │  ├─ deps.py                      # FastAPI 依赖（current_user 等）*
+   │  ├─ routers/                     # auth / resume / profile / interview / exam / practice / report / courses / history / timeline *
+   │  ├─ services/                    # 业务域分包：ai/ resume/ profile/ interview/ assessment/ report/（+ login_guard.py）*
    │  └─ seed/{courses.json, questions.json}   # 精选清单（人工维护，便于集中换链）*
    ├─ tests/{test_health.py, test_courses.py, test_resume_guard.py}   # pytest *
    └─ app.db                          # 运行时生成（gitignore）
@@ -109,22 +108,22 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
 | 路径 | 职责 | 已实现 / 待填 |
 | --- | --- | --- |
 | `app/main.py` | app 工厂、CORS（5173/127.0.0.1）、`AppError` → envelope、`GET /health` | ✅ 已实现 |
-| `app/config.py` | `Settings`（AI_BASE_URL / AI_API_KEY / AI_MODEL / AI_TIMEOUT_S / DB_PATH / 上传上限） | ✅ |
-| `app/db.py` | 连接、`init_db()` 建 7 表、`get_connection()` 依赖 | ✅（表结构见 §3.4；r6 增 `questions` / `question_attempts`） |
-| `app/errors.py` | 错误码常量 + `AppError` | ✅ |
+| `app/core/config.py` | `Settings`（AI_BASE_URL / AI_API_KEY / AI_MODEL / AI_TIMEOUT_S / DB_PATH / 上传上限） | ✅ |
+| `app/core/db.py` | 连接、`init_db()` 建 7 表、`get_connection()` 依赖 | ✅（表结构见 §3.4；r6 增 `questions` / `question_attempts`） |
+| `app/core/errors.py` | 错误码常量 + `AppError` | ✅ |
 | `app/schemas.py` | pydantic v2 模型（Profile 5 维度 / 题目 / 报告 / 课程）；**HTTP 契约唯一真源** | ✅ 齐备；r5 起含 4 项面试设定（`InterviewSettings` / `InterviewSettingsPatch`）、会话与回合（`InterviewRun` / `InterviewTurn` / `InterviewSession`），`RunSummary` / `Report` 增 `interview_settings` |
 | `app/routers/resume.py` | `POST /api/resumes` 上传 → 校验 → 抽取 → 入库 → 元信息 | ✅ 文本/ PDF / DOCX 抽取（依赖装好后生效） |
 | `app/routers/profile.py` | `POST /api/resumes/{id}/profile`、`GET|PATCH /api/profiles/{id}` | ⛔ 501 待 M2 |
-| `app/routers/interview.py` | 开局 / 每轮作答 / 会话恢复（r5 契约 v2：只转发与错误 envelope，业务在 `services/interview.py`） | ✅ 三路由 |
+| `app/routers/interview.py` | 开局 / 每轮作答 / 会话恢复（r5 契约 v2：只转发与错误 envelope，业务在 `services/interview/interview.py`） | ✅ 三路由 |
 | `app/routers/exam.py` | 出卷 / 提交判分 | ✅ 已交付 |
 | `app/routers/report.py` | 生成诊断报告 / `GET /markdown` | ✅ 已交付 |
 | `app/routers/history.py` | 历史记录列表（r3 起含长期记忆聚合） | ✅ 已交付 |
 | `app/routers/courses.py` | `GET /api/courses`（读 seed，校验 ≥20 门且 ≥3 门入门） | ✅ |
-| `app/services/parser.py` | 类型白名单、10MB、空文件/加密 PDF 中文错误、`chars/sections` 统计 | ✅ |
-| `app/services/ai.py` | OpenAI 兼容客户端：`complete_model(system, user, Model)`，超时、1 次重试、非法 JSON → `AI_SCHEMA_INVALID` | ✅（无 key 时抛 `AI_UNAVAILABLE`，页面得中文提示而非 500） |
-| `app/services/{profile,interview,exam,diagnosis}.py` | 提示词 + 校验 + 落库 | ✅ 已交付；`interview.py` 为 r5 会话引擎（比赛制/评分/追问/会话读取闭环） |
-| `app/services/rules.py` | 阈值与口径唯一出处（r5 增 4 项面试配置闭集 + `experience_band_of` / `is_follow_up_allowed`） | ✅ |
-| `app/services/courses.py` | 加载 seed、按方向/短板匹配（含「无匹配兜底」） | ✅ 加载与匹配骨架 |
+| `app/services/resume/parser.py` | 类型白名单、10MB、空文件/加密 PDF 中文错误、`chars/sections` 统计 | ✅ |
+| `app/services/ai/ai.py` | OpenAI 兼容客户端：`complete_model(system, user, Model)`，超时、1 次重试、非法 JSON → `AI_SCHEMA_INVALID` | ✅（无 key 时抛 `AI_UNAVAILABLE`，页面得中文提示而非 500） |
+| `app/services/{profile/profile,interview/interview,assessment/exam,report/diagnosis}.py` | 提示词 + 校验 + 落库 | ✅ 已交付；`interview.py` 为 r5 会话引擎（比赛制/评分/追问/会话读取闭环） |
+| `app/services/report/rules.py` | 阈值与口径唯一出处（r5 增 4 项面试配置闭集 + `experience_band_of` / `is_follow_up_allowed`） | ✅ |
+| `app/services/report/courses.py` | 加载 seed、按方向/短板匹配（含「无匹配兜底」） | ✅ 加载与匹配骨架 |
 
 ### 3.3 HTTP 契约（单一前缀 `/api`）
 
@@ -152,7 +151,7 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
 { "error": { "code": "FILE_TOO_LARGE", "message": "文件超过 10MB，请压缩或分卷", "retryable": false } }
 ```
 
-`code` 闭集（`app/errors.py` 常量）：`EMPTY_FILE` `ENCRYPTED_PDF` `FILE_TOO_LARGE` `UNSUPPORTED_TYPE` `PARSE_FAILED` `AI_UNAVAILABLE` `AI_SCHEMA_INVALID` `NOT_IMPLEMENTED` `NOT_FOUND` `VALIDATION_ERROR` `HTTP_ERROR`（其它框架级状态透传）`METHOD_NOT_ALLOWED`（框架级 405 中文 envelope），r23 增 `AUTH_REQUIRED` `AUTH_INVALID` `AUTH_DISABLED` `AUTH_RATE_LIMITED`（HTTP 429，登录失败达阈值后锁定）`PASSWORD_INVALID` `FORBIDDEN` `AI_KEY_REQUIRED` `AI_QUOTA_EXCEEDED` `AI_KEY_STORE_UNAVAILABLE`。**message 一律中文**，且不含文件绝对路径、堆栈、模型端点或 key。
+`code` 闭集（`app/core/errors.py` 常量）：`EMPTY_FILE` `ENCRYPTED_PDF` `FILE_TOO_LARGE` `UNSUPPORTED_TYPE` `PARSE_FAILED` `AI_UNAVAILABLE` `AI_SCHEMA_INVALID` `NOT_IMPLEMENTED` `NOT_FOUND` `VALIDATION_ERROR` `HTTP_ERROR`（其它框架级状态透传）`METHOD_NOT_ALLOWED`（框架级 405 中文 envelope），r23 增 `AUTH_REQUIRED` `AUTH_INVALID` `AUTH_DISABLED` `AUTH_RATE_LIMITED`（HTTP 429，登录失败达阈值后锁定）`PASSWORD_INVALID` `FORBIDDEN` `AI_KEY_REQUIRED` `AI_QUOTA_EXCEEDED` `AI_KEY_STORE_UNAVAILABLE`。**message 一律中文**，且不含文件绝对路径、堆栈、模型端点或 key。
 
 ### 3.4 数据模型（SQLite，`backend/app.db`）
 
@@ -166,7 +165,7 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
 | `questions` | `id TEXT PK, direction, kind, difficulty, essentiality, prompt, options TEXT(JSON), answer TEXT(JSON), source, created_at, updated_at` | r6 **题库承载**（11 列）：`seed/questions.json` 退为唯一导入源；`answer` 只服务端可见，不入任何响应模型 |
 | `question_attempts` | `id TEXT PK, question_id, run_id, correct INT(0/1), answered_at, created_at`，`UNIQUE(question_id, run_id)` | r6 客观题作答事件：熟练度判定的唯一事实源（简答不计分故永不写入） |
 
-> 共 **7 张表**（r1 的 4 张 + r3 的 `timeline_events` + r6 的 `questions` / `question_attempts`）。DDL 只有 `app/db.py` 一处出处，SQL 只有 `app/repository.py` 一处出口。
+> 共 **7 张表**（r1 的 4 张 + r3 的 `timeline_events` + r6 的 `questions` / `question_attempts`）。DDL 只有 `app/core/db.py` 一处出处，SQL 只有 `app/core/repository.py` 一处出口。
 >
 > r23 追加 `users` / `sessions` / `ai_usage` 三张表，并给上表 6 张业务表（除共享题库 `questions`）各加
 > `user_id TEXT NOT NULL DEFAULT 'default'`；存量行由 `ADD COLUMN ... DEFAULT` 直接回填为 `default`。见 §3.8。
@@ -225,7 +224,7 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
 - 失败映射：空内容 / 0 字节 → `EMPTY_FILE`；PDF 加密 → `ENCRYPTED_PDF`；超限 → `FILE_TOO_LARGE`；类型不在白名单 → `UNSUPPORTED_TYPE`；抽取异常 → `PARSE_FAILED`。**任何失败都不写库**，因此不会生成画像数据（AC-1 末句）。
 - 统计规则：`chars` = 正文去空白后字符数；`sections` = 命中「教育 / 工作经历 / 项目 / 技能」等标题行的数量，上限 99。
 
-### 3.6 AI 调用契约（`app/services/ai.py`）
+### 3.6 AI 调用契约（`app/services/ai/ai.py`）
 
 `async def complete_model(system, user, model_cls, *, retries=1) -> BaseModel`：单次 HTTP 超时 `AI_TIMEOUT_S=20`；把模型输出剥 ``` 围栏后 `json.loads`，再 `model_cls.model_validate`；**校验失败重试 1 次**（第二次在 user 后追加「只输出 JSON」）；仍失败 → `AI_SCHEMA_INVALID`；网络 / 401 / 429 / 超时 → `AI_UNAVAILABLE`（`retryable` 视 4xx 除外为 true）。无 `AI_API_KEY` 时**不发请求**，直接 `AI_UNAVAILABLE` 中文提示。调用方（M2–M4）必须传 pydantic 模型，禁止返回裸 dict。
 
@@ -240,13 +239,13 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
 
 | 路径 | 职责 |
 | --- | --- |
-| `app/auth.py` | `scrypt` 密码哈希 / 校验、会话 token（库里只存 SHA-256 摘要）、Cookie 读写（`sc_session`，HttpOnly + SameSite=Lax） |
-| `app/context.py` | `ContextVar` 承载当前 `user_id`（缺省 `'default'`） |
+| `app/core/auth.py` | `scrypt` 密码哈希 / 校验、会话 token（库里只存 SHA-256 摘要）、Cookie 读写（`sc_session`，HttpOnly + SameSite=Lax） |
+| `app/core/context.py` | `ContextVar` 承载当前 `user_id`（缺省 `'default'`） |
 | `app/deps.py` | **async** 依赖 `current_user`（sync 依赖跑线程池，ContextVar 写不回端点上下文）；类型别名 `CurrentUser = Annotated[...]` 规避 ruff B008 |
-| `app/services/user_ai.py` | per-user AI 单一出口：能力分级 `full \| light \| none`、内置 Key 每日配额、Fernet 加密存取 Key |
+| `app/services/ai/user_ai.py` | per-user AI 单一出口：能力分级 `full \| light \| none`、内置 Key 每日配额、Fernet 加密存取 Key |
 | `app/admin_cli.py` | 管理员建号（`--id` 可指定，如 `default` 接管存量）/ 切 Key 模式 / 停用 / 重置密码 / 列表 / `adopt-default` 存量改挂（不开放注册的唯一入口） |
 
-- 隔离口径：`repository.py` 全部读写 SQL 带 `user_id` 条件；按 id 取数查不到即 404（不暴露跨用户存在性）。
+- 隔离口径：`core/repository.py` 全部读写 SQL 带 `user_id` 条件；按 id 取数查不到即 404（不暴露跨用户存在性）。
 - 能力分级：light = 画像生成 + 润色建议；heavy = 一键成稿 / 模拟面试（开局与每题）/ 诊断报告；笔试 / 练习 / 题库 / 时间线 / 历史 / 课程零 AI 不受限。
 - `own` 未配 Key ⇒ `none`，heavy 直接 403 `AI_KEY_REQUIRED`（`retryable=false`）；`shared` 恒 `light` 且受 `SHARED_AI_DAILY_LIMIT` 约束（超限 429 `AI_QUOTA_EXCEEDED`）。
 - Key 明文只进 `Fernet` 密文列，所有响应只回 `****后4位`；`SECRET_KEY` 为空时保存 Key 返回 503 `AI_KEY_STORE_UNAVAILABLE`。
@@ -322,16 +321,16 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
 | 设计 token 与组件类 | `src/styles/tokens.css`、`src/styles/base.css`（含 40 按钮 / 24 徽章 / 96 磁贴 / 132 课程卡 / 128 textarea / 环 64-56 的 CSS 尺寸） |
 | 通用件 8 个 | `src/components/ui/*.tsx` |
 | API 契约类型 + fetch 封装 | `src/api/{types,client}.ts` |
-| 后端 app 工厂 / 配置 / 建库 / 错误 envelope / `/health` | `backend/app/{main,config,db,errors}.py` |
-| 上传解析链路（文本 / PDF / DOCX + 四类中文错误） | `backend/app/services/parser.py`、`routers/resume.py` |
-| AI 客户端骨架（超时 / 重试 / schema 校验 / 无 key 提示） | `backend/app/services/ai.py` |
-| 课程清单 25 门 + `/api/courses` | `backend/app/seed/courses.json`、`services/courses.py` |
-| 画像生成（AC-2 端到端） | `services/profile.py`、`routers/profile.py`（生成 / 读取 / 逐条编辑）、`pages/ProfilePage.tsx` 五维卡 + 溯源 |
-| 双测评（AC-3/AC-4 端到端） | `services/{interview,exam}.py`、`routers/{interview,exam}.py`、`pages/{InterviewPage,ExamPage}.tsx` |
-| 面试对话流（r5 · 多轮追问 + 4 项设定） | `services/interview.py`（会话引擎）+ `services/rules.py`（设定闭集 / `experience_band_of` / `is_follow_up_allowed`）+ `routers/interview.py`（3 路由）+ `pages/InterviewPage.tsx` 与 `components/interview/*`（7 态 + 气泡组件） |
-| 题库组卷与选池 | `services/exam_selector.py`（`rank_pool` / `build_paper` / L1–L6 阶梯，结构闸门唯一实现） |
-| 诊断报告 + 课程匹配（AC-5/AC-6） | `services/diagnosis.py`、`routers/report.py`（含 `GET /markdown`）、`pages/ReportPage.tsx` |
-| 历史与趋势（AC-9/AC-10） | `services/history.py`、`routers/history.py`、`pages/HistoryPage.tsx`；r3 起含长期记忆聚合 |
+| 后端 app 工厂 / 配置 / 建库 / 错误 envelope / `/health` | `backend/app/main.py`、`backend/app/core/{config,db,errors}.py` |
+| 上传解析链路（文本 / PDF / DOCX + 四类中文错误） | `backend/app/services/resume/parser.py`、`routers/resume.py` |
+| AI 客户端骨架（超时 / 重试 / schema 校验 / 无 key 提示） | `backend/app/services/ai/ai.py` |
+| 课程清单 25 门 + `/api/courses` | `backend/app/seed/courses.json`、`services/report/courses.py` |
+| 画像生成（AC-2 端到端） | `services/profile/profile.py`、`routers/profile.py`（生成 / 读取 / 逐条编辑）、`pages/ProfilePage.tsx` 五维卡 + 溯源 |
+| 双测评（AC-3/AC-4 端到端） | `services/interview/interview.py`、`services/assessment/exam.py`、`routers/{interview,exam}.py`、`pages/{InterviewPage,ExamPage}.tsx` |
+| 面试对话流（r5 · 多轮追问 + 4 项设定） | `services/interview/interview.py`（会话引擎）+ `services/report/rules.py`（设定闭集 / `experience_band_of` / `is_follow_up_allowed`）+ `routers/interview.py`（3 路由）+ `pages/InterviewPage.tsx` 与 `components/interview/*`（7 态 + 气泡组件） |
+| 题库组卷与选池 | `services/assessment/exam_selector.py`（`rank_pool` / `build_paper` / L1–L6 阶梯，结构闸门唯一实现） |
+| 诊断报告 + 课程匹配（AC-5/AC-6） | `services/report/diagnosis.py`、`routers/report.py`（含 `GET /markdown`）、`pages/ReportPage.tsx` |
+| 历史与趋势（AC-9/AC-10） | `services/interview/history.py`、`routers/history.py`、`pages/HistoryPage.tsx`；r3 起含长期记忆聚合 |
 | 题库种子 779 道（r12 起） | `backend/app/seed/questions.json`（r6 起退为**唯一导入源**，运行时由 `questions` 表承载；r11 起每次启动幂等导入，r14 起启动同时覆写既有行差异）；素材输入与留痕在 `docs/question-bank-staging/`（`PROVENANCE.md` + `NOTICE-fe-interview.md`），id 前缀口径见 §3.4.2 |
 | pydantic 契约模型（画像 5 维度 / 题目 / 报告 / 课程） | `backend/app/schemas.py` |
 | 后端测试 31 文件（pytest 零网络） | `backend/tests/*.py` |
@@ -353,7 +352,7 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
 ## 8. 下游交接（谁在哪填哪）
 
 - **M1–M5 已全部交付**（画像 / 双测评 / 报告 / 历史与趋势），各里程碑的模块与页面清单见 §7.1；本文件不再保留「待填」交接清单。
-- **r5 面试对话流已交付（2026-11-01）**：`services/interview.py`（`fill_settings` / `calibration_of` / `validate_questions` / `validate_session` / `create_run` / `score_answer` / `load_session`）、`services/rules.py`（4 项设定闭集 + `experience_band_of` + `is_follow_up_allowed`）、`routers/interview.py`（3 路由）、`pages/InterviewPage.tsx` + `components/interview/*`（7 态 + 气泡组件）、`RunSummary` / `Report` 投影字段；契约与 payload 不变量见 §3.3 / §3.4.1，技术方案见任务夹 `docs/teamflow/20261101-r5-interview-chat-config/TECHNICAL.md`。
+- **r5 面试对话流已交付（2026-11-01）**：`services/interview/interview.py`（`fill_settings` / `calibration_of` / `validate_questions` / `validate_session` / `create_run` / `score_answer` / `load_session`）、`services/report/rules.py`（4 项设定闭集 + `experience_band_of` + `is_follow_up_allowed`）、`routers/interview.py`（3 路由）、`pages/InterviewPage.tsx` + `components/interview/*`（7 态 + 气泡组件）、`RunSummary` / `Report` 投影字段；契约与 payload 不变量见 §3.3 / §3.4.1，技术方案见任务夹 `docs/teamflow/20261101-r5-interview-chat-config/TECHNICAL.md`。
 - **统一约束（不许破）**：所有新组件复用 `tokens.css`；所有新端点返回 `AppError` envelope 与中文 message；所有改字段同步 `frontend/src/api/types.ts` ↔ `backend/app/schemas.py`；新增尺寸必须回写 DESIGN §0.7 的推导。
 
 ### 8.1 历史任务夹的偏差补记（产物不可改，以实现为准）
@@ -362,9 +361,9 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
 
 | 来源 | 历史文档写法 | 实现真相 |
 | --- | --- | --- |
-| r5 `TECHNICAL.md:186` | `is_follow_up_allowed(kind, follow_up_count, total_questions)`（3 参） | `is_follow_up_allowed(kind, follow_up_count, asked, planned_total)`（4 参，`services/rules.py:226`）：r8 起以「不挤占剩余正题轮次」替代「answered+1 ≤ 12」 |
-| r5 `TECHNICAL.md:302` | 调用处同记 3 参 | 同上；调用方 `services/interview.py` 已传 4 参 |
-| r11 `TECHNICAL.md` | 未记 `exam_selector._prefer_kind_diversity()` 与 `PromptBody.tsx` | 二者已落盘：题型覆盖是取题策略（见 `services/exam_selector.py` 模块 docstring）；`components/exam/PromptBody.tsx` 是题面围栏渲染唯一出口（题卡与错题本共用）；练习与笔试的共享口径见 §3.4.3 |
+| r5 `TECHNICAL.md:186` | `is_follow_up_allowed(kind, follow_up_count, total_questions)`（3 参） | `is_follow_up_allowed(kind, follow_up_count, asked, planned_total)`（4 参，`services/report/rules.py`）：r8 起以「不挤占剩余正题轮次」替代「answered+1 ≤ 12」 |
+| r5 `TECHNICAL.md:302` | 调用处同记 3 参 | 同上；调用方 `services/interview/interview.py` 已传 4 参 |
+| r11 `TECHNICAL.md` | 未记 `exam_selector._prefer_kind_diversity()` 与 `PromptBody.tsx` | 二者已落盘：题型覆盖是取题策略（见 `services/assessment/exam_selector.py` 模块 docstring）；`components/exam/PromptBody.tsx` 是题面围栏渲染唯一出口（题卡与错题本共用）；练习与笔试的共享口径见 §3.4.3 |
 | r11 `QA-REPORT.md` | 缺 AC-16 要求的「练习 vs 笔试共用同一题库」说明段 | 已按不可变约定补记在 §3.4.3（r17 收口） |
 | r12 `TECH-CHANGE.md` §3.2 | id 前缀写 `iq-NNN` | 实现取 `iq380-`（避开面试发言 `iq-` 域），见 §3.4.2 |
 | r3 `DESIGN.md` §0.5-4 | 摘要条 48 高按 `2px 边框 + 12px×2 内边距 + 22px 行高` 推导 | 常规态一致；`has-action` 态为容纳 40 高按钮，上下内边距取 `calc(var(--sp-1) - 1px)`（3px），即 `2 + 3×2 + 40 = 48`，在 border-box 下总高仍守 48（`styles/base.css` `.sc-merge-bar.has-action`） |

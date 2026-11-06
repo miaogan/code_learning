@@ -24,9 +24,9 @@ from uuid import uuid4
 
 import pytest
 
-from app import repository
-from app.config import get_settings
-from app.db import _ADDED_COLUMNS, init_db
+from app.core import repository
+from app.core.config import get_settings
+from app.core.db import _ADDED_COLUMNS, init_db
 
 #: 临时库落点（与 conftest 同一处 scratch 目录，见其注释里的沙箱原因）。
 SCRATCH_DIR = Path(__file__).resolve().parent / ".tmp"

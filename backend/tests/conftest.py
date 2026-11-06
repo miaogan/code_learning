@@ -2,7 +2,7 @@
 
 约定：
 - `tmp_db` 用 `DB_PATH` 环境变量把 SQLite 指到临时目录，并 `get_settings.cache_clear()`，
-  让 `app.db.connection()` 每次重读配置；用例之间互不污染。
+  让 `app.core.db.connection()` 每次重读配置；用例之间互不污染。
 - 所有 AI 调用走 `FakeAI`（服务层 `client=` 注入）或 `patch_ai`（类级补丁，覆盖
   「路由层不注入 client」的真实链路），因此整轮测试**不产生任何外网请求**。
 """
@@ -19,14 +19,14 @@ from uuid import uuid4
 import pytest
 from fastapi.testclient import TestClient
 
-from app import repository
-from app.auth import COOKIE_NAME, hash_password, new_session_token, session_expiry
-from app.config import get_settings
-from app.db import init_db
+from app.core import repository
+from app.core.auth import COOKIE_NAME, hash_password, new_session_token, session_expiry
+from app.core.config import get_settings
+from app.core.db import init_db
 from app.main import app
 from app.schemas import Evidence, Profile, ProfileProject, ProfileSkill, SkillStatus
-from app.services import user_ai
-from app.services.ai import AIClient, reset_ai_pool
+from app.services.ai import user_ai
+from app.services.ai.ai import AIClient, reset_ai_pool
 
 SEED_PATH = Path(__file__).resolve().parent.parent / "app" / "seed" / "questions.json"
 
@@ -488,7 +488,7 @@ def ai_outage(monkeypatch: pytest.MonkeyPatch, tmp_db: Path) -> None:
         async def post(self, *_args: Any, **_kwargs: Any) -> _Response:
             return _Response()
 
-    monkeypatch.setattr("app.services.ai.httpx.AsyncClient", _Client)
+    monkeypatch.setattr("app.services.ai.ai.httpx.AsyncClient", _Client)
 
 
 @pytest.fixture()
@@ -516,7 +516,7 @@ def drive_session(
     重放已答旧题会被服务端拒绝（QA D-2），所以这里只按 `current_id` 单向推进。
     `on_turn` 给需要在「每一轮之后」断言的用例留钩子（例如时间线不得提前写事件）。
     """
-    from app.services import interview as interview_service
+    from app.services.interview import interview as interview_service
 
     turns: list[Any] = []
     question_id = run.question.id

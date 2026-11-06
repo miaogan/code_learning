@@ -7,13 +7,13 @@
 from fastapi import APIRouter, Depends
 from fastapi.responses import PlainTextResponse
 
-from .. import repository
-from ..deps import CurrentUser, current_user
-from ..errors import NOT_FOUND, AppError
-from ..schemas import Report, ReportGenerateRequest
-from ..services import user_ai
-from ..services.diagnosis import build_report
-from ..services.markdown import to_markdown
+from app.core import repository
+from app.core.errors import NOT_FOUND, AppError
+from app.deps import CurrentUser, current_user
+from app.schemas import Report, ReportGenerateRequest
+from app.services.ai import user_ai
+from app.services.report.diagnosis import build_report
+from app.services.report.markdown import to_markdown
 
 router = APIRouter(prefix="/api/reports", tags=["report"], dependencies=[Depends(current_user)])
 

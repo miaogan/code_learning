@@ -11,7 +11,7 @@ from pydantic import (
     model_validator,
 )
 
-from .config import JsonMode
+from app.core.config import JsonMode
 
 Severity = Literal["high", "medium", "low"]
 CourseLevel = Literal["入门", "进阶"]
@@ -54,7 +54,7 @@ def _check_direction_filter(value: str) -> str:
     延迟导入是刻意的：`rules` 反向上依赖本模块（`ExamKind` / `InterviewSettings`），
     模块级导入会成环；校验器在请求到达时才执行，那时两个模块都已就绪。
     """
-    from .services import rules
+    from app.services.report import rules
 
     if value != rules.FILTER_ANY and value not in rules.DIRECTIONS:
         raise ValueError("direction 越出闭集")
@@ -309,9 +309,20 @@ class ExamOption(BaseModel):
 
 
 class ExamCreateRequest(BaseModel):
-    """笔试组卷请求体（同上：profile_id 只走 body）。"""
+    """笔试组卷请求体。
+
+    全部筛选字段可选：不传时走默认阶梯（画像相关度 + 6 层兜底）。
+    传入时在候选池先做硬过滤，再走阶梯；若单方向/难度凑不出结构达标的卷，
+    整轮仍以 400 出口（与 AC-8 一致）。
+    """
 
     profile_id: str
+    #: 指定方向（取值见 rules.DIRECTIONS）。None = 不过滤。
+    direction: str | None = None
+    #: 指定难度档（如 "basic" 或 ("basic", "intermediate")）。None = 不过滤。
+    difficulty: str | tuple[str, ...] | None = None
+    #: 目标题量。None = 默认 10–12。至少 10，低于会被结构闸门拒掉。
+    question_count: int | None = None
 
 
 class ExamQuestion(BaseModel):

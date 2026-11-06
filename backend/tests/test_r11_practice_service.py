@@ -11,8 +11,9 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import uuid4
 
-from app import repository
-from app.services import exam as exam_service, practice, proficiency, question_bank, rules
+from app.core import repository
+from app.services.assessment import exam as exam_service, practice, proficiency, question_bank
+from app.services.report import rules
 
 #: 造数用的固定「现在」：同一 `minutes_ago` 得到**同一时刻**，排序断言才可复现
 #: （每次调用 `datetime.now()` 会差几微秒，同刻次序的用例会变成掷骰子）。

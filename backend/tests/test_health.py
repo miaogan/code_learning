@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from app.config import JSON_MODES, get_settings
+from app.core.config import JSON_MODES, get_settings
 from app.main import app
 
 client = TestClient(app)

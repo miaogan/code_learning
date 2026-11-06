@@ -16,9 +16,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from .config import get_settings
-from .db import init_db
-from .errors import (
+from app.core.config import get_settings
+from app.core.db import init_db
+from app.core.errors import (
     FORBIDDEN,
     HTTP_ERROR,
     INTERNAL_ERROR,
@@ -27,7 +27,7 @@ from .errors import (
     VALIDATION_ERROR,
     AppError,
 )
-from .observability import (
+from app.core.observability import (
     REQUEST_ID_HEADER,
     configure_logging,
     get_request_id,
@@ -35,7 +35,7 @@ from .observability import (
     reset_request_id,
     set_request_id,
 )
-from .routers import (
+from app.routers import (
     auth,
     courses,
     exam,
@@ -47,9 +47,9 @@ from .routers import (
     resume,
     timeline,
 )
-from .schemas import HealthResponse
-from .services import question_bank
-from .services.ai import close_ai_pool
+from app.schemas import HealthResponse
+from app.services.ai.ai import close_ai_pool
+from app.services.assessment import question_bank
 
 APP_VERSION = "0.1.0"
 

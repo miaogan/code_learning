@@ -4,7 +4,7 @@
 任一侧回退（删掉 `judge`、把「全部」换成 `""`、给练习模型加字段）都必须在 CI 转红，
 否则接口会在下一次改名时静默漂移 —— 而前端的 Record 查表会得到 `undefined` 而不是报错。
 
-单一出处：`backend/app/services/rules.py`。`schemas.py` 是镜像，`types.ts` 是第二份镜像。
+单一出处：`backend/app/services/report/rules.py`。`schemas.py` 是镜像，`types.ts` 是第二份镜像。
 """
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ from app.schemas import (
     PracticeWrongItem,
     QuestionLanguage,
 )
-from app.services import rules
+from app.services.report import rules
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 TYPES_TS = REPO_ROOT / "frontend" / "src" / "api" / "types.ts"

@@ -11,8 +11,8 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from app import repository
-from app.services import practice
+from app.core import repository
+from app.services.assessment import practice
 
 
 def _option(key: str, text: str) -> dict[str, str]:
@@ -295,7 +295,7 @@ def test_wrong_book_lists_last_wrong_and_filters_language(client: Any) -> None:
 
 def test_no_ai_without_key(monkeypatch: Any, client: Any) -> None:
     """B-11：`AI_API_KEY=` 未配置下四端点全部可用（练习链路不 import AI、不读 Key）。"""
-    from app.services import practice as practice_module
+    from app.services.assessment import practice as practice_module
 
     source = practice_module.__file__
     assert source is not None

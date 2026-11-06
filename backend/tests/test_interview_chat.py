@@ -12,10 +12,11 @@ from typing import Any
 
 import pytest
 
-from app import repository
-from app.errors import AI_SCHEMA_INVALID, AI_UNAVAILABLE, NOT_FOUND, VALIDATION_ERROR, AppError
+from app.core import repository
+from app.core.errors import AI_SCHEMA_INVALID, AI_UNAVAILABLE, NOT_FOUND, VALIDATION_ERROR, AppError
 from app.schemas import InterviewSettings, InterviewSettingsPatch
-from app.services import diagnosis, history, interview as interview_service, rules
+from app.services.interview import history, interview as interview_service
+from app.services.report import diagnosis, rules
 
 #: 结构合格的计划：5 技术 + 3 项目（8 题、0 挑战），与 rules 下限逐项贴合。
 VALID_KINDS = ["technical"] * rules.MIN_TECHNICAL_QUESTIONS + ["project"] * (
@@ -327,6 +328,51 @@ def test_follow_up_gated_by_challenge_parent(
     assert nxt.parent_id is None, "challenge 父题不给追问，静默降级为计划下一正题"
     assert nxt.id == "iq-2"
     assert _payload_of(run.run_id)["follow_up_count"] == 0
+
+
+def test_follow_up_gated_by_low_score(
+    tmp_db: Any, profile_factory: Any, fake_ai: Any
+) -> None:
+    """低分 (< FOLLOW_UP_MIN_SCORE) 时不得追问：AI 即使返回 follow_up 也静默降级为 advance（服务端硬门禁）。
+
+    边界场景：提示词本应引导 AI 在追低分答时选 advance，但万一模型没遵守，服务端兜底拦截。
+    这与 challenge 守门、配额守门并列，构成追问决策的三重保障。
+    """
+    profile = _seed_profile(profile_factory)
+    # AI 同时返回「追问」模式和「低分」——模拟提示词没说服 AI 的边界情况
+    fake_ai.responder = _responder(
+        next_of=lambda round_no, _ctx: _follow_up(round_no),
+        score_of=lambda _round_no, _ctx: interview_service.FOLLOW_UP_MIN_SCORE - 2,  # 低于阈值 2 分
+    )
+    run = _create(fake_ai, profile.id, None)
+
+    turn = asyncio.run(interview_service.score_answer(run.run_id, "iq-1", "作答", client=fake_ai))
+
+    nxt = turn.next_question
+    assert nxt is not None
+    assert nxt.parent_id is None, "低分禁追问：静默降级为计划下一正题，无 parent_id"
+    assert nxt.id == "iq-2"
+    assert _payload_of(run.run_id)["follow_up_count"] == 0
+    assert turn.score == interview_service.FOLLOW_UP_MIN_SCORE - 2, "分数本身不受门禁影响，如实记录"
+
+
+def test_follow_up_allowed_at_threshold_score(
+    tmp_db: Any, profile_factory: Any, fake_ai: Any
+) -> None:
+    """恰在阈值（= FOLLOW_UP_MIN_SCORE）时允许追问：分数够了，且 allow_follow_up 也为 true。"""
+    profile = _seed_profile(profile_factory)
+    fake_ai.responder = _responder(
+        next_of=lambda round_no, _ctx: _follow_up(round_no),
+        score_of=lambda _round_no, _ctx: interview_service.FOLLOW_UP_MIN_SCORE,
+    )
+    run = _create(fake_ai, profile.id, None)
+
+    turn = asyncio.run(interview_service.score_answer(run.run_id, "iq-1", "作答", client=fake_ai))
+
+    nxt = turn.next_question
+    assert nxt is not None
+    assert nxt.parent_id == "iq-1", "阈值分数恰好允许追问"
+    assert _payload_of(run.run_id)["follow_up_count"] == 1
 
 
 def test_follow_up_gated_by_quota(tmp_db: Any, profile_factory: Any, fake_ai: Any) -> None:

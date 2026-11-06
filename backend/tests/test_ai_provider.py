@@ -18,16 +18,16 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
 
-from app.config import (
+from app.core.config import (
     DEFAULT_JSON_MODE,
     JSON_MODES,
     UNIFIED_AI_TIMEOUT_S,
     Settings,
     get_settings,
 )
-from app.errors import AI_UNAVAILABLE, AppError
+from app.core.errors import AI_UNAVAILABLE, AppError
 from app.main import app
-from app.services.ai import JSON_RETRY_HINT, AIClient
+from app.services.ai.ai import JSON_RETRY_HINT, AIClient
 
 LMSTUDIO_BASE = "http://localhost:1234/v1"
 DEEPSEEK_BASE = "https://api.deepseek.com/v1"
@@ -124,7 +124,7 @@ def ai_transport(monkeypatch: pytest.MonkeyPatch) -> _Transport:
             )
             return _Response(transport.status_code, transport.next_content())
 
-    monkeypatch.setattr("app.services.ai.httpx.AsyncClient", _Client)
+    monkeypatch.setattr("app.services.ai.ai.httpx.AsyncClient", _Client)
     return transport
 
 

@@ -18,16 +18,12 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
-from app import repository
-from app.errors import AI_UNAVAILABLE, VALIDATION_ERROR, AppError
+from app.core import repository
+from app.core.errors import AI_UNAVAILABLE, VALIDATION_ERROR, AppError
 from app.schemas import TimelineComparison, TimelineEvent, TimelineMetrics
-from app.services import (
-    diagnosis,
-    exam as exam_service,
-    interview as interview_service,
-    rules,
-    timeline,
-)
+from app.services.assessment import exam as exam_service
+from app.services.interview import interview as interview_service
+from app.services.report import diagnosis, rules, timeline
 from conftest import drive_session
 
 #: 与 `test_interview_service` 同一套合法配比（8 题：5 技术 + 3 项目）。

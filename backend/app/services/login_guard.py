@@ -12,7 +12,7 @@ from __future__ import annotations
 import threading
 import time
 
-from ..config import get_settings
+from app.core.config import get_settings
 
 #: 窗口内保留的时间戳；进程被多请求并发读写，需加锁。
 _LOCK = threading.Lock()

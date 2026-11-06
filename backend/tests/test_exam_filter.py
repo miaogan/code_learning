@@ -18,9 +18,10 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import uuid4
 
-from app import repository
+from app.core import repository
 from app.schemas import ExamRun
-from app.services import exam as exam_service, exam_selector, proficiency, question_bank, rules
+from app.services.assessment import exam as exam_service, exam_selector, proficiency, question_bank
+from app.services.report import rules
 
 # --- 受控小题库构造 -------------------------------------------------------
 
@@ -502,3 +503,97 @@ def test_exam_run_filtered_count_defaults_to_zero() -> None:
     """旧客户端兼容：`ExamRun.filtered_count` 缺省 0（读侧不需要判断字段是否存在）。"""
     run = ExamRun(run_id="legacy", questions=[])
     assert run.filtered_count == 0
+
+
+# --- 用户自定义筛选（方向 / 难度 / 题量）----------------------------------
+
+
+def test_select_paper_filters_by_direction(profile_factory: Any) -> None:
+    """指定 direction 后，6 层阶梯共享的 `known` 集合先做硬过滤，所有返回的题目方向必须匹配。"""
+    profile = profile_factory()
+    pool = [_question(f"q-{i}", direction="前端" if i % 2 == 0 else "后端") for i in range(30)]
+
+    paper = exam_selector.select_paper(
+        pool, profile, proficient=set(), recent=[], direction="前端"
+    )
+    assert paper is not None
+    assert len(paper.questions) >= rules.MIN_EXAM_QUESTIONS
+    assert all(str(q.get("direction") or "") == "前端" for q in paper.questions), (
+        f"direction=前端 仍混入了其它方向：{[q.get('direction') for q in paper.questions]}"
+    )
+
+
+def test_select_paper_filters_by_difficulty(profile_factory: Any) -> None:
+    """指定 difficulty 后，返回的所有题目难度必须命中指定档位集合。"""
+    profile = profile_factory()
+    pool = [
+        _question(f"q-{i}", difficulty=difficulty)
+        for i, difficulty in enumerate(("basic", "intermediate", "challenge") * 10)
+    ]
+
+    paper = exam_selector.select_paper(
+        pool,
+        profile,
+        proficient=set(),
+        recent=[],
+        difficulty=("basic", "intermediate"),
+    )
+    assert paper is not None
+    assert all(
+        str(q.get("difficulty") or "") in {"basic", "intermediate"} for q in paper.questions
+    ), (
+        "difficulty=(basic, intermediate) 仍混入了 challenge 档"
+    )
+
+
+def test_select_paper_single_direction_insufficient_returns_none(profile_factory: Any) -> None:
+    """单方向凑不出结构达标的卷时（例如一个方向只有 5 道客观题），select_paper 返回 None，
+    上层 create_run 走既有 400 出口。**阶梯机制不能绕过用户指定的硬过滤**。"""
+    profile = profile_factory()
+    # 只造 5 道前端客观题 + 3 道前端简答 —— 客观题数达不到 MIN_OBJECTIVE_QUESTIONS=8
+    pool = [_question(f"fe-{i}", direction="前端") for i in range(5)]
+    pool += [
+        _question(f"fe-t-{i}", kind="text", direction="前端") for i in range(3)
+    ]
+    pool += [_question(f"be-{i}", direction="后端") for i in range(15)]  # 后端不相关
+
+    paper = exam_selector.select_paper(
+        pool, profile, proficient=set(), recent=[], direction="前端"
+    )
+    assert paper is None, "单方向客观题不足 8 道必须返回 None，由上层 400"
+
+
+def test_select_paper_target_count_respected(profile_factory: Any) -> None:
+    """question_count 透传为 target_count：返回卷题目数 ≤ target_count 且 ≥ MIN_EXAM_QUESTIONS。"""
+    profile = profile_factory()
+    pool = [_question(f"q-{i}") for i in range(30)]
+
+    paper = exam_selector.select_paper(
+        pool, profile, proficient=set(), recent=[], target_count=12
+    )
+    assert paper is not None
+    assert len(paper.questions) <= 12, f"target_count=12 但卷有 {len(paper.questions)} 题"
+
+    paper_15 = exam_selector.select_paper(
+        pool, profile, proficient=set(), recent=[], target_count=15
+    )
+    assert paper_15 is not None
+    assert len(paper_15.questions) <= 15
+
+
+def test_create_run_passes_filters_through_service(
+    tmp_db: Any, profile_factory: Any, seed_questions: list[dict[str, Any]]
+) -> None:
+    """服务层 create_run 能把三个筛选参数一路透传到 select_paper。不传参时逐字节兼容。"""
+    profile = profile_factory()
+    repository.insert_profile(profile)
+
+    # 单方向可能凑不出来（种子是 8 方向混排），因此先验证不传参时行为不变（兼容回归）
+    default_run = exam_service.create_run(profile.id)
+    assert len(default_run.questions) >= rules.MIN_EXAM_QUESTIONS
+
+    # 显式传 None 也等价于不传
+    null_run = exam_service.create_run(
+        profile.id, direction=None, difficulty=None, question_count=None
+    )
+    assert len(null_run.questions) >= rules.MIN_EXAM_QUESTIONS

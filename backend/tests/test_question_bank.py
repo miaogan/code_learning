@@ -26,8 +26,9 @@ from typing import Any
 
 import pytest
 
-from app import repository
-from app.services import question_bank, rules
+from app.core import repository
+from app.services.assessment import question_bank
+from app.services.report import rules
 
 #: 全库难度分布（存量 80 题口径）与客观题难度分布（`single`+`multiple` 口径）。
 FULL_DIFFICULTY = {"basic": 60, "intermediate": 12, "challenge": 8}
@@ -105,7 +106,7 @@ def test_import_seed_never_overwrites_existing_rows(tmp_db: Path) -> None:
 def test_ensure_seeded_imports_every_time_and_stays_idempotent(tmp_db: Path) -> None:
     """r11 改口径：每次 ensure 都导入（存量库才能拿到新增题），但重复调用 0 新增。
 
-    这是 AC-5「存量 app.db 启动即升级」的关键行为；r6 的「仅空库导入」会让老库永远缺新题。
+    这是 AC-5「存量 app.core.db 启动即升级」的关键行为；r6 的「仅空库导入」会让老库永远缺新题。
     """
     expected = len(_seed_rows())
     assert question_bank.ensure_seeded() == expected, f"空库应收敛到 {expected} 行"

@@ -16,16 +16,16 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
-from app.config import Settings, get_settings
-from app.main import create_app
-from app.observability import (
+from app.core.config import Settings, get_settings
+from app.core.observability import (
     REQUEST_ID_HEADER,
     configure_logging,
     get_request_id,
     reset_request_id,
     set_request_id,
 )
-from app.services.ai import AIClient
+from app.main import create_app
+from app.services.ai.ai import AIClient
 
 
 class _Payload:
@@ -123,7 +123,7 @@ def test_ai_logs_metadata_without_secret(
         async def post(self, *_args: Any, **_kwargs: Any) -> _Response:
             return _Response()
 
-    monkeypatch.setattr("app.services.ai._shared_client", lambda: _Client())
+    monkeypatch.setattr("app.services.ai.ai._shared_client", lambda: _Client())
     caplog.set_level(logging.INFO, logger="app.ai")
     configure_logging("INFO")
 

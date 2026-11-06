@@ -18,10 +18,10 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
-from app import repository
-from app.auth import COOKIE_NAME, hash_password, new_session_token, session_expiry
-from app.db import connection
-from app.errors import VALIDATION_ERROR, AppError
+from app.core import repository
+from app.core.auth import COOKIE_NAME, hash_password, new_session_token, session_expiry
+from app.core.db import connection
+from app.core.errors import VALIDATION_ERROR, AppError
 from app.schemas import ResumeMeta
 
 TEST_USER_ID = "default"

@@ -16,10 +16,10 @@ import secrets
 import sys
 import uuid
 
-from . import repository
-from .auth import hash_password, normalize_email
-from .db import init_db
-from .services.user_ai import KEY_MODE_OWN, KEY_MODE_SHARED
+from app.core import repository
+from app.core.auth import hash_password, normalize_email
+from app.core.db import init_db
+from app.services.ai.user_ai import KEY_MODE_OWN, KEY_MODE_SHARED
 
 _MODES = (KEY_MODE_OWN, KEY_MODE_SHARED)
 

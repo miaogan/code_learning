@@ -11,8 +11,8 @@
 
 from fastapi import APIRouter, Depends
 
-from ..deps import current_user
-from ..schemas import (
+from app.deps import current_user
+from app.schemas import (
     PracticeAnswerRequest,
     PracticeAnswerResult,
     PracticeDifficultyFilter,
@@ -25,7 +25,7 @@ from ..schemas import (
     PracticeStats,
     PracticeWrongBook,
 )
-from ..services import practice as practice_service
+from app.services.assessment import practice as practice_service
 
 router = APIRouter(prefix="/api/practice", tags=["practice"], dependencies=[Depends(current_user)])
 

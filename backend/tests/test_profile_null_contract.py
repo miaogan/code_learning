@@ -27,8 +27,9 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
-from app import repository, schemas
-from app.errors import AI_SCHEMA_INVALID, AppError
+from app import schemas
+from app.core import repository
+from app.core.errors import AI_SCHEMA_INVALID, AppError
 from app.schemas import (
     InterviewSettings,
     Profile,
@@ -37,14 +38,11 @@ from app.schemas import (
     ProfileSkill,
     ResumeMeta,
 )
-from app.services import (
-    interview as interview_service,
-    profile_merge,
-    resume_polish,
-    role_fit,
-    rules,
-)
-from app.services.profile import PROFILE_SYSTEM, verify_quotes
+from app.services.interview import interview as interview_service
+from app.services.profile import profile_merge
+from app.services.profile.profile import PROFILE_SYSTEM, verify_quotes
+from app.services.report import role_fit, rules
+from app.services.resume import resume_polish
 
 #: 数据看板项目的溯源片段：与 conftest 的 `RESUME_TEXT` 逐字对应（`verify_quotes` 用）。
 DASHBOARD_QUOTE = "数据看板项目：主导表格虚拟滚动与缓存策略"

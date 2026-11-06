@@ -16,16 +16,12 @@ from typing import Any
 
 import pytest
 
-from app import repository
+from app.core import repository
 from app.schemas import Report
-from app.services import (
-    coach_copy,
-    diagnosis,
-    exam as exam_service,
-    rules,
-    weakness as weakness_service,
-)
-from app.services.diagnosis import _CoachCopyDraft
+from app.services.assessment import exam as exam_service
+from app.services.report import diagnosis, rules, weakness as weakness_service
+from app.services.report.diagnosis import _CoachCopyDraft
+from app.services.resume import coach_copy
 from test_report_service import VALID_KINDS, _bad_score_responder, _prepare_runs
 
 

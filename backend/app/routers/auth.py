@@ -4,8 +4,8 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter, Request, Response
 
-from .. import repository
-from ..auth import (
+from app.core import repository
+from app.core.auth import (
     COOKIE_NAME,
     clear_session_cookie,
     hash_password,
@@ -17,8 +17,7 @@ from ..auth import (
     token_digest,
     verify_password,
 )
-from ..deps import CurrentUser
-from ..errors import (
+from app.core.errors import (
     AUTH_DISABLED,
     AUTH_INVALID,
     AUTH_RATE_LIMITED,
@@ -26,7 +25,8 @@ from ..errors import (
     VALIDATION_ERROR,
     AppError,
 )
-from ..schemas import (
+from app.deps import CurrentUser
+from app.schemas import (
     AiSettingsRequest,
     AiTestRequest,
     AiTestResult,
@@ -34,7 +34,8 @@ from ..schemas import (
     MeResponse,
     PasswordChangeRequest,
 )
-from ..services import login_guard, user_ai
+from app.services import login_guard
+from app.services.ai import user_ai
 
 router = APIRouter(prefix="/api", tags=["auth"])
 

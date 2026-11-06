@@ -10,9 +10,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.services import diagnosis, question_bank, rules, weakness
-from app.services.coach_copy import DIFFICULTY_LABEL, ESSENTIALITY_LABEL
-from app.services.markdown import format_score
+from app.services.assessment import question_bank
+from app.services.report import diagnosis, rules, weakness
+from app.services.report.markdown import format_score
+from app.services.resume.coach_copy import DIFFICULTY_LABEL, ESSENTIALITY_LABEL
 
 
 def _exam_run(
@@ -135,7 +136,7 @@ def test_idempotent() -> None:
 
 
 def test_ai_failure_keeps_order_and_summary(monkeypatch: Any) -> None:
-    from app.services.ai import AIClient
+    from app.services.ai.ai import AIClient
 
     async def boom(*_args: Any, **_kwargs: Any) -> Any:
         raise RuntimeError("AI 不可用（测试替身）")

@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from app.services import question_merge, question_shuffle
+from app.services.assessment import question_merge, question_shuffle
 
 #: 单选答案四个位置的占比区间（需求「20%–30% 且任一位置 ≤35%」，上界抬到 32% 容纳 551 样本抽样波动）。
 SINGLE_POSITION_RATIO = (0.20, 0.32)

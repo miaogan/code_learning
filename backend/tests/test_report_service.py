@@ -8,10 +8,12 @@ from typing import Any
 
 import pytest
 
-from app import repository
-from app.errors import AI_UNAVAILABLE, AppError
+from app.core import repository
+from app.core.errors import AI_UNAVAILABLE, AppError
 from app.schemas import Report, Shortfall
-from app.services import diagnosis, exam as exam_service, interview as interview_service, rules
+from app.services.assessment import exam as exam_service
+from app.services.interview import interview as interview_service
+from app.services.report import diagnosis, rules
 from conftest import drive_session
 
 VALID_KINDS = ["technical"] * rules.MIN_TECHNICAL_QUESTIONS + ["project"] * (

@@ -10,10 +10,10 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, UploadFile
 
-from .. import repository
-from ..deps import CurrentUser, current_user
-from ..errors import NOT_FOUND, VALIDATION_ERROR, AppError
-from ..schemas import (
+from app.core import repository
+from app.core.errors import NOT_FOUND, VALIDATION_ERROR, AppError
+from app.deps import CurrentUser, current_user
+from app.schemas import (
     PolishFullRequest,
     PolishFullResponse,
     PolishRequest,
@@ -21,8 +21,9 @@ from ..schemas import (
     Profile,
     ResumeMeta,
 )
-from ..services import resume_polish, user_ai
-from ..services.parser import max_upload_bytes, parse_resume
+from app.services.ai import user_ai
+from app.services.resume import resume_polish
+from app.services.resume.parser import max_upload_bytes, parse_resume
 
 router = APIRouter(prefix="/api/resumes", tags=["resume"], dependencies=[Depends(current_user)])
 

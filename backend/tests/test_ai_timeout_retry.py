@@ -17,10 +17,10 @@ import httpx
 import pytest
 from pydantic import BaseModel
 
-from app.config import Settings, get_settings
-from app.errors import AI_UNAVAILABLE, AppError
-from app.services.ai import AIClient
-from app.services.profile import generate_profile
+from app.core.config import Settings, get_settings
+from app.core.errors import AI_UNAVAILABLE, AppError
+from app.services.ai.ai import AIClient
+from app.services.profile.profile import generate_profile
 
 
 class _Payload(BaseModel):
@@ -78,7 +78,7 @@ def transport(monkeypatch: pytest.MonkeyPatch) -> _Transport:
                 raise httpx.ConnectTimeout("timed out")
             return _Response()
 
-    monkeypatch.setattr("app.services.ai.httpx.AsyncClient", _Client)
+    monkeypatch.setattr("app.services.ai.ai.httpx.AsyncClient", _Client)
     return state
 
 

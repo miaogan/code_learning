@@ -13,10 +13,10 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
-from app import repository
+from app.core import repository
 from app.schemas import PolishResponse, PolishSuggestion, ResumeMeta
-from app.services.ai import AIClient
-from app.services.resume_polish import (
+from app.services.ai.ai import AIClient
+from app.services.resume.resume_polish import (
     MIN_SECTIONS,
     MIN_SUGGESTIONS,
     UNFILLED,
@@ -91,7 +91,7 @@ def _install_ai(
 
 @pytest.fixture(autouse=True)
 def _clean_polish_cache() -> Any:
-    from app.services import resume_polish
+    from app.services.resume import resume_polish
 
     resume_polish.clear_cache()
     yield

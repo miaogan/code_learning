@@ -13,9 +13,10 @@ from urllib.parse import quote
 
 from fastapi.testclient import TestClient
 
-from app import repository
+from app.core import repository
 from app.schemas import Report
-from app.services import coach_copy, markdown
+from app.services.report import markdown
+from app.services.resume import coach_copy
 
 # --- payload 构造（形状与 build_report 的真实产物一致）--------------------------------
 

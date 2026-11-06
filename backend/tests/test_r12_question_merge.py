@@ -24,9 +24,10 @@ from uuid import uuid4
 
 import pytest
 
-from app import repository
-from app.config import get_settings
-from app.services import question_bank, question_merge as qm, rules
+from app.core import repository
+from app.core.config import get_settings
+from app.services.assessment import question_bank, question_merge as qm
+from app.services.report import rules
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = BACKEND_ROOT.parent

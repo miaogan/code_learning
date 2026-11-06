@@ -8,16 +8,21 @@
 
 from fastapi import APIRouter, Depends
 
-from ..deps import current_user
-from ..schemas import ExamAnswers, ExamCreateRequest, ExamResult, ExamRun
-from ..services import exam as exam_service
+from app.deps import current_user
+from app.schemas import ExamAnswers, ExamCreateRequest, ExamResult, ExamRun
+from app.services.assessment import exam as exam_service
 
 router = APIRouter(prefix="/api/exams", tags=["exam"], dependencies=[Depends(current_user)])
 
 
-@router.post("", response_model=ExamRun, summary="依据画像出 ≥10 道笔试题（不含答案）")
+@router.post("", response_model=ExamRun, summary="依据画像出笔试题（可选指定方向/难度/题量）")
 def create_run(payload: ExamCreateRequest) -> ExamRun:
-    return exam_service.create_run(payload.profile_id)
+    return exam_service.create_run(
+        payload.profile_id,
+        direction=payload.direction,
+        difficulty=payload.difficulty,
+        question_count=payload.question_count,
+    )
 
 
 @router.post(

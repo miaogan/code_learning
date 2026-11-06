@@ -2,9 +2,9 @@
 
 from fastapi import APIRouter, Depends
 
-from ..deps import current_user
-from ..schemas import Course
-from ..services import courses
+from app.deps import current_user
+from app.schemas import Course
+from app.services.report import courses
 
 router = APIRouter(prefix="/api/courses", tags=["courses"], dependencies=[Depends(current_user)])
 

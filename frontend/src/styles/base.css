@@ -909,6 +909,41 @@ a {
   color: var(--text-secondary);
 }
 
+/* 笔试筛选控件（方向 / 难度 / 题量）：三列并排，窄屏折行。 */
+.sc-exam-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin: var(--sp-3) 0 var(--sp-2);
+}
+.sc-filter {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  min-width: 120px;
+}
+.sc-filter-label {
+  font-size: var(--fs-small);
+  color: var(--text-secondary);
+}
+.sc-filter-select {
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: var(--fs-base);
+  cursor: pointer;
+}
+.sc-filter-select:hover {
+  border-color: var(--accent-primary);
+}
+.sc-filter-select:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px var(--accent-primary-alpha);
+}
+
 /* 出分侧栏：56 环 + 分数 + 点评（内嵌面，左 2px accent 承载点评） */
 .sc-score-side {
   display: flex;

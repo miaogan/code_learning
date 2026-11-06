@@ -21,15 +21,12 @@ from pathlib import Path
 from typing import get_args
 
 from app.schemas import ExamKind, Profile
-from app.services import (
-    exam_selector,
-    interview as interview_service,
-    profile as profile_service,
-    question_bank,
-    resume_polish as resume_polish_service,
-    rules,
-)
-from app.services.ai import AIClient
+from app.services.ai.ai import AIClient
+from app.services.assessment import exam_selector, question_bank
+from app.services.interview import interview as interview_service
+from app.services.profile import profile as profile_service
+from app.services.report import rules
+from app.services.resume import resume_polish as resume_polish_service
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 APP_DIR = REPO_ROOT / "backend" / "app"
@@ -158,15 +155,15 @@ def test_run_logs_stay_out_of_git() -> None:
 #: 漏掉前缀会在 pytest 的 cwd=`backend/` 下解析成 `<repo>/app/...` 而 FileNotFoundError（QA D-1，
 #: 常驻回归见 `test_r6_touched_paths_resolve`）。
 R6_TOUCHED = (
-    "backend/app/db.py",
-    "backend/app/repository.py",
-    "backend/app/config.py",
+    "backend/app/core/db.py",
+    "backend/app/core/repository.py",
+    "backend/app/core/config.py",
     "backend/app/schemas.py",
-    "backend/app/services/rules.py",
-    "backend/app/services/question_bank.py",
-    "backend/app/services/proficiency.py",
-    "backend/app/services/exam_selector.py",
-    "backend/app/services/exam.py",
+    "backend/app/services/report/rules.py",
+    "backend/app/services/assessment/question_bank.py",
+    "backend/app/services/assessment/proficiency.py",
+    "backend/app/services/assessment/exam_selector.py",
+    "backend/app/services/assessment/exam.py",
     "backend/app/main.py",
 )
 
@@ -258,7 +255,7 @@ def test_ddl_lives_only_in_db_module() -> None:
 
 def test_question_tables_declared_in_db() -> None:
     """`questions`（11 列）+ `question_attempts`（6 列 + 唯一约束）必须幂等建表。"""
-    source = (APP_DIR / "db.py").read_text(encoding="utf-8")
+    source = (APP_DIR / "core" / "db.py").read_text(encoding="utf-8")
     questions = _ddl_block(source, "questions")
     attempts = _ddl_block(source, "question_attempts")
     for column in ("id", "direction", "kind", "difficulty", "essentiality", "prompt", "options", "answer", "source"):
@@ -273,7 +270,7 @@ def test_question_tables_declared_in_db() -> None:
 
 def test_proficiency_thresholds_only_from_config() -> None:
     """30 / 2 / 3 三个阈值只在 `config.Settings`（可环境变量覆盖），服务层不得写字面量。"""
-    from app.config import Settings
+    from app.core.config import Settings
 
     fields = Settings.model_fields
     for name, default in (
@@ -285,14 +282,14 @@ def test_proficiency_thresholds_only_from_config() -> None:
         assert fields[name].default == default, f"{name} 默认值应为 {default}"
 
     offenders: list[str] = []
-    for path in sorted(SERVICES.glob("*.py")):
+    for path in sorted(SERVICES.rglob("*.py")):
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if isinstance(node, ast.Constant) and type(node.value) is int and node.value == 30:
                 offenders.append(f"{path.name}:{node.lineno}")
     assert not offenders, f"窗口天数须来自 config.get_settings()，服务层出现 30 字面量：{offenders}"
 
-    rules_source = (SERVICES / "rules.py").read_text(encoding="utf-8")
+    rules_source = (SERVICES / "report" / "rules.py").read_text(encoding="utf-8")
     assert not re.search(r"PROFICIENCY|WINDOW_DAYS|RECENT_PAPER", rules_source), (
         "阈值常量漂回 rules.py（阈值与闭集分工，阈值只住 config.py）"
     )
@@ -301,15 +298,15 @@ def test_proficiency_thresholds_only_from_config() -> None:
 def test_single_usable_and_structure_gate() -> None:
     """`_usable` 只在 question_bank.py；结构闸门 build_paper 只在 exam_selector.py。"""
     defs = _python_defs()
-    assert defs.get("_usable") == ["backend/app/services/question_bank.py"], (
+    assert defs.get("_usable") == ["backend/app/services/assessment/question_bank.py"], (
         f"_usable 必须唯一一份且住 question_bank.py，实际：{defs.get('_usable')}"
     )
-    assert defs.get("build_paper") == ["backend/app/services/exam_selector.py"], (
+    assert defs.get("build_paper") == ["backend/app/services/assessment/exam_selector.py"], (
         f"结构闸门必须唯一一份且住 exam_selector.py，实际：{defs.get('build_paper')}"
     )
     # QA D-2：这两条只钉「exam.py 不得复活第二份」，**不是**全 `app/` 范围的命名禁令 ——
     # 其它模块的同名私有助手（如 `proficiency._ordered` 的作答排序）是合法实现，不得误伤。
-    exam_py = "backend/app/services/exam.py"
+    exam_py = "backend/app/services/assessment/exam.py"
     assert exam_py not in defs.get("_compose", []), "exam.py 不得保留第二份结构拼装 _compose"
     assert exam_py not in defs.get("_ordered", []), (
         "exam.py 不得复活确定性排序 _ordered（已由 exam_selector.rank_pool 取代）"
@@ -318,7 +315,7 @@ def test_single_usable_and_structure_gate() -> None:
 
 def test_closed_sets_single_source() -> None:
     """闭集只在 rules.py，且与 schemas.py 的 Literal 逐字相等。"""
-    rules_tree = _r6_ast("backend/app/services/rules.py")
+    rules_tree = _r6_ast("backend/app/services/report/rules.py")
     schemas_tree = _r6_ast("backend/app/schemas.py")
     for rule_name, literal_name in (
         ("DIFFICULTIES", "ExamDifficulty"),
@@ -363,7 +360,7 @@ def test_direction_literals_not_duplicated() -> None:
     """r6 改动面内除 rules.py 外不得再写字面方向（防止第二份闭集）。"""
     offenders: list[str] = []
     for rel in R6_TOUCHED:
-        if rel.endswith("services/rules.py"):
+        if rel.endswith("services/report/rules.py"):
             continue
         source = (REPO_ROOT / rel).read_text(encoding="utf-8")
         offenders += [f"{rel}: {direction}" for direction in DIRECTIONS if f'"{direction}"' in source]
@@ -475,13 +472,13 @@ def test_r7_closed_sets_not_duplicated() -> None:
     """门禁 40：闭集（方向/难度/必备级别）只能来自 `rules.py`，新服务不得复制字面量。"""
     closed = set(rules.DIRECTIONS) | set(rules.DIFFICULTIES) | set(rules.ESSENTIALITIES)
     for name in ("weakness.py", "role_fit.py"):
-        literals = _string_literals((SERVICES / name).read_text(encoding="utf-8"))
+        literals = _string_literals((SERVICES / "report" / name).read_text(encoding="utf-8"))
         assert not (literals & closed), f"{name} 复制了闭集字面量：{sorted(literals & closed)}"
 
 
 def test_r7_copy_parity() -> None:
     """门禁 42：`coach_copy.py` 的 6 条中文文案必须逐字出现在 `lib/coach.ts`（同源不漂移）。"""
-    backend = (SERVICES / "coach_copy.py").read_text(encoding="utf-8")
+    backend = (SERVICES / "resume" / "coach_copy.py").read_text(encoding="utf-8")
     frontend = (FRONTEND / "src/lib/coach.ts").read_text(encoding="utf-8")
     names = (
         "LEGACY_BLOCK_NOTICE",
@@ -558,8 +555,8 @@ def test_r8_profile_nullable_mirror() -> None:
     """
     schemas_py = (APP_DIR / "schemas.py").read_text(encoding="utf-8")
     types_ts = (FRONTEND / "src/api/types.ts").read_text(encoding="utf-8")
-    profile_py = (SERVICES / "profile.py").read_text(encoding="utf-8")
-    merge_py = (SERVICES / "profile_merge.py").read_text(encoding="utf-8")
+    profile_py = (SERVICES / "profile" / "profile.py").read_text(encoding="utf-8")
+    merge_py = (SERVICES / "profile" / "profile_merge.py").read_text(encoding="utf-8")
     profile_text_ts = (FRONTEND / "src/lib/profileText.ts").read_text(encoding="utf-8")
 
     project_cls = _py_class_block(schemas_py, "ProfileProject")
@@ -721,9 +718,9 @@ def test_r9_json_mode_closed_set_single_source() -> None:
     - 请求体形状：`{"type": "json_object"}` 与 `"response_format"` 在 `ai.py` 里各只出现一次
       （第二次注入 `response_format` ＝ 绕过投影表）。
     """
-    from app.config import DEFAULT_JSON_MODE, JSON_MODES, JsonMode
+    from app.core.config import DEFAULT_JSON_MODE, JSON_MODES, JsonMode
 
-    config_tree = _r6_ast("backend/app/config.py")
+    config_tree = _r6_ast("backend/app/core/config.py")
     literal_values = _literal_values(config_tree, "JsonMode")
     assert literal_values == {"json_object", "none"}, (
         f"JsonMode 闭集变成了 {sorted(literal_values)}（只允许 json_object / none）"
@@ -733,13 +730,13 @@ def test_r9_json_mode_closed_set_single_source() -> None:
         f"JSON_MODES {sorted(JSON_MODES)} 不再等于 get_args(JsonMode)"
     )
     assert DEFAULT_JSON_MODE in JSON_MODES
-    config_source = (APP_DIR / "config.py").read_text(encoding="utf-8")
+    config_source = (APP_DIR / "core" / "config.py").read_text(encoding="utf-8")
     assert re.search(r"JSON_MODES[^\n]*=\s*frozenset\(\s*get_args\(", config_source), (
         "JSON_MODES 必须由 get_args(JsonMode) 派生，不能另写一份同义字面量"
     )
 
-    ai_source = (SERVICES / "ai.py").read_text(encoding="utf-8")
-    projection = _dict_items(_r6_ast("backend/app/services/ai.py"), "_RESPONSE_FORMAT_BY_MODE")
+    ai_source = (SERVICES / "ai" / "ai.py").read_text(encoding="utf-8")
+    projection = _dict_items(_r6_ast("backend/app/services/ai/ai.py"), "_RESPONSE_FORMAT_BY_MODE")
     assert set(projection) == set(JSON_MODES), (
         f"投影表键集 {sorted(projection)} != json_mode 闭集 {sorted(JSON_MODES)}"
     )
@@ -765,10 +762,10 @@ def test_r9_ai_uses_runtime_not_naked_fields() -> None:
     `*.ai_*` 属性访问；此外 `resolve_ai()` 在 `ai.py` 只能出现一次（构造期快照），
     每请求现读会让一次请求内的模型 / 超时口径前后不一致。
     """
-    ai_source = (SERVICES / "ai.py").read_text(encoding="utf-8")
+    ai_source = (SERVICES / "ai" / "ai.py").read_text(encoding="utf-8")
     offenders = [name for name in _NAKED_AI_FIELDS if re.search(rf"\b{name}\b", ai_source)]
     assert not offenders, f"ai.py 又在直读裸配置字段：{offenders}（请改读 self._runtime）"
-    ai_tree = _r6_ast("backend/app/services/ai.py")
+    ai_tree = _r6_ast("backend/app/services/ai/ai.py")
     attributes = {
         node.attr for node in ast.walk(ai_tree) if isinstance(node, ast.Attribute)
     }
@@ -803,7 +800,7 @@ def test_r9_env_example_lists_provider_keys() -> None:
     assert env_path.is_file(), ".env.example 是配置示例的唯一出处，不得删除"
     env_text = env_path.read_text(encoding="utf-8")
 
-    settings_fields = _class_annotations(_r6_ast("backend/app/config.py"), "Settings")
+    settings_fields = _class_annotations(_r6_ast("backend/app/core/config.py"), "Settings")
     ai_fields = sorted(name for name in settings_fields if name.startswith("ai_"))
     assert {"ai_provider", "ai_json_mode", "ai_deepseek_model", "ai_lmstudio_model"} <= set(
         ai_fields
@@ -828,7 +825,7 @@ def test_r9_env_example_lists_provider_keys() -> None:
         "示例的 AI_LMSTUDIO_TIMEOUT_S 必须给可照抄的数值（留空/写 0 ＝继承全局 20s，本地画像必 503）"
     )
     example_timeout = float(example_match.group(1))
-    config_source = (REPO_ROOT / "backend" / "app" / "config.py").read_text(encoding="utf-8")
+    config_source = (REPO_ROOT / "backend" / "app" / "core" / "config.py").read_text(encoding="utf-8")
     config_match = re.search(
         r"^    ai_lmstudio_timeout_s: float = (\d+(?:\.\d+)?)$", config_source, re.MULTILINE
     )
@@ -854,13 +851,13 @@ def test_r9_env_example_lists_provider_keys() -> None:
 
 #: r11 改动面（仓库根相对）。蓝图 34 模块里的**产品文件**，逐条必须可解析。
 R11_TOUCHED = (
-    "backend/app/services/rules.py",
+    "backend/app/services/report/rules.py",
     "backend/app/schemas.py",
-    "backend/app/db.py",
-    "backend/app/repository.py",
-    "backend/app/services/question_backfill.py",
-    "backend/app/services/question_bank.py",
-    "backend/app/services/practice.py",
+    "backend/app/core/db.py",
+    "backend/app/core/repository.py",
+    "backend/app/services/assessment/question_backfill.py",
+    "backend/app/services/assessment/question_bank.py",
+    "backend/app/services/assessment/practice.py",
     "backend/app/routers/practice.py",
     "backend/app/main.py",
     "backend/app/seed/questions.json",
@@ -957,8 +954,8 @@ def test_r11_single_grading_function() -> None:
         f"客观题判分函数必须恰好一个（实际 {sorted(graders)}）：练习与笔试共用 exam.grade_objective"
     )
     files = graders["grade_objective"]
-    assert len(files) == 1 and files[0].endswith("services/exam.py"), (
-        f"grade_objective 必须唯一一份且住 services/exam.py，实际 {files}"
+    assert len(files) == 1 and files[0].endswith("services/assessment/exam.py"), (
+        f"grade_objective 必须唯一一份且住 services/assessment/exam.py，实际 {files}"
     )
 
     offenders: list[str] = []
@@ -999,7 +996,7 @@ def test_r11_single_grading_function() -> None:
 
 def test_r11_language_direction_single_source() -> None:
     """AC-1 / AC-12：语言闭集与「语言→方向归属」只在 `rules.py`，两侧镜像逐字一致。"""
-    rules_tree = _r6_ast("backend/app/services/rules.py")
+    rules_tree = _r6_ast("backend/app/services/report/rules.py")
     schemas_tree = _r6_ast("backend/app/schemas.py")
 
     declared = _literal_values(rules_tree, "LANGUAGES")
@@ -1068,7 +1065,7 @@ def test_r11_practice_closed_sets() -> None:
     特别钉住 r11 的**语义不对称**：`language` 的「全部」是 `"all"`，而 `""` 是「通用题」
     这个**闭集成员**——任何地方拿 `""` 表示「全部」都会让通用题筛不出来。
     """
-    rules_tree = _r6_ast("backend/app/services/rules.py")
+    rules_tree = _r6_ast("backend/app/services/report/rules.py")
     schemas_tree = _r6_ast("backend/app/schemas.py")
     types_ts = (FRONTEND / "src/api/types.ts").read_text(encoding="utf-8")
 
@@ -1146,7 +1143,7 @@ def test_r11_exam_excluded_kinds_default_empty() -> None:
         )
 
     if rules.EXAM_EXCLUDED_KINDS:
-        selector = (APP_DIR / "services" / "exam_selector.py").read_text(encoding="utf-8")
+        selector = (APP_DIR / "services" / "assessment" / "exam_selector.py").read_text(encoding="utf-8")
         assert "is_exam_objective_kind" in selector, (
             "EXAM_EXCLUDED_KINDS 非空但 exam_selector 仍用 is_objective_kind：开关是死的，卷面不会变"
         )
@@ -1206,7 +1203,7 @@ def test_r11_judge_reachable_in_exam_paper(monkeypatch) -> None:
         assert sum(k in ("single", "multiple") for k in degraded_kinds) >= 8
 
     # 4) 组卷侧必须真的消费组卷口径（不是只把常量拨了一半）
-    selector_src = (APP_DIR / "services" / "exam_selector.py").read_text(encoding="utf-8")
+    selector_src = (APP_DIR / "services" / "assessment" / "exam_selector.py").read_text(encoding="utf-8")
     assert "is_exam_objective_kind" in selector_src
     assert "is_objective_kind" not in selector_src.replace("is_exam_objective_kind", ""), (
         "exam_selector 仍残留裸 is_objective_kind：取池与计数会绕开降级开关"
@@ -1249,8 +1246,8 @@ def test_r11_touched_paths_resolve() -> None:
 
 #: r12 改动面（仓库根相对）：6 个代码/数据文件 + 2 件任务夹产物（许可 NOTICE、导入报表）。
 R12_TOUCHED = (
-    "backend/app/services/question_merge.py",
-    "backend/app/repository.py",
+    "backend/app/services/assessment/question_merge.py",
+    "backend/app/core/repository.py",
     "backend/app/seed/questions.json",
     "backend/tests/test_r12_question_merge.py",
     "backend/tests/test_question_bank_quality.py",
@@ -1260,10 +1257,10 @@ R12_TOUCHED = (
 )
 
 #: 离线合并工具本身（不是运行时模块：门禁 2 的依据）。
-R12_MERGE_TOOL = "backend/app/services/question_merge.py"
+R12_MERGE_TOOL = "backend/app/services/assessment/question_merge.py"
 
 #: r13 打乱库（同样只在离线跑；它委托合并工具写盘，故两件工具互为合法引用对象）。
-R13_SHUFFLE_TOOL = "backend/app/services/question_shuffle.py"
+R13_SHUFFLE_TOOL = "backend/app/services/assessment/question_shuffle.py"
 
 #: 离线工具白名单：运行时不得把其中任何一个拉进启动路径，工具间互引则允许。
 OFFLINE_TOOLS = (R12_MERGE_TOOL, R13_SHUFFLE_TOOL)
@@ -1311,10 +1308,14 @@ def test_r12_merge_tool_not_imported_by_runtime() -> None:
     tree = _r6_ast(R12_MERGE_TOOL)
     imported: set[str] = set()
     for node in ast.walk(tree):
-        if isinstance(node, ast.ImportFrom) and node.level:
+        # 兼容两种写法：相对导入（node.level 非 0）与 app 内部的绝对导入；标准库/三方不纳入。
+        if isinstance(node, ast.ImportFrom) and (
+            node.level or (node.module or "").split(".")[0] == "app"
+        ):
             imported.update(alias.name for alias in node.names)
-    assert imported == {"repository", "question_bank", "rules"}, (
-        "合并工具只允许依赖这三处（唯一 SQL 出口 / 种子读口径 / 闭集与方向归属），"
+    assert imported == {"repository", "question_bank", "question_shuffle", "rules"}, (
+        "合并工具只允许依赖这三处（唯一 SQL 出口 / 种子读口径 / 闭集与方向归属）"
+        "加上离线工具互引（question_shuffle），"
         f"实际：{sorted(imported)}"
     )
 

@@ -1,6 +1,6 @@
 """精选课程清单的 AC-6 下限校验与匹配兜底。"""
 
-from app.services import courses
+from app.services.report import courses
 
 
 def test_catalog_meets_quantity_floor() -> None:

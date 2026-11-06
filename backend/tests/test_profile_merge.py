@@ -21,10 +21,11 @@ from typing import Any
 
 import pytest
 
-from app import repository, schemas
+from app import schemas
+from app.core import repository
 from app.schemas import Profile, ProfileDraft, ResumeMeta
-from app.services import profile_merge
-from app.services.profile import generate_profile
+from app.services.profile import profile_merge
+from app.services.profile.profile import generate_profile
 
 #: 生产模块源码：AC-9 的「零重复模型」据此做源码级断言（而非运行期反射）。
 PROFILE_MERGE_SOURCE = Path(profile_merge.__file__)

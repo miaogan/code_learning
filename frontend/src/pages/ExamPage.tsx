@@ -27,6 +27,31 @@ const CREATE_PHASES = ['读取画像方向', '按方向选题组卷', '校验客
 type Stage = 'idle' | 'creating' | 'running' | 'submitting' | 'submitted'
 type View = 'gate' | 'empty' | 'error' | Stage
 
+/** 方向闭集：与后端 `rules.DIRECTIONS` 逐字一致，改动必须同步两处。 */
+const DIRECTION_OPTIONS: { value: string | null; label: string }[] = [
+  { value: null, label: '按画像智能组卷' },
+  { value: '前端', label: '前端' },
+  { value: '后端', label: '后端' },
+  { value: '算法与数据结构', label: '算法与数据结构' },
+  { value: '计算机基础', label: '计算机基础' },
+  { value: 'AI 工程', label: 'AI 工程' },
+  { value: '中间件与运维', label: '中间件与运维' },
+  { value: 'SQL 与数据库', label: 'SQL 与数据库' },
+  { value: '研发工程实践', label: '研发工程实践' },
+]
+const DIFFICULTY_OPTIONS: { value: string | null; label: string }[] = [
+  { value: null, label: '不限难度' },
+  { value: 'basic', label: '基础（basic）' },
+  { value: 'intermediate', label: '进阶（intermediate）' },
+  { value: 'challenge', label: '挑战（challenge）' },
+]
+const QUESTION_COUNT_OPTIONS: { value: number | null; label: string }[] = [
+  { value: null, label: '默认 10–12' },
+  { value: 12, label: '12 题' },
+  { value: 15, label: '15 题' },
+  { value: 20, label: '20 题' },
+]
+
 function isAnswered(value: string[] | string | undefined): boolean {
   if (value === undefined) return false
   if (Array.isArray(value)) return value.length > 0
@@ -55,6 +80,9 @@ export default function ExamPage() {
   const [pendingLeave, setPendingLeave] = useState<string | null>(null)
   const [createElapsed, setCreateElapsed] = useState(0)
   const [runElapsed, setRunElapsed] = useState(0)
+  const [filterDirection, setFilterDirection] = useState<string | null>(null)
+  const [filterDifficulty, setFilterDifficulty] = useState<string | null>(null)
+  const [filterCount, setFilterCount] = useState<number | null>(null)
 
   const attemptRef = useRef(0)
   const mountedRef = useRef(true)
@@ -157,7 +185,12 @@ export default function ExamPage() {
     setConfirmOpen(false)
     setCreateElapsed(0)
     try {
-      const created = await api.createExam({ profile_id: profile.id })
+      const created = await api.createExam({
+        profile_id: profile.id,
+        direction: filterDirection,
+        difficulty: filterDifficulty,
+        question_count: filterCount,
+      })
       if (attemptRef.current !== attempt || !mountedRef.current) return
       const objective = created.questions.filter((item) => item.kind !== 'text').length
       if (created.questions.length < MIN_QUESTIONS || objective < MIN_OBJECTIVE) {
@@ -260,6 +293,52 @@ export default function ExamPage() {
           <p className="sc-qcard-hint">
             单选 / 多选 / 简答三型混排，客观题多选题必须完全匹配才得分；简答不计入客观题数。计时从出卷后开始，仅记录用时。
           </p>
+
+          <div className="sc-exam-filters">
+            <label className="sc-filter">
+              <span className="sc-filter-label">方向</span>
+              <select
+                className="sc-filter-select"
+                value={filterDirection ?? ''}
+                onChange={(e) => setFilterDirection(e.target.value || null)}
+              >
+                {DIRECTION_OPTIONS.map((opt) => (
+                  <option key={opt.label} value={opt.value ?? ''}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="sc-filter">
+              <span className="sc-filter-label">难度</span>
+              <select
+                className="sc-filter-select"
+                value={filterDifficulty ?? ''}
+                onChange={(e) => setFilterDifficulty(e.target.value || null)}
+              >
+                {DIFFICULTY_OPTIONS.map((opt) => (
+                  <option key={opt.label} value={opt.value ?? ''}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="sc-filter">
+              <span className="sc-filter-label">题量</span>
+              <select
+                className="sc-filter-select"
+                value={filterCount ?? ''}
+                onChange={(e) => setFilterCount(e.target.value ? Number(e.target.value) : null)}
+              >
+                {QUESTION_COUNT_OPTIONS.map((opt) => (
+                  <option key={opt.label} value={opt.value ?? ''}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
           {createError ? (
             <InlineError message={createError} onRetry={() => void startExam()} retryLabel="重新出卷" />
           ) : null}

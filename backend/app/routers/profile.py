@@ -19,21 +19,21 @@ from typing import Any
 
 from fastapi import APIRouter, Depends
 
-from .. import repository
-from ..context import set_current_user_id
-from ..deps import CurrentUser, current_user
-from ..errors import NOT_FOUND, AppError
-from ..schemas import (
+from app.core import repository
+from app.core.context import set_current_user_id
+from app.core.errors import NOT_FOUND, AppError
+from app.deps import CurrentUser, current_user
+from app.schemas import (
     Profile,
     ProfileJobStarted,
     ProfileJobStatus,
     ProfilePatch,
     ProfileWithMerge,
 )
-from ..services import user_ai
-from ..services.ai import AIClient
-from ..services.profile import generate_profile
-from ..services.profile_merge import backfill_evidence
+from app.services.ai import user_ai
+from app.services.ai.ai import AIClient
+from app.services.profile.profile import generate_profile
+from app.services.profile.profile_merge import backfill_evidence
 
 router = APIRouter(prefix="/api", tags=["profile"], dependencies=[Depends(current_user)])
 

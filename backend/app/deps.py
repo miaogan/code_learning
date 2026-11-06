@@ -9,10 +9,10 @@ from typing import Annotated, Any
 
 from fastapi import Depends, Request
 
-from . import repository
-from .auth import COOKIE_NAME, token_digest
-from .context import set_current_user_id
-from .errors import AUTH_DISABLED, AUTH_REQUIRED, AppError
+from app.core import repository
+from app.core.auth import COOKIE_NAME, token_digest
+from app.core.context import set_current_user_id
+from app.core.errors import AUTH_DISABLED, AUTH_REQUIRED, AppError
 
 
 async def current_user(request: Request) -> dict[str, Any]:

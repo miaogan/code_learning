@@ -8,9 +8,9 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from app.errors import AI_SCHEMA_INVALID, AppError
+from app.core.errors import AI_SCHEMA_INVALID, AppError
 from app.schemas import Profile, ProfileDraft, ProfileSkill
-from app.services import profile as profile_service
+from app.services.profile import profile as profile_service
 
 INVENTED_QUOTE = "精通 Kubernetes 多集群运维与 Istio 服务网格治理"
 

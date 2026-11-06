@@ -24,10 +24,10 @@ from uuid import uuid4
 
 import pytest
 
-from app import repository
-from app.config import get_settings
-from app.services import proficiency
-from app.services.proficiency import (
+from app.core import repository
+from app.core.config import get_settings
+from app.services.assessment import proficiency
+from app.services.assessment.proficiency import (
     Attempt,
     attempts_by_question,
     evaluate,
