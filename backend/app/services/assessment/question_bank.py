@@ -90,6 +90,7 @@ def _row_of(question: dict[str, Any]) -> dict[str, Any]:
     return {
         "id": str(question["id"]).strip(),
         "direction": str(question.get("direction") or "").strip(),
+        "sub_direction": question.get("sub_direction"),
         "kind": str(question.get("kind") or "").strip(),
         "difficulty": difficulty if difficulty in rules.DIFFICULTIES else _DEFAULT_DIFFICULTY,
         "essentiality": rules.essentiality_of(question),

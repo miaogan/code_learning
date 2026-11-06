@@ -578,8 +578,8 @@ def fill_empty_question_columns(rows: list[dict[str, Any]]) -> int:
 
 
 _QUESTION_REFRESH = (
-    "UPDATE questions SET direction = ?, kind = ?, difficulty = ?, essentiality = ?, prompt = ?, "
-    "options = ?, answer = ?, source = ?, language = ?, explanation = ?, updated_at = ? "
+    "UPDATE questions SET direction = ?, sub_direction = ?, kind = ?, difficulty = ?, essentiality = ?, "
+    "prompt = ?, options = ?, answer = ?, source = ?, language = ?, explanation = ?, updated_at = ? "
     "WHERE id = ?"
 )
 
@@ -588,6 +588,7 @@ def _normalized_question(question: dict[str, Any]) -> dict[str, Any]:
     """种子行 / 库行 → 可逐字段比对的扁平字典（JSON 列统一按序列化文本比，避免 list/dict 顺序噪声）。"""
     return {
         "direction": str(question.get("direction") or ""),
+        "sub_direction": question.get("sub_direction"),
         "kind": str(question.get("kind") or ""),
         "difficulty": str(question.get("difficulty") or ""),
         "essentiality": str(question.get("essentiality") or ""),
@@ -626,6 +627,7 @@ def refresh_questions(rows: list[dict[str, Any]]) -> int:
                 _QUESTION_REFRESH,
                 (
                     expected["direction"],
+                    expected["sub_direction"],
                     expected["kind"],
                     expected["difficulty"],
                     expected["essentiality"],
