@@ -76,6 +76,9 @@ export function ProfileDimension({
     setExpandedKey((current) => (current === entryKey ? null : entryKey))
   }
 
+  /** 技能详情（简历原文 + 编辑/删除）在标签行下方独占整行，避免窄列里被挤成竖条。 */
+  const expandedEntry = entries.find((entry) => entry.key === expandedKey) ?? null
+
   const editorIfEditing = editing ? editor : null
 
   return (
@@ -94,41 +97,63 @@ export function ProfileDimension({
           entries.length === 0 ? (
             <p className="sc-meta-line">{emptyHint}</p>
           ) : (
-            <div className="sc-chips" aria-label={title}>
-              {entries.map((entry) => (
-                <div key={entry.key}>
-                  <button
-                    type="button"
-                    aria-expanded={expandedKey === entry.key}
-                    onClick={() => toggleEntry(entry.key)}
-                  >
-                    <Chip label={entry.title} />
-                  </button>
-                  {expandedKey === entry.key ? (
-                    <div className="sc-source-quote">
-                      <span className="sc-source-quote-label">简历原文</span>
-                      {hasQuote(entry) ? (
-                        <p>{entry.sourceQuote}</p>
-                      ) : (
-                        <InlineError message="缺失来源：该条无法溯源，建议删除或补充原文" />
-                      )}
-                      <div className="sc-btn-row">
-                        {onEditEntry ? (
-                          <Button variant="ghost" onClick={() => onEditEntry(entry.key)} disabled={saving}>
-                            编辑
-                          </Button>
-                        ) : null}
-                        {onDeleteEntry ? (
-                          <Button variant="ghost" onClick={() => onDeleteEntry(entry.key)} disabled={saving}>
-                            删除
-                          </Button>
-                        ) : null}
-                      </div>
-                    </div>
-                  ) : null}
+            <>
+              <div className="sc-lab-skills" role="group" aria-label={title}>
+                {entries.map((entry) => {
+                  const open = expandedKey === entry.key
+                  const quoted = hasQuote(entry)
+                  const classes = ['sc-lab-skill']
+                  if (open) classes.push('is-open')
+                  if (!quoted) classes.push('is-missing')
+                  return (
+                    <button
+                      key={entry.key}
+                      type="button"
+                      className={classes.join(' ')}
+                      aria-expanded={open}
+                      onClick={() => toggleEntry(entry.key)}
+                    >
+                      <span className="sc-lab-skill-mark" aria-hidden="true" />
+                      <span className="sc-lab-skill-name">{entry.title}</span>
+                      <span className="sc-lab-skill-cue" aria-hidden="true">
+                        {open ? '−' : '+'}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+
+              {expandedEntry !== null ? (
+                <div className="sc-source-quote sc-lab-skill-detail">
+                  <span className="sc-source-quote-label">{`简历原文 · ${expandedEntry.title}`}</span>
+                  {hasQuote(expandedEntry) ? (
+                    <p>{expandedEntry.sourceQuote}</p>
+                  ) : (
+                    <InlineError message="缺失来源：该条无法溯源，建议删除或补充原文" />
+                  )}
+                  <div className="sc-btn-row">
+                    {onEditEntry ? (
+                      <Button
+                        variant="ghost"
+                        onClick={() => onEditEntry(expandedEntry.key)}
+                        disabled={saving}
+                      >
+                        编辑
+                      </Button>
+                    ) : null}
+                    {onDeleteEntry ? (
+                      <Button
+                        variant="ghost"
+                        onClick={() => onDeleteEntry(expandedEntry.key)}
+                        disabled={saving}
+                      >
+                        删除
+                      </Button>
+                    ) : null}
+                  </div>
                 </div>
-              ))}
-            </div>
+              ) : null}
+            </>
           )
         ) : dimension === 'tech_stack' ? (
           entries.length === 0 ? (

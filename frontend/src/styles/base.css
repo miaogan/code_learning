@@ -6670,3 +6670,104 @@ body {
     animation: none;
   }
 }
+
+/* ============================================================
+   r39 · 技术画像 · 技能标签（仪器寄存器）
+   原技能标签是 24px 圆角 chip：高度、底色、边框全部相同，
+   既没有「可溯源 / 缺失来源」的状态区分，也没有可展开的提示，
+   点开后原文还会挤在窄列里把标签行撑乱。
+   现改为等宽寄存器：左侧信号方块（可溯源 / 缺失）、右侧 +/− 折叠提示，
+   原文详情独占标签行下方整行。
+   ============================================================ */
+.sc-lab-skills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+.sc-lab-skill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  max-width: 100%;
+  height: var(--lab-chip-h);
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: border-color var(--fast) var(--ease), background-color var(--fast) var(--ease),
+    color var(--fast) var(--ease);
+}
+
+.sc-lab-skill:hover {
+  border-color: var(--border-strong);
+  background: var(--overlay-03);
+  color: var(--text-primary);
+}
+
+.sc-lab-skill.is-open {
+  border-color: var(--accent-line-30);
+  background: var(--accent-wash-06);
+  color: var(--accent-soft);
+}
+
+/* 信号方块：有简历原文 = 信号色；缺失来源 = 语义色（点开另有显式错误条） */
+.sc-lab-skill-mark {
+  flex: none;
+  width: var(--sp-1);
+  height: var(--sp-1);
+  background: var(--accent);
+}
+
+.sc-lab-skill.is-missing .sc-lab-skill-mark {
+  background: var(--danger);
+}
+
+.sc-lab-skill-name {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.sc-lab-skill-cue {
+  flex: none;
+  color: var(--text-tertiary);
+  font-size: var(--fs-nano);
+  line-height: var(--lh-nano);
+}
+
+.sc-lab-skill.is-open .sc-lab-skill-cue {
+  color: var(--accent);
+}
+
+.sc-lab-skill-detail {
+  margin-top: var(--sp-2);
+  animation: sc-lab-skill-in var(--base) var(--ease);
+}
+
+@keyframes sc-lab-skill-in {
+  from {
+    opacity: 0;
+    transform: translateY(calc(-1 * var(--sp-1)));
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sc-lab-skill-detail {
+    animation: none;
+  }
+}
+
