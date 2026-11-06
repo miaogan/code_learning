@@ -319,6 +319,9 @@ class ExamCreateRequest(BaseModel):
     profile_id: str
     #: 指定方向（取值见 rules.DIRECTIONS）。None = 不过滤。
     direction: str | None = None
+    #: 指定二级方向（如 "python" / "react" / "动态规划"，取值见 rules.SUBDIRECTIONS[direction]）。
+    #: None = 不过滤；传值时**必须**同时传 direction（二级方向从属于一级方向）。
+    sub_direction: str | None = None
     #: 指定难度档（如 "basic" 或 ("basic", "intermediate")）。None = 不过滤。
     difficulty: str | tuple[str, ...] | None = None
     #: 目标题量。None = 默认 10–12。至少 10，低于会被结构闸门拒掉。
@@ -329,6 +332,7 @@ class ExamQuestion(BaseModel):
     id: str
     kind: ExamKind
     direction: str
+    sub_direction: str | None = None
     prompt: str
     options: list[ExamOption]
 

@@ -382,15 +382,17 @@ def select_paper(
     recent: list[set[str]],
     rng: random.Random | None = None,
     direction: str | None = None,
+    sub_direction: str | None = None,
     difficulty: str | Sequence[str] | None = None,
     target_count: int | None = None,
 ) -> Paper | None:
     """L1→L6 逐层换池建卷，返回命中的 `Paper`；**只有 L6 也不足**才返回 `None`（调用方 400）。
 
-    新增三个可选筛选参数：`direction` / `difficulty` / `target_count`。传入时在每层 attempt
-    内部对候选池先做硬过滤再组卷，保持 6 层阶梯顺序不变；`target_count` 同时影响
-    `build_paper()` 的上限（默认 12），下限由 `rules.MIN_EXAM_QUESTIONS` 硬兜住。
-    不传三个参数 → 行为与改造前逐字节一致（向后兼容）。
+    新增可选筛选参数：`direction` / `sub_direction` / `difficulty` / `target_count`。
+    传入时在每层 attempt 内部对候选池先做硬过滤再组卷，保持 6 层阶梯顺序不变；
+    不传任何筛选 → 行为与改造前逐字节一致（向后兼容）。
+    注意：传了 `sub_direction` 但没传 `direction` 时，会在 direction 闭集中找该子方向
+    归属的父方向（自动补 direction），不需要调用方同时传。
     """
     available = [
         question
@@ -400,7 +402,7 @@ def select_paper(
     by_id = {str(question["id"]): question for question in available}
     known = set(by_id)
 
-    # --- 全局硬过滤（方向 / 难度）：作用于 6 层阶梯共享的 `known` 集合 -------------------
+    # --- 全局硬过滤（方向 / 子方向 / 难度）：作用于 6 层阶梯共享的 `known` 集合 ---------
     difficulty_set: set[str] | None = None
     if difficulty is not None:
         if isinstance(difficulty, str):
@@ -409,11 +411,23 @@ def select_paper(
             difficulty_set = {str(item) for item in difficulty if str(item).strip()}
     if direction is not None:
         direction = direction.strip() or None
-    if direction is not None or difficulty_set is not None:
+    if sub_direction is not None:
+        sub_direction = sub_direction.strip() or None
+        # 传了 sub_direction 但没传 direction → 自动查归属
+        if direction is None and sub_direction is not None:
+            for d, subs in rules.SUBDIRECTIONS.items():
+                if sub_direction in subs:
+                    direction = d
+                    break
+    if direction is not None or sub_direction is not None or difficulty_set is not None:
         known = {
             question_id
             for question_id in known
             if (direction is None or str(by_id[question_id].get("direction") or "").strip() == direction)
+            and (
+                sub_direction is None
+                or (by_id[question_id].get("sub_direction") or "") == sub_direction
+            )
             and (
                 difficulty_set is None
                 or str(by_id[question_id].get("difficulty") or "").strip() in difficulty_set

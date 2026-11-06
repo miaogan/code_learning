@@ -52,6 +52,18 @@ const QUESTION_COUNT_OPTIONS: { value: number | null; label: string }[] = [
   { value: 20, label: '20 题' },
 ]
 
+/** 二级方向闭集：与后端 `rules.SUBDIRECTIONS` 逐字一致，改动必须同步两处。 */
+const SUBDIRECTIONS: Record<string, string[]> = {
+  '前端': ['react', 'vue3', 'js', 'ts', 'css', 'html', '通用前端'],
+  '后端': ['python', 'java', 'go', '通用后端'],
+  '算法与数据结构': ['动态规划', '二叉树与递归', '链表', '排序', '图', '复杂度', '哈希', '通用算法'],
+  '计算机基础': ['操作系统', '网络', '组成原理', '通用基础'],
+  'AI 工程': ['LLM 与 RAG', 'Agent', 'Prompt 工程', '部署与推理', '通用 AI'],
+  '中间件与运维': ['Docker 与容器', 'Nginx', 'Redis', '消息队列', '监控与日志', 'CI-CD', '通用运维'],
+  'SQL 与数据库': ['SQL 基础', '事务与 ACID', '索引', 'NoSQL', '通用数据库'],
+  '研发工程实践': ['Git 与版本控制', '测试', 'CI-CD', '架构设计', '通用工程实践'],
+}
+
 function isAnswered(value: string[] | string | undefined): boolean {
   if (value === undefined) return false
   if (Array.isArray(value)) return value.length > 0
@@ -81,6 +93,7 @@ export default function ExamPage() {
   const [createElapsed, setCreateElapsed] = useState(0)
   const [runElapsed, setRunElapsed] = useState(0)
   const [filterDirection, setFilterDirection] = useState<string | null>(null)
+  const [filterSubDirection, setFilterSubDirection] = useState<string | null>(null)
   const [filterDifficulty, setFilterDifficulty] = useState<string | null>(null)
   const [filterCount, setFilterCount] = useState<number | null>(null)
 
@@ -188,6 +201,7 @@ export default function ExamPage() {
       const created = await api.createExam({
         profile_id: profile.id,
         direction: filterDirection,
+        sub_direction: filterSubDirection,
         difficulty: filterDifficulty,
         question_count: filterCount,
       })
@@ -300,12 +314,31 @@ export default function ExamPage() {
               <select
                 className="sc-filter-select"
                 value={filterDirection ?? ''}
-                onChange={(e) => setFilterDirection(e.target.value || null)}
+                onChange={(e) => {
+                  const dir = e.target.value || null
+                  setFilterDirection(dir)
+                  setFilterSubDirection(null) // direction 变了，子方向必须重选
+                }}
               >
                 {DIRECTION_OPTIONS.map((opt) => (
                   <option key={opt.label} value={opt.value ?? ''}>
                     {opt.label}
                   </option>
+                ))}
+              </select>
+            </label>
+            <label className="sc-filter">
+              <span className="sc-filter-label">子方向</span>
+              <select
+                className="sc-filter-select"
+                value={filterSubDirection ?? ''}
+                onChange={(e) => setFilterSubDirection(e.target.value || null)}
+                disabled={!filterDirection}
+                title={filterDirection ? '按所选一级方向选子方向' : '请先选一级方向'}
+              >
+                <option value="">不限（该方向全部）</option>
+                {filterDirection && SUBDIRECTIONS[filterDirection]?.map((sub) => (
+                  <option key={sub} value={sub}>{sub}</option>
                 ))}
               </select>
             </label>

@@ -15,11 +15,12 @@ from app.services.assessment import exam as exam_service
 router = APIRouter(prefix="/api/exams", tags=["exam"], dependencies=[Depends(current_user)])
 
 
-@router.post("", response_model=ExamRun, summary="依据画像出笔试题（可选指定方向/难度/题量）")
+@router.post("", response_model=ExamRun, summary="依据画像出笔试题（可选指定方向/子方向/难度/题量）")
 def create_run(payload: ExamCreateRequest) -> ExamRun:
     return exam_service.create_run(
         payload.profile_id,
         direction=payload.direction,
+        sub_direction=payload.sub_direction,
         difficulty=payload.difficulty,
         question_count=payload.question_count,
     )

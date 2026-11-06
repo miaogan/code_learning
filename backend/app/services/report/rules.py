@@ -62,6 +62,32 @@ MAX_EXAM_QUESTIONS = 12
 DIRECTIONS: tuple[str, ...] = ("前端", "后端", "算法与数据结构", "计算机基础", "AI 工程", "中间件与运维", "SQL 与数据库", "研发工程实践")
 DIFFICULTIES: tuple[str, ...] = ("basic", "intermediate", "challenge")
 ESSENTIALITIES: tuple[str, ...] = ("must_know", "advanced", "nice_to_know")
+#: 二级方向闭集：direction → 其下所有合法 sub_direction（含"通用 XX"兜底）。
+#: 闭集只此一份：schema / 组卷筛选 / 前端下拉一律从这里派生。
+#: 扩展子方向只需在对应 tuple 末尾追加字符串，其余地方零改动。
+SUBDIRECTIONS: dict[str, tuple[str, ...]] = {
+    "前端": ("react", "vue3", "js", "ts", "css", "html", "通用前端"),
+    "后端": ("python", "java", "go", "通用后端"),
+    "算法与数据结构": ("动态规划", "二叉树与递归", "链表", "排序", "图", "复杂度", "哈希", "通用算法"),
+    "计算机基础": ("操作系统", "网络", "组成原理", "通用基础"),
+    "AI 工程": ("LLM 与 RAG", "Agent", "Prompt 工程", "部署与推理", "通用 AI"),
+    "中间件与运维": ("Docker 与容器", "Nginx", "Redis", "消息队列", "监控与日志", "CI-CD", "通用运维"),
+    "SQL 与数据库": ("SQL 基础", "事务与 ACID", "索引", "NoSQL", "通用数据库"),
+    "研发工程实践": ("Git 与版本控制", "测试", "CI-CD", "架构设计", "通用工程实践"),
+}
+
+
+def is_valid_sub_direction(direction: str, sub_direction: str | None) -> bool:
+    """校验 sub_direction 是否属于该 direction 的闭集。None 视为合法（不指定子方向时）。"""
+    if sub_direction is None:
+        return True
+    return sub_direction in SUBDIRECTIONS.get(direction, ())
+
+
+def generic_sub_direction_of(direction: str) -> str:
+    """direction 对应的兜底 sub_direction。约定 SUBDIRECTIONS[direction] 的最后一项就是兜底名。"""
+    subs = SUBDIRECTIONS.get(direction, ())
+    return subs[-1] if subs else f"通用{direction}"
 #: 组卷兜底阶梯：L1 最优 → L6 全库兜底，**顺序即优先级**，任何一层都不得因过滤而返回 400。
 PAPER_STAGES: tuple[str, ...] = ("L1", "L2", "L3", "L4", "L5", "L6")
 #: 客观题闭集（`ExamKind` 里 `text` 是简答题）：只有它们判分并写熟练度事件。

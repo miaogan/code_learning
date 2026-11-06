@@ -214,6 +214,8 @@ export interface ExamCreateRequest {
   profile_id: string
   /** 指定方向（如 "前端"），不传则不过滤 */
   direction?: string | null
+  /** 指定二级方向（如 "python" / "react" / "动态规划"），不传则不过滤。传时建议同时传 direction */
+  sub_direction?: string | null
   /** 指定难度档（如 "basic" 或 ["basic", "intermediate"]），不传则不过滤 */
   difficulty?: string | string[] | null
   /** 目标题量，不传则默认 10–12，下限 10、上限 20 */

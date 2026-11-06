@@ -105,6 +105,7 @@ CREATE INDEX IF NOT EXISTS idx_timeline_occurred ON timeline_events (occurred_at
 CREATE TABLE IF NOT EXISTS questions (
     id           TEXT PRIMARY KEY,
     direction    TEXT NOT NULL,
+    sub_direction TEXT,                    -- 二级方向（如 python / react / 动态规划）；None = 通用
     kind         TEXT NOT NULL,
     difficulty   TEXT NOT NULL,   -- basic | intermediate | challenge
     essentiality TEXT NOT NULL,   -- must_know | advanced | nice_to_know
@@ -138,8 +139,10 @@ CREATE TABLE IF NOT EXISTS question_attempts (
 SCHEMA_INDEXES = """
 -- 选池的唯一索引：按 (direction, difficulty) 取候选池时不必扫全表。
 -- r11 组卷侧排除开关与按语言筛选都需要 language 进索引。
-CREATE INDEX IF NOT EXISTS idx_questions_pool      ON questions (direction, difficulty);
-CREATE INDEX IF NOT EXISTS idx_questions_lang_pool ON questions (language, direction, difficulty);
+-- r16 二级方向过滤（sub_direction）进第三个索引，按 (direction, sub_direction) 取子池时快。
+CREATE INDEX IF NOT EXISTS idx_questions_pool       ON questions (direction, difficulty);
+CREATE INDEX IF NOT EXISTS idx_questions_lang_pool  ON questions (language, direction, difficulty);
+CREATE INDEX IF NOT EXISTS idx_questions_subdir_pool ON questions (direction, sub_direction, difficulty);
 
 -- 熟练度窗口读取口径：按题取该题的作答序列（`answered_at` 升序）。
 -- r11 练习事件按 run 聚合（错题本 / 会话统计）需要 run_id 索引。
@@ -209,6 +212,7 @@ CREATE INDEX IF NOT EXISTS idx_attempts_user       ON question_attempts (user_id
 _ADDED_COLUMNS: tuple[tuple[str, str, str], ...] = (
     ("questions", "language", "TEXT NOT NULL DEFAULT ''"),
     ("questions", "explanation", "TEXT NOT NULL DEFAULT ''"),
+    ("questions", "sub_direction", "TEXT"),
     ("question_attempts", "source", "TEXT NOT NULL DEFAULT 'exam'"),
 )
 

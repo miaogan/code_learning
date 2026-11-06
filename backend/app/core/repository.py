@@ -466,14 +466,14 @@ def _json_list(value: Any) -> list[Any]:
 
 
 _QUESTION_INSERT = (
-    "INSERT INTO questions (id, direction, kind, difficulty, essentiality, prompt, "
+    "INSERT INTO questions (id, direction, sub_direction, kind, difficulty, essentiality, prompt, "
     "options, answer, source, language, explanation, created_at, updated_at) "
-    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
     "ON CONFLICT(id) DO NOTHING"
 )
 
 _QUESTION_SELECT = (
-    "SELECT id, direction, kind, difficulty, essentiality, prompt, options, answer, source, "
+    "SELECT id, direction, sub_direction, kind, difficulty, essentiality, prompt, options, answer, source, "
     "language, explanation "
     "FROM questions"
 )
@@ -487,9 +487,10 @@ _QUESTION_FILL = (
     "UPDATE questions SET "
     "language = CASE WHEN language = '' AND ? <> '' THEN ? ELSE language END, "
     "explanation = CASE WHEN explanation = '' AND ? <> '' THEN ? ELSE explanation END, "
+    "sub_direction = CASE WHEN sub_direction IS NULL AND ? IS NOT NULL THEN ? ELSE sub_direction END, "
     "updated_at = ? "
     "WHERE id = ? "
-    "AND ((language = '' AND ? <> '') OR (explanation = '' AND ? <> ''))"
+    "AND ((language = '' AND ? <> '') OR (explanation = '' AND ? <> '') OR (sub_direction IS NULL AND ? IS NOT NULL))"
 )
 
 
@@ -507,6 +508,7 @@ def insert_question(question: dict[str, Any]) -> bool:
             (
                 question["id"],
                 question["direction"],
+                question.get("sub_direction"),
                 question["kind"],
                 question["difficulty"],
                 question["essentiality"],
@@ -528,6 +530,7 @@ def _question_of(row: sqlite3.Row) -> dict[str, Any]:
     return {
         "id": row["id"],
         "direction": row["direction"],
+        "sub_direction": row["sub_direction"],
         "kind": row["kind"],
         "difficulty": row["difficulty"],
         "essentiality": row["essentiality"],
@@ -541,11 +544,11 @@ def _question_of(row: sqlite3.Row) -> dict[str, Any]:
 
 
 def fill_empty_question_columns(rows: list[dict[str, Any]]) -> int:
-    """把种子的 `language` / `explanation` 补到**空单元格**上，返回实际补齐的行数。
+    """把种子的 `language` / `explanation` / `sub_direction` 补到**空单元格**上，返回实际补齐的行数。
 
-    `ON CONFLICT DO NOTHING` 只保证「不新增、不覆盖」，不补列 —— 存量 80 题若不补，
+    `ON CONFLICT DO NOTHING` 只保证「不新增、不覆盖」，不补列 —— 存量行若不补，
     筛选与解析会全空。这里题面 / 选项 / 答案 / 难度 / 必备度一律不碰（r6 AC-1 不回退）；
-    种子给空串的字段跳过（`language=''` 是通用题的合法取值）。
+    种子给空串的字段跳过（`language=''` 是通用题的合法取值，`sub_direction=None` 是通用兜底）。
     幂等真值：补齐后该列不再为空，第二次调用返回 0。
     """
     if not rows:
@@ -557,11 +560,18 @@ def fill_empty_question_columns(rows: list[dict[str, Any]]) -> int:
             question_id = row.get("id")
             language = str(row.get("language") or "")
             explanation = str(row.get("explanation") or "")
-            if not question_id or not (language or explanation):
+            sub_direction = row.get("sub_direction")
+            if not question_id or not (language or explanation or sub_direction):
                 continue
             cursor = conn.execute(
                 _QUESTION_FILL,
-                (language, language, explanation, explanation, now, question_id, language, explanation),
+                (
+                    language, language,
+                    explanation, explanation,
+                    sub_direction, sub_direction,
+                    now, question_id,
+                    language, explanation, sub_direction,
+                ),
             )
             filled += max(cursor.rowcount, 0)
     return filled

@@ -64,12 +64,13 @@ def create_run(
     now: datetime | None = None,
     rng: random.Random | None = None,
     direction: str | None = None,
+    sub_direction: str | None = None,
     difficulty: str | tuple[str, ...] | None = None,
     question_count: int | None = None,
 ) -> ExamRun:
     """按画像从题库选一份卷并落库（`status=running`），答案只留在服务端 payload。
 
-    新增三个可选筛选参数：`direction` / `difficulty` / `question_count`，透传给
+    四个可选筛选参数（direction / sub_direction / difficulty / question_count）透传给
     `select_paper()`；不传则与改造前逐字节一致（向后兼容）。
     """
     profile = repository.get_profile(profile_id)
@@ -86,6 +87,7 @@ def create_run(
         recent=recent,
         rng=rng,
         direction=direction,
+        sub_direction=sub_direction,
         difficulty=difficulty,
         target_count=question_count,
     )
