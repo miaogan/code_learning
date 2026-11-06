@@ -34,6 +34,7 @@ from .routers import (
 )
 from .schemas import HealthResponse
 from .services import question_bank
+from .services.ai import close_ai_pool
 
 APP_VERSION = "0.1.0"
 
@@ -45,6 +46,8 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     # `ON CONFLICT DO NOTHING` 保证重复启动 0 新增，存量库（r10 卷）也能拿到新增题与解析。
     question_bank.ensure_seeded()
     yield
+    # 关停时释放 AI 连接池（进程内共享客户端，keep-alive 连接不能留给下一次启动）。
+    await close_ai_pool()
 
 
 def create_app() -> FastAPI:

@@ -26,7 +26,7 @@ from app.db import init_db
 from app.main import app
 from app.schemas import Evidence, Profile, ProfileProject, ProfileSkill, SkillStatus
 from app.services import user_ai
-from app.services.ai import AIClient
+from app.services.ai import AIClient, reset_ai_pool
 
 SEED_PATH = Path(__file__).resolve().parent.parent / "app" / "seed" / "questions.json"
 
@@ -191,6 +191,18 @@ _NEUTRAL_AI_ENV: dict[str, str] = {
     "AI_LMSTUDIO_API_KEY": "",
     "AI_LMSTUDIO_JSON_MODE": "",
 }
+
+
+@pytest.fixture(autouse=True)
+def _isolate_ai_pool() -> Iterator[None]:
+    """AI 出网口已池化：用例之间清空连接池，避免打补丁的假客户端跨用例串用。
+
+    httpx 连接池按事件循环分桶，而用例里的 `asyncio.run` 每次都是一个新 loop；
+    不清空的话，上一个用例创建假客户端会滞留在池里，导致后一个用例「没有出网记录」。
+    """
+    reset_ai_pool()
+    yield
+    reset_ai_pool()
 
 
 @pytest.fixture()
@@ -467,6 +479,10 @@ def ai_outage(monkeypatch: pytest.MonkeyPatch, tmp_db: Path) -> None:
             return self
 
         async def __aexit__(self, *_exc: Any) -> None:
+            return None
+
+        async def aclose(self) -> None:
+            """池化客户端的关停钩子（lifespan 退出时会调用）。"""
             return None
 
         async def post(self, *_args: Any, **_kwargs: Any) -> _Response:

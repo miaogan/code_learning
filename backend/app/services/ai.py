@@ -6,13 +6,14 @@ r9 起口径收敛：构造时快照 `Settings.resolve_ai()` 得到的 `AiRuntim
 重试次数**全部取自该快照**，本模块不再读任何裸配置字段（`config.py` 是开关的唯一出处）。
 """
 
+import asyncio
 import json
 from typing import Any, TypeVar
 
 import httpx
 from pydantic import BaseModel, ValidationError
 
-from ..config import AiRuntime, Settings, get_settings
+from ..config import UNIFIED_AI_TIMEOUT_S, AiRuntime, Settings, get_settings
 from ..errors import AI_SCHEMA_INVALID, AI_UNAVAILABLE, AppError
 
 ModelT = TypeVar("ModelT", bound=BaseModel)
@@ -35,6 +36,41 @@ def _response_format(mode: str) -> dict[str, Any] | None:
     return _RESPONSE_FORMAT_BY_MODE.get(mode)
 
 
+#: 连接池：进程内复用同一个 `httpx.AsyncClient`（keep-alive / 连接上限都在这里配一次）。
+#: 按事件循环分桶——httpx 的连接池绑定创建时的 loop；uvicorn 生产环境只有一个 loop，
+#: 等价于全局单例；测试里每个 `asyncio.run` 各起一个 loop，也不会互相串用已关闭的池。
+_POOL: dict[asyncio.AbstractEventLoop, httpx.AsyncClient] = {}
+
+
+def _shared_client() -> httpx.AsyncClient:
+    loop = asyncio.get_running_loop()
+    client = _POOL.get(loop)
+    if client is None:
+        client = httpx.AsyncClient(
+            timeout=UNIFIED_AI_TIMEOUT_S,
+            limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
+        )
+        _POOL[loop] = client
+    return client
+
+
+def reset_ai_pool() -> None:
+    """清空连接池（测试隔离用；生产由 lifespan 的 `close_ai_pool` 负责释放）。"""
+    _POOL.clear()
+
+
+async def close_ai_pool() -> None:
+    """释放全部池化连接（应用关停时调用）。"""
+    clients = list(_POOL.values())
+    _POOL.clear()
+    for client in clients:
+        try:
+            await client.aclose()
+        except RuntimeError:
+            # 该连接池所属的 loop 已关闭（测试场景）：没有可释放的连接，忽略即可。
+            continue
+
+
 class AIClient:
     def __init__(self, settings: Settings | None = None, *, runtime: AiRuntime | None = None) -> None:
         #: 构造即快照：一次请求内 模型 / 超时 / JSON 模式 / 重试口径一致，不在 `_chat` 里现读配置。
@@ -50,7 +86,8 @@ class AIClient:
         timeout_s: float | None = None,
         retry_unavailable: bool = False,
     ) -> ModelT:
-        """结构化补全。`timeout_s` 缺省走 `runtime.timeout_s`（已合并档内/全局，TECHNICAL §5）。
+        """结构化补全。`timeout_s` 缺省走 `runtime.timeout_s` —— 所有调用点统一 600s
+        （`config.UNIFIED_AI_TIMEOUT_S`），调用方不再各自覆写超时。
 
         `retry_unavailable`（r34）：仅在**后台任务 / 非同步等待**的调用点开启 —— 超时、
         5xx、429 这类 `retryable` 失败自动重来一次；前台交互调用不开启，避免用户等待翻倍。
@@ -117,8 +154,10 @@ class AIClient:
             # 本地端点无鉴权；空 `Bearer` 会被部分实现判 401，所以 key 为空时整键不发。
             headers["Authorization"] = f"Bearer {api_key}"
         try:
-            async with httpx.AsyncClient(timeout=timeout) as client:
-                response = await client.post(url, headers=headers, json=payload)
+            # 池化出网：连接复用由模块级 `_shared_client()` 统一管理，不再每次调用新建客户端。
+            response = await _shared_client().post(
+                url, headers=headers, json=payload, timeout=timeout
+            )
         except httpx.TimeoutException as exc:
             raise AppError(
                 AI_UNAVAILABLE, "AI 服务响应超时，请稍后重试", status=503, retryable=True

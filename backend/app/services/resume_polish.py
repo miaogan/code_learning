@@ -31,10 +31,6 @@ UNFILLED = "〈待补充〉"
 MIN_SUGGESTIONS = 3
 MIN_SECTIONS = 2
 
-#: 润色分析专用超时（秒，r36）：要逐条「逐字抄录原句 + 改写 + 说明」输出大 JSON，
-#: 与画像生成同属重调用 —— 沿用全局 `AI_TIMEOUT_S=20` 在真实简历上必超时（用户实测）。
-POLISH_TIMEOUT_S = 120.0
-
 POLISH_SECTIONS: tuple[str, ...] = ("project", "experience", "education", "summary")
 
 POLISH_SYSTEM = """你是中文简历润色顾问。读候选人简历与画像，给出逐条、可逐字定位的润色建议，只输出 JSON。
@@ -158,8 +154,8 @@ async def build_suggestions(
         POLISH_SYSTEM,
         _polish_brief(resume_text, profile, target_role),
         _SuggestDraft,
-        timeout_s=POLISH_TIMEOUT_S,
-        # 生成耗时与网络抖动都在所难免：超时/5xx/429 自动重来一次，不让一次抖动直接判死。
+        # 超时走统一 600s；生成耗时与网络抖动都在所难免：超时/5xx/429 自动重来一次，
+        # 不让一次抖动直接判死。
         retry_unavailable=True,
     )
     suggestions: list[PolishSuggestion] = []

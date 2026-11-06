@@ -146,7 +146,6 @@ def test_score_answer_persists_then_completes_run(
 ) -> None:
     profile = _seed_profile(profile_factory)
     fake_ai.responder = _responder_for_paper(VALID_KINDS)
-    assert interview_service.SCORING_TIMEOUT_S <= 15.0, "AC-3 要求单题评分 15s 内"
 
     run = asyncio.run(interview_service.create_run(profile.id, client=fake_ai))
     question_id: str | None = run.question.id

@@ -21,7 +21,14 @@ from pathlib import Path
 from typing import get_args
 
 from app.schemas import ExamKind, Profile
-from app.services import exam_selector, interview as interview_service, question_bank, rules
+from app.services import (
+    exam_selector,
+    interview as interview_service,
+    profile as profile_service,
+    question_bank,
+    resume_polish as resume_polish_service,
+    rules,
+)
 from app.services.ai import AIClient
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -72,10 +79,12 @@ def test_complete_model_accepts_timeout() -> None:
     assert params["timeout_s"].kind is inspect.Parameter.KEYWORD_ONLY, "timeout_s 必须为 keyword-only"
 
 
-def test_interview_passes_timeout_without_reflection() -> None:
-    source = inspect.getsource(interview_service)
-    assert "timeout_s=SCORING_TIMEOUT_S" in source, "单题评分未把 14s 预算交给客户端"
-    assert "inspect.signature" not in source, "不再允许用签名反射兜底超时"
+def test_ai_call_sites_use_unified_timeout() -> None:
+    """超时统一在 config（600s）：调用点不得再各自覆写，也不允许签名反射兜底。"""
+    for module in (interview_service, profile_service, resume_polish_service):
+        source = inspect.getsource(module)
+        assert "timeout_s=" not in source, f"{module.__name__} 仍在调用点覆写超时"
+        assert "inspect.signature" not in source, f"{module.__name__} 不允许用签名反射兜底超时"
 
 
 def test_frontend_lockfile_is_reproducible() -> None:

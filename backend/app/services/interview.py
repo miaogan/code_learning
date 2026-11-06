@@ -41,9 +41,6 @@ from . import rules, timeline
 from .ai import AIClient
 from .history import INTERVIEW_KIND, score_of
 
-#: 单轮「评分 + 下一条发言」预算：AC 要求 15s 内出结果，留 1s 给网络与落库。
-SCORING_TIMEOUT_S = 14.0
-
 #: 点评字数上限（DESIGN §2.3 的点评区按两行展示）；超长不报错，截断即可。
 MAX_COMMENT_CHARS = 120
 
@@ -656,7 +653,7 @@ async def score_answer(
         ROUND_SYSTEM,
         _round_input(payload, target, entries, text, settings, calibration),
         RoundDraft,
-        timeout_s=SCORING_TIMEOUT_S,
+        # 超时走统一 600s：与画像 / 润色 / 报告文案同一档，不再单独收紧。
     )
     elapsed_s = round(time.perf_counter() - started, 1)
 

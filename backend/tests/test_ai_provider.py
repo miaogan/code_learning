@@ -18,7 +18,13 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
 
-from app.config import DEFAULT_JSON_MODE, JSON_MODES, Settings, get_settings
+from app.config import (
+    DEFAULT_JSON_MODE,
+    JSON_MODES,
+    UNIFIED_AI_TIMEOUT_S,
+    Settings,
+    get_settings,
+)
 from app.errors import AI_UNAVAILABLE, AppError
 from app.main import app
 from app.services.ai import JSON_RETRY_HINT, AIClient
@@ -95,19 +101,25 @@ def ai_transport(monkeypatch: pytest.MonkeyPatch) -> _Transport:
         async def __aexit__(self, *_exc: object) -> bool:
             return False
 
+        async def aclose(self) -> None:
+            """池化客户端的关停钩子（lifespan 退出时会调用）。"""
+            return None
+
         async def post(
             self,
             url: str,
             *,
             headers: dict[str, str] | None = None,
             json: dict[str, Any] | None = None,
+            timeout: float | None = None,
         ) -> _Response:
             transport.calls.append(
                 {
                     "url": url,
                     "headers": headers or {},
                     "json": json or {},
-                    "timeout": self._timeout,
+                    # 池化后超时按请求覆写：显式传入优先，否则用客户端构造时的默认值。
+                    "timeout": timeout if timeout is not None else self._timeout,
                 }
             )
             return _Response(transport.status_code, transport.next_content())
@@ -295,7 +307,7 @@ def test_profile_timeout_overrides_global_and_call_site_wins(
     _complete(settings)
     assert ai_transport.calls[-1]["timeout"] == 450.0
 
-    _complete(settings, timeout_s=14.0)  # 面试单题预算（SCORING_TIMEOUT_S）
+    _complete(settings, timeout_s=14.0)  # 显式覆写仍作为底层能力保留（生产调用点已统一不传）
     assert ai_transport.calls[-1]["timeout"] == 14.0
 
     inherit = ai_env(AI_LMSTUDIO_TIMEOUT_S="0", AI_TIMEOUT_S="25")
@@ -441,12 +453,12 @@ def test_blank_numeric_profile_env_falls_back_to_default(
 
     settings = Settings()  # 关键：不抛 ValidationError
 
-    assert settings.ai_timeout_s == 20.0
+    assert settings.ai_timeout_s == UNIFIED_AI_TIMEOUT_S
     assert settings.ai_max_retries == 1
     assert settings.ai_deepseek_timeout_s == 0.0  # 0＝继承全局
     assert settings.ai_lmstudio_timeout_s >= 300.0  # 空值回落「字段默认值」，不是落到 0
     # 空值不改变解析结论：仍能正常解析出可用的 legacy 口径。
-    assert settings.resolve_ai().timeout_s == 20.0
+    assert settings.resolve_ai().timeout_s == UNIFIED_AI_TIMEOUT_S
 
 
 # --- 5. 真实链路冒烟（默认跳过） ------------------------------------------------

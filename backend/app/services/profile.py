@@ -33,11 +33,6 @@ from .profile_merge import (
 #: 送进模型的简历正文上限：超出即截断（长简历既撑上下文，也会拖慢首屏）。
 MAX_PROFILE_CHARS = 12000
 
-#: 画像生成的专用超时（秒，r34）：该调用要输出「技能 / 项目 / 逐条证据」大 JSON，
-#: 真实体量简历上远超 20s 的通用超时（用户实测报「AI 服务响应超时」）。
-#: 生成已改为后台任务（r30），用户不在同步等待，拉长不改交互体验。
-PROFILE_TIMEOUT_S = 120.0
-
 #: 单条 `source_quote` 的合理上限（DESIGN §2.2 溯源引用块按一行展示）。
 MAX_QUOTE_CHARS = 200
 
@@ -236,8 +231,8 @@ async def generate_profile(
         PROFILE_SYSTEM,
         context,
         ProfileDraft,
-        timeout_s=PROFILE_TIMEOUT_S,
-        # 后台任务：超时/5xx 自动重来一次，不让一次抖动直接判死（用户可重试但代价高）。
+        # 超时走统一 600s（不再单独覆写）；后台任务：超时/5xx 自动重来一次，
+        # 不让一次抖动直接判死（用户可重试但代价高）。
         retry_unavailable=True,
     )
     verify_quotes(draft, body)

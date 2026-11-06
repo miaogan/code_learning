@@ -69,6 +69,12 @@ _NUMERIC_ENV_FIELDS: tuple[str, ...] = (
 )
 
 
+#: 统一 AI 出网超时（秒）：所有调用点共用这一档，不再按功能各自写数值。
+#: 标定依据：本机 `qwen3.5-9b`（reasoning 类）单次画像实测 201.25s，取 ≈3 倍余量；
+#: 画像 / 润色 / 报告文案这类长输出任务同样受益。改这里即改全局默认。
+UNIFIED_AI_TIMEOUT_S = 600.0
+
+
 @dataclass(frozen=True)
 class AiRuntime:
     """一次解析出来的 AI 运行期口径（出网口与探活共用同一份事实）。
@@ -81,7 +87,7 @@ class AiRuntime:
     model: str
     api_key: str = field(repr=False, default="")
     json_mode: str = DEFAULT_JSON_MODE
-    timeout_s: float = 20.0
+    timeout_s: float = UNIFIED_AI_TIMEOUT_S
     max_retries: int = 1
     ready: bool = False
     reason: str = ""
@@ -125,7 +131,7 @@ class Settings(BaseSettings):
     ai_base_url: str = "https://api.openai.com/v1"
     ai_api_key: str = ""
     ai_model: str = "gpt-4o-mini"
-    ai_timeout_s: float = 20.0
+    ai_timeout_s: float = UNIFIED_AI_TIMEOUT_S
     ai_max_retries: int = 1
 
     # --- AI 供应商档位（r9：`AI_PROVIDER` 空＝legacy） --------------------------

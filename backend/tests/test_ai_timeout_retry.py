@@ -1,10 +1,10 @@
-"""r34：画像生成超时治理的行为用例（零网络）。
+"""r34/r40：AI 超时治理的行为用例（零网络）。
 
 两个口径：
 - `complete_model(retry_unavailable=True)` 只在调用点显式开启时重试「可重试」失败
   （超时 / 5xx / 429）；不可重试（鉴权 / 额度）即使开启也不重试，避免重复扣配额。
-- `generate_profile` 必须用专用长超时（`PROFILE_TIMEOUT_S`）：生成是后台任务，
-  长简历输出大 JSON 远超通用 20s 超时，用户实测报「AI 服务响应超时」。
+- 超时统一在 `config.UNIFIED_AI_TIMEOUT_S`（600s）：调用点（画像 / 润色 / 面试评分）
+  一律不再传 `timeout_s`，统一走 runtime 口径。
 """
 
 from __future__ import annotations
@@ -19,9 +19,8 @@ from pydantic import BaseModel
 
 from app.config import Settings, get_settings
 from app.errors import AI_UNAVAILABLE, AppError
-from app.services import profile as profile_service
 from app.services.ai import AIClient
-from app.services.profile import PROFILE_TIMEOUT_S, generate_profile
+from app.services.profile import generate_profile
 
 
 class _Payload(BaseModel):
@@ -67,6 +66,10 @@ def transport(monkeypatch: pytest.MonkeyPatch) -> _Transport:
 
         async def __aexit__(self, *_exc: object) -> bool:
             return False
+
+        async def aclose(self) -> None:
+            """池化客户端的关停钩子（lifespan 退出时会调用）。"""
+            return None
 
         async def post(self, *_args: Any, **_kwargs: Any) -> _Response:
             state.calls += 1
@@ -153,10 +156,8 @@ def test_non_retryable_rejection_not_retried(
     assert transport.calls == 1
 
 
-def test_generate_profile_uses_dedicated_long_timeout(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """画像生成必须显式传长超时且开启重试 —— 通用 20s 对真实简历不够。"""
+def test_generate_profile_uses_unified_timeout() -> None:
+    """画像生成不再单独覆写超时（统一 600s），但仍开启一次可重试失败的重来。"""
     captured: dict[str, Any] = {}
 
     class _Client:
@@ -167,7 +168,5 @@ def test_generate_profile_uses_dedicated_long_timeout(
     with pytest.raises(AppError):
         asyncio.run(generate_profile("res-1", "技能：Python", client=_Client()))  # type: ignore[arg-type]
 
-    assert captured["timeout_s"] == PROFILE_TIMEOUT_S
+    assert "timeout_s" not in captured, "调用点不得再覆写超时"
     assert captured["retry_unavailable"] is True
-    assert PROFILE_TIMEOUT_S >= 60, "长简历生成远超 20s，专用超时必须显著大于通用值"
-    assert profile_service.PROFILE_TIMEOUT_S is PROFILE_TIMEOUT_S
