@@ -50,6 +50,8 @@ frontend/.htpasswd
 .vscode/
 .idea/
 .trae/
+# IDE 预览分享包（HTML 导出 zip，非交付物）
+.trae-html-share-packages/
 *.log
 .DS_Store
 
