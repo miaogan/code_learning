@@ -909,39 +909,71 @@ a {
   color: var(--text-secondary);
 }
 
-/* 笔试筛选控件（方向 / 难度 / 题量）：三列并排，窄屏折行。 */
+/* 笔试筛选控件（方向 / 子方向 / 难度 / 题量）：四列并排，窄屏折行。 */
 .sc-exam-filters {
   display: flex;
   flex-wrap: wrap;
   gap: var(--sp-2);
   margin: var(--sp-3) 0 var(--sp-2);
+  padding: var(--sp-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-8);
+  background: var(--bg-inset);
+  transition: border-color var(--base) var(--ease), background-color var(--base) var(--ease);
 }
 .sc-filter {
   display: flex;
   flex-direction: column;
   gap: var(--sp-1);
-  min-width: 120px;
+  min-width: 140px;
+  flex: 1 1 0;
 }
 .sc-filter-label {
   font-size: var(--fs-small);
   color: var(--text-secondary);
+  letter-spacing: 0.02em;
 }
 .sc-filter-select {
-  padding: var(--sp-2) var(--sp-3);
+  position: relative;
+  padding: calc(var(--sp-2) + 2px) var(--sp-4) calc(var(--sp-2) + 2px) var(--sp-3);
   border: 1px solid var(--border-default);
-  border-radius: var(--radius-sm);
-  background: var(--bg-surface);
+  border-radius: var(--radius-6);
+  background-color: var(--bg-surface);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239aa0a6' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 12px;
   color: var(--text-primary);
   font-size: var(--fs-base);
+  font-weight: 500;
   cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  transition: border-color var(--fast) var(--ease),
+              background-color var(--fast) var(--ease),
+              box-shadow var(--fast) var(--ease),
+              transform var(--fast) var(--ease);
 }
-.sc-filter-select:hover {
-  border-color: var(--accent-primary);
+.sc-filter-select:hover:not(:disabled) {
+  border-color: var(--accent);
+  background-color: var(--bg-surface);
 }
 .sc-filter-select:focus {
   outline: none;
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 2px var(--accent-primary-alpha);
+  border-color: var(--accent);
+  box-shadow: var(--elev-accent);
+  transform: translateY(-1px);
+}
+.sc-filter-select:active:not(:disabled) {
+  transform: translateY(0);
+}
+.sc-filter-select:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  background-color: var(--bg-inset);
+  background-image: none;
+  color: var(--text-secondary);
 }
 
 /* 出分侧栏：56 环 + 分数 + 点评（内嵌面，左 2px accent 承载点评） */
@@ -6803,6 +6835,63 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .sc-lab-skill-detail {
     animation: none;
+  }
+}
+
+/* ==========================================================================
+ * 通用动效 utility classes（可跨页面复用）
+ * ========================================================================== */
+
+/* 页面主容器淡入：状态切换 / 组件挂载时用。 */
+.sc-fade-in {
+  animation: sc-fade-in var(--base) var(--ease);
+}
+
+@keyframes sc-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(calc(-1 * var(--sp-2)));
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 带延迟的淡入：列表项逐个进场时用。delay 用 CSS 变量控制，JS 里设 style。 */
+.sc-pop-in {
+  animation: sc-fade-in var(--base) var(--ease) both;
+  animation-delay: var(--sc-delay, 0ms);
+}
+
+/* 卡片 / 面板 hover lift：让可点击的大块有微弹跳。 */
+.sc-card-hover {
+  transition: border-color var(--fast) var(--ease),
+              background-color var(--fast) var(--ease),
+              transform var(--base) var(--ease),
+              box-shadow var(--base) var(--ease);
+}
+.sc-card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  border-color: var(--accent-line-30);
+}
+
+/* 全局 reduced-motion 兜底：所有动画归零，不影响布局。 */
+@media (prefers-reduced-motion: reduce) {
+  .sc-fade-in,
+  .sc-pop-in {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  .sc-card-hover {
+    transition: none;
+  }
+  .sc-card-hover:hover {
+    transform: none;
+    box-shadow: none;
   }
 }
 

@@ -293,13 +293,14 @@ export default function ExamPage() {
       ) : null}
 
       {view === 'idle' ? (
-        <Card>
-          <div className="sc-qcard-head">
-            <Chip label="本卷规则" />
-            <Chip label="总题 ≥10" tone="direction" />
-            <Chip label="客观 ≥8" tone="direction" />
-            <span className="sc-badge sc-badge--low">提交 10s 内出分</span>
-          </div>
+        <div className="sc-fade-in">
+          <Card className="sc-card-hover">
+            <div className="sc-qcard-head">
+              <Chip label="本卷规则" />
+              <Chip label="总题 ≥10" tone="direction" />
+              <Chip label="客观 ≥8" tone="direction" />
+              <span className="sc-badge sc-badge--low">提交 10s 内出分</span>
+            </div>
           <p className="sc-qcard-prompt">
             依据画像：目标岗位 {profile?.target_role ?? '未填写'} · 技能 {profile?.skills.length ?? 0} 项 · 项目{' '}
             {profile?.projects.length ?? 0} 个
@@ -381,26 +382,30 @@ export default function ExamPage() {
               先看看画像
             </Link>
           </div>
-        </Card>
+          </Card>
+        </div>
       ) : null}
 
       {view === 'creating' ? (
-        <Card>
-          <PhaseLoader
-            title="正在依据画像组卷"
-            phases={CREATE_PHASES}
-            active={createPhase}
-            elapsedSec={createElapsed}
+        <div className="sc-fade-in">
+          <Card>
+            <PhaseLoader
+              title="正在依据画像组卷"
+              phases={CREATE_PHASES}
+              active={createPhase}
+              elapsedSec={createElapsed}
           />
           <div className="sc-btn-row">
             <Button variant="ghost" onClick={cancelCreate}>
               取消
             </Button>
           </div>
-        </Card>
+          </Card>
+        </div>
       ) : null}
 
       {(view === 'running' || view === 'submitting') && run ? (
+        <div className="sc-fade-in">
         <>
           {/* AC-12：`filtered_count = 0` / 字段缺失时 notice 为 null → 不挂载节点（零占位）。 */}
           {notice ? (
@@ -467,9 +472,11 @@ export default function ExamPage() {
             </Button>
           </div>
         </>
+        </div>
       ) : null}
 
       {view === 'submitted' && run && result ? (
+        <div className="sc-fade-in">
         <>
           <ExamResultPanel result={result} questions={run.questions} />
 
@@ -510,6 +517,7 @@ export default function ExamPage() {
             <InlineError message={createError} onRetry={() => void startExam()} retryLabel="重新出卷" />
           ) : null}
         </>
+        </div>
       ) : null}
 
       <ConfirmModal
