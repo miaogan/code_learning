@@ -1,6 +1,6 @@
 # 题库合并导入报表（r15 · 工具生成，勿手改）
 
-命令：`cd backend && python -X utf8 -m app.services.question_merge --write`
+命令：`cd backend && python -X utf8 -m app.services.assessment.question_merge --write`
 （重算 → 写 `backend/app/seed/questions.json` → 本报表；`--check` 用它做逐字节幂等比对）
 
 ## 1 总量
@@ -100,7 +100,7 @@
 代码回退后**必须**再跑数据回滚（数据只增不删，只回退代码不会清理已导入的 519 行）：
 
 ```bash
-cd backend && python -X utf8 -m app.services.question_merge --rollback
+cd backend && python -X utf8 -m app.services.assessment.question_merge --rollback
 # 只删 source ∈ tiji/local100/iq380/fe-interview 的行，存量 260 行（source='seed'）不受影响
 # 幂等：再跑一次删 0 行
 ```

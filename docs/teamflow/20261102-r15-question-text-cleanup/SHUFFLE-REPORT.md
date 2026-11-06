@@ -1,6 +1,6 @@
 # r15 答案偏置收口报表（SHUFFLE-REPORT）
 
-> 本文件由 `python -X utf8 -m app.services.question_shuffle --write` 生成（`question_shuffle.render_report()`），指标与 `seed/questions.json` 同源；手抄数字会在下次重算时漂移，因此不得手改。
+> 本文件由 `python -X utf8 -m app.services.assessment.question_shuffle --write` 生成（`question_shuffle.render_report()`），指标与 `seed/questions.json` 同源；手抄数字会在下次重算时漂移，因此不得手改。
 
 ## 1 概览
 
@@ -242,9 +242,9 @@ iq380-281 iq380-184 iq380-280 sql-034 iq380-129 l100-095 iq380-321 iq380-249 iq3
 ## 8 幂等与门禁（可复跑的证据）
 
 ```bash
-cd backend && python -X utf8 -m app.services.question_shuffle --check   # 0 差异（只读）
-cd backend && python -X utf8 -m app.services.question_merge --check      # 0 差异（打乱已并入重算）
-cd backend && python -X utf8 -m app.services.question_shuffle --write    # 再次写盘后 seed 逐字节不变
+cd backend && python -X utf8 -m app.services.assessment.question_shuffle --check   # 0 差异（只读）
+cd backend && python -X utf8 -m app.services.assessment.question_merge --check      # 0 差异（打乱已并入重算）
+cd backend && python -X utf8 -m app.services.assessment.question_shuffle --write    # 再次写盘后 seed 逐字节不变
 cd backend && python -X utf8 -m pytest -q -p no:cacheprovider tests/test_r13_question_shuffle.py
 ```
 
@@ -252,4 +252,4 @@ cd backend && python -X utf8 -m pytest -q -p no:cacheprovider tests/test_r13_que
 
 ## 9 运行时不受影响
 
-本模块是**离线工具**：运行时（`question_bank` / `exam` / `practice` / `proficiency`）永不 import 它；变换只落在被 git 追踪的 `seed/questions.json` 上，序列化仍只经 `question_merge.dumps()` 一处。r14（P3-1）起 `question_bank.ensure_seeded()` 在启动时用 `repository.refresh_questions()` 把种子覆写到已存在的同 id 行，因此已部署的旧 `app.db` 也会收敛到本报表的分布；历史 `question_attempts` / `runs.payload` 不受影响（判分只存 `correct`，卷面快照在 payload 里）。
+本模块是**离线工具**：运行时（`question_bank` / `exam` / `practice` / `proficiency`）永不 import 它；变换只落在被 git 追踪的 `seed/questions.json` 上，序列化仍只经 `question_merge.dumps()` 一处。r14（P3-1）起 `question_bank.ensure_seeded()` 在启动时用 `repository.refresh_questions()` 把种子覆写到已存在的同 id 行，因此已部署的旧 `app.core.db` 也会收敛到本报表的分布；历史 `question_attempts` / `runs.payload` 不受影响（判分只存 `correct`，卷面快照在 payload 里）。
