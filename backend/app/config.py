@@ -159,6 +159,9 @@ class Settings(BaseSettings):
     #: 机器 / 更小的模型仍够用），且这只是**单请求上限**，不改变任何请求的等待语义。
     ai_lmstudio_timeout_s: float = 600.0
 
+    #: 日志级别（DEBUG / INFO / WARNING / ERROR），非法值按 INFO 处理（不因配置错起不来）。
+    log_level: str = "INFO"
+
     db_path: str = "app.db"
     max_upload_mb: int = 10
     cors_origins: str = "http://127.0.0.1:5173,http://localhost:5173"

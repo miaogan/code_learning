@@ -11,6 +11,8 @@
 from __future__ import annotations
 
 import asyncio
+import logging
+import time
 import uuid
 from datetime import UTC, datetime
 from typing import Any
@@ -34,6 +36,8 @@ from ..services.profile import generate_profile
 from ..services.profile_merge import backfill_evidence
 
 router = APIRouter(prefix="/api", tags=["profile"], dependencies=[Depends(current_user)])
+
+logger = logging.getLogger("app.profile_job")
 
 
 def _document_meta(document_id: str) -> dict[str, Any]:
@@ -110,6 +114,15 @@ async def _run_profile_job(
 ) -> None:
     """后台任务体：成功落 `ProfileWithMerge` JSON，失败落中文原因 —— 两种终态都必须可见。"""
     set_current_user_id(user_id)
+    started = time.perf_counter()
+    # 任务继承了发起请求的 trace id（asyncio.create_task 复制上下文），日志里的 request_id 可回连到那次 POST。
+    logger.info(
+        "profile_job.start job_id=%s resume_id=%s chars=%s user_id=%s",
+        job_id,
+        resume_id,
+        len(text),
+        user_id,
+    )
     try:
         result = await generate_profile(
             resume_id,
@@ -119,8 +132,31 @@ async def _run_profile_job(
             client=client,
         )
         repository.finish_profile_job(job_id, result.model_dump_json(), user_id=user_id)
+        logger.info(
+            "profile_job.finish job_id=%s resume_id=%s elapsed_ms=%s",
+            job_id,
+            resume_id,
+            int((time.perf_counter() - started) * 1000),
+        )
     except Exception as exc:  # noqa: BLE001 - 任何失败都要落库可见，见 _job_error_message
         repository.fail_profile_job(job_id, _job_error_message(exc), user_id=user_id)
+        if isinstance(exc, AppError):
+            logger.warning(
+                "profile_job.failed job_id=%s resume_id=%s code=%s elapsed_ms=%s message=%s",
+                job_id,
+                resume_id,
+                exc.code,
+                int((time.perf_counter() - started) * 1000),
+                exc.message,
+            )
+        else:
+            # 非业务异常才带堆栈（业务异常的 message 是给用户看的中文，堆栈无意义）。
+            logger.exception(
+                "profile_job.failed job_id=%s resume_id=%s elapsed_ms=%s",
+                job_id,
+                resume_id,
+                int((time.perf_counter() - started) * 1000),
+            )
 
 
 @router.post(
@@ -150,6 +186,7 @@ async def create_profile_async(resume_id: str, user: CurrentUser) -> ProfileJobS
     )
     _PENDING_JOBS.add(task)
     task.add_done_callback(_PENDING_JOBS.discard)
+    logger.info("profile_job.accepted job_id=%s resume_id=%s", job_id, resume_id)
     return ProfileJobStarted(job_id=job_id)
 
 

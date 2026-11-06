@@ -24,6 +24,8 @@ NOT_FOUND = "NOT_FOUND"
 VALIDATION_ERROR = "VALIDATION_ERROR"
 HTTP_ERROR = "HTTP_ERROR"
 METHOD_NOT_ALLOWED = "METHOD_NOT_ALLOWED"
+#: 未捕获异常的统一出口：message 只有中文兜底文案，堆栈与路径只进服务端日志。
+INTERNAL_ERROR = "INTERNAL_ERROR"
 
 
 class AppError(Exception):
