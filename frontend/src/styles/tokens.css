@@ -206,3 +206,110 @@
      故既有固定高（--iq-composer-h 156 / --textarea-min-h 128）的推导不受影响。 */
   --fs-input-mobile: 16px;
 }
+
+/* ---------- r38 · 视觉改版「编译器实验室」（append-only；后置同名 token 覆盖前值） ---------- */
+:root {
+  /* 画布与表面：近黑画布 + 三级面板，替代原蓝灰层级 */
+  --bg-canvas: #070809;
+  --bg-surface: #0b0d10;
+  --bg-raised: #0f1216;
+  --bg-inset: #050607;
+  --border-subtle: #1a1f25;
+  --border-strong: #28303a;
+  --border-hair: #141a20;
+
+  --text-primary: #eceff2;
+  --text-secondary: #a0aab5;
+  /* 三级文字取 #737d89（在 #070809 上对比度约 4.5:1）；原型里的 #5d6672 过暗，不照搬 */
+  --text-tertiary: #737d89;
+
+  /* 单一信号色：酸柠 —— 只给「当前 / 数据 / 下一步」，不做第二强调色 */
+  --accent: #c6f24e;
+  --accent-hover: #d6ff62;
+  --accent-press: #b3dd3c;
+  --accent-tint: rgba(198, 242, 78, 0.12);
+  --accent-ink: #0a0d05;
+  --accent-soft: #e2ff9c;
+  --accent-wash-06: rgba(198, 242, 78, 0.06);
+  --accent-line-30: rgba(198, 242, 78, 0.38);
+
+  /* 语义色对齐仪器读数（只改色值，语义与既有闭集不变） */
+  --success: #46c08a;
+  --warn: #ffb020;
+  --danger: #ff7a6b;
+  --success-tint-10: rgba(70, 192, 138, 0.1);
+  --success-line-55: rgba(70, 192, 138, 0.55);
+  --warn-tint-12: rgba(255, 176, 32, 0.12);
+  --warn-line-35: rgba(255, 176, 32, 0.35);
+  --danger-tint-08: rgba(255, 122, 107, 0.08);
+  --danger-tint-10: rgba(255, 122, 107, 0.1);
+  --danger-tint-12: rgba(255, 122, 107, 0.12);
+  --danger-line-35: rgba(255, 122, 107, 0.35);
+  --danger-line-55: rgba(255, 122, 107, 0.55);
+
+  /* 发丝网格 / 顶部辉光 / 阴影（base.css 只能引用变量，不得出现裸色值） */
+  --lab-grid-line: rgba(255, 255, 255, 0.022);
+  --lab-glow: rgba(198, 242, 78, 0.06);
+  --lab-signal-wash: rgba(198, 242, 78, 0.05);
+  --lab-shadow: rgba(0, 0, 0, 0.55);
+  --lab-shadow-soft: rgba(0, 0, 0, 0.35);
+
+  --elev-1: inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 1px 2px var(--lab-shadow-soft);
+  --elev-2: 0 16px 40px var(--lab-shadow), 0 0 0 1px var(--border-strong);
+  --elev-accent: 0 0 0 1px var(--accent), 0 0 16px rgba(198, 242, 78, 0.22);
+
+  /* 圆角直角化：仪器面板不用大圆角（pill 保持） */
+  --radius-4: 2px;
+  --radius-6: 2px;
+  --radius-8: 2px;
+  --radius-12: 2px;
+  --radius-16: 2px;
+
+  /* 布局：内容区放宽到 1180，与原型海报同宽 */
+  --content-max: 1180px;
+
+  /* 字体阶梯：等宽骨架承担编号 / 标签 / 数字 */
+  --fs-kicker: 10px;
+  --lh-kicker: 14px;
+  --ls-kicker: 0.16em;
+  --fs-nano: 9.5px;
+  --lh-nano: 14px;
+  --fs-lead: 15px;
+  --lh-lead: 27px;
+  --fs-hero: clamp(40px, 4.6vw, 72px);
+  --lh-hero: 1.05;
+  --fs-stat: 40px;
+  --lh-stat: 40px;
+  --fs-chapter: 15.5px;
+  --lh-chapter: 24px;
+  --fs-section-title: 26px;
+  --lh-section-title: 34px;
+
+  /* 页面骨架尺寸 */
+  --lab-page-pad-y: 52px;
+  --lab-page-pad-x: 48px;
+  --lab-page-pad-y-sm: 36px;
+  --lab-page-pad-x-sm: 24px;
+  --lab-gap: 24px;
+  --lab-gap-lg: 56px;
+  --lab-hero-gap: 64px;
+  --lab-lead-w: 520px;
+  --lab-instrument-w: 420px;
+  --lab-row-gap: 28px;
+  --lab-chip-h: 28px;
+  --lab-seg-h: 3px;
+  --lab-track-w: 76px;
+  --lab-drop-h: 88px;
+  --lab-ring: 112px;
+  --lab-ring-text: 34px;
+  --lab-report-cols: 1.15fr 1fr 0.8fr 1fr auto;
+  --lab-chapter-cols: 56px minmax(0, 1fr) 132px 84px 132px 20px;
+  --lab-chapter-cols-sm: 40px minmax(0, 1fr) 20px;
+  --lab-rise-dur: 650ms;
+  --lab-pipe-cols: repeat(5, minmax(0, 1fr));
+  --lab-week-cols: repeat(7, minmax(0, 1fr));
+  --lab-week-cols-sm: repeat(2, minmax(0, 1fr));
+  --lab-grid-size: 64px;
+  --lab-blur: 14px;
+  --lab-inst-pad: 16px;
+}

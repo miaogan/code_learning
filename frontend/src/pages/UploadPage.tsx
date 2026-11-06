@@ -5,7 +5,6 @@ import { ApiError, api } from '../api/client'
 import type { ProfileMergeSummary, ResumeMeta } from '../api/types'
 import { mergeSummaryText } from '../components/profile/mergeModel'
 import { Button } from '../components/ui/Button'
-import { Card } from '../components/ui/Card'
 import { Chip } from '../components/ui/Chip'
 import { ConfirmModal } from '../components/ui/ConfirmModal'
 import { InlineError } from '../components/ui/InlineError'
@@ -22,7 +21,7 @@ import {
   shouldSurfaceFailure,
 } from '../lib/profileJob'
 import { useAsync } from '../lib/useAsync'
-import { setFlow } from '../state/flow'
+import { setFlow, useFlowState } from '../state/flow'
 
 const MAX_BYTES = 10 * 1024 * 1024
 const ACCEPTED = ['.pdf', '.docx', '.txt']
@@ -66,6 +65,7 @@ function validateLocally(file: File): string | null {
 export default function UploadPage() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
+  const flow = useFlowState()
   const inputRef = useRef<HTMLInputElement>(null)
   /** 只保护文件上传这一段在途请求；画像任务在服务端，卸载不需要（也不应该）中止它。 */
   const abortRef = useRef<AbortController | null>(null)
@@ -359,17 +359,202 @@ export default function UploadPage() {
     navigate('/polish', { state: { fromUpload: true } })
   }
 
+  /** 简历 / 画像里的证据条数：优先累计证据，没有时用兼容字段记 1 条。 */
+  const evidenceCount = (item: { source_quote?: string; source_quotes?: unknown[] }) =>
+    Math.max(item.source_quotes?.length ?? 0, item.source_quote ? 1 : 0)
+
+  const activeFile = picked?.name ?? meta?.file_name ?? null
+  const parseState = busy
+    ? phase === 'uploading'
+      ? `UPLOADING ${uploadSec}s`
+      : `PROFILING ${profileSec}s`
+    : saved !== null
+      ? 'READY'
+      : 'IDLE'
+
+  /** 五步管线：本机记录与页内阶段合并成「已完成 / 进行中 / 待做」。 */
+  const pipeline = [
+    {
+      num: '01',
+      title: '上传简历',
+      desc: '解析正文与章节，不保存原文件',
+      state: flow.hasResume ? 'done' : phase === 'uploading' ? 'now' : 'todo',
+    },
+    {
+      num: '02',
+      title: '建立画像',
+      desc: '技能 / 项目 / 证据逐条可溯源',
+      state: flow.hasProfile ? 'done' : phase === 'profiling' ? 'now' : 'todo',
+    },
+    {
+      num: '03',
+      title: '模拟面试',
+      desc: '按画像出题，作答即时评分',
+      state: flow.hasInterview ? 'done' : 'todo',
+    },
+    {
+      num: '04',
+      title: '模拟笔试',
+      desc: '客观题定位知识盲区',
+      state: flow.hasExam ? 'done' : 'todo',
+    },
+    {
+      num: '05',
+      title: '诊断报告',
+      desc: '短板按证据排序，直连精选课程',
+      state: flow.hasReport ? 'done' : 'todo',
+    },
+  ] as const
+
   return (
-    <section>
-      <header className="sc-page-header">
-        <h1 className="sc-page-title">
-          {saved === null ? '上传简历，建立你的技术画像' : '继续你的技术画像'}
-        </h1>
-        <p className="sc-page-sub">
-          {saved === null
-            ? '一次闭环：画像 → 面试 / 笔试 → 短板报告 → 课程'
-            : '也可以上传新版简历：自动合并，保留原有能力与证据'}
-        </p>
+    <section className="sc-lab-home">
+      <header className="sc-lab-hero">
+        <div className="sc-lab-hero-copy">
+          <p className="sc-lab-kicker sc-lab-rise">
+            <span className="sc-lab-kicker-idx">01</span> COMPILE PROFILE
+          </p>
+          <h1 className="sc-lab-hero-title sc-lab-rise is-d1">
+            {saved === null ? (
+              <>
+                上传简历，
+                <br />
+                建立<span className="sc-lab-hl">可溯源</span>
+                <br />
+                的技术画像
+              </>
+            ) : (
+              <>
+                继续你的
+                <br />
+                <span className="sc-lab-hl">技术画像</span>
+              </>
+            )}
+          </h1>
+          <p className="sc-lab-lead sc-lab-rise is-d2">
+            {saved === null
+              ? '从一份简历出发：抽取技能与项目，把每条结论都钉回原文，再用面试与笔试定位真实的短板。'
+              : '你的画像已经就绪。可以直接开始面试或笔试，也可以上传新版简历让它继续长大。'}
+          </p>
+          <div className="sc-lab-cta sc-lab-rise is-d3">
+            <button
+              type="button"
+              className="sc-btn sc-btn--primary sc-lab-cta-btn"
+              onClick={() => inputRef.current?.click()}
+              disabled={busy}
+            >
+              选择简历文件
+              <span className="sc-lab-arrow" aria-hidden="true">
+                ↗
+              </span>
+            </button>
+            <Link className="sc-lab-ghost" to={saved === null ? '/learn' : '/profile'}>
+              {saved === null ? '先看站内教程 →' : '查看我的画像 →'}
+            </Link>
+          </div>
+          {saved === null && savedError === null && phase === 'idle' ? (
+            <p className="sc-lab-note sc-lab-rise is-d4">
+              暂时没有简历？<Link to="/practice">在线练习</Link>和
+              <Link to="/learn">站内教程</Link>不需要简历，现在就能用。
+            </p>
+          ) : saved !== null ? (
+            <p className="sc-lab-note sc-lab-rise is-d4">
+              重新上传会自动合并：原有能力与证据不会被覆盖，逐条仍可核溯源。
+            </p>
+          ) : null}
+        </div>
+
+        {/* 解析仪器：把「简历 → 画像」的过程做成一台看得见的读数面板 */}
+        <aside className="sc-lab-parse sc-lab-rise is-d2" aria-label="画像解析面板">
+          <div className="sc-lab-parse-head">
+            <span>PARSE STREAM</span>
+            <span className={busy ? 'sc-lab-parse-live is-busy' : 'sc-lab-parse-live'}>
+              <i aria-hidden="true" />
+              {parseState}
+            </span>
+          </div>
+
+          {saved !== null && !busy ? (
+            <>
+              <div className="sc-lab-parse-file">
+                <span className="sc-lab-parse-name">{saved.target_role ?? '目标岗位未填写'}</span>
+                <span className="sc-lab-parse-meta">
+                  {`技能 ${saved.skills.length} 项 · 项目 ${saved.projects.length} 个 · 证据 ${saved.skills.reduce(
+                    (sum, skill) => sum + evidenceCount(skill),
+                    0,
+                  ) + saved.projects.reduce((sum, project) => sum + evidenceCount(project), 0)} 条`}
+                </span>
+                <div className="sc-lab-scan">
+                  <span className="sc-lab-scan-fill" style={{ width: '100%' }} />
+                </div>
+              </div>
+              <div className="sc-lab-toks">
+                {saved.skills.slice(0, 4).map((skill) => (
+                  <div className="sc-lab-tok" key={`skill-${skill.name}`}>
+                    <span className="sc-lab-tok-k">SKILL</span>
+                    <span className="sc-lab-tok-v">{skill.name}</span>
+                    <span className="sc-lab-bars" aria-hidden="true">
+                      {[0, 1, 2, 3, 4].map((index) => (
+                        <i
+                          key={index}
+                          className={index < Math.min(5, evidenceCount(skill)) ? 'is-on' : undefined}
+                        />
+                      ))}
+                    </span>
+                    <span className="sc-lab-tok-s">{evidenceCount(skill)} 证</span>
+                  </div>
+                ))}
+                {saved.projects.slice(0, 2).map((project) => (
+                  <div className="sc-lab-tok" key={`project-${project.name}`}>
+                    <span className="sc-lab-tok-k">PROJECT</span>
+                    <span className="sc-lab-tok-v">{project.name}</span>
+                    <span className="sc-lab-bars" aria-hidden="true">
+                      {[0, 1, 2, 3, 4].map((index) => (
+                        <i
+                          key={index}
+                          className={index < Math.min(5, evidenceCount(project)) ? 'is-on' : undefined}
+                        />
+                      ))}
+                    </span>
+                    <span className="sc-lab-tok-s">{evidenceCount(project)} 证</span>
+                  </div>
+                ))}
+              </div>
+              <div className="sc-lab-parse-foot">
+                <span>
+                  证据 <b>{saved.tech_stack.length}</b> 项技术栈
+                </span>
+                <span>原文未保存</span>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="sc-lab-parse-file">
+                <span className="sc-lab-parse-name">{activeFile ?? '等待简历文件'}</span>
+                <span className="sc-lab-parse-meta">
+                  {busy ? '解析正文 → 抽取能力 → 合并画像' : 'PDF / DOCX / TXT · ≤10MB · 解析约 30 秒'}
+                </span>
+                <div className="sc-lab-scan">
+                  {busy ? <span className="sc-lab-scan-echo" /> : null}
+                </div>
+              </div>
+              <ul className="sc-lab-stages">
+                <li>
+                  <span>01</span> 解析正文与章节
+                </li>
+                <li>
+                  <span>02</span> 抽取技能 / 项目 / 证据
+                </li>
+                <li>
+                  <span>03</span> 合并成可溯源画像
+                </li>
+              </ul>
+              <div className="sc-lab-parse-foot">
+                <span>不保存原文件</span>
+                <span>只存抽取正文</span>
+              </div>
+            </>
+          )}
+        </aside>
       </header>
 
       {/* 非 404 的画像读取失败：显式报错 + 重试，不当作「新用户」。 */}
@@ -377,31 +562,9 @@ export default function UploadPage() {
         <InlineError message={savedError} onRetry={savedProfileAsync.reload} />
       ) : null}
 
-      {phase === 'idle' && saved !== null ? (
-        <Card>
-          <div className="sc-upload-summary">
-            <p className="sc-meta-line">你已有一份技术画像</p>
-            <p className="sc-summary-meta">
-              {`目标岗位 ${saved.target_role ?? '未填写'} · 技能 ${saved.skills.length} 项 · 项目 ${saved.projects.length} 个`}
-            </p>
-            <div className="sc-btn-row">
-              <Link className="sc-btn sc-btn--primary" to="/profile">
-                查看画像
-              </Link>
-              <Link className="sc-btn sc-btn--secondary" to="/interview">
-                模拟面试
-              </Link>
-              <Link className="sc-btn sc-btn--secondary" to="/report">
-                诊断报告
-              </Link>
-            </div>
-          </div>
-        </Card>
-      ) : null}
-
       <button
         type="button"
-        className={dragOver ? 'sc-dropzone is-dragover' : 'sc-dropzone'}
+        className={dragOver ? 'sc-lab-dropband is-dragover' : 'sc-lab-dropband'}
         onClick={() => inputRef.current?.click()}
         onDragOver={(event) => {
           event.preventDefault()
@@ -411,10 +574,10 @@ export default function UploadPage() {
         onDrop={onDrop}
         disabled={busy}
       >
-        <span className="sc-dropzone-inner">
-          <span className="sc-dropzone-text">拖入或点击选择文件</span>
-          <span className="sc-dropzone-hint">支持 PDF / DOCX / TXT · 单文件 ≤10MB</span>
-        </span>
+        <span className="sc-lab-drop-kicker">DROP</span>
+        <span className="sc-lab-drop-main">拖入或点击选择文件</span>
+        <span className="sc-lab-drop-meta">PDF / DOCX / TXT · 单文件 ≤10MB</span>
+        <span className="sc-lab-drop-cta">选择文件 ↗</span>
       </button>
       <input
         ref={inputRef}
@@ -426,23 +589,28 @@ export default function UploadPage() {
         tabIndex={-1}
       />
 
-      <div className="sc-chips">
-        <Chip label="PDF / DOCX / TXT" />
-        <Chip label="≤10MB" />
-        <Chip label="解析约 30 秒 · 生成在后台进行" />
-      </div>
-
-      {/* 新用户引导（r27）：练习与教程不依赖画像，先把这两个免简历入口摆在首屏，
-          否则不想 / 不能立刻传简历的用户在首页找不到任何可做的事。 */}
-      {saved === null && savedError === null && phase === 'idle' ? (
-        <p className="sc-meta-line">
-          暂时没有简历？<Link to="/practice">在线练习</Link>和<Link to="/learn">站内教程</Link>
-          不需要简历，现在就能用。
-        </p>
+      {phase === 'idle' && saved !== null ? (
+        <div className="sc-lab-existing">
+          <span className="sc-lab-tag">已有画像 · 回访</span>
+          <span className="sc-lab-existing-text">
+            {`目标岗位 ${saved.target_role ?? '未填写'} · 技能 ${saved.skills.length} 项 · 项目 ${saved.projects.length} 个`}
+          </span>
+          <span className="sc-lab-existing-links">
+            <Link className="sc-lab-ghost" to="/profile">
+              查看画像 →
+            </Link>
+            <Link className="sc-lab-ghost" to="/interview">
+              模拟面试 →
+            </Link>
+            <Link className="sc-lab-ghost" to="/report">
+              诊断报告 →
+            </Link>
+          </span>
+        </div>
       ) : null}
 
       {failure !== null && phase === 'error' ? (
-        <div className="sc-actions">
+        <div className="sc-lab-panel">
           <InlineError
             message={failure.message}
             onRetry={failure.retryable ? retry : undefined}
@@ -458,94 +626,111 @@ export default function UploadPage() {
       ) : null}
 
       {phase === 'uploading' ? (
-        <div className="sc-actions is-block">
-          <Card>
-            <div className="sc-upload-summary">
-              <div className="sc-upload-progress">
-                <RingProgress size={56} state="indeterminate" ariaLabel="解析中" />
-                <PhaseLoader
-                  phases={['上传简历', '解析简历 → 提取正文', 'AI 生成并合并画像']}
-                  active={0}
-                  elapsedSec={uploadSec}
-                  title={picked ? picked.name : undefined}
-                />
-              </div>
-              <div className="sc-actions">
-                <Button variant="ghost" size="sm" onClick={cancel}>
-                  取消
-                </Button>
-              </div>
-            </div>
-          </Card>
+        <div className="sc-lab-panel">
+          <div className="sc-upload-progress">
+            <RingProgress size={56} state="indeterminate" ariaLabel="解析中" />
+            <PhaseLoader
+              phases={['上传简历', '解析简历 → 提取正文', 'AI 生成并合并画像']}
+              active={0}
+              elapsedSec={uploadSec}
+              title={picked ? picked.name : undefined}
+            />
+          </div>
+          <div className="sc-actions">
+            <Button variant="ghost" size="sm" onClick={cancel}>
+              取消
+            </Button>
+          </div>
         </div>
       ) : null}
 
       {phase === 'profiling' ? (
-        <div className="sc-actions is-block">
-          <Card>
-            <div className="sc-upload-summary">
-              <div className="sc-upload-progress">
-                <RingProgress size={56} state="indeterminate" ariaLabel="生成画像" />
-                <PhaseLoader
-                  phases={['上传简历', '解析简历 → 提取正文', 'AI 生成并合并画像']}
-                  active={2}
-                  elapsedSec={profileSec}
-                  title={meta ? `${meta.file_name} · 正在生成可溯源画像` : undefined}
-                />
-              </div>
-              {/* r30：任务在服务端跑，离开本页不会中断 —— 给出口而不是给拦截。 */}
-              <p className="sc-meta-line">
-                画像在后台生成，离开本页不会中断，回来后会自动接上进度。
-              </p>
-              <div className="sc-btn-row">
-                <Link className="sc-btn sc-btn--secondary" to="/practice">
-                  先去练习
-                </Link>
-                <Link className="sc-btn sc-btn--secondary" to="/learn">
-                  看站内教程
-                </Link>
-              </div>
-            </div>
-          </Card>
+        <div className="sc-lab-panel">
+          <div className="sc-upload-progress">
+            <RingProgress size={56} state="indeterminate" ariaLabel="生成画像" />
+            <PhaseLoader
+              phases={['上传简历', '解析简历 → 提取正文', 'AI 生成并合并画像']}
+              active={2}
+              elapsedSec={profileSec}
+              title={meta ? `${meta.file_name} · 正在生成可溯源画像` : undefined}
+            />
+          </div>
+          {/* r30：任务在服务端跑，离开本页不会中断 —— 给出口而不是给拦截。 */}
+          <p className="sc-meta-line">
+            画像在后台生成，离开本页不会中断，回来后会自动接上进度。
+          </p>
+          <div className="sc-btn-row">
+            <Link className="sc-btn sc-btn--secondary" to="/practice">
+              先去练习
+            </Link>
+            <Link className="sc-btn sc-btn--secondary" to="/learn">
+              看站内教程
+            </Link>
+          </div>
         </div>
       ) : null}
 
       {phase === 'done' && meta ? (
-        <div className="sc-actions is-block">
-          <Card>
-            <div className="sc-upload-summary">
-              <p className="sc-file-name">{meta.file_name}</p>
-              <p className="sc-summary-meta">
-                抽取 {formatChars(meta.chars)} · {meta.sections} 章节
+        <div className="sc-lab-panel">
+          <p className="sc-file-name">{meta.file_name}</p>
+          <p className="sc-summary-meta">
+            抽取 {formatChars(meta.chars)} · {meta.sections} 章节
+          </p>
+
+          {merge !== null ? (
+            <>
+              <p className={merge.duplicate ? 'sc-meta-line' : 'sc-summary-meta'}>
+                {`本次合并 · ${mergeSummaryText(merge)}`}
               </p>
-
-              {merge !== null ? (
-                <>
-                  <p className={merge.duplicate ? 'sc-meta-line' : 'sc-summary-meta'}>
-                    {`本次合并 · ${mergeSummaryText(merge)}`}
-                  </p>
-                  <p className="sc-meta-line">原有能力与证据不会被覆盖，可在画像页逐条核溯源</p>
-                  {merge.duplicate ? (
-                    <div className="sc-chips">
-                      <Chip label="同一份简历 · 仍记为一次成长事件" />
-                    </div>
-                  ) : null}
-                </>
+              <p className="sc-meta-line">原有能力与证据不会被覆盖，可在画像页逐条核溯源</p>
+              {merge.duplicate ? (
+                <div className="sc-chips">
+                  <Chip label="同一份简历 · 仍记为一次成长事件" />
+                </div>
               ) : null}
+            </>
+          ) : null}
 
-              <div className="sc-actions">
-                <Button onClick={toProfile}>查看画像</Button>
-                <Button variant="secondary" onClick={toPolish}>
-                  继续润色这份简历
-                </Button>
-                <Button variant="ghost" onClick={reset}>
-                  重新上传
-                </Button>
-              </div>
-            </div>
-          </Card>
+          <div className="sc-actions">
+            <Button onClick={toProfile}>查看画像</Button>
+            <Button variant="secondary" onClick={toPolish}>
+              继续润色这份简历
+            </Button>
+            <Button variant="ghost" onClick={reset}>
+              重新上传
+            </Button>
+          </div>
         </div>
       ) : null}
+
+      <section className="sc-lab-pipeline" aria-label="五步闭环">
+        <div className="sc-lab-pipeline-head">
+          <h2>一次闭环，五步</h2>
+          <p>UPLOAD → PROFILE → MEASURE → REPAIR</p>
+        </div>
+        <div className="sc-lab-pipe-grid">
+          {pipeline.map((step) => (
+            <article
+              className={
+                step.state === 'done'
+                  ? 'sc-lab-pipe is-done'
+                  : step.state === 'now'
+                    ? 'sc-lab-pipe is-now'
+                    : 'sc-lab-pipe'
+              }
+              key={step.num}
+            >
+              <span className="sc-lab-pipe-num">{step.num}</span>
+              <h3>{step.title}</h3>
+              <p>{step.desc}</p>
+              <span className="sc-lab-pipe-state">
+                {step.state === 'done' ? 'DONE' : step.state === 'now' ? 'RUNNING' : 'TODO'}
+              </span>
+            </article>
+          ))}
+        </div>
+      </section>
+
       <ConfirmModal
         open={pendingLeave !== null}
         title="简历还在上传，离开会中断"

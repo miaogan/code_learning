@@ -1,8 +1,8 @@
 export type RingState = 'default' | 'warn' | 'danger' | 'success' | 'indeterminate'
 
 export interface RingProgressProps {
-  /** 计时环 64 / 得分环 56 / 上传环 56（DESIGN §0.7 第 1–2 条） */
-  size?: 56 | 64
+  /** 计时环 64 / 得分环 56 / 上传环 56（DESIGN §0.7 第 1–2 条）；报告仪表环用 112 */
+  size?: number
   stroke?: number
   value?: number
   max?: number

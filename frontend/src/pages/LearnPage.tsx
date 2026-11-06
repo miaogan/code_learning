@@ -1,6 +1,5 @@
 import { Link, useSearchParams } from 'react-router-dom'
 import { EmptyState } from '../components/ui/EmptyState'
-import { Card } from '../components/ui/Card'
 import { Chip } from '../components/ui/Chip'
 import { ChipRow, type ChipOption } from '../components/ui/ChipRow'
 import { LevelChip } from '../components/learn/LevelChip'
@@ -72,24 +71,47 @@ export default function LearnPage() {
 
   return (
     <div className="sc-learn-page">
-      <header className="sc-page-header">
-        <h1 className="sc-page-title">学习</h1>
-        <p className="sc-page-sub">
-          {`站内教程共 ${ALL_TUTORIAL_CHAPTERS.length} 章，覆盖 ${TUTORIAL_DIRECTIONS.length} 个方向与基础 / 进阶 / 高级三档难度；每章都能回到对应专项练习`}
-        </p>
-        {summary.percent > 0 ? (
-          <p className="sc-learn-statline">
-            {`已读 ${summary.percent}% · 读完 ${summary.done} 章 · 在读 ${summary.reading} 章`}
+      <header className="sc-lab-pagehead">
+        <div>
+          <p className="sc-lab-kicker sc-lab-rise">
+            <span className="sc-lab-kicker-idx">02</span> CURRICULUM
           </p>
-        ) : null}
+          <h1 className="sc-lab-page-title sc-lab-rise is-d1">学习目录</h1>
+          <p className="sc-lab-lead sc-lab-rise is-d2">
+            {`站内教程共 ${ALL_TUTORIAL_CHAPTERS.length} 章，覆盖 ${TUTORIAL_DIRECTIONS.length} 个方向与基础 / 进阶 / 高级三档难度；每章都能回到对应专项练习`}
+          </p>
+        </div>
+        <div className="sc-lab-stats sc-lab-rise is-d2">
+          <div className="sc-lab-stat">
+            <b>
+              {ALL_TUTORIAL_CHAPTERS.length}
+              <span className="u">章</span>
+            </b>
+            <em>CHAPTERS</em>
+          </div>
+          <div className="sc-lab-stat">
+            <b>
+              {TUTORIAL_DIRECTIONS.length}
+              <span className="u">方向</span>
+            </b>
+            <em>DIRECTIONS</em>
+          </div>
+          <div className="sc-lab-stat">
+            <b>
+              {summary.percent}
+              <span className="u">%</span>
+            </b>
+            <em>READ</em>
+          </div>
+        </div>
       </header>
 
       {resume === null ? null : <ResumeCard target={resume} />}
 
-      <Card className="sc-qa-filters">
-        <div className="sc-qa-filter-row">
-          <span className="sc-qa-filter-label">方向</span>
-          <div className="sc-qa-filter-body">
+      <div className="sc-lab-filters">
+        <div className="sc-lab-filter-row">
+          <span className="sc-lab-filter-label">方向</span>
+          <div className="sc-lab-filter-body">
             <ChipRow
               groupLabel="教程方向筛选"
               options={DIRECTION_OPTIONS}
@@ -99,21 +121,21 @@ export default function LearnPage() {
           </div>
         </div>
 
-        <div className="sc-qa-filter-row">
-          <span className="sc-qa-filter-label">难度</span>
-          <div className="sc-qa-filter-body">
+        <div className="sc-lab-filter-row">
+          <span className="sc-lab-filter-label">难度</span>
+          <div className="sc-lab-filter-body">
             <ChipRow
               groupLabel="教程难度筛选"
               options={levelOptions}
               value={level}
               onSelect={selectLevel}
             />
-            <p className="sc-qa-hint">
+            <p className="sc-lab-filter-hint">
               {`当前${direction === 'all' ? '全部方向' : `「${direction}」方向`}共 ${chapters.length} 章 · 难度档位随方向变化，只列有内容的档`}
             </p>
           </div>
         </div>
-      </Card>
+      </div>
 
       {scope.length === 0 ? (
         <EmptyState
@@ -128,47 +150,65 @@ export default function LearnPage() {
           actionTo={tutorialHref(direction)}
         />
       ) : (
-        <div className="sc-grid-2 sc-learn-grid">
-          {chapters.map((chapter) => {
-            const readState = progressView(progressState.chapters[chapter.id], chapter)
-            return (
-              <Link
-                className="sc-card is-interactive sc-learn-chapter"
-                key={chapter.id}
-                to={chapterHref(chapter.id)}
-              >
-                <p className="sc-meta-line">
-                  <Chip label={chapter.direction} tone="direction" />
-                  <LevelChip level={chapter.level} />
-                  <span>
-                    {readState.status === 'unread'
-                      ? `${chapter.sections.length} 节`
-                      : `${readState.seen}/${readState.total} 节`}
+        <>
+          <div className="sc-lab-listhead" aria-hidden="true">
+            <span>NO.</span>
+            <span>章节</span>
+            <span>方向</span>
+            <span>难度</span>
+            <span>进度</span>
+            <span />
+          </div>
+          <div className="sc-lab-chapters">
+            {chapters.map((chapter) => {
+              const readState = progressView(progressState.chapters[chapter.id], chapter)
+              const order = ALL_TUTORIAL_CHAPTERS.findIndex((item) => item.id === chapter.id) + 1
+              const seenCount = readState.status === 'unread' ? 0 : readState.seen
+              return (
+                <Link
+                  className={
+                    readState.status === 'reading' ? 'sc-lab-chapter is-reading' : 'sc-lab-chapter'
+                  }
+                  key={chapter.id}
+                  to={chapterHref(chapter.id)}
+                >
+                  <span className="sc-lab-cnum">{String(order).padStart(2, '0')}</span>
+                  <span className="sc-lab-ctext">
+                    <span className="sc-lab-ctitle">{chapter.title}</span>
+                    <span className="sc-lab-csum">{chapter.summary}</span>
                   </span>
-                </p>
-                <h2 className="sc-learn-chaptertitle">{chapter.title}</h2>
-                <p className="sc-learn-chaptersum">{chapter.summary}</p>
-                {readState.status === 'unread' ? null : (
-                  <span className="sc-learn-chapterread">
-                    <span
-                      className={
-                        readState.status === 'done' ? 'sc-learn-track is-done' : 'sc-learn-track'
-                      }
-                      aria-hidden="true"
-                    >
-                      <span
-                        className="sc-learn-trackfill"
-                        style={{ width: `${readState.percent}%` }}
-                      />
+                  <span className="sc-lab-ctags sc-lab-cdir">
+                    <Chip label={chapter.direction} tone="direction" />
+                  </span>
+                  <span className="sc-lab-ctags sc-lab-clevel">
+                    <LevelChip level={chapter.level} />
+                  </span>
+                  <span className="sc-lab-cprog">
+                    <span className="sc-lab-segbar" aria-hidden="true">
+                      {chapter.sections.map((section, index) => (
+                        <span
+                          className={index < seenCount ? 'sc-lab-seg is-on' : 'sc-lab-seg'}
+                          key={section.id}
+                        />
+                      ))}
                     </span>
-                    <span className="sc-learn-chapterstate">{readState.label}</span>
+                    <span>
+                      {readState.status === 'unread'
+                        ? `${chapter.sections.length} 节`
+                        : `${readState.seen}/${readState.total} 节`}
+                    </span>
                   </span>
-                )}
-                <span className="sc-learn-chapterfoot">{`${readState.cta} →`}</span>
-              </Link>
-            )
-          })}
-        </div>
+                  <span className="sc-lab-go" aria-hidden="true">
+                    →
+                  </span>
+                </Link>
+              )
+            })}
+          </div>
+          <p className="sc-lab-listfoot">
+            {`当前${direction === 'all' ? '全部方向' : `「${direction}」方向`}共 ${chapters.length} 章 · ${summary.done} 章读完 · ${summary.reading} 章在读`}
+          </p>
+        </>
       )}
     </div>
   )

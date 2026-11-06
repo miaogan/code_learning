@@ -11,7 +11,6 @@ import { ShortfallCard } from '../components/report/ShortfallCard'
 import { WeekPlan } from '../components/report/WeekPlan'
 import { AiHeavyNotice } from '../components/ui/AiHeavyNotice'
 import { Button } from '../components/ui/Button'
-import { Card } from '../components/ui/Card'
 import { EmptyState } from '../components/ui/EmptyState'
 import { InlineError } from '../components/ui/InlineError'
 import { PhaseLoader } from '../components/ui/PhaseLoader'
@@ -283,13 +282,34 @@ export default function ReportPage() {
   const interviewAvg = report ? report.interview_avg : null
   const examTotal = report ? report.exam_total : null
 
+  /** 仪表条读数：严重度分档计数与笔试十格刻度，都只做展示，不参与任何排序。 */
+  const severityCount = (level: 'high' | 'medium' | 'low') =>
+    report ? report.shortfalls.filter((item) => item.severity === level).length : 0
+  const examSegments =
+    examTotal === null ? 0 : Math.max(0, Math.min(10, Math.round(examTotal / 10)))
+  const roleFit = report?.role_fit ?? null
+
   return (
     <section>
-      <header className="sc-page-header">
-        <h1 className="sc-page-title">诊断报告</h1>
-        <p className="sc-page-sub">
-          短板按严重度从高到低排序，每条都带题目证据、建议动作与推荐课程
-        </p>
+      <header className="sc-lab-pagehead">
+        <div>
+          <p className="sc-lab-kicker sc-lab-rise">
+            <span className="sc-lab-kicker-idx">03</span> DIAGNOSTIC
+          </p>
+          <h1 className="sc-lab-page-title sc-lab-rise is-d1">诊断报告</h1>
+          <p className="sc-lab-lead sc-lab-rise is-d2">
+            短板按严重度从高到低排序，每条都带题目证据、建议动作与推荐课程
+          </p>
+        </div>
+        {report !== null && !requestPending && !requestFailed ? (
+          <p className="sc-lab-report-meta sc-lab-rise is-d2">
+            {`生成于 ${formatGeneratedAt(report.generated_at)}`}
+            <br />
+            {`${requested ? '本场报告' : '最近一批测评'} · 覆盖 `}
+            <b>{report.run_ids.length}</b>
+            {' 次测评'}
+          </p>
+        ) : null}
       </header>
       <AiHeavyNotice />
 
@@ -336,13 +356,14 @@ export default function ReportPage() {
               <InlineError message={copyError} onRetry={copyMarkdown} retryLabel="重新复制" />
             ) : null}
 
-            <Card>
-              <div className="sc-score-side">
-                <div className="sc-profile-dim">
-                  <p className="sc-meta-line">面试均分</p>
+            {/* 仪表条：一格一个读数（面试 / 笔试 / 短板 / 岗位对标 / 动作） */}
+            <div className="sc-lab-instrument">
+              <div className="sc-lab-icell">
+                <p className="sc-lab-icell-label">INTERVIEW AVG</p>
+                <div className="sc-lab-ring-wrap">
                   <RingProgress
-                    size={56}
-                    stroke={5}
+                    size={112}
+                    stroke={3}
                     value={interviewAvg ?? 0}
                     max={10}
                     label={interviewAvg === null ? '—' : formatScore(interviewAvg)}
@@ -353,54 +374,101 @@ export default function ReportPage() {
                         : `面试均分 ${formatScore(interviewAvg)} 分，满分 10 分`
                     }
                   />
-                </div>
-
-                <div className="sc-profile-dim">
-                  <p className="sc-meta-line">笔试总分</p>
-                  <p className="sc-mono">
-                    {examTotal === null ? '—' : `${formatPoints(examTotal)} / 100`}
-                  </p>
-                </div>
-
-                <div className="sc-profile-dim">
-                  <p className="sc-meta-line">短板条数</p>
-                  <p className="sc-mono">{`${report.shortfalls.length} 条`}</p>
+                  <div className="sc-lab-ring-side">
+                    <span>面试均分</span>
+                    <span className="sc-mono">
+                      {interviewAvg === null ? '本报告未包含面试' : '满分 10'}
+                    </span>
+                  </div>
                 </div>
               </div>
 
-              <div className="sc-btn-row">
-                <p className="sc-meta-line">
-                  {`生成于 ${formatGeneratedAt(report.generated_at)} · ${
-                    requested ? '本场报告' : '最近一批测评'
-                  } · 覆盖 ${report.run_ids.length} 次测评`}
+              <div className="sc-lab-icell">
+                <p className="sc-lab-icell-label">EXAM TOTAL</p>
+                <span className="sc-lab-bigval">
+                  {examTotal === null ? '—' : formatPoints(examTotal)}
+                  <span className="den"> / 100</span>
+                </span>
+                <div className="sc-lab-segbar" aria-hidden="true" style={{ marginTop: 'var(--sp-3)' }}>
+                  {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((index) => (
+                    <span
+                      className={index < examSegments ? 'sc-lab-seg is-on' : 'sc-lab-seg'}
+                      key={index}
+                    />
+                  ))}
+                </div>
+                <p className="sc-lab-icell-sub">
+                  {examTotal === null ? '本报告未包含笔试' : '客观题总分'}
                 </p>
               </div>
 
-              <div className="sc-btn-row">
-                <Button variant="secondary" onClick={copyMarkdown} loading={copying}>
-                  复制 Markdown
-                </Button>
-                <Button variant="primary" onClick={exportMarkdown} loading={exporting}>
-                  导出 .md
-                </Button>
-                <Button variant="secondary" onClick={regenerate} disabled={exporting}>
-                  重新生成
-                </Button>
+              <div className="sc-lab-icell">
+                <p className="sc-lab-icell-label">SHORTFALLS</p>
+                <span className="sc-lab-bigval">
+                  {report.shortfalls.length}
+                  <span className="den"> 条</span>
+                </span>
+                <div className="sc-lab-icell-vals">
+                  <div className="sc-lab-icell-row">
+                    <b className="is-sig">{severityCount('high')}</b> 高严重度
+                  </div>
+                  <div className="sc-lab-icell-row">
+                    <b>{severityCount('medium')}</b> 中
+                    <b>{severityCount('low')}</b> 低
+                  </div>
+                </div>
               </div>
 
-              {/* 润色入口：只在既有按钮行之后追加，复制/导出/重生成的顺序与文案零改动（AC-14 不回归） */}
-              <div className="sc-btn-row sc-report-polish">
-                <p className="sc-meta-line">让简历更贴近这个目标岗位</p>
+              <div className="sc-lab-icell">
+                <p className="sc-lab-icell-label">ROLE FIT</p>
+                <span className="sc-lab-bigval is-role">{roleFit?.target_role ?? '—'}</span>
+                <div className="sc-lab-icell-vals">
+                  <div className="sc-lab-icell-row">
+                    缺失必备 <b>{roleFit?.missing_must.length ?? 0}</b> 项
+                  </div>
+                  <div className="sc-lab-icell-row">
+                    先补
+                    <b className="is-sig">
+                      {roleFit !== null && roleFit.first_fix.length > 0
+                        ? roleFit.first_fix.slice(0, 2).join(' / ')
+                        : '—'}
+                    </b>
+                  </div>
+                </div>
+              </div>
+
+              <div className="sc-lab-icell">
+                <p className="sc-lab-icell-label">ACTIONS</p>
+                <div className="sc-btn-row">
+                  <Button variant="secondary" size="sm" onClick={copyMarkdown} loading={copying}>
+                    复制 Markdown
+                  </Button>
+                  <Button variant="primary" size="sm" onClick={exportMarkdown} loading={exporting}>
+                    导出 .md
+                  </Button>
+                  <Button variant="secondary" size="sm" onClick={regenerate} disabled={exporting}>
+                    重新生成
+                  </Button>
+                </div>
+                {/* 润色入口：复制/导出/重生成的顺序与文案零改动（AC-14 不回归） */}
                 <Link
-                  className="sc-btn sc-btn--secondary is-sm"
+                  className="sc-lab-ghost"
                   to={polishRoleHref(report.role_fit?.target_role ?? null)}
                 >
-                  润色简历
+                  润色简历 →
                 </Link>
               </div>
-            </Card>
+            </div>
 
-            <div className="sc-profile-dim">
+            <section className="sc-lab-section">
+              <div className="sc-lab-sectionhead">
+                <div className="sc-lab-sectionhead-main">
+                  <p className="sc-lab-kicker">SHORTFALLS</p>
+                  <h2 className="sc-lab-section-title">带证据的短板</h2>
+                  <span className="sc-lab-count">{`${report.shortfalls.length} 条`}</span>
+                </div>
+                <span className="sc-lab-aside">按严重度排序 · 每条可回题目</span>
+              </div>
               {report.shortfalls.map((shortfall, index) => (
                 <ShortfallCard
                   key={`${shortfall.name}-${index}`}
@@ -408,7 +476,7 @@ export default function ReportPage() {
                   order={index + 1}
                 />
               ))}
-            </div>
+            </section>
 
             {/* 提升路线三块（r7）：DOM 必须在短板主轴之后（超长内容不抢首屏，AC-14） */}
             <CoachBlocks report={report} />
@@ -418,7 +486,9 @@ export default function ReportPage() {
 
             {/* 调研改造（boss / LeetCode 借鉴）：逐题复盘 → 7 天补短板计划，同样排在主轴之后 */}
             <AnswerReview runIds={report.run_ids} />
-            <WeekPlan report={report} userId={cacheScope} />
+            <div className="sc-lab-week">
+              <WeekPlan report={report} userId={cacheScope} />
+            </div>
           </div>
         ) : null}
 

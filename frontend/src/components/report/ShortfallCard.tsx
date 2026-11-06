@@ -1,6 +1,5 @@
 import type { Shortfall } from '../../api/types'
 import { severityLabel } from '../../lib/format'
-import { Card } from '../ui/Card'
 import { InlineError } from '../ui/InlineError'
 import { CourseCard } from './CourseCard'
 import { EvidenceChip } from './EvidenceChip'
@@ -23,38 +22,45 @@ export function ShortfallCard({ shortfall, order }: ShortfallCardProps) {
   const { name, severity, evidence, diagnosis, actions, courses, question_ref } = shortfall
 
   return (
-    <Card className="sc-shortfall">
-      <span className={`sc-sev-bar is-${severity}`} data-severity={severity} aria-hidden="true" />
+    <article className="sc-lab-sf" data-severity={severity}>
+      <span className={order === 1 ? 'sc-lab-sf-rank is-sig' : 'sc-lab-sf-rank'} aria-hidden="true">
+        {String(order).padStart(2, '0')}
+      </span>
 
-      <div className="sc-qcard-head">
-        <span className="sc-mono">{`#${order}`}</span>
-        <span className={`sc-badge sc-badge--${severity}`} data-severity={severity}>
-          {`严重度 ${severityLabel(severity)}`}
-        </span>
-        <EvidenceChip evidence={evidence} questionRef={question_ref} />
-      </div>
-
-      <h2 className="sc-qcard-prompt">{name}</h2>
-      <p className="sc-qcard-hint">{diagnosis}</p>
-
-      <div className="sc-profile-dim">
-        <p className="sc-meta-line">建议动作</p>
-        {actions.map((action, index) => (
-          <p className="sc-qcard-hint" key={`${order}-action-${index}`}>
-            {`▸ ${action}`}
-          </p>
-        ))}
-      </div>
-
-      {courses.length > 0 ? (
-        <div className="sc-grid-2">
-          {courses.map((course) => (
-            <CourseCard course={course} key={course.id} />
-          ))}
+      <div className="sc-lab-sf-body">
+        <div className="sc-lab-sf-top">
+          <h2 className="sc-lab-sf-title">{name}</h2>
+          <span className={`sc-lab-sf-sev is-${severity}`} data-severity={severity}>
+            {`严重度 ${severityLabel(severity)}`}
+          </span>
         </div>
-      ) : (
-        <InlineError message="暂无匹配课程，已记录；可先按上面的动作自查这一短板" />
-      )}
-    </Card>
+
+        <p className="sc-lab-sf-diagnosis">{diagnosis}</p>
+
+        <div className="sc-lab-sf-evidence">
+          <p className="sc-lab-sf-ek">EVIDENCE</p>
+          <EvidenceChip evidence={evidence} questionRef={question_ref} />
+        </div>
+
+        <div className="sc-lab-sf-action">
+          <div className="sc-lab-sf-actions">
+            <p className="sc-lab-sf-ak">ACTIONS</p>
+            {actions.map((action, index) => (
+              <p key={`${order}-action-${index}`}>{`▸ ${action}`}</p>
+            ))}
+          </div>
+        </div>
+
+        {courses.length > 0 ? (
+          <div className="sc-grid-2">
+            {courses.map((course) => (
+              <CourseCard course={course} key={course.id} />
+            ))}
+          </div>
+        ) : (
+          <InlineError message="暂无匹配课程，已记录；可先按上面的动作自查这一短板" />
+        )}
+      </div>
+    </article>
   )
 }

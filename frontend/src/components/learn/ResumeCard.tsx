@@ -1,7 +1,5 @@
 import { Link } from 'react-router-dom'
 import { type ResumeTarget, resumeHref } from '../../lib/learnProgress'
-import { Chip } from '../ui/Chip'
-import { LevelChip } from './LevelChip'
 
 /**
  * 「继续学习」入口：只展示一个目标，不做列表。
@@ -15,22 +13,19 @@ export function ResumeCard({ target }: { target: ResumeTarget }) {
     sectionIndex === null ? view.label : `${view.label} · 上次读到第 ${sectionIndex} 节`
 
   return (
-    <Link className="sc-learn-resume" to={resumeHref(target)}>
-      <span className="sc-learn-resumehead">
-        <span className="sc-learn-resumekicker">继续学习</span>
-        <span className="sc-learn-resumego">
-          {sectionIndex === null ? '从第一章开始 →' : '从这里接着读 →'}
+    <Link className="sc-lab-resume" to={resumeHref(target)}>
+      <span className="sc-lab-resume-main">
+        <span className="sc-lab-kicker">CONTINUE</span>
+        <span className="sc-lab-resume-title">{chapter.title}</span>
+        <span className="sc-lab-resume-meta">
+          {`${chapter.direction} · ${chapter.level} · ${resumePoint}`}
         </span>
       </span>
-      <span className="sc-learn-resumetitle">{chapter.title}</span>
-      <span className="sc-learn-resumemeta">
-        <Chip label={chapter.direction} tone="direction" />
-        <LevelChip level={chapter.level} />
-        <span className="sc-learn-resumepoint">{resumePoint}</span>
+      <span className="sc-lab-resume-track" aria-hidden="true">
+        <span style={{ width: `${view.percent}%` }} />
       </span>
-      {/* 进度条限宽：拉满整卡读起来像一条分隔线，丢掉了「进度」的语义 */}
-      <span className="sc-learn-track" aria-hidden="true">
-        <span className="sc-learn-trackfill" style={{ width: `${view.percent}%` }} />
+      <span className="sc-lab-resume-go">
+        {sectionIndex === null ? '从第一章开始 →' : '接着读 →'}
       </span>
     </Link>
   )
