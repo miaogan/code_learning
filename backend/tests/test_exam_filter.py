@@ -33,6 +33,7 @@ def _question(
     direction: str = "前端",
     difficulty: str = "basic",
     essentiality: str = "nice_to_know",
+    sub_direction: str = "",
 ) -> dict[str, Any]:
     """一条题库记录（形状与 `repository.list_questions()` 的行一致）。"""
     objective = rules.is_objective_kind(kind)
@@ -40,6 +41,7 @@ def _question(
         "id": qid,
         "kind": kind,
         "direction": direction,
+        "sub_direction": sub_direction,
         "prompt": f"{qid} 的题干",
         "options": [{"key": "A", "text": "甲"}, {"key": "B", "text": "乙"}] if objective else [],
         "answer": ["A"] if objective else [],
@@ -605,3 +607,75 @@ def test_create_run_passes_filters_through_service(
         profile.id, direction=None, difficulty=None, question_count=None
     )
     assert len(null_run.questions) >= rules.MIN_EXAM_QUESTIONS
+
+
+# --- r46 子方向聚焦：聚焦优先 / 不足补位（不再 400） ----------------------------
+
+
+def test_sub_direction_wide_enough_keeps_all_questions_in_focus(profile_factory: Any) -> None:
+    """子方向自己凑得出卷（≥10 客观题）→ 全卷命中该子方向，补位数为 0。"""
+    profile = profile_factory()
+    pool = [_question(f"react-{i}", sub_direction="react") for i in range(12)]
+
+    paper = exam_selector.select_paper(
+        pool, profile, proficient=set(), recent=[], sub_direction="react"
+    )
+    assert paper is not None
+    assert paper.sub_direction == "react"
+    assert paper.sub_direction_backfill == 0
+    assert all(str(q.get("sub_direction") or "") == "react" for q in paper.questions)
+
+
+def test_thin_sub_direction_backfills_from_same_direction(profile_factory: Any) -> None:
+    """子方向只有 2 道题（题库薄于 10 道的实际形态）→ 同方向其余题补位，并如实计数。"""
+    profile = profile_factory()
+    pool = [_question(f"react-{i}", sub_direction="react") for i in range(2)]
+    pool += [_question(f"js-{i}", sub_direction="js") for i in range(20)]
+
+    paper = exam_selector.select_paper(
+        pool, profile, proficient=set(), recent=[], sub_direction="react"
+    )
+    assert paper is not None, "子方向题量不足必须补位出卷，而不是让上层 400"
+    assert len(paper.questions) >= rules.MIN_EXAM_QUESTIONS
+    assert paper.sub_direction == "react"
+    expected = sum(1 for q in paper.questions if str(q.get("sub_direction") or "") != "react")
+    assert paper.sub_direction_backfill == expected, "补位数必须等于卷中不属于该子方向的题数"
+    assert 0 < paper.sub_direction_backfill <= len(paper.questions)
+
+
+def test_empty_sub_direction_falls_back_to_direction_pool(profile_factory: Any) -> None:
+    """子方向 0 题（组成原理 / NoSQL / 架构设计 的实际形态）→ 按同方向出卷，不 400。"""
+    profile = profile_factory()
+    pool = [_question(f"os-{i}", direction="计算机基础", sub_direction="操作系统") for i in range(12)]
+
+    paper = exam_selector.select_paper(
+        pool, profile, proficient=set(), recent=[], sub_direction="组成原理"
+    )
+    assert paper is not None
+    assert paper.sub_direction == "组成原理"
+    assert paper.sub_direction_backfill == len(paper.questions), "一道都没命中时补位数等于卷题数"
+    assert all(str(q.get("sub_direction") or "") == "操作系统" for q in paper.questions)
+
+
+def test_sub_direction_focus_never_drops_to_l5(profile_factory: Any) -> None:
+    """方向 / 子方向聚焦时池内只有一个方向，方向覆盖基线降为 ≥1 —— 不再永远掉到 L5。"""
+    profile = profile_factory()
+    pool = [_question(f"react-{i}", sub_direction="react") for i in range(12)]
+
+    paper = exam_selector.select_paper(
+        pool, profile, proficient=set(), recent=[], sub_direction="react"
+    )
+    assert paper is not None
+    assert paper.stage in {"L1", "L2", "L3", "L4"}, f"聚焦卷不应落 {paper.stage}"
+
+
+def test_direction_focus_applies_proficiency_filter_at_l1(profile_factory: Any) -> None:
+    """指定 direction 后 L1 就能成卷（改造前必然掉到 L5，熟练过滤在聚焦场景下实际失效）。"""
+    profile = profile_factory()
+    pool = [_question(f"fe-{i}", direction="前端") for i in range(20)]
+
+    paper = exam_selector.select_paper(
+        pool, profile, proficient=set(), recent=[], direction="前端"
+    )
+    assert paper is not None
+    assert paper.stage == "L1", f"direction 聚焦应命中 L1，实际 {paper.stage}"

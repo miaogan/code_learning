@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { backfillNotice, filteredNotice, proficiencyRuleHint } from '../lib/examNotice'
+import {
+  backfillNotice,
+  filteredNotice,
+  proficiencyRuleHint,
+  subDirectionNotice,
+} from '../lib/examNotice'
 
 /**
  * AC-12：`filtered_count` 的一行透明度文案。
@@ -93,5 +98,51 @@ describe('backfillNotice', () => {
     expect(backfillNotice(null)).toBeNull()
     expect(backfillNotice(undefined)).toBeNull()
     expect(backfillNotice(Number.NaN)).toBeNull()
+  })
+})
+
+/**
+ * r46：子方向聚焦的透明度文案。
+ * 断言语义：事实（补位题数 / 卷题数）由服务端给，前端只读成一句话 ——
+ * 未选子方向或全部命中时静默，部分补位与「一道都没命中」各有一句，措辞不许改写。
+ */
+describe('subDirectionNotice', () => {
+  it('未选子方向 / 空白：静默（不挂「方向聚焦」行）', () => {
+    expect(subDirectionNotice('', 3, 10)).toBeNull()
+    expect(subDirectionNotice('   ', 3, 10)).toBeNull()
+    expect(subDirectionNotice(null, 3, 10)).toBeNull()
+    expect(subDirectionNotice(undefined, 3, 10)).toBeNull()
+  })
+
+  it('全部命中（backfill 0 / 负数 / 缺失 / 非有限数）：静默', () => {
+    expect(subDirectionNotice('动态规划', 0, 10)).toBeNull()
+    expect(subDirectionNotice('动态规划', -2, 10)).toBeNull()
+    expect(subDirectionNotice('动态规划', null, 10)).toBeNull()
+    expect(subDirectionNotice('动态规划', undefined, 10)).toBeNull()
+    expect(subDirectionNotice('动态规划', Number.NaN, 10)).toBeNull()
+    expect(subDirectionNotice('动态规划', Number.POSITIVE_INFINITY, 10)).toBeNull()
+  })
+
+  it('部分补位：逐字给出「题目不足以单独成卷，已补充 N 道同方向题」', () => {
+    expect(subDirectionNotice('哈希', 4, 10)).toBe('「哈希」题目不足以单独成卷，已补充 4 道同方向题')
+  })
+
+  it('一道都没命中（backfill >= 卷题数）：明说「暂无可用题目，本卷已改按同方向出题」', () => {
+    expect(subDirectionNotice('NoSQL', 10, 10)).toBe('「NoSQL」暂无可用题目，本卷已改按同方向出题')
+    expect(subDirectionNotice('NoSQL', 12, 10)).toBe('「NoSQL」暂无可用题目，本卷已改按同方向出题')
+  })
+
+  it('卷题数缺失 / 非正数时退化为「已补充 N 道」句（不误判成零题子方向）', () => {
+    expect(subDirectionNotice('图', 3, 0)).toBe('「图」题目不足以单独成卷，已补充 3 道同方向题')
+    expect(subDirectionNotice('图', 3, undefined)).toBe('「图」题目不足以单独成卷，已补充 3 道同方向题')
+    expect(subDirectionNotice('图', 3, Number.NaN)).toBe('「图」题目不足以单独成卷，已补充 3 道同方向题')
+  })
+
+  it('文案里的数字与入参同源：不同补位量只差数字，措辞恒定', () => {
+    for (const count of [1, 6, 9]) {
+      expect(subDirectionNotice('排序', count, 12)).toBe(
+        `「排序」题目不足以单独成卷，已补充 ${count} 道同方向题`,
+      )
+    }
   })
 })

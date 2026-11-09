@@ -31,7 +31,7 @@ from __future__ import annotations
 
 import random
 from collections.abc import Iterable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 from app.schemas import Profile
@@ -102,6 +102,10 @@ class Paper:
     filtered_count: int
     reintroduced_count: int
     backfill: dict[str, int]
+    #: r46：实际生效的子方向（闭集内取值；未指定 / 闭集外脏参数时为 `""`）。
+    sub_direction: str = ""
+    #: r46：本卷中**不属于所选子方向**、因该子方向题量不足而补齐的题数（0 = 全部命中）。
+    sub_direction_backfill: int = 0
 
 
 # --- 相关度与排序 ----------------------------------------------------------
@@ -396,6 +400,13 @@ def select_paper(
     不传任何筛选 → 行为与改造前逐字节一致（向后兼容）。
     注意：传了 `sub_direction` 但没传 `direction` 时，会在 direction 闭集中找该子方向
     归属的父方向（自动补 direction），不需要调用方同时传。
+
+    r46 子方向语义（方向 / 难度仍是硬过滤，只有子方向是**聚焦优先、不足补位**）：
+    先只在子方向池里跑阶梯，成功则 `sub_direction_backfill = 0`；该池凑不出结构达标的卷
+    （题库薄于 10 题 / 客观题不足 8 道）时退化到同方向宽池补位，并把「卷中不属于该子方向的
+    题数」写进 `sub_direction_backfill` —— 用户永远拿到一份能做的卷，页面如实说明补位事实。
+    方向聚焦时（指定 direction 或子方向）候选池只剩一个方向，「方向覆盖 ≥2」恒不可满足，
+    因此基线方向要求降到 ≥1，否则整条阶梯会永远掉到 L5、熟练度过滤在聚焦场景下失效。
     """
     available = [
         question
@@ -403,116 +414,146 @@ def select_paper(
         if isinstance(question, dict) and str(question.get("id") or "").strip()
     ]
     by_id = {str(question["id"]): question for question in available}
-    known = set(by_id)
 
-    # --- 全局硬过滤（方向 / 子方向 / 难度）：作用于 6 层阶梯共享的 `known` 集合 ---------
+    # --- 归一筛选参数：闭集外的值一律当「未指定」，不让脏参数变成空卷 -------------------
+    if direction is not None:
+        direction = direction.strip() or None
+    if sub_direction is not None:
+        sub_direction = sub_direction.strip() or None
+        if sub_direction is not None and not any(
+            sub_direction in subs for subs in rules.SUBDIRECTIONS.values()
+        ):
+            sub_direction = None
+        elif sub_direction is not None and direction is None:
+            # 传了 sub_direction 但没传 direction → 自动查归属（r44 语义不变）
+            for dir_name, subs in rules.SUBDIRECTIONS.items():
+                if sub_direction in subs:
+                    direction = dir_name
+                    break
+
     difficulty_set: set[str] | None = None
     if difficulty is not None:
         if isinstance(difficulty, str):
             difficulty_set = {difficulty}
         else:
             difficulty_set = {str(item) for item in difficulty if str(item).strip()}
-    if direction is not None:
-        direction = direction.strip() or None
-    if sub_direction is not None:
-        sub_direction = sub_direction.strip() or None
-        # 传了 sub_direction 但没传 direction → 自动查归属
-        if direction is None and sub_direction is not None:
-            for d, subs in rules.SUBDIRECTIONS.items():
-                if sub_direction in subs:
-                    direction = d
-                    break
-    if direction is not None or sub_direction is not None or difficulty_set is not None:
-        known = {
+
+    def pool(*, narrow: bool) -> set[str]:
+        """方向 / 难度过滤后的候选 ID；`narrow` 时再叠加子方向（仅子方向筛选时使用）。"""
+        return {
             question_id
-            for question_id in known
-            if (direction is None or str(by_id[question_id].get("direction") or "").strip() == direction)
-            and (
-                sub_direction is None
-                or (by_id[question_id].get("sub_direction") or "") == sub_direction
-            )
+            for question_id, question in by_id.items()
+            if (direction is None or str(question.get("direction") or "").strip() == direction)
+            and (not narrow or (question.get("sub_direction") or "") == sub_direction)
             and (
                 difficulty_set is None
-                or str(by_id[question_id].get("difficulty") or "").strip() in difficulty_set
+                or str(question.get("difficulty") or "").strip() in difficulty_set
             )
         }
-        if not known:
-            return None
 
-    proficient_hits = {question_id for question_id in known if question_id in proficient}
-    must_know_hits = {
-        question_id
-        for question_id in proficient_hits
-        if rules.essentiality_of(by_id[question_id]) == rules.MUST_KNOW
-    }
-    other_hits = proficient_hits - must_know_hits
-    papers = [set(item) & known for item in recent]
-    papers = [item for item in papers if item]
-    oldest_first = list(reversed(papers))
-    recent_ids = set().union(*papers) if papers else set()
+    # `scope` = 方向 / 难度硬过滤后的宽池；`focus` = 再叠加子方向的窄池（仅子方向聚焦时存在）。
+    scope = pool(narrow=False)
+    focus = pool(narrow=True) if sub_direction is not None else None
+    if not scope:
+        # 方向 / 难度本身没有题 → 唯一 400 语义（子方向为空不再单独构成 400）。
+        return None
 
     # --- 题量上限：默认 12；target_count 传上来时 clamp 到 [10, 20] -------------------------
     if target_count is not None:
         target_count = max(rules.MIN_EXAM_QUESTIONS, min(20, int(target_count)))
 
-    def attempt(
-        stage: str, ids: set[str], backfill: dict[str, int], require_directions: int
-    ) -> Paper | None:
-        ranked = rank_pool([by_id[question_id] for question_id in sorted(ids)], profile, rng=rng)
-        picked = build_paper(
-            ranked,
-            require_directions=require_directions,
-            max_count=target_count,
-        )
-        if picked is None:
-            return None
-        picked_ids = {str(question.get("id") or "") for question in picked}
-        return Paper(
-            questions=picked,
-            stage=stage,
-            filtered_count=_filtered_count(proficient_hits, picked),
-            reintroduced_count=len(proficient_hits & picked_ids),
-            backfill=backfill,
-        )
+    def run_ladder(pool_ids: set[str]) -> Paper | None:
+        """在一份候选池上跑 L1→L6（阶梯顺序与阈值口径不变，只换池）。"""
+        proficient_hits = {question_id for question_id in pool_ids if question_id in proficient}
+        must_know_hits = {
+            question_id
+            for question_id in proficient_hits
+            if rules.essentiality_of(by_id[question_id]) == rules.MUST_KNOW
+        }
+        other_hits = proficient_hits - must_know_hits
+        papers = [set(item) & pool_ids for item in recent]
+        papers = [item for item in papers if item]
+        oldest_first = list(reversed(papers))
+        recent_ids = set().union(*papers) if papers else set()
+        # 方向聚焦时池内只有一个方向，「方向 ≥2」恒不可满足 → 基线降到 ≥1（见 docstring）。
+        require = 1 if direction is not None else 2
 
-    # L1：全库 − 熟练 − 近 N 卷（首选层；方向 ≥2）
-    base = known - proficient_hits - recent_ids
-    paper = attempt("L1", base, _counts(), 2)
-    if paper is not None:
-        return paper
+        def attempt(
+            stage: str, ids: set[str], backfill: dict[str, int], require_directions: int
+        ) -> Paper | None:
+            ranked = rank_pool([by_id[question_id] for question_id in sorted(ids)], profile, rng=rng)
+            picked = build_paper(
+                ranked,
+                require_directions=require_directions,
+                max_count=target_count,
+            )
+            if picked is None:
+                return None
+            picked_ids = {str(question.get("id") or "") for question in picked}
+            return Paper(
+                questions=picked,
+                stage=stage,
+                filtered_count=_filtered_count(proficient_hits, picked),
+                reintroduced_count=len(proficient_hits & picked_ids),
+                backfill=backfill,
+            )
 
-    # L2：放回「熟练 ∩ must_know」
-    l2 = base | must_know_hits
-    paper = attempt("L2", l2, _counts(must_know=len(must_know_hits)), 2)
-    if paper is not None:
-        return paper
+        # L1：全库 − 熟练 − 近 N 卷（首选层；方向 ≥ require）
+        base = pool_ids - proficient_hits - recent_ids
+        paper = attempt("L1", base, _counts(), require)
+        if paper is not None:
+            return paper
 
-    # L3：再放回其余熟练题
-    l3 = l2 | other_hits
-    paper = attempt(
-        "L3", l3, _counts(must_know=len(must_know_hits), other=len(other_hits)), 2
-    )
-    if paper is not None:
-        return paper
+        # L2：放回「熟练 ∩ must_know」
+        l2 = base | must_know_hits
+        paper = attempt("L2", l2, _counts(must_know=len(must_know_hits)), require)
+        if paper is not None:
+            return paper
 
-    # L4：历史卷从最旧一卷起逐卷放回
-    l4 = set(l3)
-    for paper_ids in oldest_first:
-        l4 |= paper_ids
+        # L3：再放回其余熟练题
+        l3 = l2 | other_hits
         paper = attempt(
-            "L4",
-            l4,
-            _counts(len(must_know_hits), len(other_hits), len(l4 - l3)),
-            2,
+            "L3", l3, _counts(must_know=len(must_know_hits), other=len(other_hits)), require
         )
         if paper is not None:
             return paper
 
-    full = _counts(len(must_know_hits), len(other_hits), len(recent_ids))
-    # L5：全库，方向覆盖放宽到 ≥1
-    paper = attempt("L5", known, full, 1)
-    if paper is not None:
-        return paper
+        # L4：历史卷从最旧一卷起逐卷放回
+        l4 = set(l3)
+        for paper_ids in oldest_first:
+            l4 |= paper_ids
+            paper = attempt(
+                "L4",
+                l4,
+                _counts(len(must_know_hits), len(other_hits), len(l4 - l3)),
+                require,
+            )
+            if paper is not None:
+                return paper
 
-    # L6：全库，连方向覆盖都不再要求
-    return attempt("L6", known, full, 0)
+        full = _counts(len(must_know_hits), len(other_hits), len(recent_ids))
+        # L5：全库，方向覆盖放宽到 ≥1
+        paper = attempt("L5", pool_ids, full, 1)
+        if paper is not None:
+            return paper
+
+        # L6：全库，连方向覆盖都不再要求
+        return attempt("L6", pool_ids, full, 0)
+
+    if sub_direction is None:
+        return run_ladder(scope)
+
+    # --- 子方向聚焦优先：窄池能成卷就全命中；凑不出才退化到同方向宽池并如实计数 ---------
+    if focus:
+        narrowed = run_ladder(focus)
+        if narrowed is not None:
+            return replace(narrowed, sub_direction=sub_direction, sub_direction_backfill=0)
+    wide = run_ladder(scope)
+    if wide is None:
+        return None
+    backfill_count = sum(
+        1
+        for question in wide.questions
+        if str(question.get("sub_direction") or "").strip() != sub_direction
+    )
+    return replace(wide, sub_direction=sub_direction, sub_direction_backfill=backfill_count)

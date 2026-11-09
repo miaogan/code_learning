@@ -52,3 +52,30 @@ export function proficiencyRuleHint(
     ? `${rule}。${backfillNotice(backfilled)}`
     : rule
 }
+
+/**
+ * 子方向聚焦的透明度事实（r46）。
+ *
+ * 后端对子方向是「**聚焦优先、不足补位**」：窄池凑不出结构达标的卷时，会用同方向的其余题补位，
+ * 并如实把「卷中不属于该子方向的题数」放回 `sub_direction_backfill`。这里只把它读成一句话：
+ * - 未选子方向 / 未生效（`sub_direction` 为空）→ `null`（不挂节点）；
+ * - 全部命中（`backfill <= 0`）→ `null`（用户自己选的聚焦生效了，无需额外说明）；
+ * - 一道都没命中（`backfill >= 卷题数`）→ 明说「该子方向暂无题，已改按同方向出题」；
+ * - 部分补位 → 明说「不足以单独成卷，已补充 N 道同方向题」。
+ *
+ * 前端**不重算**补位量、不改写措辞 —— 与 `filteredNotice` 同一口径：事实由服务端给。
+ */
+export function subDirectionNotice(
+  subDirection: string | null | undefined,
+  backfill: number | null | undefined,
+  total: number | null | undefined,
+): string | null {
+  const sub = (subDirection ?? '').trim()
+  if (!sub) return null
+  if (!isPositiveCount(backfill)) return null
+  const size = typeof total === 'number' && Number.isFinite(total) && total > 0 ? total : 0
+  if (size > 0 && backfill >= size) {
+    return `「${sub}」暂无可用题目，本卷已改按同方向出题`
+  }
+  return `「${sub}」题目不足以单独成卷，已补充 ${backfill} 道同方向题`
+}

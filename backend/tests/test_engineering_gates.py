@@ -368,12 +368,22 @@ def test_direction_literals_not_duplicated() -> None:
 
 
 def test_contract_mirror_filtered_count() -> None:
-    """`ExamRun.filtered_count` / `reintroduced_count` 双侧同步，且 `answer` 不进响应模型（AC-4）。"""
+    """`ExamRun.filtered_count` / `reintroduced_count` 双侧同步，且 `answer` 不进响应模型（AC-4）。
+
+    r46：`sub_direction` / `sub_direction_backfill` 同样必须双侧同步（聚焦透明度）。
+    """
     schemas_tree = _r6_ast("backend/app/schemas.py")
     run_fields = _class_annotations(schemas_tree, "ExamRun")
-    expected = {"run_id", "questions", "filtered_count", "reintroduced_count"}
+    expected = {
+        "run_id",
+        "questions",
+        "filtered_count",
+        "reintroduced_count",
+        "sub_direction",
+        "sub_direction_backfill",
+    }
     assert set(run_fields) == expected, f"ExamRun 字段应为 {sorted(expected)}，实际 {sorted(run_fields)}"
-    for field in ("filtered_count", "reintroduced_count"):
+    for field in ("filtered_count", "reintroduced_count", "sub_direction_backfill"):
         default = run_fields[field]
         if isinstance(default, ast.Call):  # Field(default=0)
             defaults = [kw.value for kw in default.keywords if kw.arg == "default"]

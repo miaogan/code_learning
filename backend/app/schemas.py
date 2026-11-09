@@ -358,6 +358,10 @@ class ExamRun(BaseModel):
     #: r43：本卷里**已熟练但被兜底放回**的题数（= `|熟练 ∩ 本卷|`），用于「另有 N 道因保持卷面结构被重新纳入」。
     #: 旧客户端兼容默认 0；不从 payload 读（出卷响应专属字段）。
     reintroduced_count: int = 0
+    #: r46：实际生效的子方向（闭集内取值）；未指定或闭集外脏参数时为空串（= 未聚焦）。
+    sub_direction: str = ""
+    #: r46：本卷中**不属于所选子方向**、因该子方向题量不足而补齐的题数（0 = 全部命中）。
+    sub_direction_backfill: int = 0
 
 
 class ExamAnswers(BaseModel):

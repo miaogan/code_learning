@@ -12,7 +12,7 @@ import { InlineError } from '../components/ui/InlineError'
 import { PhaseLoader } from '../components/ui/PhaseLoader'
 import { ResumeGate } from '../components/ui/ResumeGate'
 import { RingProgress } from '../components/ui/RingProgress'
-import { backfillNotice, filteredNotice, proficiencyRuleHint } from '../lib/examNotice'
+import { backfillNotice, filteredNotice, proficiencyRuleHint, subDirectionNotice } from '../lib/examNotice'
 import { formatElapsed } from '../lib/format'
 import { DIRECTIONS, SUBDIRECTIONS } from '../lib/questionDirections'
 import { useAsync } from '../lib/useAsync'
@@ -137,10 +137,18 @@ export default function ExamPage() {
     : null
   /** D-8：复核时复显本卷的过滤事实；L2 兜底回流也拼在同一行（r43 合并成一处）。 */
   const resultNotice = run
-    ? [filteredNotice(run.filtered_count), backfillNotice(run.reintroduced_count)]
+    ? [
+        filteredNotice(run.filtered_count),
+        backfillNotice(run.reintroduced_count),
+        subDirectionNotice(run.sub_direction, run.sub_direction_backfill, run.questions.length),
+      ]
         .filter((text): text is string => text !== null)
         .join(' · ')
     : ''
+  /** r46：子方向聚焦的透明度事实（未聚焦 / 全部命中时不挂载），作答中单独一行。 */
+  const subNotice = run
+    ? subDirectionNotice(run.sub_direction, run.sub_direction_backfill, run.questions.length)
+    : null
   const hasAnyAnswer = answeredCount > 0
 
   // 作答中离开保护：刷新/关闭走浏览器原生提示，站内链接先确认 —— 作答只在本页 state，
@@ -404,6 +412,15 @@ export default function ExamPage() {
               {' '}
               {notice ? <span>{notice}</span> : null}
               {notice ? <span>{`· ${noticeHint}`}</span> : <span>{noticeHint}</span>}
+            </span>
+          ) : null}
+
+          {/* r46：选了子方向但题量不足、用同方向题补位时如实说明（未聚焦 / 全部命中不挂载）。 */}
+          {subNotice ? (
+            <span className="sc-meta-line">
+              <Chip label="方向聚焦" />
+              {' '}
+              <span>{subNotice}</span>
             </span>
           ) : null}
 

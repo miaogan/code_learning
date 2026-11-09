@@ -254,6 +254,16 @@ export interface ExamRun {
    * 旧 payload 缺该字段时按 0 静默处理。
    */
   reintroduced_count: number
+  /**
+   * r46：实际生效的子方向（闭集内取值）；未指定 / 闭集外脏参数时为空串（= 未聚焦）。
+   * 与服务端 `ExamRun.sub_direction` 逐字对齐。
+   */
+  sub_direction: string
+  /**
+   * r46：本卷中**不属于所选子方向**、因该子方向题量不足而补齐的题数（0 = 全部命中）。
+   * 由 `lib/examNotice` 的 `subDirectionNotice()` 解释成一句透明文案。
+   */
+  sub_direction_backfill: number
 }
 
 export interface ExamAnswers {

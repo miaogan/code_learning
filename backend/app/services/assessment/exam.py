@@ -20,7 +20,8 @@ r6 起本模块退回**纯编排**职责（TECHNICAL §4 / §7）：
 payload 形状（TECHNICAL §4.3 笔试部分 + 判分回写扩展）：
 `{"questions":[{id,kind,direction,prompt,options,answer,difficulty,essentiality}],
   "started_at":..., "stage":"L1".."L6", "filtered_count":n,
-  "reintroduced_count":n, "backfill":{"must_know":n,"other":m,"history":k}, "submitted_at":...,
+  "reintroduced_count":n, "backfill":{"must_know":n,"other":m,"history":k},
+  "sub_direction":"","sub_direction_backfill":0, "submitted_at":...,
   "answers":{qid: 作答}, "per_question":[{question_id,correct,your_answer,correct_answer}],
   "correct_count":n, "objective_total":n, "total":x, "elapsed_s":y}`
 旧卷（r5 及更早）没有 `stage`/`filtered_count`/`backfill`，读侧一律 `.get()` 兜底，
@@ -106,6 +107,9 @@ def create_run(
         "filtered_count": paper.filtered_count,
         "reintroduced_count": paper.reintroduced_count,
         "backfill": dict(paper.backfill),
+        # r46：子方向聚焦透明度（未指定子方向时恒为 ""/0，旧卷读侧 .get() 兜底）
+        "sub_direction": paper.sub_direction,
+        "sub_direction_backfill": paper.sub_direction_backfill,
     }
     repository.insert_run(run_id, EXAM_KIND, profile_id, payload)
     return ExamRun(
@@ -113,6 +117,8 @@ def create_run(
         questions=[_public(question) for question in paper.questions],
         filtered_count=paper.filtered_count,
         reintroduced_count=paper.reintroduced_count,
+        sub_direction=paper.sub_direction,
+        sub_direction_backfill=paper.sub_direction_backfill,
     )
 
 
