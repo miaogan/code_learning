@@ -35,6 +35,8 @@ jobs:
         run: npm test
       - name: Build
         run: npm run build
+      - name: Retrieval eval gate
+        run: node ../scripts/eval_retrieval.mjs --check
 
   backend:
     runs-on: ubuntu-latest
@@ -56,3 +58,9 @@ jobs:
         run: python -X utf8 -m app.services.assessment.question_merge --check
       - name: Test
         run: python -m pytest -q
+      - name: Offline eval gate
+        run: python -X utf8 ../scripts/eval_harness.py --check
+      - name: Question retrieval eval gate
+        run: python -X utf8 ../scripts/eval_question_retrieval.py --check
+      - name: Reliability fault-injection gate
+        run: python -X utf8 ../scripts/eval_reliability.py --check

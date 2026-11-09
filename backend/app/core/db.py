@@ -1,4 +1,4 @@
-"""SQLite 单库访问层：7 张表，结构化产物以 JSON 文本列存（ARCHITECTURE §3.4）。
+"""SQLite 单库访问层：13 张业务表 + 1 张可选 FTS5 虚表，结构化产物以 JSON 文本列存（ARCHITECTURE §3.4）。
 
 不做迁移框架：只用 CREATE TABLE IF NOT EXISTS，字段变更需在 memory.md 记录一次性升级说明。
 r3 追加 `timeline_events`（成长时间线的事件快照，`(type, ref_id)` 唯一）——对既有 `app.core.db`
@@ -13,11 +13,14 @@ r11 追加题库第五维 `questions.language`、逐题解析 `questions.explana
 `language` / `source`，必须在补列之后执行）。索引因此从 `SCHEMA` 抽出为独立脚本。
 """
 
+import logging
 import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager
 
 from app.core.config import get_settings
+
+logger = logging.getLogger("app.db")
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS documents (
@@ -218,6 +221,47 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_resume_jobs_running_hash
     ON resume_jobs (user_id, content_hash) WHERE status = 'running';
 """
 
+#: r51 模型调用日志：结构化日志不再「打完就丢」，落库后可聚合成功率 / 延迟分位 / 失败分布。
+#: 只记元数据，绝不写 Key / Prompt / 简历正文 / 图片（与 ai.py 的隐私边界一致）。
+R51_SCHEMA = """
+CREATE TABLE IF NOT EXISTS ai_call_logs (
+    id           TEXT PRIMARY KEY,
+    user_id      TEXT NOT NULL DEFAULT 'default',
+    request_id   TEXT NOT NULL DEFAULT '-',
+    provider     TEXT NOT NULL,
+    model        TEXT NOT NULL,
+    kind         TEXT NOT NULL,
+    status_code  INTEGER,
+    elapsed_ms   INTEGER NOT NULL,
+    attempt      INTEGER NOT NULL DEFAULT 1,
+    prompt_chars INTEGER NOT NULL DEFAULT 0,
+    created_at   TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_call_logs_created ON ai_call_logs (created_at);
+CREATE INDEX IF NOT EXISTS idx_ai_call_logs_user_model ON ai_call_logs (user_id, model, kind);
+"""
+
+#: r51 题目全文检索：FTS5 trigram 对中文子串友好。编译选项 / tokenizer 缺失时不建虚表，
+#: 由 `repository.search_questions()` 降级为 LIKE，绝不因可选能力阻断启动。
+R51_FTS_SCHEMA = """
+CREATE VIRTUAL TABLE IF NOT EXISTS question_search USING fts5(
+    question_id UNINDEXED,
+    prompt,
+    explanation,
+    direction UNINDEXED,
+    sub_direction UNINDEXED,
+    tokenize = 'trigram'
+);
+"""
+
+
+def fts5_available(conn: sqlite3.Connection) -> bool:
+    """探测当前 SQLite 是否编译了 FTS5；不抛异常，缺能力即返回 False。"""
+    row = conn.execute("SELECT sqlite_compileoption_used('ENABLE_FTS5') AS enabled").fetchone()
+    return bool(row and row["enabled"])
+
+
 #: r23 存量 6 表补 `user_id`（DEFAULT 'default' 即回填旧数据）。
 _R23_ADDED_COLUMNS: tuple[tuple[str, str, str], ...] = (
     ("documents", "user_id", "TEXT NOT NULL DEFAULT 'default'"),
@@ -249,11 +293,20 @@ _ADDED_COLUMNS: tuple[tuple[str, str, str], ...] = (
 
 
 
+#: r53 并发写锁：8 线程 × 50 次短事务基准里，无 busy_timeout 成功率仅 28.2%（287 次
+#: `database is locked`），设 3000ms 后 100%、0 次失败。证据见 `docs/eval/PERF-REPORT.md`。
+#: 刻意**不启用 WAL**：单进程本地库，busy_timeout 已消除写失败；WAL 会引入 -wal/-shm
+#: 文件与备份复杂度，收益不成立（README 设计取舍同源判断）。
+BUSY_TIMEOUT_MS = 3000
+
+
 @contextmanager
 def connection() -> Iterator[sqlite3.Connection]:
-    conn = sqlite3.connect(get_settings().db_path)
+    conn = sqlite3.connect(get_settings().db_path, timeout=BUSY_TIMEOUT_MS / 1000)
     conn.row_factory = sqlite3.Row
     try:
+        # 驱动参数与数据库层双保险：不同 Python 版本对 connect(timeout=) 的实现细节不同。
+        conn.execute(f"PRAGMA busy_timeout = {BUSY_TIMEOUT_MS}")
         yield conn
         conn.commit()
     finally:
@@ -291,6 +344,12 @@ def init_db() -> None:
         conn.executescript(R42_SCHEMA)      # 7. r42 图片识别任务表
         _dedupe_running_profile_jobs(conn)  # 8. 建部分唯一索引前先收敛历史重复 running 行
         conn.executescript(R42_INDEXES)     # 9. r42 幂等索引
+        conn.executescript(R51_SCHEMA)      # 10. r51 模型调用日志表 + 索引
+        if fts5_available(conn):            # 11. FTS5 虚表（可选能力，缺 tokenizer 时静默降级）
+            try:
+                conn.executescript(R51_FTS_SCHEMA)
+            except sqlite3.OperationalError as exc:
+                logger.warning("db.fts5_unavailable error=%s", type(exc).__name__)
 
 
 def _dedupe_running_profile_jobs(conn: sqlite3.Connection) -> None:

@@ -96,7 +96,8 @@ export function WeekPlan({ report, userId }: WeekPlanProps) {
     if (stored !== null && stored.report_id === report.id && stored.daily_minutes === minutes) {
       return stored
     }
-    return buildStudyPlan(report, { dailyMinutes: minutes, learned })
+    // r51：报告页开启检索引用（纯函数、零网络），旧快照无该字段时下方零占位。
+    return buildStudyPlan(report, { dailyMinutes: minutes, learned, citations: true })
   }, [learned, minutes, planKey, report])
 
   // 快照落本地：跨会话保持同一份任务顺序（打卡按 task.id，重算不会丢已完成项）。
@@ -210,6 +211,21 @@ export function WeekPlan({ report, userId }: WeekPlanProps) {
                         去学习 →
                       </Link>
                     </div>
+                    {task.citations && task.citations.length > 0 ? (
+                      <div className="sc-plan-taskmeta">
+                        <span>依据：</span>
+                        {task.citations.map((citation) => (
+                          <Link
+                            className="sc-plan-taskgo"
+                            to={citation.href}
+                            key={`${citation.chapter_id}:${citation.section_id}`}
+                            title={citation.title}
+                          >
+                            {citation.title}
+                          </Link>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
                 ))}
               </div>

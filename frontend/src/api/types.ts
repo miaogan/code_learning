@@ -285,6 +285,56 @@ export interface ExamResult {
   per_question: PerQuestionResult[]
 }
 
+/** r51 模型调用质量看板：单个模型聚合行。 */
+export interface EvalModelStat {
+  total: number
+  success_rate: number
+  p95_ms: number
+}
+
+export interface EvalTrendPoint {
+  day: string
+  total: number
+  success_rate: number
+}
+
+/** 只读聚合：分母与分位算法固定在后端，前端只做展示（零二次统计）。 */
+export interface EvalSummary {
+  window_days: number
+  total: number
+  success_rate: number
+  p50_ms: number
+  p95_ms: number
+  by_kind: Record<string, number>
+  by_model: Record<string, EvalModelStat>
+  trend: EvalTrendPoint[]
+  notice: string
+}
+
+/** r51 题目全文检索请求：方向 / 子方向可选，闭集外脏值由服务端静默忽略。 */
+export interface QuestionSearchRequest {
+  query: string
+  direction?: string
+  sub_direction?: string
+  limit?: number
+}
+
+export interface QuestionSearchItem {
+  question_id: string
+  prompt: string
+  direction: string
+  sub_direction: string
+  score: number
+}
+
+/** mode = fts5 | like（降级）；响应永不含 answer。 */
+export interface QuestionSearchResponse {
+  items: QuestionSearchItem[]
+  total: number
+  mode: string
+  notice: string
+}
+
 export interface Course {
   id: string
   title: string

@@ -1,0 +1,576 @@
+{
+  "version": "v1",
+  "created_at": "2026-11-09",
+  "rubric_version": "r1",
+  "cases": [
+    {
+      "id": "g-001",
+      "input": {
+        "resume_excerpt": "在某电商公司负责智能客服问答系统，基于大语言模型搭建 RAG 检索链路，用向量数据库做文档召回，并接入提示词模板管理多轮会话，上线后问答命中率提升约两成。",
+        "target_role": "高级 AI 应用工程师"
+      },
+      "expected": {
+        "profile_fields": ["大语言模型", "RAG", "向量数据库", "提示词模板", "智能客服问答系统"],
+        "score_band": "7-8",
+        "must_not_contain": ["Kubernetes"]
+      },
+      "response_snapshot": {
+        "skills": ["大语言模型", "RAG", "向量数据库", "提示词模板"],
+        "projects": ["智能客服问答系统"],
+        "years_experience": 3,
+        "summary": "具备 RAG 问答链路与提示词工程落地经验。"
+      },
+      "annotation": { "source": "synthetic", "annotator": "manual", "rubric_version": "r1" }
+    },
+    {
+      "id": "g-002",
+      "input": {
+        "resume_excerpt": "某团队内部开发智能工单助手，使用 LangChain 编排多工具调用，实现文档解析与结构化抽取，配合流式输出与重试降级把结果写回工单系统。",
+        "target_role": "AI 应用工程师"
+      },
+      "expected": {
+        "profile_fields": ["LangChain", "工具调用", "文档解析", "结构化抽取", "流式输出", "重试降级", "智能工单助手"],
+        "score_band": "7-8",
+        "must_not_contain": ["TensorFlow"]
+      },
+      "response_snapshot": {
+        "skills": ["LangChain", "工具调用", "文档解析", "结构化抽取", "流式输出", "重试降级"],
+        "projects": ["智能工单助手"],
+        "years_experience": 4,
+        "summary": "熟悉 Agent 编排与工具调用链路的工程实现。"
+      },
+      "annotation": { "source": "synthetic", "annotator": "manual", "rubric_version": "r1" }
+    },
+    {
+      "id": "g-003",
+      "input": {
+        "resume_excerpt": "参与某业务线的模型评测平台建设，负责离线金标集标注规范、字段级准确率与召回率统计，并搭建提示词版本对比流程，输出可回放的评测报告。",
+        "target_role": "高级 AI 应用工程师"
+      },
+      "expected": {
+        "profile_fields": ["模型评测", "离线金标集", "字段级准确率", "召回率", "提示词版本对比", "评测报告", "模型评测平台"],
+        "score_band": "8-9",
+        "must_not_contain": ["Spark"]
+      },
+      "response_snapshot": {
+        "skills": ["模型评测", "离线金标集", "字段级准确率", "召回率", "提示词版本对比", "评测报告"],
+        "projects": ["模型评测平台"],
+        "years_experience": 5,
+        "summary": "有评测数据集与指标口径建设经验。"
+      },
+      "annotation": { "source": "synthetic", "annotator": "manual", "rubric_version": "r1" }
+    },
+    {
+      "id": "g-004",
+      "input": {
+        "resume_excerpt": "在某电商公司落地知识库问答项目，用 pgvector 作向量库存向量，拿 K8s 编排推理容器，检索侧接 ES 做关键词兜底，模型服务为自托管大模型，另写了重排模块。",
+        "target_role": "高级 AI 应用工程师"
+      },
+      "expected": {
+        "profile_fields": ["向量数据库", "Kubernetes", "Elasticsearch", "重排模块", "自托管大模型", "知识库问答"],
+        "score_band": "6-7",
+        "must_not_contain": ["Flink"]
+      },
+      "response_snapshot": {
+        "skills": ["向量数据库", "Elasticsearch", "重排模块", "自托管大模型"],
+        "projects": ["知识库问答"],
+        "years_experience": 4,
+        "summary": "片段用别名书写，响应快照漏抽了编排相关的一项技能。"
+      },
+      "annotation": { "source": "synthetic", "annotator": "manual", "rubric_version": "r1" }
+    },
+    {
+      "id": "g-005",
+      "input": {
+        "resume_excerpt": "负责某团队对话系统的意图识别与槽位填充，用少量样本做少样本提示，接入向量召回做相似问法匹配，并设计了会话状态机管理多轮上下文。",
+        "target_role": "AI 应用工程师"
+      },
+      "expected": {
+        "profile_fields": ["意图识别", "槽位填充", "少样本提示", "向量召回", "会话状态机", "对话系统"],
+        "score_band": "7-8",
+        "must_not_contain": ["Kafka"]
+      },
+      "response_snapshot": {
+        "skills": ["意图识别", "槽位填充", "少样本提示", "向量召回", "会话状态机"],
+        "projects": ["对话系统"],
+        "years_experience": 3,
+        "summary": "熟悉任务型对话的召回与状态管理。"
+      },
+      "annotation": { "source": "synthetic", "annotator": "manual", "rubric_version": "r1" }
+    },
+    {
+      "id": "g-006",
+      "input": {
+        "resume_excerpt": "在某电商公司做管理后台前端，用 React 函数组件加 Hooks 组织状态，配合 TypeScript 定义接口类型，落地虚拟列表优化长表格渲染，并封装了通用表单组件。",
+        "target_role": "高级前端工程师"
+      },
+      "expected": {
+        "profile_fields": ["React", "Hooks", "TypeScript", "虚拟列表", "表单组件", "管理后台前端"],
+        "score_band": "7-8",
+        "must_not_contain": ["Vue3"]
+      },
+      "response_snapshot": {
+        "skills": ["React", "Hooks", "TypeScript", "虚拟列表", "表单组件"],
+        "projects": ["管理后台前端"],
+        "years_experience": 4,
+        "summary": "熟悉 React 技术栈与长列表性能优化。"
+      },
+      "annotation": { "source": "synthetic", "annotator": "manual", "rubric_version": "r1" }
+    },
+    {
+      "id": "g-007",
+      "input": {
+        "resume_excerpt": "某团队组件库建设，负责基于 CSS 变量的多主题方案，用 Vite 做构建，补齐单元测试与按需加载，解决了打包体积过大和样式污染两类问题。",
+        "target_role": "前端工程师"
+      },
+      "expected": {
+        "profile_fields": ["CSS 变量", "多主题", "Vite", "单元测试", "按需加载", "组件库"],
+        "score_band": "6-7",
+        "must_not_contain": ["Webpack"]
+      },
+      "response_snapshot": {
+        "skills": ["CSS 变量", "多主题", "Vite", "单元测试", "按需加载"],
+        "projects": ["组件库"],
+        "years_experience": 3,
+        "summary": "有设计系统主题化与构建优化经验。"
+      },
+      "annotation": { "source": "synthetic", "annotator": "manual", "rubric_version": "r1" }
+    },
+    {
+      "id": "g-008",
+      "input": {
+        "resume_excerpt": "做某业务线数据看板，处理事件循环里的微任务与宏任务顺序，排查过 setState 批量更新导致的重复渲染，用 Chrome 性能面板定位长任务并做了任务分片。",
+        "target_role": "高级前端工程师"
+      },
+      "expected": {
+        "profile_fields": ["事件循环", "微任务", "批量更新", "重复渲染", "性能面板", "任务分片", "数据看板"],
+        "score_band": "6-7",
+        "must_not_contain": ["WebAssembly"]
+      },
+      "response_snapshot": {
+        "skills": ["事件循环", "微任务", "批量更新", "重复渲染", "性能面板", "任务分片"],
+        "projects": ["数据看板"],
+        "years_experience": 2,
+        "summary": "理解浏览器渲染与异步机制，能定位卡顿。"
+      },
+      "annotation": { "source": "synthetic", "annotator": "manual", "rubric_version": "r1" }
+    },
+    {
+      "id": "g-009",
+      "input": {
+        "resume_excerpt": "负责某电商公司小程序跨端页面，用 TypeScript 严格模式约束接口，落地骨架屏与图片懒加载，配合错误边界兜底白屏，并接入前端埋点监控首屏耗时。",
+        "target_role": "前端工程师"
+      },
+      "expected": {
+        "profile_fields": ["TypeScript", "骨架屏", "图片懒加载", "错误边界", "埋点监控", "小程序跨端页面"],
+        "score_band": "7-8",
+        "must_not_contain": ["React Native"]
+      },
+      "response_snapshot": {
+        "skills": ["TypeScript", "骨架屏", "图片懒加载", "错误边界", "埋点监控"],
+        "projects": ["小程序跨端页面"],
+        "years_experience": 3,
+        "summary": "关注首屏体验与前端稳定性建设。"
+      },
+      "annotation": { "source": "synthetic", "annotator": "manual", "rubric_version": "r1" }
+    },
+    {
+      "id": "g-010",
+      "input": {
+        "resume_excerpt": "在某团队做 React 管理后台，明确未使用过 Vue3，日常只用函数组件与 Context 管理状态，配合 React Router 做路由，未接触过微前端框架，构建走 Vite。",
+        "target_role": "高级前端工程师"
+      },
+      "expected": {
+        "profile_fields": ["React", "函数组件", "Context", "React Router", "Vite", "React 管理后台"],
+        "score_band": "5-6",
+        "must_not_contain": ["Vue3", "微前端框架"]
+      },
+      "response_snapshot": {
+        "skills": ["React", "函数组件", "Context", "React Router", "Vite", "Vue3"],
+        "projects": ["React 管理后台"],
+        "years_experience": 3,
+        "summary": "片段含否定表述，响应快照仍编造了未使用的框架。"
+      },
+      "annotation": { "source": "synthetic", "annotator": "manual", "rubric_version": "r1" }
+    },
+    {
+      "id": "g-011",
+      "input": {
+        "resume_excerpt": "在某电商公司做订单服务，用 Python 写 REST 接口，基于 Redis 做幂等令牌防重复提交，接 MySQL 事务保证库存扣减一致，并补了接口限流。",
+        "target_role": "高级后端工程师"
+      },
+      "expected": {
+        "profile_fields": ["Python", "REST 接口", "Redis", "幂等令牌", "MySQL 事务", "接口限流", "订单服务"],
+        "score_band": "8-9",
+        "must_not_contain": ["Kafka"]
+      },
+      "response_snapshot": {
+        "skills": ["Python", "REST 接口", "Redis", "幂等令牌", "MySQL 事务", "接口限流"],
+        "projects": ["订单服务"],
+        "years_experience": 5,
+        "summary": "熟悉交易链路的幂等与一致性处理。"
+      },
+      "annotation": { "source": "synthetic", "annotator": "manual", "rubric_version": "r1" }
+    },
+    {
+      "id": "g-012",
+      "input": {
+        "resume_excerpt": "某团队网关开发，负责 JWT 鉴权与会话续期，落地基于角色的权限校验，用连接池治理数据库连接，并写了灰度发布时的兼容层。",
+        "target_role": "高级后端工程师"
+      },
+      "expected": {
+        "profile_fields": ["JWT 鉴权", "会话续期", "权限校验", "连接池", "灰度发布", "网关服务"],
+        "score_band": "7-8",
+        "must_not_contain": ["gRPC"]
+      },
+      "response_snapshot": {
+        "skills": ["JWT 鉴权", "会话续期", "权限校验", "连接池", "灰度发布"],
+        "projects": ["网关服务"],
+        "years_experience": 4,
+        "summary": "有认证鉴权与服务治理落地经验。"
+      },
+      "annotation": { "source": "synthetic", "annotator": "manual", "rubric_version": "r1" }
+    },
+    {
+      "id": "g-013",
+      "input": {
+        "resume_excerpt": "做某业务线的库存系统，针对联合索引与最左前缀做了慢查询优化，用消息队列削峰填谷，补了分布式锁避免超卖，并整理了执行计划分析流程。",
+        "target_role": "高级后端工程师"
+      },
+      "expected": {
+        "profile_fields": ["联合索引", "最左前缀", "慢查询优化", "消息队列", "分布式锁", "执行计划", "库存系统"],
+        "score_band": "8-9",
+        "must_not_contain": ["Elasticsearch"]
+      },
+      "response_snapshot": {
+        "skills": ["联合索引", "最左前缀", "慢查询优化", "消息队列", "分布式锁", "执行计划"],
+        "projects": ["库存系统"],
+        "years_experience": 6,
+        "summary": "擅长数据库调优与高并发库存一致性。"
+      },
+      "annotation": { "source": "synthetic", "annotator": "manual", "rubric_version": "r1" }
+    },
+    {
+      "id": "g-014",
+      "input": {
+        "resume_excerpt": "在某电商公司做用户中心，用 Go 写 HTTP 接口，接 PostgreSQL 存用户资料，配合 Redis 缓存会话，写了单元测试覆盖注册登录流程。",
+        "target_role": "高级后端工程师"
+      },
+      "expected": {
+        "profile_fields": ["Go", "HTTP 接口", "PostgreSQL", "Redis", "单元测试", "用户中心"],
+        "score_band": "6-7",
+        "must_not_contain": ["Kubernetes"]
+      },
+      "response_snapshot": {
+        "skills": ["Go", "HTTP 接口", "PostgreSQL", "Redis", "单元测试", "Kubernetes"],
+        "projects": ["用户中心"],
+        "years_experience": 4,
+        "summary": "响应快照含一项片段未提及的编造技能。"
+      },
+      "annotation": { "source": "synthetic", "annotator": "manual", "rubric_version": "r1" }
+    },
+    {
+      "id": "g-015",
+      "input": {
+        "resume_excerpt": "负责某团队对账任务，用定时任务拉取渠道流水，做分页批处理与失败重试，按唯一键做去重，补了任务幂等与告警通知，保证日终对账可重跑。",
+        "target_role": "后端工程师"
+      },
+      "expected": {
+        "profile_fields": ["定时任务", "分页批处理", "失败重试", "去重", "任务幂等", "告警通知", "对账任务"],
+        "score_band": "6-7",
+        "must_not_contain": ["Flink"]
+      },
+      "response_snapshot": {
+        "skills": ["定时任务", "分页批处理", "失败重试", "去重", "任务幂等", "告警通知"],
+        "projects": ["对账任务"],
+        "years_experience": 3,
+        "summary": "熟悉离线任务的幂等与可重入设计。"
+      },
+      "annotation": { "source": "synthetic", "annotator": "manual", "rubric_version": "r1" }
+    },
+    {
+      "id": "g-016",
+      "input": {
+        "resume_excerpt": "在某电商公司做数仓分层，用 SQL 写维度建模与宽表，负责日活与留存指标口径，补了数据质量校验规则，并产出经营分析报表。",
+        "target_role": "数据开发工程师"
+      },
+      "expected": {
+        "profile_fields": ["数仓分层", "SQL", "维度建模", "宽表", "留存指标", "数据质量校验", "经营分析报表"],
+        "score_band": "7-8",
+        "must_not_contain": ["TensorFlow"]
+      },
+      "response_snapshot": {
+        "skills": ["数仓分层", "SQL", "维度建模", "宽表", "留存指标", "数据质量校验"],
+        "projects": ["经营分析报表"],
+        "years_experience": 4,
+        "summary": "熟悉数仓建模与指标口径治理。"
+      },
+      "annotation": { "source": "synthetic", "annotator": "manual", "rubric_version": "r1" }
+    },
+    {
+      "id": "g-017",
+      "input": {
+        "resume_excerpt": "某团队埋点治理，设计事件上报规范与字段字典，用窗口函数算会话内漏斗，配合分组聚合做渠道归因，并搭了异常值监控看板。",
+        "target_role": "数据开发工程师"
+      },
+      "expected": {
+        "profile_fields": ["埋点规范", "字段字典", "窗口函数", "漏斗分析", "分组聚合", "异常值监控", "埋点治理"],
+        "score_band": "7-8",
+        "must_not_contain": ["Spark Streaming"]
+      },
+      "response_snapshot": {
+        "skills": ["埋点规范", "字段字典", "窗口函数", "漏斗分析", "分组聚合", "异常值监控"],
+        "projects": ["埋点治理"],
+        "years_experience": 3,
+        "summary": "有埋点体系与漏斗分析建设经验。"
+      },
+      "annotation": { "source": "synthetic", "annotator": "manual", "rubric_version": "r1" }
+    },
+    {
+      "id": "g-018",
+      "input": {
+        "resume_excerpt": "做某业务线特征加工，用 Python 写离线批处理脚本，处理空值与异常分布，做了特征分箱与归一化，按版本管理特征表供下游复用。",
+        "target_role": "数据开发工程师"
+      },
+      "expected": {
+        "profile_fields": ["Python", "离线批处理", "空值处理", "特征分箱", "归一化", "特征版本管理", "特征加工"],
+        "score_band": "6-7",
+        "must_not_contain": ["Kubernetes"]
+      },
+      "response_snapshot": {
+        "skills": ["Python", "离线批处理", "空值处理", "特征分箱", "归一化", "特征版本管理"],
+        "projects": ["特征加工"],
+        "years_experience": 2,
+        "summary": "熟悉离线特征处理与版本化。"
+      },
+      "annotation": { "source": "synthetic", "annotator": "manual", "rubric_version": "r1" }
+    },
+    {
+      "id": "g-019",
+      "input": {
+        "resume_excerpt": "在某电商公司做报表平台，用 SQL 做多表关联与聚合，落地增量同步减少回刷，补了口径对齐文档与数据校验，支持业务部门自助取数。",
+        "target_role": "数据开发工程师"
+      },
+      "expected": {
+        "profile_fields": ["SQL", "多表关联", "增量同步", "口径对齐", "数据校验", "自助取数", "报表平台"],
+        "score_band": "6-7",
+        "must_not_contain": ["Flink"]
+      },
+      "response_snapshot": {
+        "skills": ["SQL", "多表关联", "增量同步", "口径对齐", "数据校验"],
+        "projects": ["报表平台"],
+        "years_experience": "三年",
+        "summary": "年限字段被写成字符串，且响应快照缺少一项技能。"
+      },
+      "annotation": { "source": "synthetic", "annotator": "manual", "rubric_version": "r1" }
+    },
+    {
+      "id": "g-020",
+      "input": {
+        "resume_excerpt": "负责某团队指标平台，设计原子指标与派生指标的分层，用调度系统编排依赖，补了血缘解析与回溯能力，保障口径变更可追溯。",
+        "target_role": "高级数据开发工程师"
+      },
+      "expected": {
+        "profile_fields": ["原子指标", "派生指标", "调度系统", "依赖编排", "血缘解析", "口径追溯", "指标平台"],
+        "score_band": "8-9",
+        "must_not_contain": ["Kafka"]
+      },
+      "response_snapshot": {
+        "skills": ["原子指标", "派生指标", "调度系统", "依赖编排", "血缘解析", "口径追溯"],
+        "projects": ["指标平台"],
+        "years_experience": 5,
+        "summary": "有指标中台与数据血缘建设经验。"
+      },
+      "annotation": { "source": "synthetic", "annotator": "manual", "rubric_version": "r1" }
+    },
+    {
+      "id": "g-021",
+      "input": {
+        "resume_excerpt": "在某电商公司做容器化改造，用 Docker 打包服务镜像，写 CI 流水线做构建与发布，接 Prometheus 采指标，并配了日志采集查线上问题。",
+        "target_role": "运维开发工程师"
+      },
+      "expected": {
+        "profile_fields": ["Docker", "镜像打包", "CI 流水线", "Prometheus", "日志采集", "容器化改造"],
+        "score_band": "7-8",
+        "must_not_contain": ["Kubernetes"]
+      },
+      "response_snapshot": {
+        "skills": ["Docker", "镜像打包", "CI 流水线", "Prometheus", "日志采集"],
+        "projects": ["容器化改造"],
+        "years_experience": 4,
+        "summary": "熟悉容器化与可观测性基础建设。"
+      },
+      "annotation": { "source": "synthetic", "annotator": "manual", "rubric_version": "r1" }
+    },
+    {
+      "id": "g-022",
+      "input": {
+        "resume_excerpt": "某团队做 Redis 集群治理，处理缓存穿透与热点 key，落地过期与淘汰策略，补了慢查询告警，并写了主从切换的演练脚本。",
+        "target_role": "SRE"
+      },
+      "expected": {
+        "profile_fields": ["Redis 集群", "缓存穿透", "热点 key", "淘汰策略", "慢查询告警", "主从切换", "缓存治理"],
+        "score_band": "8-9",
+        "must_not_contain": ["Kafka"]
+      },
+      "response_snapshot": {
+        "skills": ["Redis 集群", "缓存穿透", "热点 key", "淘汰策略", "慢查询告警", "主从切换"],
+        "projects": ["缓存治理"],
+        "years_experience": 5,
+        "summary": "有缓存稳定性与故障演练经验。"
+      },
+      "annotation": { "source": "synthetic", "annotator": "manual", "rubric_version": "r1" }
+    },
+    {
+      "id": "g-023",
+      "input": {
+        "resume_excerpt": "做某业务线发布系统，接消息队列做异步解耦，落地蓝绿发布与回滚流程，用 Nginx 配灰度路由，补了健康检查与发布审计。",
+        "target_role": "运维开发工程师"
+      },
+      "expected": {
+        "profile_fields": ["消息队列", "异步解耦", "蓝绿发布", "回滚流程", "Nginx", "健康检查", "发布系统"],
+        "score_band": "7-8",
+        "must_not_contain": ["Istio"]
+      },
+      "response_snapshot": {
+        "skills": ["消息队列", "异步解耦", "蓝绿发布", "回滚流程", "Nginx", "健康检查"],
+        "projects": ["发布系统"],
+        "years_experience": 3,
+        "summary": "熟悉发布链路与灰度路由配置。"
+      },
+      "annotation": { "source": "synthetic", "annotator": "manual", "rubric_version": "r1" }
+    },
+    {
+      "id": "g-024",
+      "input": {
+        "resume_excerpt": "在某团队做监控告警，用 Prometheus 写告警规则，接 Grafana 出图，明确未使用过 Kubernetes，日常只管虚拟机上的 exporter 与告警降噪。",
+        "target_role": "运维开发工程师"
+      },
+      "expected": {
+        "profile_fields": ["Prometheus", "告警规则", "Grafana", "告警降噪", "监控告警平台"],
+        "score_band": "5-6",
+        "must_not_contain": ["Kubernetes"]
+      },
+      "response_snapshot": {
+        "skills": ["Prometheus", "告警规则", "Grafana", "告警降噪", "Kubernetes"],
+        "projects": ["监控告警平台"],
+        "years_experience": 3
+      },
+      "annotation": { "source": "synthetic", "annotator": "manual", "rubric_version": "r1" }
+    },
+    {
+      "id": "g-025",
+      "input": {
+        "resume_excerpt": "负责某电商公司稳定性治理，整理故障告警时间线与根因，推动补容量水位监控与限流预案，写了复盘文档并跟进整改项闭环。",
+        "target_role": "SRE"
+      },
+      "expected": {
+        "profile_fields": ["故障复盘", "时间线梳理", "根因分析", "容量水位", "限流预案", "整改闭环", "稳定性治理"],
+        "score_band": "8-9",
+        "must_not_contain": ["Kubernetes"]
+      },
+      "response_snapshot": {
+        "skills": ["故障复盘", "时间线梳理", "根因分析", "容量水位", "限流预案", "整改闭环"],
+        "projects": ["稳定性治理"],
+        "years_experience": 6,
+        "summary": "有故障复盘与稳定性治理经验。"
+      },
+      "annotation": { "source": "synthetic", "annotator": "manual", "rubric_version": "r1" }
+    },
+    {
+      "id": "g-026",
+      "input": {
+        "resume_excerpt": "在某电商公司做召回排序，用双塔模型做向量召回，接协同过滤补长尾，做了特征交叉与样本去偏，离线用 AUC 与召回率评估迭代。",
+        "target_role": "算法工程师"
+      },
+      "expected": {
+        "profile_fields": ["双塔模型", "向量召回", "协同过滤", "特征交叉", "样本去偏", "AUC", "召回排序"],
+        "score_band": "8-9",
+        "must_not_contain": ["TensorFlow"]
+      },
+      "response_snapshot": {
+        "skills": ["双塔模型", "向量召回", "协同过滤", "特征交叉", "样本去偏", "AUC"],
+        "projects": ["召回排序"],
+        "years_experience": 4,
+        "summary": "熟悉推荐召回与离线评估迭代。"
+      },
+      "annotation": { "source": "synthetic", "annotator": "manual", "rubric_version": "r1" }
+    },
+    {
+      "id": "g-027",
+      "input": {
+        "resume_excerpt": "某团队做文本分类，用预训练模型微调，处理类别不均衡与数据增强，补了阈值调优与混淆矩阵分析，并导出轻量模型供线上推理。",
+        "target_role": "算法工程师"
+      },
+      "expected": {
+        "profile_fields": ["预训练模型", "微调", "类别不均衡", "数据增强", "阈值调优", "混淆矩阵", "文本分类"],
+        "score_band": "7-8",
+        "must_not_contain": ["Kubernetes"]
+      },
+      "response_snapshot": {
+        "skills": ["预训练模型", "微调", "类别不均衡", "数据增强", "阈值调优", "混淆矩阵"],
+        "projects": ["文本分类"],
+        "years_experience": 3,
+        "summary": "有文本分类微调与评估经验。"
+      },
+      "annotation": { "source": "synthetic", "annotator": "manual", "rubric_version": "r1" }
+    },
+    {
+      "id": "g-028",
+      "input": {
+        "resume_excerpt": "在某团队做搜索相关性，用 BM25 做字面召回，拿向量检索做语义补充，用 GBDT（也叫 xgboost 系）做排序，另写了 query 改写模块，未引入深度学习排序模型。",
+        "target_role": "算法工程师"
+      },
+      "expected": {
+        "profile_fields": ["BM25", "向量检索", "GBDT", "query 改写", "搜索相关性"],
+        "score_band": "6-7",
+        "must_not_contain": ["深度学习排序"]
+      },
+      "response_snapshot": {
+        "skills": ["BM25", "向量检索", "GBDT", "query 改写", "深度学习排序"],
+        "projects": ["搜索相关性"],
+        "years_experience": 4,
+        "summary": "片段用别名且含否定表述，快照误加了未使用的模型。"
+      },
+      "annotation": { "source": "synthetic", "annotator": "manual", "rubric_version": "r1" }
+    },
+    {
+      "id": "g-029",
+      "input": {
+        "resume_excerpt": "做某业务线预测服务，用滑动窗口构造样本，处理缺失与节假日特征，对比了基线模型与树模型，用 MAPE 监控线上漂移并定期重训。",
+        "target_role": "算法工程师"
+      },
+      "expected": {
+        "profile_fields": ["时间序列预测", "滑动窗口", "缺失值处理", "节假日特征", "树模型", "MAPE", "漂移监控", "预测服务"],
+        "score_band": "7-8",
+        "must_not_contain": ["强化学习"]
+      },
+      "response_snapshot": {
+        "skills": ["时间序列预测", "滑动窗口", "缺失值处理", "节假日特征", "树模型", "MAPE", "漂移监控"],
+        "projects": ["预测服务"],
+        "years_experience": 3,
+        "summary": "有时序预测与线上监控经验。"
+      },
+      "annotation": { "source": "synthetic", "annotator": "manual", "rubric_version": "r1" }
+    },
+    {
+      "id": "g-030",
+      "input": {
+        "resume_excerpt": "某团队做图像质检，用卷积网络做缺陷分类，做了数据清洗与标注校验，补了难例挖掘与模型蒸馏，落地边缘侧推理的耗时优化。",
+        "target_role": "机器学习工程师"
+      },
+      "expected": {
+        "profile_fields": ["卷积网络", "缺陷分类", "数据清洗", "标注校验", "难例挖掘", "模型蒸馏", "图像质检"],
+        "score_band": "8-9",
+        "must_not_contain": ["Kubernetes"]
+      },
+      "response_snapshot": {
+        "skills": ["卷积网络", "缺陷分类", "数据清洗", "标注校验", "难例挖掘", "模型蒸馏"],
+        "projects": ["图像质检"],
+        "years_experience": 5,
+        "summary": "熟悉视觉质检与模型压缩部署。"
+      },
+      "annotation": { "source": "synthetic", "annotator": "manual", "rubric_version": "r1" }
+    }
+  ]
+}

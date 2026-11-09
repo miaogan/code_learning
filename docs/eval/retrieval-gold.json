@@ -1,0 +1,146 @@
+{
+  "version": "v1",
+  "created_at": "2026-11-09",
+  "cases": [
+    {
+      "id": "r-001",
+      "query": "RAG 引用对不上原文",
+      "direction": "AI 工程",
+      "sub_direction": "LLM 与 RAG",
+      "expected_chapter_ids": ["ai-rag", "ai-eval-harness"]
+    },
+    {
+      "id": "r-002",
+      "query": "多 Agent 转派成环怎么办",
+      "direction": "AI 工程",
+      "sub_direction": "Agent",
+      "expected_chapter_ids": ["ai-multi-agent", "ai-langchain-langgraph"]
+    },
+    {
+      "id": "r-003",
+      "query": "推理服务首 token 太慢",
+      "direction": "AI 工程",
+      "sub_direction": "部署与推理",
+      "expected_chapter_ids": ["ai-inference-serving"]
+    },
+    {
+      "id": "r-004",
+      "query": "提示词改一版效果就崩",
+      "direction": "AI 工程",
+      "sub_direction": "Prompt 工程",
+      "expected_chapter_ids": ["ai-prompt-engineering"]
+    },
+    {
+      "id": "r-005",
+      "query": "分不清 token 和微调这些名词",
+      "direction": "AI 工程",
+      "sub_direction": "通用 AI",
+      "expected_chapter_ids": ["ai-glossary", "ai-llm-basics"]
+    },
+    {
+      "id": "r-006",
+      "query": "向量召回总是漏掉关键段落",
+      "direction": "AI 工程",
+      "sub_direction": "LLM 与 RAG",
+      "expected_chapter_ids": ["ai-rag", "ai-transformer"]
+    },
+    {
+      "id": "r-007",
+      "query": "React 组件反复重渲染",
+      "direction": "前端",
+      "sub_direction": "react",
+      "expected_chapter_ids": ["fe-react-render", "fe-render-performance"]
+    },
+    {
+      "id": "r-008",
+      "query": "事件循环和微任务顺序搞不清",
+      "direction": "前端",
+      "sub_direction": "js",
+      "expected_chapter_ids": ["fe-event-loop"]
+    },
+    {
+      "id": "r-009",
+      "query": "接口并发下数据被重复写",
+      "direction": "后端",
+      "sub_direction": "通用后端",
+      "expected_chapter_ids": ["be-concurrency-idempotency"]
+    },
+    {
+      "id": "r-010",
+      "query": "登录态总丢，会话方案没底",
+      "direction": "后端",
+      "sub_direction": "通用后端",
+      "expected_chapter_ids": ["be-auth-session"]
+    },
+    {
+      "id": "r-011",
+      "query": "事务隔离级别和幻读分不清",
+      "direction": "SQL 与数据库",
+      "sub_direction": "事务与 ACID",
+      "expected_chapter_ids": ["sql-lock-isolation"]
+    },
+    {
+      "id": "r-012",
+      "query": "多表 join 结果里 NULL 处理错",
+      "direction": "SQL 与数据库",
+      "sub_direction": "SQL 基础",
+      "expected_chapter_ids": ["sql-join-null", "sql-schema-design"]
+    },
+    {
+      "id": "r-013",
+      "query": "消息重复投递怎么保证只消费一次",
+      "direction": "中间件与运维",
+      "sub_direction": "消息队列",
+      "expected_chapter_ids": ["mw-message-queue"]
+    },
+    {
+      "id": "r-014",
+      "query": "缓存和数据库不一致",
+      "direction": "中间件与运维",
+      "sub_direction": "Redis",
+      "expected_chapter_ids": ["mw-cache-strategy"]
+    },
+    {
+      "id": "r-015",
+      "query": "动态规划状态转移写不出来",
+      "direction": "算法与数据结构",
+      "sub_direction": "动态规划",
+      "expected_chapter_ids": ["algo-dp-graph"]
+    },
+    {
+      "id": "r-016",
+      "query": "二叉树递归边界老是错",
+      "direction": "算法与数据结构",
+      "sub_direction": "二叉树与递归",
+      "expected_chapter_ids": ["algo-binary-tree"]
+    },
+    {
+      "id": "r-017",
+      "query": "TCP 三次握手和 HTTP 关系说不清",
+      "direction": "计算机基础",
+      "sub_direction": "网络",
+      "expected_chapter_ids": ["cs-tcp-http"]
+    },
+    {
+      "id": "r-018",
+      "query": "进程线程和虚拟内存概念混淆",
+      "direction": "计算机基础",
+      "sub_direction": "操作系统",
+      "expected_chapter_ids": ["cs-process-thread", "cs-memory-virtual"]
+    },
+    {
+      "id": "r-019",
+      "query": "CI 门禁老红，测试分层不会做",
+      "direction": "研发工程实践",
+      "sub_direction": "测试",
+      "expected_chapter_ids": ["eng-test-ci"]
+    },
+    {
+      "id": "r-020",
+      "query": "分支管理和代码评审流程乱",
+      "direction": "研发工程实践",
+      "sub_direction": "Git 与版本控制",
+      "expected_chapter_ids": ["eng-git-review"]
+    }
+  ]
+}

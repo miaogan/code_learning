@@ -4,6 +4,7 @@ import { AiKeyModal } from './components/ui/AiKeyModal'
 import { Button } from './components/ui/Button'
 import { Stepper, type StepItem, type StepState } from './components/ui/Stepper'
 import { ToolNav } from './components/ui/ToolNav'
+import EvalPage from './pages/EvalPage'
 import ExamPage from './pages/ExamPage'
 import HistoryPage from './pages/HistoryPage'
 import InterviewPage from './pages/InterviewPage'
@@ -34,6 +35,7 @@ const TOOL_ITEMS = [
   { key: 'learn', label: '学习', to: '/learn' },
   { key: 'practice', label: '练习', to: '/practice' },
   { key: 'history', label: '成绩趋势', to: '/history' },
+  { key: 'eval', label: '模型质量', to: '/eval' },
   { key: 'polish', label: '简历润色', to: '/polish' },
   { key: 'settings', label: '设置', to: '/settings' },
 ]
@@ -128,6 +130,7 @@ export default function App() {
               <Route path="/exam" element={<ExamPage />} />
               <Route path="/report" element={<ReportPage />} />
               <Route path="/history" element={<HistoryPage />} />
+              <Route path="/eval" element={<EvalPage />} />
               <Route path="/polish" element={<PolishPage />} />
               <Route path="/practice" element={<PracticePage />} />
               <Route path="/learn" element={<LearnPage />} />

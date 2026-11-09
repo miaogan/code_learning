@@ -481,6 +481,64 @@ class PracticeWrongBook(BaseModel):
     total: int
 
 
+class EvalModelStat(BaseModel):
+    """r51 看板：单个模型的聚合行。"""
+
+    total: int
+    success_rate: float
+    p95_ms: int
+
+
+class EvalTrendPoint(BaseModel):
+    """r51 看板：按 UTC 日期聚合的一天。"""
+
+    day: str
+    total: int
+    success_rate: float
+
+
+class EvalSummary(BaseModel):
+    """r51 模型调用质量看板（GET /api/eval/summary）：按当前用户聚合，零 AI、零 Key 回传。"""
+
+    window_days: int
+    total: int
+    success_rate: float
+    p50_ms: int
+    p95_ms: int
+    by_kind: dict[str, int]
+    by_model: dict[str, EvalModelStat]
+    trend: list[EvalTrendPoint]
+    notice: str = ""
+
+
+class QuestionSearchRequest(BaseModel):
+    """r51 题目检索请求：方向 / 子方向是闭集外一律静默忽略的可选过滤。"""
+
+    query: str = ""
+    direction: str = ""
+    sub_direction: str = ""
+    limit: int = 5
+
+
+class QuestionSearchItem(BaseModel):
+    """题目检索命中行：**不含 answer**，与练习 / 笔试的答案口径一致。"""
+
+    question_id: str
+    prompt: str
+    direction: str
+    sub_direction: str = ""
+    score: float = 0.0
+
+
+class QuestionSearchResponse(BaseModel):
+    """r51 题目检索结果：mode = fts5 | like（降级），notice 说明降级原因。"""
+
+    items: list[QuestionSearchItem]
+    total: int
+    mode: str
+    notice: str = ""
+
+
 class Course(BaseModel):
     id: str
     title: str

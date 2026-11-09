@@ -1,0 +1,8 @@
+{
+  "schema_pass_rate": 0.9333,
+  "field_precision": 0.9798,
+  "field_recall": 0.9898,
+  "field_f1": 0.9848,
+  "hallucination_rate": 0.1333,
+  "golden_sha256": "b91e0e78b8d430b6fa5e0f8711748b2200e968bf728ee1d28db5741ba6946c70"
+}

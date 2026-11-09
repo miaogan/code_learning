@@ -9,6 +9,7 @@
 """
 
 import json
+import math
 import sqlite3
 import uuid
 from collections.abc import Sequence
@@ -1082,6 +1083,7 @@ def delete_expired_sessions() -> int:
 
 def create_session(*, token_hash: str, user_id: str, expires_at: str) -> None:
     delete_expired_sessions()
+    prune_ai_call_logs()  # r53：与会话清理同一收口点，避免日志表无限增长
     with connection() as conn:
         conn.execute(
             "INSERT INTO sessions (token_hash, user_id, created_at, expires_at) "
@@ -1169,3 +1171,225 @@ def adopt_default_data(user_id: str) -> dict[str, int]:
             )
             migrated[table] = max(cursor.rowcount, 0)
     return migrated
+
+
+# --- r51 模型调用日志 / 题目全文检索 -----------------------------------------
+
+_AI_LOG_INSERT = (
+    "INSERT INTO ai_call_logs "
+    "(id, user_id, request_id, provider, model, kind, status_code, elapsed_ms, "
+    "attempt, prompt_chars, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+)
+
+
+def insert_ai_call_log(
+    *,
+    provider: str,
+    model: str,
+    kind: str,
+    elapsed_ms: int,
+    status_code: int | None = None,
+    attempt: int = 1,
+    prompt_chars: int = 0,
+    request_id: str = "-",
+    created_at: str | None = None,
+) -> None:
+    """写一条模型调用元数据。**调用方必须 best-effort 包裹**：日志失败不得影响主链路。
+
+    `created_at` 仅用于离线回放 / 历史回填（评测脚本与保留期测试），正常调用留空。
+    """
+    with connection() as conn:
+        conn.execute(
+            _AI_LOG_INSERT,
+            (
+                uuid.uuid4().hex,
+                _uid(),
+                request_id,
+                provider,
+                model,
+                kind,
+                status_code,
+                max(int(elapsed_ms), 0),
+                max(int(attempt), 1),
+                max(int(prompt_chars), 0),
+                created_at or _now(),
+            ),
+        )
+
+
+#: r53 日志保留期：`ai_call_logs` 是高频写入表，不清理会无限增长（sessions 已有同类收口）。
+AI_LOG_RETENTION_DAYS = 90
+
+
+def prune_ai_call_logs(days: int = AI_LOG_RETENTION_DAYS) -> int:
+    """删除窗口外的模型调用日志，返回实际删除行数。登录时顺带执行。
+
+    与 `ai_call_log_summary()` 用同一 ISO UTC 时间口径；`days` 夹紧到 [1, 365]，
+    避免脏配置把刚写入的日志全删光。
+    """
+    window = max(1, min(int(days), 365))
+    cutoff = (datetime.now(UTC) - timedelta(days=window)).isoformat()
+    with connection() as conn:
+        cursor = conn.execute("DELETE FROM ai_call_logs WHERE created_at < ?", (cutoff,))
+    return max(cursor.rowcount, 0)
+
+
+def _percentile(values: list[int], quantile: float) -> int:
+    if not values:
+        return 0
+    ordered = sorted(values)
+    index = max(0, min(len(ordered) - 1, math.ceil(quantile * len(ordered)) - 1))
+    return ordered[index]
+
+
+def ai_call_log_summary(days: int = 7) -> dict[str, Any]:
+    """按当前用户聚合调用日志：SQL 只取窗口内行，指标全在 Python 里算（分母写死）。"""
+    window = max(1, min(int(days), 90))
+    cutoff = (datetime.now(UTC) - timedelta(days=window)).isoformat()
+    with connection() as conn:
+        rows = conn.execute(
+            "SELECT provider, model, kind, status_code, elapsed_ms, created_at "
+            "FROM ai_call_logs WHERE user_id = ? AND created_at >= ?",
+            (_uid(), cutoff),
+        ).fetchall()
+    total = len(rows)
+    if total == 0:
+        return {
+            "window_days": window,
+            "total": 0,
+            "success_rate": 0.0,
+            "p50_ms": 0,
+            "p95_ms": 0,
+            "by_kind": {},
+            "by_model": {},
+            "trend": [],
+            "notice": "暂无模型调用记录",
+        }
+    by_kind: dict[str, int] = {}
+    by_model: dict[str, dict[str, Any]] = {}
+    trend: dict[str, dict[str, int]] = {}
+    for row in rows:
+        kind = str(row["kind"])
+        model = str(row["model"])
+        by_kind[kind] = by_kind.get(kind, 0) + 1
+        stat = by_model.setdefault(model, {"total": 0, "success": 0, "latencies": []})
+        stat["total"] += 1
+        stat["success"] += int(kind == "success")
+        stat["latencies"].append(int(row["elapsed_ms"]))
+        day = str(row["created_at"])[:10]
+        bucket = trend.setdefault(day, {"total": 0, "success": 0})
+        bucket["total"] += 1
+        bucket["success"] += int(kind == "success")
+    latencies = [int(row["elapsed_ms"]) for row in rows]
+    return {
+        "window_days": window,
+        "total": total,
+        "success_rate": round(by_kind.get("success", 0) / total, 4),
+        "p50_ms": _percentile(latencies, 0.5),
+        "p95_ms": _percentile(latencies, 0.95),
+        "by_kind": by_kind,
+        "by_model": {
+            model: {
+                "total": stat["total"],
+                "success_rate": round(stat["success"] / stat["total"], 4),
+                "p95_ms": _percentile(stat["latencies"], 0.95),
+            }
+            for model, stat in by_model.items()
+        },
+        "trend": [
+            {
+                "day": day,
+                "total": bucket["total"],
+                "success_rate": round(bucket["success"] / bucket["total"], 4),
+            }
+            for day, bucket in sorted(trend.items())
+        ],
+        "notice": "",
+    }
+
+
+def _question_search_table_exists(conn: sqlite3.Connection) -> bool:
+    row = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'question_search'"
+    ).fetchone()
+    return row is not None
+
+
+def rebuild_question_search() -> tuple[str, int]:
+    """题库幂等导入后重建 FTS 索引；返回 (mode, rows)，无 FTS5 能力时为 ('like', 0)。"""
+    with connection() as conn:
+        if not _question_search_table_exists(conn):
+            return "like", 0
+        existing = int(conn.execute("SELECT COUNT(*) AS n FROM question_search").fetchone()["n"])
+        total = int(conn.execute("SELECT COUNT(*) AS n FROM questions").fetchone()["n"])
+        # 题库导入幂等（只增不改），行数一致即跳过重建，避免每次启动重写 1164 行。
+        if existing == total:
+            return "fts5", total
+        source = conn.execute(
+            "SELECT id, prompt, explanation, direction, sub_direction FROM questions"
+        ).fetchall()
+        conn.execute("DELETE FROM question_search")
+        conn.executemany(
+            "INSERT INTO question_search "
+            "(question_id, prompt, explanation, direction, sub_direction) VALUES (?, ?, ?, ?, ?)",
+            [
+                (
+                    row["id"],
+                    row["prompt"],
+                    row["explanation"],
+                    row["direction"],
+                    row["sub_direction"] or "",
+                )
+                for row in source
+            ],
+        )
+    return "fts5", len(source)
+
+
+def search_questions(
+    query: str, direction: str = "", sub_direction: str = "", limit: int = 5
+) -> dict[str, Any]:
+    """题目检索：FTS5 trigram 优先，短查询 / 无虚表时降级 LIKE；答案列永不入响应。"""
+    needle = str(query or "").strip()
+    size = max(1, min(int(limit), 20))
+    if not needle:
+        return {"items": [], "total": 0, "mode": "fts5", "notice": "请输入检索关键词"}
+    filters: list[str] = []
+    params: list[Any] = []
+    if direction:
+        filters.append("direction = ?")
+        params.append(direction)
+    if sub_direction:
+        filters.append("sub_direction = ?")
+        params.append(sub_direction)
+    where = (" AND " + " AND ".join(filters)) if filters else ""
+    with connection() as conn:
+        if _question_search_table_exists(conn) and len(needle) >= 3:
+            match = '"' + needle.replace('"', '""') + '"'
+            rows = conn.execute(
+                "SELECT question_id, prompt, direction, sub_direction, "
+                "bm25(question_search) AS rank FROM question_search "
+                "WHERE question_search MATCH ?" + where + " ORDER BY rank ASC LIMIT ?",
+                [match, *params, size],
+            ).fetchall()
+            mode = "fts5"
+        else:
+            like = "%" + needle + "%"
+            rows = conn.execute(
+                "SELECT id AS question_id, prompt, direction, sub_direction FROM questions "
+                "WHERE (prompt LIKE ? OR explanation LIKE ?)" + where + " ORDER BY id LIMIT ?",
+                [like, like, *params, size],
+            ).fetchall()
+            mode = "like"
+    items = [
+        {
+            "question_id": str(row["question_id"]),
+            "prompt": str(row["prompt"]),
+            "direction": str(row["direction"]),
+            "sub_direction": str(row["sub_direction"] or ""),
+            "score": round(-float(row["rank"]), 4) if mode == "fts5" else 1.0,
+        }
+        for row in rows
+    ]
+    notice = "" if mode == "fts5" else "当前环境未启用全文索引，已按关键词包含匹配"
+    return {"items": items, "total": len(items), "mode": mode, "notice": notice}

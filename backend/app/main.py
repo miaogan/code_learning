@@ -16,6 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.core import repository
 from app.core.config import get_settings
 from app.core.db import init_db
 from app.core.errors import (
@@ -38,6 +39,7 @@ from app.core.observability import (
 from app.routers import (
     auth,
     courses,
+    eval as eval_router,
     exam,
     history,
     interview,
@@ -45,6 +47,7 @@ from app.routers import (
     profile,
     report,
     resume,
+    search,
     timeline,
 )
 from app.schemas import HealthResponse
@@ -79,6 +82,8 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     # 启动即补种子（数据不是 DDL，故不进 db.py）：r11 起**每次都跑**幂等导入 + 只补空列——
     # `ON CONFLICT DO NOTHING` 保证重复启动 0 新增，存量库（r10 卷）也能拿到新增题与解析。
     question_bank.ensure_seeded()
+    # r51：题库导入后重建 FTS 索引（无 FTS5 能力时数据层自行降级为 LIKE，不影响启动）。
+    repository.rebuild_question_search()
     yield
     # 关停时释放 AI 连接池（进程内共享客户端，keep-alive 连接不能留给下一次启动）。
     await close_ai_pool()
@@ -261,6 +266,9 @@ def create_app() -> FastAPI:
     app.include_router(courses.router)
     app.include_router(history.router)
     app.include_router(timeline.router)
+    # r51：模型调用质量看板与题目全文检索（只读 / 登录态 / 按用户隔离）。
+    app.include_router(eval_router.router)
+    app.include_router(search.router)
 
     @app.get("/health", response_model=HealthResponse, tags=["ops"], summary="探活（AC-8）")
     def health() -> HealthResponse:

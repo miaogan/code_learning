@@ -8,6 +8,9 @@
 
 ### 1.1 现状（本轮实际核过，不是估计）
 
+> 下表是 **r51 方案阶段基线**，按「任务夹建后不可变」约定保留原数字；
+> 最终交付状态与最新数字见 `TECHNICAL.md §6–§7`、`ACCEPTANCE.md §6–§7`、`RESUME.md §1`。
+
 | 维度 | 已有 | 证据 |
 |---|---|---|
 | 内容资产 | 题库 1164 题、教程 40 章、8 方向 × 子方向 × 3 难度 | `seed/questions.json`、`content/tutorials/*.ts` |
@@ -59,8 +62,8 @@
 | 里程碑 | 内容 | 依赖 | 状态 |
 |---|---|---|---|
 | M1 | CI 门禁增强 + README badge / Design decisions + 现状盘点入档 | 无 | 本轮交付 |
-| M2 | 离线评测 Harness：`ai_call_logs` 落库 → 版本化金标集 → 评测脚本 → 报告 / CI 门禁 → 质量看板 | M1 | 方案已定，待实施 |
-| M3 | 检索增强学习计划：前端 BM25 教程检索 + 后端 FTS5 题目检索 → 融合 → citation → recall@5 | M1 | 方案已定，待实施 |
+| M2 | 离线评测 Harness：`ai_call_logs` 落库 → 版本化金标集 → 评测脚本 → 报告 / CI 门禁 → 质量看板 | M1 | **已交付（r53）**，偏差见 TECHNICAL §6 |
+| M3 | 检索增强学习计划：前端 BM25 教程检索 + 后端 FTS5 题目检索 → 融合 → citation → recall@5 | M1 | **已交付（r53）**，RRF 未接 UI，偏差见 TECHNICAL §6 |
 
 ## 5. 风险与对策
 

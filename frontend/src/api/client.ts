@@ -5,6 +5,7 @@ import type {
   AnswerRequest,
   ApiErrorBody,
   Course,
+  EvalSummary,
   ExamAnswers,
   ExamCreateRequest,
   ExamResult,
@@ -33,6 +34,8 @@ import type {
   PracticePaperRequest,
   PracticeStats,
   PracticeWrongBook,
+  QuestionSearchRequest,
+  QuestionSearchResponse,
   Report,
   ReportGenerateRequest,
   ResumeJobStarted,
@@ -148,6 +151,14 @@ function queryString(params: Record<string, string | number | undefined>): strin
 
 export const api = {
   health: (): Promise<Health> => request<Health>('/health'),
+
+  /** r51 模型调用质量看板：只读聚合，零 AI、零 Key 回传。 */
+  evalSummary: (days = 7, signal?: AbortSignal): Promise<EvalSummary> =>
+    request<EvalSummary>(`/api/eval/summary?${queryString({ days })}`, { signal }),
+
+  /** r51 题目全文检索：FTS5 优先，环境不支持时服务端降级并给中文 notice。 */
+  searchQuestions: (payload: QuestionSearchRequest): Promise<QuestionSearchResponse> =>
+    request<QuestionSearchResponse>('/api/search/questions', jsonInit('POST', payload)),
 
   /* ---------- r23 登录态与个人设置 ---------- */
 

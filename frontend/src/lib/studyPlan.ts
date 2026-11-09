@@ -13,10 +13,12 @@
 import type { Report, WeaknessItem } from '../api/types'
 import type { LearnProgressState } from './learnProgress'
 import type { TutorialChapter, TutorialLevel } from './tutorialTypes'
-import { chaptersInDirection } from './tutorials'
+import { ALL_TUTORIAL_CHAPTERS, chaptersInDirection } from './tutorials'
+import { searchTutorials } from './tutorialSearch'
 import { DIFFICULTY_LABEL, ESSENTIALITY_LABEL } from './practice'
 
 export const PLAN_DAY_COUNT = 7
+/** r51 刻意不 bump：citations 是纯附加可选字段，旧快照缺该字段时渲染零占位，无需失效重算。 */
 export const PLAN_VERSION = 1 as const
 
 /** 每日可用时长（分钟）：三档闭集，与 UI 选择器、存储校验共用一处。 */
@@ -24,6 +26,15 @@ export type PlanMinutes = 15 | 30 | 60
 export const PLAN_MINUTES: PlanMinutes[] = [15, 30, 60]
 
 export type TaskKind = 'tutorial' | 'practice' | 'review'
+
+/** r51 检索增强：一条可点击的「为什么推这一章」引用（章 + 小节锚点）。 */
+export interface PlanCitation {
+  chapter_id: string
+  section_id: string
+  title: string
+  href: string
+  score: number
+}
 
 export interface StudyTask {
   /** 稳定 id：`tutorial:<chapter>:<section>` / `practice:...` / `review:<slug>:d<n>`。 */
@@ -38,6 +49,8 @@ export interface StudyTask {
   /** 一句话解释「为什么排这个」：短板名 / 前置 / 通用建议。 */
   reason: string
   shortfall: string | null
+  /** r51：可选检索引用；旧快照 / 未开启检索时无此字段，渲染零占位。 */
+  citations?: PlanCitation[]
 }
 
 export interface StudyDay {
@@ -247,10 +260,30 @@ interface Candidate {
   tasks: StudyTask[]
 }
 
+/** r51：检索「短板描述 → 教程小节」的依据。命中空集时静默不挂字段，绝不编造引用。 */
+function citationsFor(item: WeaknessItem, chapterId: string): PlanCitation[] {
+  const hits = searchTutorials(
+    `${item.point} ${item.summary}`,
+    { direction: item.direction, sub_direction: item.sub_direction ?? '' },
+    ALL_TUTORIAL_CHAPTERS,
+    3,
+  )
+  const scoped = hits.filter((hit) => hit.chapter_id === chapterId)
+  const chosen = scoped.length > 0 ? scoped : hits.slice(0, 2)
+  return chosen.map((hit) => ({
+    chapter_id: hit.chapter_id,
+    section_id: hit.section_id,
+    title: hit.title,
+    href: hit.href,
+    score: hit.score,
+  }))
+}
+
 function tasksForItem(
   item: WeaknessItem,
   minutes: PlanMinutes,
   learned: LearnProgressState | undefined,
+  withCitations: boolean,
 ): StudyTask[] {
   const difficulty = filterValue(item.difficulty)
   const essentiality = filterValue(item.essentiality)
@@ -278,7 +311,12 @@ function tasksForItem(
     }
     const sectionId = firstUnreadSection(chapter, learned)
     if (sectionId !== null) {
-      tasks.push(tutorialTask(chapter, sectionId, minutes, reason, item.point))
+      const task = tutorialTask(chapter, sectionId, minutes, reason, item.point)
+      if (withCitations) {
+        const citations = citationsFor(item, chapter.id)
+        if (citations.length > 0) task.citations = citations
+      }
+      tasks.push(task)
     }
   }
 
@@ -370,9 +408,9 @@ function genericFillers(minutes: PlanMinutes): Omit<StudyTask, 'id'>[] {
  */
 export function buildStudyPlan(
   report: Report,
-  options: { dailyMinutes: PlanMinutes; learned?: LearnProgressState },
+  options: { dailyMinutes: PlanMinutes; learned?: LearnProgressState; citations?: boolean },
 ): StudyPlan {
-  const { dailyMinutes, learned } = options
+  const { dailyMinutes, learned, citations = false } = options
   const empty: StudyPlan = {
     version: PLAN_VERSION,
     report_id: report.id,
@@ -388,7 +426,7 @@ export function buildStudyPlan(
       item,
       index,
       weight: weightOf(item),
-      tasks: tasksForItem(item, dailyMinutes, learned),
+      tasks: tasksForItem(item, dailyMinutes, learned, citations),
     }))
     .sort((a, b) => b.weight - a.weight || a.index - b.index)
 

@@ -1,0 +1,166 @@
+{
+  "version": "v1",
+  "created_at": "2026-11-09",
+  "cases": [
+    {
+      "id": "q-001",
+      "query": "用于在组件挂载后",
+      "direction": "前端",
+      "expected_question_ids": [
+        "fe-q1"
+      ]
+    },
+    {
+      "id": "q-002",
+      "query": "关于浏览器事件循",
+      "direction": "前端",
+      "expected_question_ids": [
+        "fe-q3"
+      ]
+    },
+    {
+      "id": "q-003",
+      "query": "接口的幂等性",
+      "direction": "计算机基础",
+      "expected_question_ids": [
+        "be-q3"
+      ]
+    },
+    {
+      "id": "q-004",
+      "query": "中用于创建并切换",
+      "direction": "计算机基础",
+      "expected_question_ids": [
+        "cs-q1"
+      ]
+    },
+    {
+      "id": "q-005",
+      "query": "数据库中索引最主",
+      "direction": "SQL 与数据库",
+      "expected_question_ids": [
+        "be-q2"
+      ]
+    },
+    {
+      "id": "q-006",
+      "query": "数据库事务的",
+      "direction": "SQL 与数据库",
+      "expected_question_ids": [
+        "be-q5"
+      ]
+    },
+    {
+      "id": "q-007",
+      "query": "中把可变对象",
+      "direction": "后端",
+      "expected_question_ids": [
+        "be-q6"
+      ]
+    },
+    {
+      "id": "q-008",
+      "query": "风格中资源命名与",
+      "direction": "后端",
+      "expected_question_ids": [
+        "be-q20"
+      ]
+    },
+    {
+      "id": "q-009",
+      "query": "镜像与容器",
+      "direction": "中间件与运维",
+      "expected_question_ids": [
+        "be-q14"
+      ]
+    },
+    {
+      "id": "q-010",
+      "query": "缓存击穿是指大量",
+      "direction": "中间件与运维",
+      "expected_question_ids": [
+        "l100-036"
+      ]
+    },
+    {
+      "id": "q-011",
+      "query": "在一个已排序数组",
+      "direction": "算法与数据结构",
+      "expected_question_ids": [
+        "al-q1"
+      ]
+    },
+    {
+      "id": "q-012",
+      "query": "栈这种数据结构的",
+      "direction": "算法与数据结构",
+      "expected_question_ids": [
+        "al-q2"
+      ]
+    },
+    {
+      "id": "q-013",
+      "query": "工具接口时",
+      "direction": "AI 工程",
+      "expected_question_ids": [
+        "l100-061"
+      ]
+    },
+    {
+      "id": "q-014",
+      "query": "应用进行限流与成",
+      "direction": "AI 工程",
+      "expected_question_ids": [
+        "l100-062"
+      ]
+    },
+    {
+      "id": "q-015",
+      "query": "不能处理哪类改动",
+      "direction": "研发工程实践",
+      "expected_question_ids": [
+        "devprac-002"
+      ]
+    },
+    {
+      "id": "q-016",
+      "query": "会丢弃工作区中尚",
+      "direction": "研发工程实践",
+      "expected_question_ids": [
+        "devprac-005"
+      ]
+    },
+    {
+      "id": "q-017",
+      "query": "死锁",
+      "direction": "计算机基础",
+      "expected_question_ids": [
+        "cs-q11"
+      ]
+    },
+    {
+      "id": "q-018",
+      "query": "事务",
+      "direction": "SQL 与数据库",
+      "expected_question_ids": [
+        "be-q18"
+      ]
+    },
+    {
+      "id": "q-019",
+      "query": "握手",
+      "direction": "计算机基础",
+      "expected_question_ids": [
+        "cs-q3"
+      ]
+    },
+    {
+      "id": "q-020",
+      "query": "协程",
+      "direction": "后端",
+      "expected_question_ids": [
+        "be-q15"
+      ]
+    }
+  ]
+}

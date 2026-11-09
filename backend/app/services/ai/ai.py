@@ -15,8 +15,11 @@ from typing import Any, TypeVar
 import httpx
 from pydantic import BaseModel, ValidationError
 
+from app.core import repository
 from app.core.config import UNIFIED_AI_TIMEOUT_S, AiRuntime, Settings, get_settings
 from app.core.errors import AI_SCHEMA_INVALID, AI_UNAVAILABLE, AppError
+from app.core.observability import get_request_id
+from app.services.ai import reliability
 
 ModelT = TypeVar("ModelT", bound=BaseModel)
 
@@ -33,6 +36,35 @@ _RESPONSE_FORMAT_BY_MODE: dict[str, dict[str, Any] | None] = {
 
 #: `ready=False` 且 `reason` 缺省时的兜底文案（配置错一律 503 + 中文说明，绝不 500）。
 _UNCONFIGURED_REASON = "AI 服务尚未配置，请检查 backend/.env 后重启服务"
+
+
+def _persist_call_log(
+    runtime: AiRuntime,
+    *,
+    kind: str,
+    elapsed_ms: int = 0,
+    status_code: int | None = None,
+    attempt: int = 1,
+    prompt_chars: int = 0,
+) -> None:
+    """r51：结构化日志落库。**best-effort** —— 写库失败只记 warning，绝不改变主链路返回 / 异常。
+
+    只传元数据（provider / model / kind / 耗时 / 状态码 / 字数 / trace id），
+    Key / Prompt 正文 / 简历片段 / 图片 data URL 一律不进库。
+    """
+    try:
+        repository.insert_ai_call_log(
+            provider=runtime.provider,
+            model=runtime.model,
+            kind=kind,
+            elapsed_ms=elapsed_ms,
+            status_code=status_code,
+            attempt=attempt,
+            prompt_chars=prompt_chars,
+            request_id=get_request_id(),
+        )
+    except Exception as exc:
+        logger.warning("ai.log.persist_failed kind=%s error=%s", kind, type(exc).__name__)
 
 
 def _response_format(mode: str) -> dict[str, Any] | None:
@@ -102,6 +134,7 @@ class AIClient:
             logger.warning(
                 "ai.skipped provider=%s reason=%s", runtime.provider, runtime.reason
             )
+            _persist_call_log(runtime, kind="skipped")
             raise AppError(AI_UNAVAILABLE, runtime.reason or _UNCONFIGURED_REASON, status=503)
         attempts = max(1, runtime.max_retries + 1)
         prompt = user
@@ -120,8 +153,13 @@ class AIClient:
                     attempts,
                     exc.code,
                 )
+                # r53：指数退避 + 抖动，避免上游抖动时重试风暴对齐。
+                await asyncio.sleep(reliability.backoff_delay(attempt + 1))
                 continue
             payload = _extract_json_object(content)
+            if payload is None:
+                # r53：只在原本会失败时兜底修复尾随逗号 / 单引号 / 行注释，成功路径不变。
+                payload = reliability.repair_json_object(content)
             if payload is None:
                 last_error = ValueError("模型未返回 JSON 对象")
             else:
@@ -135,6 +173,12 @@ class AIClient:
                         attempt + 1,
                         attempts,
                         type(exc).__name__,
+                    )
+                    _persist_call_log(
+                        runtime,
+                        kind="schema_invalid",
+                        attempt=attempt + 1,
+                        prompt_chars=len(system) + len(prompt),
                     )
             if attempt + 1 < attempts:
                 prompt = f"{user}\n\n{JSON_RETRY_HINT}"
@@ -170,6 +214,7 @@ class AIClient:
                 runtime.model,
                 runtime.reason,
             )
+            _persist_call_log(runtime, kind="skipped")
             raise AppError(AI_UNAVAILABLE, runtime.reason or _UNCONFIGURED_REASON, status=503)
         blocks: list[dict[str, Any]] = []
         if user:
@@ -198,6 +243,7 @@ class AIClient:
                     exc.code,
                     len(image_data_urls),
                 )
+                await asyncio.sleep(reliability.backoff_delay(attempt + 1))
         raise AppError(
             AI_UNAVAILABLE, "图片识别失败，请稍后重试", status=503, retryable=True
         ) from last_error
@@ -223,6 +269,7 @@ class AIClient:
             logger.warning(
                 "ai.skipped provider=%s reason=%s", runtime.provider, runtime.reason
             )
+            _persist_call_log(runtime, kind="skipped")
             raise AppError(AI_UNAVAILABLE, runtime.reason or _UNCONFIGURED_REASON, status=503)
         # 优先级在 `resolve_ai` 已合并为「档内 > 全局」，这里只剩一次「调用点显式 > 档内」比较。
         timeout = runtime.timeout_s if timeout_s is None else timeout_s
@@ -265,24 +312,28 @@ class AIClient:
                 url, headers=headers, json=payload, timeout=timeout
             )
         except httpx.TimeoutException as exc:
+            elapsed_ms = int((time.perf_counter() - started) * 1000)
             logger.warning(
                 "ai.failed provider=%s model=%s kind=timeout elapsed_ms=%s timeout_s=%s",
                 runtime.provider,
                 runtime.model,
-                int((time.perf_counter() - started) * 1000),
+                elapsed_ms,
                 timeout,
             )
+            _persist_call_log(runtime, kind="timeout", elapsed_ms=elapsed_ms)
             raise AppError(
                 AI_UNAVAILABLE, "AI 服务响应超时，请稍后重试", status=503, retryable=True
             ) from exc
         except httpx.HTTPError as exc:
+            elapsed_ms = int((time.perf_counter() - started) * 1000)
             logger.warning(
                 "ai.failed provider=%s model=%s kind=connect elapsed_ms=%s error=%s",
                 runtime.provider,
                 runtime.model,
-                int((time.perf_counter() - started) * 1000),
+                elapsed_ms,
                 type(exc).__name__,
             )
+            _persist_call_log(runtime, kind="connect", elapsed_ms=elapsed_ms)
             raise AppError(
                 AI_UNAVAILABLE, "AI 服务连接失败，请稍后重试", status=503, retryable=True
             ) from exc
@@ -295,6 +346,13 @@ class AIClient:
                 response.status_code,
                 elapsed_ms,
             )
+            _persist_call_log(
+                runtime,
+                kind="upstream",
+                elapsed_ms=elapsed_ms,
+                status_code=response.status_code,
+                prompt_chars=prompt_chars,
+            )
             raise AppError(
                 AI_UNAVAILABLE, "AI 服务暂时不可用，请稍后重试", status=503, retryable=True
             )
@@ -306,6 +364,13 @@ class AIClient:
                 runtime.model,
                 response.status_code,
                 elapsed_ms,
+            )
+            _persist_call_log(
+                runtime,
+                kind="rejected",
+                elapsed_ms=elapsed_ms,
+                status_code=response.status_code,
+                prompt_chars=prompt_chars,
             )
             message = (
                 "AI 调用被拒绝，请检查你在设置页填写的 API Key 与额度"
@@ -320,6 +385,13 @@ class AIClient:
             response.status_code,
             elapsed_ms,
         )
+        _persist_call_log(
+            runtime,
+            kind="success",
+            elapsed_ms=elapsed_ms,
+            status_code=response.status_code,
+            prompt_chars=prompt_chars,
+        )
         try:
             return str(response.json()["choices"][0]["message"]["content"])
         except (KeyError, IndexError, TypeError, ValueError) as exc:
@@ -329,6 +401,13 @@ class AIClient:
                 runtime.model,
                 response.status_code,
                 elapsed_ms,
+            )
+            _persist_call_log(
+                runtime,
+                kind="malformed",
+                elapsed_ms=elapsed_ms,
+                status_code=response.status_code,
+                prompt_chars=prompt_chars,
             )
             raise AppError(
                 AI_UNAVAILABLE, "AI 返回内容无法解析", status=502, retryable=True

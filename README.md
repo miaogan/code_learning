@@ -73,7 +73,20 @@ docker compose ps        # backend 的 STATUS 应带 (healthy)
 | 根 | `curl -sS http://127.0.0.1:8000/health` | `{"status":"ok",...}` |
 | 根 | `grep -riE "sk-\|api_key\|AI_API_KEY" frontend/src frontend/dist \|\| echo NO_KEY_LEAK` | `NO_KEY_LEAK`（AC-8） |
 
-CI 双 job 已在 [GitHub Actions](https://github.com/miaogan/code_learning/actions) 实跑（共 31 次；最近 `#31` / `a54e4be` 成功）；后端 job 另含 `question_merge --check` 题库字节门禁，该步骤在下一次 push 后由远端验证。
+CI 双 job 已在 [GitHub Actions](https://github.com/miaogan/code_learning/actions) 实跑 32 次；最近 `#32` / `163ebb4` 成功（1m6s），#27–#32 连续通过，`Question bank byte gate` 已随 #32 在远端验证为绿。本轮新增的 4 个评测门禁（`Offline eval` / `Retrieval eval` / `Question retrieval eval` / `Reliability fault-injection`）本地均已实跑退出 0，需下一次 push 后由远端确认。
+
+评测与检索证据（零网络、可复跑）：
+
+```bash
+python -X utf8 scripts/eval_harness.py --check              # 30 例金标集回归门禁 → REPORT.md
+node scripts/eval_retrieval.mjs --check                     # 教程侧 BM25 召回 → RETRIEVAL-REPORT.md
+python -X utf8 scripts/eval_question_retrieval.py --check   # 题目侧 FTS5 召回 → QUESTION-RETRIEVAL-REPORT.md
+python -X utf8 scripts/eval_reliability.py                  # 故障注入 → RELIABILITY-REPORT.md
+python -X utf8 scripts/benchmark.py                         # 并发写锁 / 导入 / 检索 → PERF-REPORT.md
+python -X utf8 scripts/seed_eval_demo.py --dry-run          # /eval 看板合成演示数据（不写库）
+```
+
+> 带 `--check` 的是只读 CI 门禁，不带的是会重写对应报告的生成命令；`benchmark.py` 依赖本机磁盘与 CPU，**刻意不进 CI**（跨机器分位不稳定会导致 flaky）。所有指标来自合成数据 / 同源标注 / 模拟故障，只用于回归检测与实现可用性证明，不代表模型能力或生产 QPS；口径与限制见 `docs/teamflow/20261109-r51-resume-highlight-engineering/TECHNICAL.md §6–§7`。
 
 ## 分支、交付与回滚
 

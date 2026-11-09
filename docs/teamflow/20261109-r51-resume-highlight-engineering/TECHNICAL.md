@@ -2,6 +2,12 @@
 
 > 本文只描述**已定稿的设计与已落盘的改动**，未实施项标「待实施」。所有设计遵守 AGENTS.md §4：
 > 契约双侧同步、错误 envelope 中文且脱敏、只用 token、测试按 `backend/tests/` 与 `frontend/src/**/*.test.ts` 放置。
+>
+> **阅读顺序（重要）**：§3–§4 是按「任务夹建后不可变」约定保留的**方案原文**，
+> 实际交付以 **§6（M2/M3 实施结果）** 与 **§7（r53 收口批次）** 为准。方案里这几项均未照做，
+> 且是**有意偏差**而非遗漏：`app_version` 列已去掉、评分 MAE / 轨迹 jsonl 未实现、
+> `PLAN_VERSION` 保持 1、RRF 未接入计划 UI、虚表实际名 `question_search`（非 `questions_fts`）、
+> 响应字段为 `mode`（非 `degraded`）、FTS 重建按行数一致跳过。偏差理由逐条见 §6 表格。
 
 ## 1. 现状接入点（本轮勘察结论）
 
@@ -31,8 +37,8 @@
    - 不改 Python / Node 版本、不注入任何 Key，保持「零网络、零密钥」的既有口径。
 2. `README.md`：顶部加 Actions badge；新增 `## 设计取舍（为什么这么做）` 一章，把 `ARCHITECTURE.md §1.1` 的四条取舍（不做 SSR / 后端选 Python / SQLite 直连不用 ORM / 手写 CSS）与**各自代价**搬到首页，便于面试官 30 秒看到判断力。
 3. `AGENTS.md` 变更记录追加 r51 条目。
-4. **CI 实跑已核实并更正文档**（本机 `gh` 未认证，但 Actions 页面公开可读）：共 31 次运行，最近 `CI #31` 对应 commit `a54e4be`（`feat/dev-skill-coach`）成功、耗时 1m6s；#21–#26 曾红灯、后续修复，#27–#31 连续通过。据此在 `ARCHITECTURE.md §7.1` 补 CI 实跑证据、§7.2 删除过期的「未落盘」条目，README badge 指向同一 workflow。
-   **注意**：本轮新增的 `Question bank byte gate` 步骤尚未推送，需下一次 push 后才会由远端 CI 验证；本地已实跑退出码 0。
+4. **CI 实跑已核实并更正文档**（本机 `gh` 未认证，但 Actions 页面公开可读）：共 32 次运行，最近 `CI #32` 对应 commit `163ebb4`（`feat/dev-skill-coach`）成功、耗时 1m6s；#21–#26 曾红灯、后续修复，#27–#32 连续通过。据此在 `ARCHITECTURE.md §7.1` 补 CI 实跑证据、§7.2 删除过期的「未落盘」条目，README badge 指向同一 workflow。
+   **注意**：`Question bank byte gate` 已随 #32 在远端验证为绿；后续新增的 4 个评测门禁见 §7，需下一次 push 后由远端确认。
 
 ## 3. M2 · 离线评测 Harness（方案已定，待实施）
 
@@ -187,3 +193,63 @@ M1（本轮） ──> M2（日志落库 → 金标集 → 脚本/门禁 → 看
 
 M2 与 M3 互不阻塞，任一单独完成即可独立写进简历；`docs/eval/` 是两者共享的评测产物目录。
 每一项交付前必须跑：`backend/` 的 `pytest -q` + `ruff check app tests`、`frontend/` 的 `typecheck && lint && test && build`、根目录 `question_merge --check`。
+
+## 6. 实施结果（r53，2026-11-09）
+
+M2 / M3 已落盘。以下 5 处是**有意偏差**，按「任务夹建后不可变」约定补记于此，不回改 §3–§4 原方案：
+
+| 项 | 原方案 | 实施 | 理由 |
+|---|---|---|---|
+| `app_version` 列 | 记应用版本 | 去掉该列 | 避免与 `main.APP_VERSION` 形成双份真源；日志只留元数据 |
+| 评分 MAE / 轨迹 jsonl | 列入指标与产物 | **未实现** | 金标只标 `score_band` 区间、无逐例人工打分，缺少可复算的 `human` 标签；不编造指标。报告里显式写明「未计入」 |
+| `PLAN_VERSION` | 升 2 | **保持 1** | `citations` 是纯附加可选字段，`buildStudyPlan` 默认不产出（与 r50 逐字节等价），旧快照缺字段零占位，无需失效重算 |
+| RRF 融合 | 两路检索融合进计划 | `reciprocalRankFusion` 已实现并单测，**未接入计划 UI** | `buildStudyPlan` 是同步纯函数，题目检索需异步 API；强接会破坏确定性排程。计划页只展示教程侧 citation，题目侧以独立端点提供 |
+| FTS5 重建 | 每次导入重建 | 行数一致即跳过 | 题库导入幂等（只增不改），避免每次启动重写 1164 行 |
+
+**实测（命令输出，非手写）**
+
+- `python -X utf8 scripts/eval_harness.py --check`：30 例，schema 通过率 93.3%、micro-P 98.0% / R 99.0% / F1 98.5%、负向 `hallucination_rate` 13.3%、p50/p95 本地处理耗时 3/19 微秒。基线 `docs/eval/baseline-v1.json`，波动带 ±2pp，已接入 CI `Offline eval gate`。
+- `node scripts/eval_retrieval.mjs`：20 组标注，recall@5 100%、无命中拒答率 0%、引用有效率 100%（90/90），Wilson 95% 区间 [83.9%, 100%]。
+- **两组数字都只证明实现可用**：金标 30 例为合成数据、响应快照与标注同源；检索标注 20 组由同一批章节标题启发写成，存在标注泄漏风险。用途是**回归检测**，不是能力宣传，报告内已写「解读限制」。
+
+**新增**：`ai_call_logs` 表、`question_search` FTS5 虚表（可选能力，缺失降级 LIKE）、`GET /api/eval/summary`、`POST /api/search/questions`、`/eval` 看板、`lib/tutorialSearch.ts` / `lib/eval.ts`、`scripts/eval_harness.py` / `scripts/eval_retrieval.mjs`、`docs/eval/` 五份产物、`backend/tests/test_r51_eval_harness.py`（13 条）与前端 3 个测试文件（18 条）。
+
+**验证**：后端 646 passed / 1 skipped、前端 268 passed；`typecheck` / `lint` / `build` / `ruff` / `question_merge --check` 全绿。CI 新增的 `Offline eval gate` 与题库字节门禁需下一次 push 后由远端验证。
+
+## 7. 收口批次（r53 续，2026-11-09）
+
+与 §6 同属**一个未提交变更集**，最终一次性提交。目标是消除「文档说的 ≠ 代码里有的」，并补齐 §6 明确记档的未完成项里能零网络落地的部分。
+
+### 7.1 交付内容
+
+| 项 | 落盘 | 实测证据 |
+|---|---|---|
+| 并发写锁 | `db.py::connection()` 加 `PRAGMA busy_timeout = 3000`（驱动参数 + PRAGMA 双保险）；`repository.prune_ai_call_logs()` 按 90 天保留期随 `create_session()` 收口 | 8 线程 × 50 次并发写 100% 成功、0 次锁失败；`test_r53_concurrency.py` 5 条 |
+| LLM 可靠性治理 | `services/ai/reliability.py`：指数退避+抖动、三态熔断器、结构化输出修复、幂等键、影子对比；`ai.py` 默认接入「修复兜底」与「后台重试退避」 | `scripts/eval_reliability.py` 故障注入：55.5%→84.0%（+28.5pp）、修复救回 34 次、熔断减少 80% 无效上游调用 |
+| 检索评估补完 | `eval_retrieval.mjs` 加只读 `--check`；新增 `scripts/eval_question_retrieval.py` + 20 组题目侧标注 | 教程侧 / 题目侧 recall@5 均 100%（20/20），题目侧 Wilson 95% `[83.9%, 100%]`、FTS5 命中占比 80%（4 组短查询降级 LIKE） |
+| 性能基准 | `scripts/benchmark.py` → `docs/eval/PERF-REPORT.md`（临时库，零网络） | 并发写 `no_timeout` 28.2%（287 次锁失败）→ `with_timeout` 100%；题库导入 8.78ms / 幂等二次 1.58ms；FTS5 检索 p50/p95/p99 = 72/107/238 us |
+| 演示数据 | `scripts/seed_eval_demo.py`，`provider='demo'`，重复运行幂等 | dry-run：120 条 / 7 天 / 2 模型，成功率 74.2%、p50 793ms、p95 3942ms；**默认不写开发库** |
+| CI 门禁 | backend 加 `Question retrieval eval` / `Reliability fault-injection`，frontend 加 `Retrieval eval` | 4 个新门禁在各自 `working-directory` 下本地实跑退出 0；`node ../scripts/eval_retrieval.mjs --check` 在 `frontend/` 下可跑（esbuild 从 frontend/node_modules 解析） |
+
+### 7.2 有意偏差（继续补记，不回改方案正文）
+
+| 项 | 方案 / 承诺 | 实施 | 理由 |
+|---|---|---|---|
+| WAL | §1 表格写「必要时评估 WAL」 | **不启用** | 基准显示 `busy_timeout` 已消除写失败；WAL 引入 -wal/-shm 文件与备份复杂度，单进程本地库收益不成立 |
+| 熔断短路 | PRD 加分项「熔断降级」 | 可注入状态机，**默认只观测不自动短路** | 避免把全局状态塞进 646+ 条既有测试的调用链；故障注入脚本验证策略效果，线上开关需显式注入 `allow()` |
+| 影子对比 / 幂等键 | PRD 加分项 | 纯函数已实现并单测，**未接主链路** | 接影子模型需第二份 Key 与配额，幂等缓存需定义失效语义，属于另一个变更集 |
+| benchmark 进 CI | — | **刻意不进** | 磁盘 / CPU 差异会让 p95/p99 跨机器抖动，制造 flaky；只作为本地可复跑报告 |
+| 在线评测 / 轨迹 / MAE / RRF 接入 | §3.3 / §4.4 | **仍未实现** | 需真实 Key、逐例人工打分与异步排程改造；`RESUME.md §2` 已列为「不建议写」，不冒充完成 |
+
+### 7.3 诚实边界（写简历前必读）
+
+- **故障注入 55.5%→84.0% 是模拟函数 + 虚拟时钟**，不是线上可用性；虚拟 p95 不能与 `PERF-REPORT.md` 的真实基准混用。
+- 题目侧 / 教程侧标注各 20 组，由同一批标题与题目关键词启发写成，**存在标注泄漏**；100% 只证明实现可用，不证明检索质量。
+- `busy_timeout` 的 28.2%→100% 是**同一基准的两组配置对照**，不是项目上线前后的演进数据。
+- `docs/eval/traces/` 不存在；评分 MAE 因缺逐例人工打分未计入，报告里显式写「未计入」。
+
+### 7.4 验证
+
+**后端 667 passed / 1 skipped、前端 268 passed**；`ruff check app tests` / `typecheck` / `lint` / `build` / `question_merge --check` 全绿。
+新增脚本单独 `ruff check` 全过；`eval_reliability.py` 连跑两次报告 sha256 一致（注入固定 seed 的随机源，保证可复算）。
+CI 的 4 个新门禁需下一次 push 后由远端确认；`Question bank byte gate` 已随 #32 验证为绿。
