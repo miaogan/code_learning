@@ -51,6 +51,10 @@ export function jobToResumeMeta(job: ProfileJobStatus): ResumeMeta {
     file_name: job.file_name,
     chars: job.chars,
     sections: job.sections,
+    // 任务行只记文档名与字数（r41 未扩表）：重接入只用于展示文件名与续跑，
+    // 图片来源信息只在「本次上传」的响应里用得到。
+    source_type: 'pdf',
+    image_count: 1,
   }
 }
 

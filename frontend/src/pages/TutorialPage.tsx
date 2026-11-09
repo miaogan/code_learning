@@ -6,7 +6,7 @@ import { LevelChip } from '../components/learn/LevelChip'
 import { Chip } from '../components/ui/Chip'
 import { EmptyState } from '../components/ui/EmptyState'
 import { progressView } from '../lib/learnProgress'
-import { practiceHref } from '../lib/reportPlan'
+import { practiceHref } from '../lib/studyPlan'
 import { chapterById, chapterHref, chapterNeighbors, tutorialHref } from '../lib/tutorials'
 import { markChapterOpened, markSectionSeen, useLearnProgress } from '../state/learnProgress'
 

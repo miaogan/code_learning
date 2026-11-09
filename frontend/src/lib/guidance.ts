@@ -6,7 +6,7 @@
  * 也不把技能名猜成方向 —— 没有依据时就只给文案，不硬凑卡片。
  */
 import type { Course, Report, RoleFitItem } from '../api/types'
-import { practiceHref } from './reportPlan'
+import { practiceHref } from './studyPlan'
 
 /** 主攻方向之外的延伸方向上限（再多会淹没主攻方向）。 */
 const EXTRA_DIRECTION_LIMIT = 2

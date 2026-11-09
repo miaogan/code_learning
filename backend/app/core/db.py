@@ -187,6 +187,37 @@ CREATE TABLE IF NOT EXISTS ai_usage (
 CREATE INDEX IF NOT EXISTS idx_ai_usage_user_day ON ai_usage (user_id, day);
 """
 
+#: r42 图片识别异步任务：图片抽取逐张调视觉模型，单批 1–3 张可达数十秒，
+#: 与画像生成同属「长请求」，一并改为服务端持有任务 + 前端轮询。
+#: `content_hash` 是同一批图片字节的 SHA-256：同一简历重复提交时命中同一条 running 任务
+#: （幂等键），终态后不再拦新提交。`result` 存 `ResumeMeta` JSON，终态完成后可重复读。
+R42_SCHEMA = """
+CREATE TABLE IF NOT EXISTS resume_jobs (
+    id           TEXT PRIMARY KEY,
+    user_id      TEXT NOT NULL DEFAULT 'default',
+    file_name    TEXT NOT NULL,
+    image_count  INTEGER NOT NULL,
+    content_hash TEXT NOT NULL DEFAULT '',
+    status       TEXT NOT NULL,
+    error        TEXT NOT NULL DEFAULT '',
+    result       TEXT NOT NULL DEFAULT '',
+    created_at   TEXT NOT NULL,
+    updated_at   TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_resume_jobs_user ON resume_jobs (user_id, created_at);
+"""
+
+#: r42 幂等索引：**部分唯一索引**只约束 running 行，终态行可无限累积（历史任务照常可查）。
+#: `profile_jobs` 是存量表，建索引前先跑 `_dedupe_running_profile_jobs()` —— r30 允许重复受理，
+#: 旧库里可能已有同一简历的多条 running，直接建唯一索引会失败。
+R42_INDEXES = """
+CREATE UNIQUE INDEX IF NOT EXISTS idx_profile_jobs_running_doc
+    ON profile_jobs (user_id, document_id) WHERE status = 'running';
+CREATE UNIQUE INDEX IF NOT EXISTS idx_resume_jobs_running_hash
+    ON resume_jobs (user_id, content_hash) WHERE status = 'running';
+"""
+
 #: r23 存量 6 表补 `user_id`（DEFAULT 'default' 即回填旧数据）。
 _R23_ADDED_COLUMNS: tuple[tuple[str, str, str], ...] = (
     ("documents", "user_id", "TEXT NOT NULL DEFAULT 'default'"),
@@ -257,3 +288,24 @@ def init_db() -> None:
         _ensure_r23_columns(conn)           # 4. 存量 6 表补 user_id（幂等）
         conn.executescript(SCHEMA_INDEXES)  # 5. 建索引（引用补出的列）
         conn.executescript(R23_INDEXES)     # 6. r23 隔离索引
+        conn.executescript(R42_SCHEMA)      # 7. r42 图片识别任务表
+        _dedupe_running_profile_jobs(conn)  # 8. 建部分唯一索引前先收敛历史重复 running 行
+        conn.executescript(R42_INDEXES)     # 9. r42 幂等索引
+
+
+def _dedupe_running_profile_jobs(conn: sqlite3.Connection) -> None:
+    """同一 (user_id, document_id) 只保留最新一条 running 行，其余按 failed 收敛。
+
+    r30 期间允许同一简历重复受理（每次新建 job 行），存量库里可能已有并行 running；
+    r42 的幂等靠部分唯一索引保证，建索引前必须先收敛这些旧行，否则 `init_db()` 会直接失败。
+    对干净库执行 0 行更新；对半升级库幂等（第二次启动已无重复行）。
+    """
+    conn.execute(
+        "UPDATE profile_jobs SET status = 'failed', "
+        "error = '旧版本重复受理的画像任务已合并，请重新生成画像', "
+        "updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now') || '+00:00' "
+        "WHERE status = 'running' AND rowid NOT IN ("
+        "  SELECT MAX(rowid) FROM profile_jobs WHERE status = 'running' "
+        "  GROUP BY user_id, document_id"
+        ")"
+    )

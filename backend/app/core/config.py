@@ -64,9 +64,13 @@ _NUMERIC_ENV_FIELDS: tuple[str, ...] = (
     "ai_max_retries",
     "ai_deepseek_timeout_s",
     "ai_lmstudio_timeout_s",
+    "ai_vision_timeout_s",
     "login_max_failures",
     "login_lockout_minutes",
 )
+
+#: r41：视觉档未开通时的**唯一**中文说明（图片入口直接透传，不静默降级成 PDF 提示）。
+VISION_UNCONFIGURED_REASON = "图片识别未开通，请改用 PDF 上传"
 
 
 #: 统一 AI 出网超时（秒）：所有调用点共用这一档，不再按功能各自写数值。
@@ -159,6 +163,16 @@ class Settings(BaseSettings):
     #: 机器 / 更小的模型仍够用），且这只是**单请求上限**，不改变任何请求的等待语义。
     ai_lmstudio_timeout_s: float = 600.0
 
+    # --- r41 图片简历识别（视觉档位） -----------------------------------------
+    #: 视觉模型名：留空 = 图片入口未开通（接口明确返回 VISION_UNCONFIGURED_REASON）。
+    #: DeepSeek 账号填 `deepseek-flash`（`deepseek-v4-pro` 不支持图像理解）。
+    ai_vision_model: str = ""
+    #: 留空 = 继承主档的 base_url / api_key（「同一账号、只换模型名」的默认用法）。
+    ai_vision_base_url: str = ""
+    ai_vision_api_key: str = ""
+    #: 0 = 继承主档超时（全局 `AI_TIMEOUT_S` 或具名档 `AI_<档>_TIMEOUT_S`）。
+    ai_vision_timeout_s: float = 0.0
+
     #: 日志级别（DEBUG / INFO / WARNING / ERROR），非法值按 INFO 处理（不因配置错起不来）。
     log_level: str = "INFO"
 
@@ -238,6 +252,48 @@ class Settings(BaseSettings):
         if mode_error:
             return replace(runtime, reason=mode_error)
         return replace(runtime, ready=True)
+
+    def resolve_vision(self) -> AiRuntime:
+        """图片识别（视觉）唯一解析出口：`AI_VISION_MODEL` 非空且主档就绪才算开通。
+
+        端点 / Key / 超时留空一律**继承主档**，因此 DeepSeek 用户只需填一个模型名；
+        `json_mode` 固定 `none` —— 转写结果是纯文本，不能带 `response_format`。
+        同样**永不 raise**：未开通只置 `ready=False` + 中文 `reason`，由出网口转 503。
+        """
+        main = self.resolve_ai()
+        model = self.ai_vision_model.strip()
+        if not model:
+            return AiRuntime(
+                provider="vision",
+                base_url="",
+                model="",
+                json_mode="none",
+                timeout_s=main.timeout_s,
+                max_retries=main.max_retries,
+                reason=VISION_UNCONFIGURED_REASON,
+            )
+        if not main.ready:
+            # 主档没配好时，视觉档也不可能出网：透传主档的中文原因（仍是同一套错误码）。
+            return AiRuntime(
+                provider="vision",
+                base_url="",
+                model=model,
+                json_mode="none",
+                timeout_s=main.timeout_s,
+                max_retries=main.max_retries,
+                reason=main.reason,
+            )
+        vision_timeout = float(self.ai_vision_timeout_s)
+        return AiRuntime(
+            provider="vision",
+            base_url=self.ai_vision_base_url.strip() or main.base_url,
+            model=model,
+            api_key=self.ai_vision_api_key.strip() or main.api_key,
+            json_mode="none",
+            timeout_s=vision_timeout if vision_timeout > 0 else main.timeout_s,
+            max_retries=main.max_retries,
+            ready=True,
+        )
 
     def _resolve_legacy(self) -> AiRuntime:
         """`AI_PROVIDER` 为空：直读全局四项，与 r8 逐字一致（ready 仍是「Key 非空」）。"""

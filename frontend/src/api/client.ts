@@ -35,6 +35,8 @@ import type {
   PracticeWrongBook,
   Report,
   ReportGenerateRequest,
+  ResumeJobStarted,
+  ResumeJobStatus,
   ResumeMeta,
   RunSummary,
   TimelineEvent,
@@ -178,6 +180,35 @@ export const api = {
     form.append('file', file)
     return request<ResumeMeta>('/api/resumes', { method: 'POST', body: form, signal })
   },
+
+  /** r41：手机拍照 / 相册入口（1–3 张，按顺序拼成一份简历，共用同一个 `resume_id`）。 */
+  uploadResumeImages: async (files: File[], signal?: AbortSignal): Promise<ResumeMeta> => {
+    const form = new FormData()
+    files.forEach((file) => form.append('files', file))
+    return request<ResumeMeta>('/api/resumes/images', { method: 'POST', body: form, signal })
+  },
+
+  /** r42：图片识别异步版 —— 只受理，立即返回 `job_id`，识别在服务端后台跑（弱网不丢任务）。 */
+  uploadResumeImagesAsync: async (
+    files: File[],
+    signal?: AbortSignal,
+  ): Promise<ResumeJobStarted> => {
+    const form = new FormData()
+    files.forEach((file) => form.append('files', file))
+    return request<ResumeJobStarted>('/api/resumes/images/async', {
+      method: 'POST',
+      body: form,
+      signal,
+    })
+  },
+
+  /** r42：轮询图片识别任务状态；`completed` 时 `result` 是已入库简历的 `ResumeMeta`。 */
+  getResumeJob: (jobId: string, signal?: AbortSignal): Promise<ResumeJobStatus> =>
+    request<ResumeJobStatus>(`/api/resume-jobs/${encodeURIComponent(jobId)}`, { signal }),
+
+  /** r42：最近一次图片识别任务（回上传页自动接上进度）；没有任务时 404。 */
+  latestResumeJob: (signal?: AbortSignal): Promise<ResumeJobStatus> =>
+    request<ResumeJobStatus>('/api/resume-jobs/latest', { signal }),
 
   /** 生成 / 增量合并画像（r3 行为变更：同一 profile_id 累积证据，返回带 `merge_summary`）。 */
   generateProfile: (resumeId: string, signal?: AbortSignal): Promise<ProfileWithMerge> =>

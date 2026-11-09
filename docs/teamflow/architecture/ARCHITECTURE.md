@@ -333,19 +333,19 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
 | 历史与趋势（AC-9/AC-10） | `services/interview/history.py`、`routers/history.py`、`pages/HistoryPage.tsx`；r3 起含长期记忆聚合 |
 | 题库种子 779 道（r12 起） | `backend/app/seed/questions.json`（r6 起退为**唯一导入源**，运行时由 `questions` 表承载；r11 起每次启动幂等导入，r14 起启动同时覆写既有行差异）；素材输入与留痕在 `docs/question-bank-staging/`（`PROVENANCE.md` + `NOTICE-fe-interview.md`），id 前缀口径见 §3.4.2 |
 | pydantic 契约模型（画像 5 维度 / 题目 / 报告 / 课程） | `backend/app/schemas.py` |
-| 后端测试 31 文件（pytest 零网络） | `backend/tests/*.py` |
+| 后端测试 38 文件（pytest 零网络） | `backend/tests/*.py` |
 | 容器化交付（r10） | `docker-compose.yml`、`backend/Dockerfile`、`frontend/Dockerfile`、`frontend/nginx.conf`、`docker.env.example`、任务夹 `docs/teamflow/20261101-r10-docker-compose-deploy/DEPLOY.md`；`WEB_PORT=8080` 单端口对外、SQLite 落 `skillcoach-data` 卷 |
 | 前端 `package-lock.json` + 已装依赖 | `frontend/package-lock.json`、`frontend/node_modules/` |
 | CI 双 job | `.github/workflows/ci.yml` |
+| 本地工程验证（r43 补记） | `pypdf` 6.21.4 / `python-docx` / `ruff` 均已装，真实 PDF / DOCX 解析与 `python -m ruff check app tests` 可在本机实跑（r42 起纳入每次交付门禁） |
 | AGENTS.md + memory.md + README | 仓库根与 `docs/teamflow/` |
 
 ### 7.2 未落盘（明确未完成，不计入「已完成」）
 
 | 项 | 现状 | 归属 |
 | --- | --- | --- |
-| 真实 PDF / DOCX 解析实测 | 代码已写，但本机缺 `pypdf` / `python-docx`，**未用真实文件验证**（单测走 stub） | 装依赖后 |
-| 后端 ruff lint 实跑 | **未执行**：全局 Python 无 `ruff`（`No module named ruff`），后端 lint 由 `tests/test_engineering_gates.py` + 人工复审覆盖 | 验收前补跑 |
 | CI 实跑 | workflow 已写，**未在 GitHub 上真跑过** | 验收前 |
+| iOS 真机 HEIC 相册转码行为 | r42 已实测桌面 Chromium 与后端字节嗅探；iOS Safari 无真机，仅按公开行为推断（见 `docs/teamflow/20261108-r42-task-recovery-heic/QA-REPORT.md` §3.2） | 有真机时补测 |
 
 ---
 

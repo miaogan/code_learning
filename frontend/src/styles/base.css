@@ -4311,6 +4311,7 @@ input:not([type='radio']):not([type='checkbox']):not([type='file']):disabled {
   display: flex;
   flex-direction: column;
   gap: var(--sp-1);
+  min-height: var(--plan-task-min-h);
   padding: var(--sp-2) var(--sp-3);
   background: var(--bg-raised);
   border: 1px solid var(--border-subtle);
@@ -4319,6 +4320,110 @@ input:not([type='radio']):not([type='checkbox']):not([type='file']):disabled {
   transition:
     border-color var(--fast) var(--ease),
     background var(--fast) var(--ease);
+}
+
+.sc-plan-taskhead {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  min-height: var(--touch-min, 44px);
+  cursor: pointer;
+}
+
+.sc-plan-taskhead input {
+  margin-top: var(--sp-1);
+  accent-color: var(--accent);
+}
+
+.sc-plan-taskmeta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+}
+
+.sc-plan-taskgo {
+  font-family: var(--font-mono);
+  font-size: var(--fs-meta);
+  color: var(--accent);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.sc-plan-taskgo:hover,
+.sc-plan-taskgo:focus-visible {
+  text-decoration: underline;
+}
+
+/* 时长偏好：三档闭集按钮，窄屏整行不挤（r41） */
+.sc-plan-duration {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.sc-plan-duration-label {
+  font-family: var(--font-mono);
+  font-size: var(--fs-nano);
+  letter-spacing: 0.04em;
+  color: var(--text-tertiary);
+}
+
+.sc-plan-duration-btn {
+  height: var(--chip-h);
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-4);
+  background: var(--overlay-06);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.sc-plan-duration-btn.is-active {
+  border-color: var(--accent-line-30);
+  background: var(--accent-tint);
+  color: var(--accent-soft);
+}
+
+.sc-plan-progress {
+  height: var(--qa-track-h);
+  border-radius: var(--radius-pill);
+  background: var(--overlay-06);
+  overflow: hidden;
+}
+
+.sc-plan-progress > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width var(--mid) var(--ease);
+}
+
+.sc-plan-dayminutes {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: var(--fs-nano);
+  color: var(--text-tertiary);
+}
+
+.sc-plan-daystate {
+  font-family: var(--font-mono);
+  font-size: var(--fs-nano);
+  color: var(--success);
+}
+
+.sc-plan-truncated {
+  margin: 0;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--warn);
 }
 
 .sc-plan-task:hover,
@@ -5589,6 +5694,133 @@ body {
   letter-spacing: 0.06em;
   color: var(--accent);
   white-space: nowrap;
+}
+
+/* ---------- r41 · 图片简历入口（拍照 / 相册） ---------- */
+.sc-lab-image-entry {
+  position: relative;
+  display: grid;
+  gap: var(--sp-3);
+  padding: var(--sp-5) 0 var(--sp-5) var(--sp-5);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.sc-lab-image-entry::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: var(--sp-4);
+  bottom: var(--sp-4);
+  width: 2px;
+  background: var(--border-strong);
+}
+
+.sc-lab-image-head {
+  display: grid;
+  gap: var(--sp-1);
+}
+
+.sc-lab-image-kicker {
+  font-family: var(--font-mono);
+  font-size: var(--fs-nano);
+  letter-spacing: 0.04em;
+  color: var(--text-tertiary);
+}
+
+.sc-lab-image-lead {
+  margin: 0;
+  max-width: 46ch;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--text-secondary);
+}
+
+.sc-lab-image-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+.sc-lab-thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sc-lab-thumb {
+  position: relative;
+  width: var(--thumb-size);
+  height: var(--thumb-size);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-4);
+}
+
+.sc-lab-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
+}
+
+/* 删除键：视觉 20（--sp-5），命中区 44（--touch-min），锚在缩略图右上角外扩。 */
+.sc-lab-thumb-remove {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: grid;
+  place-items: center;
+  width: var(--touch-min, 44px);
+  height: var(--touch-min, 44px);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  transform: translate(40%, -40%);
+  cursor: pointer;
+}
+
+.sc-lab-thumb-remove span {
+  display: grid;
+  place-items: center;
+  width: var(--sp-5);
+  height: var(--sp-5);
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  background: var(--bg-raised);
+  font-size: var(--fs-meta);
+  line-height: 1;
+  color: var(--text-secondary);
+}
+
+.sc-lab-thumb-remove:hover span,
+.sc-lab-thumb-remove:focus-visible span {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.sc-lab-image-submit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.sc-lab-image-hint {
+  margin: 0;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+}
+
+@media (max-width: 430px) {
+  /* 360–430：图片入口动作按钮与主 CTA 同列，各占满一行，避免「上传并识别」被挤成两行截断。 */
+  .sc-lab-image-actions .sc-btn,
+  .sc-lab-image-submit .sc-btn {
+    flex: 1 1 100%;
+  }
 }
 
 /* 已有画像回访条 */
@@ -6892,6 +7124,147 @@ body {
   .sc-card-hover:hover {
     transform: none;
     box-shadow: none;
+  }
+}
+
+/* ==========================================================================
+ * r40 · 移动端可用性收口（360–430 视口）
+ * 前几轮的移动改造只覆盖了导航（r21）、表单字号（r22）、时间线（r22）、面试输入区，
+ * 其余页面在 390 宽下仍会整页左右晃、标签字过小、按钮/chip 点不准、上传文案说「拖入」。
+ * 本段只作用于 ≤1023 / ≤430，桌面（≥1024）规则一条不动。
+ * 尺寸推导见 docs/teamflow/20261108-r40-mobile-usable/DESIGN-MOBILE.md
+ * ========================================================================== */
+
+/* 0) 深色兜底（本产品是单主题深色，不做浅色皮肤）：系统处于浅色时，
+   html 自身的底色决定「过滚回弹区」与首屏尚未绘制时的颜色——不设会在 Edge/Android WebView
+   里闪一帧白底；color-scheme 同时让原生滚动条/输入控件按深色渲染（index.html 已有 meta，这里兜底一次）。 */
+:root {
+  color-scheme: dark;
+}
+
+html {
+  background-color: var(--bg-canvas);
+}
+
+@media (max-width: 1023px) {
+  /* 1) 页面级横向溢出兜底。clip 不建立新的滚动容器（不像 hidden 会改滚动祖先），
+     所以顶栏 / 吸顶导航 / 面试粘性输入区的 sticky 行为都不受影响；
+     个别卡片里偶然超长 1–2px 的标识符不会带着整页左右晃。 */
+  html,
+  body {
+    overflow-x: clip;
+  }
+
+  /* 2) 窄屏强制断行：中文本来就会断，真正撑宽页面的是英文技能名、URL、文件路径。 */
+  .sc-page {
+    overflow-wrap: anywhere;
+  }
+
+  /* 3) 页内锚点（教程小节 #tutorial-<id> 等）落点让开吸顶两条栏：
+     顶栏 56 + 吸顶导航 53（44 项高 + 4×2 内边距 + 1 发丝线）= 109；
+     取 112（--sp-3 额外留 3px 呼吸），跳转后标题不会被压在导航下面。 */
+  html {
+    scroll-padding-top: calc(
+      var(--topbar-h) + var(--touch-min) + var(--sp-3) + env(safe-area-inset-top)
+    );
+  }
+
+  /* 4) 触控目标：主按钮 40 → 44（--touch-min），可点 chip / 技能标签 24–28 → 44。
+     --btn-h 本身不改——它被 --iq-composer-h(156) 等固定高推导引用，全局抬会连锁破坏吸底输入区。
+     本段只抬实际渲染高度：输入区 12+84+8+44+12 = 160，仍小于 --iq-scroll-pad 172，最后一条气泡
+     的评分区照样能完整滚出粘性区。 */
+  .sc-btn:not(.is-sm) {
+    min-height: var(--touch-min);
+  }
+
+  .sc-chip.is-clickable,
+  .sc-lab-skill {
+    height: auto;
+    min-height: var(--touch-min);
+  }
+
+  /* 5) 面试输入区：作答框聚焦后把它拉回可视区一次（iOS Safari 不解析
+     interactive-widget=resizes-content，软键盘仍可能盖住吸底区；Chromium / ArkWeb 由 meta 负责）。 */
+  .sc-iq-input {
+    scroll-margin-bottom: calc(var(--iq-scroll-pad) + env(safe-area-inset-bottom));
+  }
+
+  /* 触屏没有 Ctrl/Cmd，快捷键提示在手机上只是噪音（按钮本身就在同一行右侧）。 */
+  .sc-iq-meta-key {
+    display: none;
+  }
+
+  /* 6) 长文本块自己横滑，不把页面撑宽（.sc-qa-code 已有 overflow:auto，这里兜住零散 <pre>） */
+  .sc-page pre {
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+  }
+}
+
+@media (max-width: 430px) {
+  /* 7) 360–430：左右留白 24 → 16（--sp-4）。360 下正文宽 312 → 328，390 有 358。
+     页宽仍受 .sc-page 的 max-width 约束，桌面不受影响。 */
+  .sc-page {
+    padding-left: var(--sp-4);
+    padding-right: var(--sp-4);
+  }
+
+  /* 8) 五段流程条：两列时每格仅约 150、标题断成三行，直接单列。 */
+  .sc-lab-pipe-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* 9) 上传区 CTA：单列后与主文案挤在一起，改为独占一行并加一条发丝线，成为明确的下一个动作。 */
+  .sc-lab-drop-cta {
+    grid-column: 1 / -1;
+    justify-self: stretch;
+    padding-top: var(--sp-2);
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  /* 10) 弹窗按钮铺满一行，拇指区不再挤在右下角。 */
+  .sc-modal-actions .sc-btn {
+    flex: 1 1 auto;
+  }
+}
+
+/* 11) 上传区主文案：桌面可拖拽 →「拖入或点击选择文件」；触屏没有拖拽 →「点击选择文件」。
+     用视口宽度而不是 pointer 判断：窄窗口的桌面照样能拖，但点击本来就是主路径，文案不会说谎。 */
+.sc-lab-drop-main.is-tap {
+  display: none;
+}
+
+@media (max-width: 1023px) {
+  .sc-lab-drop-main.is-drag {
+    display: none;
+  }
+
+  .sc-lab-drop-main.is-tap {
+    display: inline;
+  }
+
+  /* 12) --fs-nano 在 ≤640 抬到 11px 后，首列字距必须放宽，否则「PRIMARY」≈55.4 顶破 54 的列宽。 */
+  .sc-lab-tok-k {
+    letter-spacing: 0.04em;
+  }
+}
+
+/* ---------- r41 · 7 天计划：单列富任务（append-only 覆盖，不改 r38 的周网格定义） ---------- */
+/* r38 的「一格一天」是 7 列 grid，任务内只有一行短文案时密度最优；
+   r41 的任务行带勾选、时长与「去学习」链接，7 列在 1024 以下会把每格挤到不可用。
+   基座按门禁只允许 append，这里在文件末尾用同选择器覆盖承载方式：
+   grid-template-columns 在 flex 容器下自动失效，无需回改上面的既有声明。 */
+.sc-lab-week .sc-plan-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+/* 窄屏每日一卡：--sp-4 在 360 下会让任务行内容区只剩约 264，收到 --sp-3。 */
+@media (max-width: 1023px) {
+  .sc-lab-week .sc-plan-day {
+    padding: var(--sp-3);
   }
 }
 

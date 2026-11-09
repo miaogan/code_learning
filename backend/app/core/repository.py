@@ -184,21 +184,41 @@ def insert_profile_job(
     file_name: str,
     chars: int,
     sections: int,
-) -> None:
-    """受理一个画像生成后台任务（status=running）。
+) -> bool:
+    """受理一个画像生成后台任务（status=running），返回是否真的新建了任务行。
 
     受理发生在请求上下文里，`_uid()` 即当前用户；后台任务写状态时显式传
     `user_id`（见 `finish_profile_job` / `fail_profile_job`），不依赖 ContextVar
     在 `asyncio.create_task` 里的隐式传播。
+
+    r42：`(user_id, document_id) WHERE status='running'` 是部分唯一索引，同一简历已有
+    在途任务时插入会撞唯一约束 —— 捕获后返回 `False`，由路由层复用既有任务（幂等）。
     """
+    try:
+        with connection() as conn:
+            conn.execute(
+                "INSERT INTO profile_jobs "
+                "(id, user_id, document_id, file_name, chars, sections, status, error, result, "
+                " created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, '', '', ?, ?)",
+                (job_id, _uid(), document_id, file_name, chars, sections, "running", _now(), _now()),
+            )
+        return True
+    except sqlite3.IntegrityError:
+        return False
+
+
+def find_running_profile_job(document_id: str) -> dict[str, Any] | None:
+    """同一份简历当前在途的画像任务（幂等受理用）；没有则 `None`。"""
     with connection() as conn:
-        conn.execute(
-            "INSERT INTO profile_jobs "
-            "(id, user_id, document_id, file_name, chars, sections, status, error, result, "
-            " created_at, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, '', '', ?, ?)",
-            (job_id, _uid(), document_id, file_name, chars, sections, "running", _now(), _now()),
-        )
+        row = conn.execute(
+            "SELECT id, user_id, document_id, file_name, chars, sections, status, error, "
+            "result, created_at, updated_at FROM profile_jobs "
+            "WHERE user_id = ? AND document_id = ? AND status = 'running' "
+            "ORDER BY created_at DESC LIMIT 1",
+            (_uid(), document_id),
+        ).fetchone()
+    return None if row is None else _job_dict(row)
 
 
 def get_profile_job(job_id: str) -> dict[str, Any] | None:
@@ -274,6 +294,132 @@ def _job_dict(row: sqlite3.Row) -> dict[str, Any]:
         "file_name": row["file_name"],
         "chars": row["chars"],
         "sections": row["sections"],
+        "status": row["status"],
+        "error": row["error"],
+        "result": str(row["result"]) if row["result"] else "",
+        "created_at": row["created_at"],
+    }
+
+
+# --- resume_jobs（r42 图片识别后台任务）--------------------------------------
+
+
+def insert_resume_job(
+    job_id: str,
+    file_name: str,
+    image_count: int,
+    content_hash: str,
+) -> bool:
+    """受理一个图片识别后台任务（status=running），返回是否真的新建了任务行。
+
+    幂等口径与 `insert_profile_job` 一致：`(user_id, content_hash) WHERE status='running'`
+    是部分唯一索引，同一批图片已有在途任务时返回 `False`，由路由层复用既有任务。
+    """
+    try:
+        with connection() as conn:
+            conn.execute(
+                "INSERT INTO resume_jobs "
+                "(id, user_id, file_name, image_count, content_hash, status, error, result, "
+                " created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'running', '', '', ?, ?)",
+                (job_id, _uid(), file_name, image_count, content_hash, _now(), _now()),
+            )
+        return True
+    except sqlite3.IntegrityError:
+        return False
+
+
+def find_running_resume_job(content_hash: str) -> dict[str, Any] | None:
+    """同一批图片当前在途的识别任务（幂等受理用）；没有则 `None`。"""
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT id, user_id, file_name, image_count, content_hash, status, error, result, "
+            "created_at, updated_at FROM resume_jobs "
+            "WHERE user_id = ? AND content_hash = ? AND status = 'running' "
+            "ORDER BY created_at DESC LIMIT 1",
+            (_uid(), content_hash),
+        ).fetchone()
+    return None if row is None else _resume_job_dict(row)
+
+
+def get_resume_job(job_id: str) -> dict[str, Any] | None:
+    """按 id 读图片识别任务行（当前用户隔离），查不到 `None`。"""
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT id, user_id, file_name, image_count, content_hash, status, error, result, "
+            "created_at, updated_at FROM resume_jobs WHERE id = ? AND user_id = ?",
+            (job_id, _uid()),
+        ).fetchone()
+    return None if row is None else _resume_job_dict(row)
+
+
+def latest_resume_job() -> dict[str, Any] | None:
+    """当前用户最近一次图片识别任务（任意状态）：回上传页自动接上进度用。"""
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT id, user_id, file_name, image_count, content_hash, status, error, result, "
+            "created_at, updated_at FROM resume_jobs "
+            "WHERE user_id = ? ORDER BY created_at DESC LIMIT 1",
+            (_uid(),),
+        ).fetchone()
+    return None if row is None else _resume_job_dict(row)
+
+
+def expire_stale_resume_jobs(stale_seconds: int) -> int:
+    """把长期无进展（`updated_at` 超阈值）的 running 识别任务标记为 failed。
+
+    任务每识别完一页写一次 `updated_at`（心跳），因此这里衡量的是「无进展」而不是
+    「总耗时」；进程重启 / 被回收后无人推进的行同样会在读路径上被收敛，不留永远进行中。
+    """
+    cutoff = (datetime.now(UTC) - timedelta(seconds=stale_seconds)).isoformat()
+    with connection() as conn:
+        cursor = conn.execute(
+            "UPDATE resume_jobs SET status = 'failed', error = ?, updated_at = ? "
+            "WHERE user_id = ? AND status = 'running' AND updated_at < ?",
+            (
+                "图片识别长时间没有进展（可能因服务重启而中断），请重新上传图片",
+                _now(),
+                _uid(),
+                cutoff,
+            ),
+        )
+        return cursor.rowcount
+
+
+def touch_resume_job(job_id: str, *, user_id: str) -> None:
+    """一页识别完成后的心跳：推进 `updated_at`，让惰性清扫按「无进展」而非总耗时判死。"""
+    with connection() as conn:
+        conn.execute(
+            "UPDATE resume_jobs SET updated_at = ? WHERE id = ? AND user_id = ? AND status = 'running'",
+            (_now(), job_id, user_id),
+        )
+
+
+def finish_resume_job(job_id: str, result_json: str, *, user_id: str) -> None:
+    """识别成功：写入 `ResumeMeta` JSON（正文已在此之前入库）。"""
+    with connection() as conn:
+        conn.execute(
+            "UPDATE resume_jobs SET status = 'completed', result = ?, updated_at = ? "
+            "WHERE id = ? AND user_id = ?",
+            (result_json, _now(), job_id, user_id),
+        )
+
+
+def fail_resume_job(job_id: str, error: str, *, user_id: str) -> None:
+    """识别失败：落中文原因供轮询端展示；不自动重试（前端重试=重新受理）。"""
+    with connection() as conn:
+        conn.execute(
+            "UPDATE resume_jobs SET status = 'failed', error = ?, updated_at = ? "
+            "WHERE id = ? AND user_id = ?",
+            (error, _now(), job_id, user_id),
+        )
+
+
+def _resume_job_dict(row: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "job_id": row["id"],
+        "file_name": row["file_name"],
+        "image_count": row["image_count"],
+        "content_hash": row["content_hash"],
         "status": row["status"],
         "error": row["error"],
         "result": str(row["result"]) if row["result"] else "",
@@ -494,6 +640,26 @@ _QUESTION_FILL = (
 )
 
 
+def _question_insert_row(question: dict[str, Any], now: str) -> tuple[Any, ...]:
+    """一条 `questions` 行 → `_QUESTION_INSERT` 的参数元组（单条与批量共用同一形状）。"""
+    return (
+        question["id"],
+        question["direction"],
+        question.get("sub_direction"),
+        question["kind"],
+        question["difficulty"],
+        question["essentiality"],
+        question["prompt"],
+        _json_text(question.get("options")),
+        _json_text(question.get("answer")),
+        question.get("source") or "seed",
+        str(question.get("language") or ""),
+        str(question.get("explanation") or ""),
+        now,
+        now,
+    )
+
+
 def insert_question(question: dict[str, Any]) -> bool:
     """幂等导入单题：新增 `True`，同 `id` 已存在 `False`（**绝不覆盖**既有行，AC-1）。
 
@@ -503,26 +669,25 @@ def insert_question(question: dict[str, Any]) -> bool:
     """
     now = _now()
     with connection() as conn:
-        cursor = conn.execute(
-            _QUESTION_INSERT,
-            (
-                question["id"],
-                question["direction"],
-                question.get("sub_direction"),
-                question["kind"],
-                question["difficulty"],
-                question["essentiality"],
-                question["prompt"],
-                _json_text(question.get("options")),
-                _json_text(question.get("answer")),
-                question.get("source") or "seed",
-                str(question.get("language") or ""),
-                str(question.get("explanation") or ""),
-                now,
-                now,
-            ),
-        )
+        cursor = conn.execute(_QUESTION_INSERT, _question_insert_row(question, now))
         return cursor.rowcount > 0
+
+
+def insert_questions(questions: Sequence[dict[str, Any]]) -> int:
+    """批量幂等导入（r43）：一个连接、一个事务，`executemany` 写完全部行，返回新增行数。
+
+    与逐条 `insert_question()` **同 SQL、同语义**（`ON CONFLICT(id) DO NOTHING`，只增不覆盖）：
+    冲突行不产生变更，因此 `total_changes` 的差值就是新增数，重复导入恒 `0`（AC-1 不回退）。
+    动机是启动耗时：1088 条逐条写入要 1088 次开连接 / 提事务（实测 11.26s），批量后是亚秒级。
+    """
+    if not questions:
+        return 0
+    now = _now()
+    rows = [_question_insert_row(question, now) for question in questions]
+    with connection() as conn:
+        before = conn.total_changes
+        conn.executemany(_QUESTION_INSERT, rows)
+        return conn.total_changes - before
 
 
 def _question_of(row: sqlite3.Row) -> dict[str, Any]:

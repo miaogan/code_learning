@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { filteredNotice, proficiencyRuleHint } from '../lib/examNotice'
+import { backfillNotice, filteredNotice, proficiencyRuleHint } from '../lib/examNotice'
 
 /**
  * AC-12：`filtered_count` 的一行透明度文案。
@@ -45,30 +45,53 @@ describe('filteredNotice', () => {
 })
 
 /**
- * r6 D-7 / D-9：过滤规则说明（r19）。
- * 断言语义：只在信息行已挂载（N>0）时给出；文案必须同时回答「为什么被过滤 / 怎样回流」
- * 与「为什么卷面里仍会出现熟练题」，且**不得写死阈值**（阈值只住后端 `config.Settings`）。
+ * r6 D-7 / D-9：过滤规则说明（r19；r43 合并「L2 兜底回流」）。
+ * 断言语义：文案必须同时回答「怎样才算熟练 / 怎样回流」「为什么卷面里仍会出现熟练题」
+ * 与「另有 N 道因保持卷面结构被重新纳入」，全部拼成**一处**说明，不拆成三个标签。
+ * 阈值文案带「默认」限定：真实阈值住在后端 `config.Settings`，可被环境变量覆盖。
  */
 describe('proficiencyRuleHint', () => {
-  it('正数：返回规则说明，含「回流」与「卷面结构」两个归因', () => {
+  it('正数：返回规则说明，含熟练条件、回流条件与「默认」限定', () => {
     const hint = proficiencyRuleHint(3)
     expect(hint).toBe(
-      '近期多次答对的题会暂时跳过，不再算作熟练后自动回流；个别熟练题可能因卷面结构重新出现',
+      '默认 30 天内答对 2 次及以上、且最近一次答对才计为熟练；超过 30 天或最近一次答错会自动回流到题池',
     )
+    expect(hint).toContain('默认')
     expect(hint).toContain('回流')
-    expect(hint).toContain('卷面结构')
   })
 
-  it('与 filteredNotice 同一静默口径：0 / 负数 / 缺失 / 非有限数一律 null', () => {
+  it('兜底回流数并进同一句：含「另有 N 道因保持卷面结构被重新纳入」', () => {
+    const hint = proficiencyRuleHint(3, 2)
+    expect(hint).toContain('另有 2 道因保持卷面结构被重新纳入')
+    expect(hint).toContain('默认 30 天')
+  })
+
+  it('净过滤为 0 但确有兜底回流时仍给说明（L2 放回全部熟练题）', () => {
+    expect(proficiencyRuleHint(0, 4)).toContain('另有 4 道因保持卷面结构被重新纳入')
+    expect(proficiencyRuleHint(undefined, 1)).not.toBeNull()
+  })
+
+  it('两个计数都为 0 / 负数 / 缺失 / 非有限数时一律 null（零占位）', () => {
     expect(proficiencyRuleHint(0)).toBeNull()
-    expect(proficiencyRuleHint(-3)).toBeNull()
+    expect(proficiencyRuleHint(0, 0)).toBeNull()
+    expect(proficiencyRuleHint(-3, -1)).toBeNull()
     expect(proficiencyRuleHint(null)).toBeNull()
     expect(proficiencyRuleHint(undefined)).toBeNull()
     expect(proficiencyRuleHint(Number.NaN)).toBeNull()
     expect(proficiencyRuleHint(Number.POSITIVE_INFINITY)).toBeNull()
   })
+})
 
-  it('不写死阈值（不含数字）：避免前端副本与后端可调配置漂移', () => {
-    expect(proficiencyRuleHint(80)).not.toMatch(/\d/)
+describe('backfillNotice', () => {
+  it('正数：逐字给出兜底回流事实', () => {
+    expect(backfillNotice(2)).toBe('另有 2 道因保持卷面结构被重新纳入')
+  })
+
+  it('0 / 负数 / 缺失 / 非有限数：静默（不渲染「另有 0 道」）', () => {
+    expect(backfillNotice(0)).toBeNull()
+    expect(backfillNotice(-1)).toBeNull()
+    expect(backfillNotice(null)).toBeNull()
+    expect(backfillNotice(undefined)).toBeNull()
+    expect(backfillNotice(Number.NaN)).toBeNull()
   })
 })

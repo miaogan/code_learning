@@ -95,6 +95,10 @@ class ResumeMeta(BaseModel):
     file_name: str
     chars: int
     sections: int
+    #: r41：来源类型；存量文档响应默认 `pdf`，旧客户端不受影响。
+    source_type: Literal["pdf", "docx", "txt", "image"] = "pdf"
+    #: 仅 `source_type=image` 时大于 1（同一次上传的多张照片拼成一份简历）。
+    image_count: int = 1
 
 
 class Evidence(BaseModel):
@@ -332,7 +336,6 @@ class ExamQuestion(BaseModel):
     id: str
     kind: ExamKind
     direction: str
-    sub_direction: str | None = None
     prompt: str
     options: list[ExamOption]
 
@@ -343,6 +346,9 @@ class ExamRun(BaseModel):
     #: 本次**净过滤**掉的熟练题数 = `|熟练 ∩ 可用| − |熟练 ∩ 本卷|`（r6 AC-12）。
     #: 恒 `>= 0`；声明必填但给默认 0，旧客户端/旧 payload 不会因缺字段而炸；服务端恒显式赋值。
     filtered_count: int = 0
+    #: r43：本卷里**已熟练但被兜底放回**的题数（= `|熟练 ∩ 本卷|`），用于「另有 N 道因保持卷面结构被重新纳入」。
+    #: 旧客户端兼容默认 0；不从 payload 读（出卷响应专属字段）。
+    reintroduced_count: int = 0
 
 
 class ExamAnswers(BaseModel):
@@ -656,6 +662,28 @@ class ProfileWithMerge(Profile):
     """`POST /api/resumes/{id}/profile` 响应：画像 + 本次合并摘要（AC-6/7）。"""
 
     merge_summary: ProfileMergeSummary | None = None
+
+
+class ResumeJobStarted(BaseModel):
+    """`POST /api/resumes/images/async` 响应：识别任务已受理，凭 `job_id` 轮询（r42）。"""
+
+    job_id: str
+    status: str = "running"
+
+
+class ResumeJobStatus(BaseModel):
+    """`GET /api/resume-jobs/{job_id}` 响应：图片识别任务状态 + 终态 ResumeMeta（r42）。
+
+    `completed` 时 `result` 是已入库简历的 `ResumeMeta`；`failed` 时 `error` 是可直接展示的中文原因。
+    """
+
+    job_id: str
+    file_name: str
+    image_count: int
+    status: str
+    error: str
+    result: ResumeMeta | None = None
+    created_at: str
 
 
 class ProfileJobStarted(BaseModel):

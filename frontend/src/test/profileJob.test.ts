@@ -60,6 +60,8 @@ describe('profileJob 轮询语义', () => {
       file_name: '简历.pdf',
       chars: 1200,
       sections: 4,
+      source_type: 'pdf',
+      image_count: 1,
     })
   })
 

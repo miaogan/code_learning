@@ -190,6 +190,10 @@ _NEUTRAL_AI_ENV: dict[str, str] = {
     "AI_LMSTUDIO_MODEL": "",
     "AI_LMSTUDIO_API_KEY": "",
     "AI_LMSTUDIO_JSON_MODE": "",
+    # r41 视觉档：留空 = 图片入口未开通（与宿主 .env 的 deepseek-flash 解耦）。
+    "AI_VISION_MODEL": "",
+    "AI_VISION_BASE_URL": "",
+    "AI_VISION_API_KEY": "",
 }
 
 

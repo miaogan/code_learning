@@ -313,3 +313,26 @@
   --lab-blur: 14px;
   --lab-inst-pad: 16px;
 }
+
+/* ---------- r40 · 移动端可读性（append-only；推导见 docs/teamflow/20261108-r40-mobile-usable/DESIGN-MOBILE.md） ---------- */
+@media (max-width: 640px) {
+  :root {
+    /* 仪器标签 9.5/10 在 360–430 的密集面板里低于可读下限，抬到 11/11：
+       等宽 11px × 0.6em × 7 字符（"PRIMARY"）= 46.2；默认字距 0.12em 会到 55.4，顶破 54 的首列，
+       故 base.css r40 段把 .sc-lab-tok-k 的字距放宽到 0.04em（≈49.3 ≤ 54）。
+       行高 14 → 16 对齐 --lh-meta，标签行不再比正文更挤。 */
+    --fs-nano: 11px;
+    --lh-nano: 16px;
+    --fs-kicker: 11px;
+    --lh-kicker: 16px;
+  }
+}
+
+/* ---------- r41 · 图片简历入口 + 学习计划（append-only；推导见 docs/teamflow/20261108-r41-image-resume-study-plan/TECH-PLAN.md §2.5） ---------- */
+:root {
+  /* 缩略图 56 = 7×8：360 宽内容区 328 下，3 张 + 2×8 间隙 = 184 ≤ 328，留出删除命中区与「添加」位 */
+  --thumb-size: 56px;
+  /* 计划任务行整行可点：padding 8×2 + 标题 20(--lh-small) + gap 4 + meta 16 = 56 ≥ --touch-min 44 */
+  --plan-task-min-h: 56px;
+}
+

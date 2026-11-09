@@ -2,9 +2,17 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <!-- viewport-fit=cover：刘海屏/手势条下让 env(safe-area-inset-*) 生效（base.css 顶部栏与面试输入区已让位） -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- viewport-fit=cover：刘海屏/手势条下让 env(safe-area-inset-*) 生效（base.css 顶部栏与面试输入区已让位）
+         interactive-widget=resizes-content：软键盘弹出时收缩布局视口（Chromium/ArkWeb 已支持），
+         吸底输入区随键盘上移而不是被压在键盘后面；iOS Safari 忽略该值，由 Composer 聚焦兜底。 -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content"
+    />
     <meta name="color-scheme" content="dark" />
+    <!-- 移动浏览器标题栏配色，与 tokens.css 的 --bg-canvas（r38 #070809）保持一致；
+         该值无法从 CSS 变量读取，故在 HTML 里重复一次，改色时两处同步。 -->
+    <meta name="theme-color" content="#070809" />
     <title>Skill Coach · 开发者能力提升教练</title>
   </head>
   <body>

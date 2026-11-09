@@ -12,7 +12,7 @@ import { InlineError } from '../components/ui/InlineError'
 import { PhaseLoader } from '../components/ui/PhaseLoader'
 import { ResumeGate } from '../components/ui/ResumeGate'
 import { RingProgress } from '../components/ui/RingProgress'
-import { filteredNotice, proficiencyRuleHint } from '../lib/examNotice'
+import { backfillNotice, filteredNotice, proficiencyRuleHint } from '../lib/examNotice'
 import { formatElapsed } from '../lib/format'
 import { useAsync } from '../lib/useAsync'
 import { setFlow } from '../state/flow'
@@ -149,8 +149,16 @@ export default function ExamPage() {
    * 只在 `lib/examNotice.ts` 一处定义，本页只取结果、**不再比较/改写**。
    */
   const notice = run ? filteredNotice(run.filtered_count) : null
-  /** D-7 / D-9：与 notice 同一开关的规则说明（N=0 时同样不挂载）。 */
-  const noticeHint = run ? proficiencyRuleHint(run.filtered_count) : null
+  /** D-7 / D-9：与 notice 同源的规则说明（含兜底回流数；两者皆 0 时不挂载）。 */
+  const noticeHint = run
+    ? proficiencyRuleHint(run.filtered_count, run.reintroduced_count)
+    : null
+  /** D-8：复核时复显本卷的过滤事实；L2 兜底回流也拼在同一行（r43 合并成一处）。 */
+  const resultNotice = run
+    ? [filteredNotice(run.filtered_count), backfillNotice(run.reintroduced_count)]
+        .filter((text): text is string => text !== null)
+        .join(' · ')
+    : ''
   const hasAnyAnswer = answeredCount > 0
 
   // 作答中离开保护：刷新/关闭走浏览器原生提示，站内链接先确认 —— 作答只在本页 state，
@@ -407,13 +415,13 @@ export default function ExamPage() {
       {(view === 'running' || view === 'submitting') && run ? (
         <div className="sc-fade-in">
         <>
-          {/* AC-12：`filtered_count = 0` / 字段缺失时 notice 为 null → 不挂载节点（零占位）。 */}
-          {notice ? (
+          {/* AC-12：过滤事实 + 回流规则 + L2 兜底计数合并成一处；全为 0 时不挂载节点（零占位）。 */}
+          {noticeHint ? (
             <span className="sc-meta-line">
               <Chip label="熟练过滤" />
               {' '}
-              <span>{notice}</span>
-              {noticeHint ? <span>{`· ${noticeHint}`}</span> : null}
+              {notice ? <span>{notice}</span> : null}
+              {notice ? <span>{`· ${noticeHint}`}</span> : <span>{noticeHint}</span>}
             </span>
           ) : null}
 
@@ -480,12 +488,12 @@ export default function ExamPage() {
         <>
           <ExamResultPanel result={result} questions={run.questions} />
 
-          {/* D-8：复核时回看本卷的过滤事实（只复显事实，不回放规则说明，避免抢走 40px 总分的焦点）。 */}
-          {notice ? (
+          {/* D-8：复核时回看本卷的过滤事实；L2 兜底回流拼在同一行（r43），不单独挂标签。 */}
+          {resultNotice ? (
             <span className="sc-meta-line">
               <Chip label="熟练过滤" />
               {' '}
-              <span>{notice}</span>
+              <span>{resultNotice}</span>
             </span>
           ) : null}
 

@@ -249,6 +249,8 @@ def create_app() -> FastAPI:
 
     app.include_router(auth.router)
     app.include_router(resume.router)
+    # r42：图片识别任务查询端点（与上传端点同文件、独立前缀）。
+    app.include_router(resume.jobs_router)
     app.include_router(profile.router)
     app.include_router(interview.router)
     app.include_router(exam.router)

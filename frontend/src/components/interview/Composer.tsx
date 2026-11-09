@@ -1,4 +1,4 @@
-import type { ChangeEvent, KeyboardEvent } from 'react'
+import type { ChangeEvent, FocusEvent, KeyboardEvent } from 'react'
 import { Button } from '../ui/Button'
 import { InlineError } from '../ui/InlineError'
 
@@ -56,12 +56,24 @@ export function Composer({
   }
 
   // 字数计数与上限提示（r5 O-2）：`maxLength` 会静默截断，必须让用户看得到「已写多少 / 上限多少」。
+  // r40：快捷键提示单独成节点（.sc-iq-meta-key），触屏断点里藏掉——手机没有 Ctrl/Cmd。
   const chars = value.length
-  const metaText = readonly
-    ? '本场面试已结束 · 仅供回看'
-    : `Ctrl/Cmd + Enter 提交 · 已用 ${seconds}s · ${chars}/${MAX_ANSWER_CHARS} 字${
-        chars >= MAX_ANSWER_CHARS ? '（已达上限）' : ''
-      }`
+
+  /**
+   * r40 键盘避让兜底：Chromium / ArkWeb 由 viewport 的 interactive-widget=resizes-content
+   * 收缩布局视口，吸底输入区随之上移；iOS Safari 不认该值，聚焦后检查「作答框底边是否落到
+   * 可视区之外」，只有被键盘盖住才补一次滚动，已可见时不动（避免无谓跳动）。
+   */
+  const handleFocus = (event: FocusEvent<HTMLTextAreaElement>) => {
+    if (!window.matchMedia('(max-width: 1023px)').matches) return
+    const target = event.currentTarget
+    window.setTimeout(() => {
+      const viewport = window.visualViewport
+      if (!viewport) return
+      const overflow = target.getBoundingClientRect().bottom - (viewport.offsetTop + viewport.height)
+      if (overflow > 0) window.scrollBy({ top: overflow, behavior: 'smooth' })
+    }, 260)
+  }
 
   return (
     <div className={`sc-iq-composer${readonly ? ' is-readonly' : ''}`}>
@@ -72,6 +84,7 @@ export function Composer({
         value={value}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
+        onFocus={handleFocus}
         readOnly={readonly || submitting}
         disabled={disabled}
         maxLength={MAX_ANSWER_CHARS}
@@ -81,7 +94,18 @@ export function Composer({
         aria-readonly={readonly || submitting}
       />
       <div className="sc-iq-actions">
-        <span className={metaClasses.join(' ')}>{metaText}</span>
+        <span className={metaClasses.join(' ')}>
+          {readonly ? (
+            '本场面试已结束 · 仅供回看'
+          ) : (
+            <>
+              <span className="sc-iq-meta-key">Ctrl/Cmd + Enter 提交 · </span>
+              {`已用 ${seconds}s · ${chars}/${MAX_ANSWER_CHARS} 字${
+                chars >= MAX_ANSWER_CHARS ? '（已达上限）' : ''
+              }`}
+            </>
+          )}
+        </span>
         <Button onClick={onSubmit} disabled={!canSubmit} loading={submitting}>
           {submitting ? '正在评分…' : '提交回答'}
         </Button>

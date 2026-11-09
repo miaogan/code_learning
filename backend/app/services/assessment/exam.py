@@ -20,7 +20,7 @@ r6 起本模块退回**纯编排**职责（TECHNICAL §4 / §7）：
 payload 形状（TECHNICAL §4.3 笔试部分 + 判分回写扩展）：
 `{"questions":[{id,kind,direction,prompt,options,answer,difficulty,essentiality}],
   "started_at":..., "stage":"L1".."L6", "filtered_count":n,
-  "backfill":{"must_know":n,"other":m,"history":k}, "submitted_at":...,
+  "reintroduced_count":n, "backfill":{"must_know":n,"other":m,"history":k}, "submitted_at":...,
   "answers":{qid: 作答}, "per_question":[{question_id,correct,your_answer,correct_answer}],
   "correct_count":n, "objective_total":n, "total":x, "elapsed_s":y}`
 旧卷（r5 及更早）没有 `stage`/`filtered_count`/`backfill`，读侧一律 `.get()` 兜底，
@@ -104,6 +104,7 @@ def create_run(
         # 阶梯与过滤透明度（AC-12 的一行文案读 filtered_count；stage/backfill 供 QA 断言）
         "stage": paper.stage,
         "filtered_count": paper.filtered_count,
+        "reintroduced_count": paper.reintroduced_count,
         "backfill": dict(paper.backfill),
     }
     repository.insert_run(run_id, EXAM_KIND, profile_id, payload)
@@ -111,6 +112,7 @@ def create_run(
         run_id=run_id,
         questions=[_public(question) for question in paper.questions],
         filtered_count=paper.filtered_count,
+        reintroduced_count=paper.reintroduced_count,
     )
 
 

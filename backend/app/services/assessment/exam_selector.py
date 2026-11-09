@@ -92,12 +92,15 @@ class Paper:
     """一次组卷的结果：入选题目（含 `answer`，只落 `runs.payload`）+ 透明度计数。
 
     `stage` 是命中的阶梯层号（`'L1'`..`'L6'`，与 `rules.PAPER_STAGES` 逐字一致，**永不为 None**）；
-    `filtered_count` 是净过滤数；`backfill` 是三层回池计数（见模块 docstring）。
+    `filtered_count` 是净过滤数；`backfill` 是三层回池计数（见模块 docstring）；
+    `reintroduced_count` 是本卷里已熟练但被兜底放回的题数（= `len(proficient ∩ picked)`），
+    与 `filtered_count` 满足 `filtered_count + reintroduced_count = |熟练 ∩ 可用|`。
     """
 
     questions: list[dict[str, Any]]
     stage: str
     filtered_count: int
+    reintroduced_count: int
     backfill: dict[str, int]
 
 
@@ -463,10 +466,12 @@ def select_paper(
         )
         if picked is None:
             return None
+        picked_ids = {str(question.get("id") or "") for question in picked}
         return Paper(
             questions=picked,
             stage=stage,
             filtered_count=_filtered_count(proficient_hits, picked),
+            reintroduced_count=len(proficient_hits & picked_ids),
             backfill=backfill,
         )
 

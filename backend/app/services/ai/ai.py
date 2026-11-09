@@ -145,11 +145,78 @@ class AIClient:
             retryable=True,
         ) from last_error
 
+    async def complete_vision(
+        self,
+        system: str,
+        user: str,
+        image_data_urls: list[str],
+        *,
+        timeout_s: float | None = None,
+        retry_unavailable: bool = False,
+    ) -> str:
+        """图片理解补全：把 base64 data URL 以内容块数组发往视觉模型，返回纯文本。
+
+        运行期口径来自构造时的 `AiRuntime`（r41 由 `Settings.resolve_vision()` 装配，
+        因此 `json_mode=none`、模型名 = `AI_VISION_MODEL`）。重试口径与 `complete_model`
+        一致：仅后台 / 可重复场景开 `retry_unavailable`，前台交互不翻倍等待。
+
+        隐私：图片只在请求体内流转，日志只记**张数**，不打印 data URL。
+        """
+        runtime = self._runtime
+        if not runtime.ready:
+            logger.warning(
+                "ai.skipped provider=%s model=%s reason=%s",
+                runtime.provider,
+                runtime.model,
+                runtime.reason,
+            )
+            raise AppError(AI_UNAVAILABLE, runtime.reason or _UNCONFIGURED_REASON, status=503)
+        blocks: list[dict[str, Any]] = []
+        if user:
+            blocks.append({"type": "text", "text": user})
+        blocks.extend(
+            {"type": "image_url", "image_url": {"url": url}} for url in image_data_urls
+        )
+        attempts = max(1, runtime.max_retries + 1)
+        last_error: Exception | None = None
+        for attempt in range(attempts):
+            try:
+                return await self._request(
+                    system,
+                    blocks,
+                    timeout_s=timeout_s,
+                    image_count=len(image_data_urls),
+                )
+            except AppError as exc:
+                if not (retry_unavailable and exc.retryable) or attempt + 1 >= attempts:
+                    raise
+                last_error = exc
+                logger.warning(
+                    "ai.retry attempt=%s/%s code=%s images=%s",
+                    attempt + 1,
+                    attempts,
+                    exc.code,
+                    len(image_data_urls),
+                )
+        raise AppError(
+            AI_UNAVAILABLE, "图片识别失败，请稍后重试", status=503, retryable=True
+        ) from last_error
+
     async def ping(self) -> None:
         """最小连通性探测（设置页「测试连接」）：只验证端点 / Key / 模型可用。"""
         await self._chat("你是 API 连通性检测助手。", "请只回复 OK 两个字母。")
 
     async def _chat(self, system: str, user: str, timeout_s: float | None = None) -> str:
+        return await self._request(system, user, timeout_s=timeout_s)
+
+    async def _request(
+        self,
+        system: str,
+        user: str | list[dict[str, Any]],
+        *,
+        timeout_s: float | None = None,
+        image_count: int = 0,
+    ) -> str:
         runtime = self._runtime
         if not runtime.ready:
             # 双重短路：绕过 `complete_model` 的直接调用同样得到中文 503，绝不带病出网。
@@ -176,14 +243,20 @@ class AIClient:
         if api_key:
             # 本地端点无鉴权；空 `Bearer` 会被部分实现判 401，所以 key 为空时整键不发。
             headers["Authorization"] = f"Bearer {api_key}"
-        # 日志只记元数据：不记 Key、请求头、Prompt 与简历正文（隐私边界与错误文案一致）。
+        # 日志只记元数据：不记 Key、请求头、Prompt、图片 data URL 与简历正文（隐私边界与错误文案一致）。
+        prompt_chars = len(system) + (
+            len(user)
+            if isinstance(user, str)
+            else sum(len(str(block.get("text", ""))) for block in user)
+        )
         logger.info(
-            "ai.request provider=%s model=%s timeout_s=%s json_mode=%s prompt_chars=%s",
+            "ai.request provider=%s model=%s timeout_s=%s json_mode=%s prompt_chars=%s images=%s",
             runtime.provider,
             runtime.model,
             timeout,
             runtime.json_mode,
-            len(system) + len(user),
+            prompt_chars,
+            image_count,
         )
         started = time.perf_counter()
         try:

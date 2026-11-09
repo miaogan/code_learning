@@ -165,6 +165,7 @@ def test_l1_uses_clean_pool_when_available(profile_factory: Any) -> None:
     paper = _select(_objectives(10) + _texts(4), profile_factory(), seed=11)
     assert paper.stage == "L1"
     assert paper.filtered_count == 0
+    assert paper.reintroduced_count == 0
     assert paper.backfill == {"must_know": 0, "other": 0, "history": 0}
     _assert_structure(paper.questions, require_directions=2)
 
@@ -178,6 +179,8 @@ def test_l2_returns_proficient_must_know(profile_factory: Any) -> None:
     assert _ids(paper) >= {"o00", "o01", "o02"}, "回流题应进卷面"
     # 净过滤数 = |熟练 ∩ 可用| − |熟练 ∩ 本卷|：3 道熟练题全回流，故不再算「已过滤」
     assert paper.filtered_count == 0, "回流进卷面的熟练题不得再算作已过滤（文案会自相矛盾）"
+    # r43：回流进卷面的熟练题数由 reintroduced_count 单独给出（「另有 N 道因保持卷面结构被重新纳入」）
+    assert paper.reintroduced_count == 3
     _assert_structure(paper.questions, require_directions=2)
 
 
@@ -195,6 +198,7 @@ def test_l3_returns_remaining_proficient(profile_factory: Any) -> None:
     assert paper.backfill == {"must_know": 3, "other": 3, "history": 0}
     assert _ids(paper) >= proficient
     assert paper.filtered_count == 0
+    assert paper.reintroduced_count == len(proficient)
     _assert_structure(paper.questions, require_directions=2)
 
 
@@ -220,6 +224,7 @@ def test_l5_relaxes_direction_coverage_to_one(profile_factory: Any) -> None:
     assert paper.stage == "L5", f"L1..L4 都要求 ≥2 方向，应递进到 L5，实际 {paper.stage}"
     assert paper.backfill == {"must_know": 0, "other": 3, "history": 0}
     assert paper.filtered_count == len(proficient) - len(proficient & _ids(paper))
+    assert paper.reintroduced_count == len(proficient & _ids(paper))
     _assert_structure(paper.questions, require_directions=1)
 
 
@@ -311,6 +316,7 @@ def test_proficient_question_absent_from_five_consecutive_papers(
         payload = repository.get_run(run.run_id)["payload"]
         assert payload["stage"] == "L1", f"第 {index + 1} 卷不应触发兜底回流：{payload['stage']}"
         assert payload["filtered_count"] == 1, f"净过滤数应为 1，实际 {payload['filtered_count']}"
+        assert payload["reintroduced_count"] == 0, "L1 没有回流题"
 
 
 def test_expired_attempts_refill_the_pool(tmp_db: Any, profile_factory: Any) -> None:
@@ -324,6 +330,7 @@ def test_expired_attempts_refill_the_pool(tmp_db: Any, profile_factory: Any) -> 
     run = exam_service.create_run(profile.id)
     payload = repository.get_run(run.run_id)["payload"]
     assert payload["filtered_count"] == 0, "没有熟练题时净过滤数必须为 0"
+    assert payload["reintroduced_count"] == 0
 
 
 def test_running_paper_writes_no_attempt_events(tmp_db: Any, profile_factory: Any) -> None:
@@ -503,6 +510,7 @@ def test_exam_run_filtered_count_defaults_to_zero() -> None:
     """旧客户端兼容：`ExamRun.filtered_count` 缺省 0（读侧不需要判断字段是否存在）。"""
     run = ExamRun(run_id="legacy", questions=[])
     assert run.filtered_count == 0
+    assert run.reintroduced_count == 0
 
 
 # --- 用户自定义筛选（方向 / 难度 / 题量）----------------------------------

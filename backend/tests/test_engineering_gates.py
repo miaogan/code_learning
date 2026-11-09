@@ -368,15 +368,19 @@ def test_direction_literals_not_duplicated() -> None:
 
 
 def test_contract_mirror_filtered_count() -> None:
-    """`ExamRun.filtered_count` 双侧同步，且 `answer` 不进响应模型（AC-4）。"""
+    """`ExamRun.filtered_count` / `reintroduced_count` 双侧同步，且 `answer` 不进响应模型（AC-4）。"""
     schemas_tree = _r6_ast("backend/app/schemas.py")
     run_fields = _class_annotations(schemas_tree, "ExamRun")
-    assert set(run_fields) == {"run_id", "questions", "filtered_count"}, f"ExamRun 字段应为 run_id/questions/filtered_count，实际 {sorted(run_fields)}"
-    default = run_fields["filtered_count"]
-    if isinstance(default, ast.Call):  # Field(default=0)
-        defaults = [kw.value for kw in default.keywords if kw.arg == "default"]
-        default = defaults[0] if defaults else None
-    assert isinstance(default, ast.Constant) and default.value == 0, "filtered_count 旧客户端兼容默认值必须为 0"
+    expected = {"run_id", "questions", "filtered_count", "reintroduced_count"}
+    assert set(run_fields) == expected, f"ExamRun 字段应为 {sorted(expected)}，实际 {sorted(run_fields)}"
+    for field in ("filtered_count", "reintroduced_count"):
+        default = run_fields[field]
+        if isinstance(default, ast.Call):  # Field(default=0)
+            defaults = [kw.value for kw in default.keywords if kw.arg == "default"]
+            default = defaults[0] if defaults else None
+        assert isinstance(default, ast.Constant) and default.value == 0, (
+            f"{field} 旧客户端兼容默认值必须为 0"
+        )
 
     assert "answer" not in _class_annotations(schemas_tree, "ExamQuestion"), "ExamQuestion 不得暴露 answer"
 
@@ -394,6 +398,9 @@ def test_contract_mirror_filtered_count() -> None:
     block = re.search(r"export interface ExamRun\s*\{([^}]*)\}", types_ts)
     assert block, "types.ts 缺 interface ExamRun"
     assert re.search(r"filtered_count\s*:\s*number", block.group(1)), "types.ts ExamRun.filtered_count 必须必填 number"
+    assert re.search(r"reintroduced_count\s*:\s*number", block.group(1)), (
+        "types.ts ExamRun.reintroduced_count 必须必填 number（r43 兜底回流计数）"
+    )
 
 
 def test_frontend_filtered_notice_single_source() -> None:

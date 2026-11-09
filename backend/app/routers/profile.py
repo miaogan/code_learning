@@ -21,7 +21,7 @@ from fastapi import APIRouter, Depends
 
 from app.core import repository
 from app.core.context import set_current_user_id
-from app.core.errors import NOT_FOUND, AppError
+from app.core.errors import INTERNAL_ERROR, NOT_FOUND, AppError
 from app.deps import CurrentUser, current_user
 from app.schemas import (
     Profile,
@@ -88,9 +88,14 @@ async def create_profile(resume_id: str, user: CurrentUser) -> ProfileWithMerge:
 #: 否则任务可能被垃圾回收中途回收（终态不落库、轮询永远 running）。
 _PENDING_JOBS: set[asyncio.Task[None]] = set()
 
-#: running 任务行的停滞阈值（秒）：生成常态 30~90 秒，10 分钟仍未终态视为进程中断
-#: （服务重启 / 任务被回收），读路径上惰性标记为 failed，不再让前端无限轮询（r32）。
-_PROFILE_JOB_STALE_SECONDS = 10 * 60
+#: running 任务行的停滞阈值（秒）：生成常态数十秒，但统一 AI 超时 600s 且允许重试一次，
+#: 合法耗时上限约 20 分钟 —— r30 的 10 分钟会把合法长任务误判死（r42 调整为 30 分钟）。
+#: 进程中断（服务重启 / 任务被回收）的行在读路径上惰性标记 failed，前端不会无限轮询。
+_PROFILE_JOB_STALE_SECONDS = 30 * 60
+
+#: 单任务硬上限（秒）：用 `asyncio.wait_for` 兜住「AI 客户端自身超时没生效」的挂死场景，
+#: 超时由任务体落 failed + 中文原因，绝不留永远「进行中」的行。
+_PROFILE_JOB_DEADLINE_S = 25 * 60
 
 
 def _job_error_message(exc: Exception) -> str:
@@ -124,12 +129,15 @@ async def _run_profile_job(
         user_id,
     )
     try:
-        result = await generate_profile(
-            resume_id,
-            text,
-            file_name=str(meta.get("file_name") or ""),
-            captured_at=str(meta.get("created_at") or ""),
-            client=client,
+        result = await asyncio.wait_for(
+            generate_profile(
+                resume_id,
+                text,
+                file_name=str(meta.get("file_name") or ""),
+                captured_at=str(meta.get("created_at") or ""),
+                client=client,
+            ),
+            timeout=_PROFILE_JOB_DEADLINE_S,
         )
         repository.finish_profile_job(job_id, result.model_dump_json(), user_id=user_id)
         logger.info(
@@ -138,6 +146,11 @@ async def _run_profile_job(
             resume_id,
             int((time.perf_counter() - started) * 1000),
         )
+    except TimeoutError:
+        repository.fail_profile_job(
+            job_id, "画像生成超时，请重新生成（稍后重试通常即可）", user_id=user_id
+        )
+        logger.warning("profile_job.timeout job_id=%s resume_id=%s", job_id, resume_id)
     except Exception as exc:  # noqa: BLE001 - 任何失败都要落库可见，见 _job_error_message
         repository.fail_profile_job(job_id, _job_error_message(exc), user_id=user_id)
         if isinstance(exc, AppError):
@@ -172,22 +185,32 @@ async def create_profile_async(resume_id: str, user: CurrentUser) -> ProfileJobS
     stats = repository.get_document_stats(resume_id) or {}
     client = user_ai.client_for(user, "light")
 
-    job_id = uuid.uuid4().hex
-    repository.insert_profile_job(
-        job_id,
-        resume_id,
-        file_name=str(stats.get("file_name") or meta.get("file_name") or ""),
-        chars=int(stats.get("chars") or 0),
-        sections=int(stats.get("sections") or 0),
-    )
-    # Task 会拷贝请求上下文，但任务体里仍显式 set_current_user_id 兜底（仓储层写状态用）。
-    task = asyncio.create_task(
-        _run_profile_job(job_id, resume_id, text, meta, client, user["id"])
-    )
-    _PENDING_JOBS.add(task)
-    task.add_done_callback(_PENDING_JOBS.discard)
-    logger.info("profile_job.accepted job_id=%s resume_id=%s", job_id, resume_id)
-    return ProfileJobStarted(job_id=job_id)
+    # r42 幂等：同一简历已有在途任务时直接复用，不产生重复任务（部分唯一索引兜并发）。
+    repository.expire_stale_profile_jobs(_PROFILE_JOB_STALE_SECONDS)
+    existing = repository.find_running_profile_job(resume_id)
+    if existing is not None:
+        return ProfileJobStarted(job_id=str(existing["job_id"]))
+
+    file_name = str(stats.get("file_name") or meta.get("file_name") or "")
+    chars = int(stats.get("chars") or 0)
+    sections = int(stats.get("sections") or 0)
+    for _attempt in range(2):
+        job_id = uuid.uuid4().hex
+        if repository.insert_profile_job(job_id, resume_id, file_name=file_name,
+                                         chars=chars, sections=sections):
+            # Task 会拷贝请求上下文，但任务体里仍显式 set_current_user_id 兜底（仓储层写状态用）。
+            task = asyncio.create_task(
+                _run_profile_job(job_id, resume_id, text, meta, client, user["id"])
+            )
+            _PENDING_JOBS.add(task)
+            task.add_done_callback(_PENDING_JOBS.discard)
+            logger.info("profile_job.accepted job_id=%s resume_id=%s", job_id, resume_id)
+            return ProfileJobStarted(job_id=job_id)
+        # 撞唯一约束：并发受理复用同一任务；旧任务刚终态则换 id 再试一次。
+        existing = repository.find_running_profile_job(resume_id)
+        if existing is not None:
+            return ProfileJobStarted(job_id=str(existing["job_id"]))
+    raise AppError(INTERNAL_ERROR, "画像任务受理冲突，请稍后重试", status=500, retryable=True)
 
 
 def _job_status_of(row: dict[str, Any]) -> ProfileJobStatus:

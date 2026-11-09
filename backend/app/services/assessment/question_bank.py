@@ -7,8 +7,8 @@
 - `_usable()` 只有这一份（`exam.py` 不再定义同名副本）：缺 id / kind / prompt、客观题无答案
   或无选项的条目一律不入库、也不出卷。`tests/test_engineering_gates.py::
   test_single_usable_and_structure_gate` 反向钉住「只此一份」。
-- 导入幂等由 `repository.insert_question()` 的 `ON CONFLICT(id) DO NOTHING` 兑现：重复导入
-  既不新增也不覆盖既有行（标签回填只在首次导入那一刻生效，AC-1）。
+- 导入幂等由 `repository.insert_questions()`（r43 批量版；单条版 `insert_question()` 同 SQL）的
+  `ON CONFLICT(id) DO NOTHING` 兑现：重复导入既不新增也不覆盖既有行（标签回填只在首次导入那一刻生效，AC-1）。
 - **r11 起每次启动都导入**（`ensure_seeded()`）：旧实现「仅空库导入」会让存量 `app.core.db`
   （含 r10 的 `skillcoach-data` 卷）永远拿不到新增的 180 题。幂等由主键 + `DO NOTHING` 保证，
   重复启动恒 0 新增 —— 这仍满足 r6 AC-1「重复导入不新增、既有行不被覆盖」。
@@ -104,12 +104,12 @@ def _row_of(question: dict[str, Any]) -> dict[str, Any]:
 
 
 def import_seed(path: Path = SEED_PATH) -> int:
-    """幂等导入种子：返回本次**新增**行数（重复导入恒 `0`，既有行绝不覆盖，AC-1）。"""
-    inserted = 0
-    for question in load_seed(path):
-        if repository.insert_question(_row_of(question)):
-            inserted += 1
-    return inserted
+    """幂等导入种子：返回本次**新增**行数（重复导入恒 `0`，既有行绝不覆盖，AC-1）。
+
+    r43 起改走 `repository.insert_questions()` 的单事务批量写入（同 SQL、同语义）：
+    1088 条逐条开连接要 11.26s，批量后亚秒级；幂等仍由 `ON CONFLICT(id) DO NOTHING` 兑现。
+    """
+    return repository.insert_questions([_row_of(question) for question in load_seed(path)])
 
 
 def refresh_from_seed(path: Path = SEED_PATH) -> int:

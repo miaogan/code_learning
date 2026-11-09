@@ -21,16 +21,34 @@ function isPositiveCount(count: number | null | undefined): count is number {
 }
 
 /**
- * 熟练过滤的**规则说明**（r6 D-7 / D-9 收口，2026-11-02 · r19）：解释「为什么被过滤、怎样回流」，
- * 以及「为什么卷面里仍会出现已熟练的题」（兜底会为保持卷面结构把个别熟练题放回）。
- *
- * 只与 `filteredNotice` 同一开关：`N <= 0` / 缺失时返回 `null`，调用方不挂载节点——
- * L6 全库兜底时不能凭空解释一条不存在的过滤事实。
- *
- * **不写具体阈值**（30 天 / 答对 2 次 / 近 3 卷只住在后端 `config.Settings`）：前端硬编码数字
- * 会在阈值调整后变成假话；这里只描述规则方向，数字以服务端行为为准。
+ * 兜底回流的单句事实（r43）：`reintroduced_count <= 0` / 缺失时返回 `null`。
+ * 与 `filteredNotice` 拼在**同一行**里复显，不单独挂标签（r6 三条遗留合并成一处说明）。
  */
-export function proficiencyRuleHint(count: number | null | undefined): string | null {
+export function backfillNotice(count: number | null | undefined): string | null {
   if (!isPositiveCount(count)) return null
-  return '近期多次答对的题会暂时跳过，不再算作熟练后自动回流；个别熟练题可能因卷面结构重新出现'
+  return `另有 ${count} 道因保持卷面结构被重新纳入`
+}
+
+/**
+ * 熟练过滤的**规则说明**（r6 D-7 / D-9 收口，2026-11-02 · r19；r43 合并兜底回流计数）。
+ * 解释「题怎么才会回流」「为什么卷面里仍会出现已熟练的题」，与兜底回流数合并成**一处**说明
+ * —— 不再拆成三个分散标签（规则 / 复显 / L2 回流）。
+ *
+ * 开关：`filtered_count` 与 `reintroduced_count` 都 <= 0 / 缺失时返回 `null`，调用方不挂载节点。
+ * 两者各自为 0 时也有真实场景：L2 把全部熟练题放回卷面（净过滤 0，但确实有回流）。
+ *
+ * 阈值措辞带「默认」：30 天 / 答对 2 次实际住在后端 `config.Settings`，可由环境变量覆盖；
+ * 前端不据此做判定，只做说明，默认值漂移时文案仍以「默认」限定。
+ */
+export function proficiencyRuleHint(
+  count: number | null | undefined,
+  reintroduced: number | null | undefined = 0,
+): string | null {
+  const backfilled = isPositiveCount(reintroduced) ? reintroduced : 0
+  if (!isPositiveCount(count) && backfilled === 0) return null
+  const rule =
+    '默认 30 天内答对 2 次及以上、且最近一次答对才计为熟练；超过 30 天或最近一次答错会自动回流到题池'
+  return backfilled > 0
+    ? `${rule}。${backfillNotice(backfilled)}`
+    : rule
 }

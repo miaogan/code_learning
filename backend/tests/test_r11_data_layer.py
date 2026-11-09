@@ -223,6 +223,39 @@ def test_insert_question_is_idempotent(tmp_db: Path) -> None:
     assert rows[0]["prompt"] == base["prompt"], "ON CONFLICT DO NOTHING 不得覆盖既有行"
 
 
+def test_insert_questions_batch_matches_single_row_semantics(tmp_db: Path) -> None:
+    """r43 批量导入：新增数按「真正插进去的行」计，重复部分恒 0，空批返回 0。
+
+    与逐条 `insert_question()` 同 SQL 同语义（`ON CONFLICT(id) DO NOTHING`）：
+    批量只是少开 1088 次连接，不得改变幂等口径（AC-1 / AC-5 不回退）。
+    """
+    base = {
+        "direction": "后端",
+        "kind": "single",
+        "difficulty": "basic",
+        "essentiality": "must_know",
+        "prompt": "Redis 的 RDB 与 AOF 各解决什么问题？",
+        "options": [{"key": "A", "text": "持久化"}, {"key": "B", "text": "分片"}],
+        "answer": ["A"],
+    }
+    batch = [{**base, "id": f"batch-q{index}"} for index in range(3)]
+
+    assert repository.insert_questions([]) == 0
+    assert repository.insert_questions(batch) == 3
+    assert repository.count_questions() == 3
+
+    # 全量重复：0 新增，行数不变
+    assert repository.insert_questions(batch) == 0
+    assert repository.count_questions() == 3
+
+    # 混合批：只计新增的那一条
+    mixed = [batch[0], {**base, "id": "batch-q9"}]
+    assert repository.insert_questions(mixed) == 1
+    assert repository.count_questions() == 4
+    rows = {row["id"]: row for row in repository.list_questions()}
+    assert rows["batch-q0"]["prompt"] == base["prompt"], "既有行不得被覆盖"
+
+
 def test_fill_empty_columns_never_overwrites(tmp_db: Path) -> None:
     """只补空单元格：非空值原样保留，缺的那列才被种子填上。"""
     repository.insert_question(

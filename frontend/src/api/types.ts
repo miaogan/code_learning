@@ -21,6 +21,10 @@ export interface ResumeMeta {
   file_name: string
   chars: number
   sections: number
+  /** r41：来源类型；存量后端默认返回 `pdf`，旧客户端按 `pdf` 处理即可。 */
+  source_type: 'pdf' | 'docx' | 'txt' | 'image'
+  /** 仅 `source_type=image` 时大于 1（同一次上传的多张照片拼成一份简历）。 */
+  image_count: number
 }
 
 /**
@@ -239,6 +243,12 @@ export interface ExamRun {
    * 旧 payload 缺该字段时按 0 静默处理（页面不挂载任何断言性文案）。
    */
   filtered_count: number
+  /**
+   * r43：本卷里**已熟练但被兜底放回**的题数（= `|熟练 ∩ 本卷|`）。
+   * 与 `filtered_count` 互补，用于「另有 N 道因保持卷面结构被重新纳入」；
+   * 旧 payload 缺该字段时按 0 静默处理。
+   */
+  reintroduced_count: number
 }
 
 export interface ExamAnswers {
@@ -492,6 +502,27 @@ export interface ProfileJobStatus {
   status: 'running' | 'completed' | 'failed'
   error: string
   result: ProfileWithMerge | null
+  created_at: string
+}
+
+/* ------------------------------------------------------------------ *
+ * r42 契约 · 图片识别异步任务（后台识别 + 前端轮询，与画像任务同构）
+ * ------------------------------------------------------------------ */
+
+/** `POST /api/resumes/images/async` 的响应：识别任务已受理，凭 `job_id` 轮询。 */
+export interface ResumeJobStarted {
+  job_id: string
+  status: 'running'
+}
+
+/** 图片识别任务状态：`completed` 时 `result` 是已入库简历的 `ResumeMeta`。 */
+export interface ResumeJobStatus {
+  job_id: string
+  file_name: string
+  image_count: number
+  status: 'running' | 'completed' | 'failed'
+  error: string
+  result: ResumeMeta | null
   created_at: string
 }
 

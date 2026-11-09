@@ -18,6 +18,8 @@ from app.core.errors import (
 )
 
 SUPPORTED_SUFFIXES = {".pdf", ".docx", ".txt"}
+#: r41：图片后缀单独一份（图片走视觉抽取端点，不进 PDF/DOCX 解析分支）。
+IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
 SECTION_KEYWORDS = (
     "教育",
     "工作经历",
@@ -45,18 +47,40 @@ def max_upload_bytes() -> int:
     return get_settings().max_upload_mb * 1024 * 1024
 
 
+def ensure_upload_size(size: int, *, message: str) -> None:
+    """体积上限的**唯一判断点**（r43）：文档 / 单张图片 / 图片合计都走这里。
+
+    `message` 由调用方给（三种超限文案不同），其中 `{mb}` 占位符在这里替换成配置值，
+    避免路由层各自拼阈值文案、配置调整后出现两份不同数字。
+    """
+    limit = max_upload_bytes()
+    if size > limit:
+        raise AppError(FILE_TOO_LARGE, message.format(mb=limit // (1024 * 1024)), status=413)
+
+
+def is_image_name(file_name: str) -> bool:
+    """后缀是否为图片（仅用于给旧文档端点一条明确指引，不做真实格式判断）。"""
+    return _suffix_of(file_name) in IMAGE_SUFFIXES
+
+
+def build_parsed(text: str) -> ParsedResume:
+    """把已抽取正文包装成 `ParsedResume`：图片入口复用同一套字数 / 章节统计口径。"""
+    return ParsedResume(text=text, chars=_count_chars(text), sections=_count_sections(text))
+
+
 def parse_resume(file_name: str, raw: bytes) -> ParsedResume:
+    if is_image_name(file_name):
+        raise AppError(
+            UNSUPPORTED_TYPE,
+            "图片简历请用「拍照 / 相册上传」入口（支持 JPG / PNG / WebP）",
+            status=415,
+        )
     suffix = _suffix_of(file_name)
     if suffix not in SUPPORTED_SUFFIXES:
         raise AppError(UNSUPPORTED_TYPE, "仅支持 PDF / DOCX / TXT 文件", status=415)
     if not raw:
         raise AppError(EMPTY_FILE, "文件内容为空，请换一份", status=400)
-    if len(raw) > max_upload_bytes():
-        raise AppError(
-            FILE_TOO_LARGE,
-            f"文件超过 {get_settings().max_upload_mb}MB，请压缩或分卷",
-            status=413,
-        )
+    ensure_upload_size(len(raw), message="文件超过 {mb}MB，请压缩或分卷")
 
     text = _extract(suffix, raw)
     if not text.strip():
@@ -65,7 +89,7 @@ def parse_resume(file_name: str, raw: bytes) -> ParsedResume:
             "没有抽取到正文，请上传含文本层的 PDF，或改用 TXT / DOCX",
             status=400,
         )
-    return ParsedResume(text=text, chars=_count_chars(text), sections=_count_sections(text))
+    return build_parsed(text)
 
 
 def _suffix_of(file_name: str) -> str:

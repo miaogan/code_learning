@@ -149,9 +149,13 @@ def test_latest_profile_job_and_empty_404(client: TestClient) -> None:
 
 
 def test_stale_running_job_marked_failed_on_read(client: TestClient) -> None:
-    """r32 僵尸任务：服务重启后无人推进的 running 行，读一次就拿到 failed 终态。"""
+    """r32 僵尸任务：服务重启后无人推进的 running 行，读一次就拿到 failed 终态。
+
+    r42 把阈值从 10 分钟上调到 30 分钟（统一 AI 超时 600s + 重试一次，合法耗时可到 20 分钟）；
+    「陈旧行会被收敛」的语义不变，只改判定时长。
+    """
     repository.insert_profile_job("job-zombie", "res-1", "resume.txt", 100, 3)
-    stale_at = (datetime.now(UTC) - timedelta(seconds=11 * 60)).isoformat()
+    stale_at = (datetime.now(UTC) - timedelta(seconds=31 * 60)).isoformat()
     with connection() as conn:
         conn.execute(
             "UPDATE profile_jobs SET updated_at = ? WHERE id = 'job-zombie'", (stale_at,)
