@@ -414,7 +414,7 @@ def test_contract_mirror_filtered_count() -> None:
 
 
 def test_frontend_filtered_notice_single_source() -> None:
-    """一行文案的唯一出处 `filteredNotice()`，ExamPage 不自行解释 `filtered_count`。"""
+    """一行文案的唯一出处 `filteredNotice()`：ExamPage 与 PracticePage 都不自行解释 `filtered_count`。"""
     notice = FRONTEND / "src/lib/examNotice.ts"
     assert notice.is_file(), "缺 src/lib/examNotice.ts（AC-12 文案唯一出处）"
     source = notice.read_text(encoding="utf-8")
@@ -423,6 +423,14 @@ def test_frontend_filtered_notice_single_source() -> None:
     assert "filteredNotice(run.filtered_count" in page, "ExamPage 未把 run.filtered_count 交给 filteredNotice"
     assert "sc-meta-line" in page, "ExamPage 未复用既有 .sc-meta-line"
     assert not re.search(r"filtered_count\s*[<>]=?\s*[\d-]", page), "ExamPage 内自行比较 filtered_count（语义须唯一）"
+    # r52：练习侧同样只解释不重算（服务端给 filtered_count，前端一行文案）。
+    practice_page = (FRONTEND / "src/pages/PracticePage.tsx").read_text(encoding="utf-8")
+    assert "filteredNotice(paper.filtered_count" in practice_page, (
+        "PracticePage 未把 paper.filtered_count 交给 filteredNotice"
+    )
+    assert not re.search(r"filtered_count\s*[<>]=?\s*[\d-]", practice_page), (
+        "PracticePage 内自行比较 filtered_count（语义须唯一）"
+    )
 
 
 def test_style_baseline_append_only() -> None:

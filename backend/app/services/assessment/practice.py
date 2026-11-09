@@ -18,6 +18,11 @@
 r50 二级方向：与笔试 r46 同口径 —— **聚焦优先、不足补位**。先只在子方向窄池里取题，
 不足 `limit` 时用**同方向**宽池补齐并如实计数；闭集外脏值静默忽略（不造第二套 422）。
 不聚焦时（`sub_direction=""`）整条主路径逐字节等价，既有 B-1..B-10 口径零改动。
+
+r52 熟练度过滤：组卷与 `/stats.hit` 共用 `proficiency.proficient_ids()`（与笔试同一份
+「30 天内答对 2 次且最近一次答对」判定），默认跳过熟练题并把条数写进 `filtered_count`；
+超 30 天或最近答错自动回流，零新增阈值。`unseen` / `wrong` 语义不变 —— 熟练题本就
+不会命中这两个范围（有作答记录 / 最近一次答对）。
 """
 
 from __future__ import annotations
@@ -29,7 +34,7 @@ from uuid import uuid4
 
 from app.core import repository
 from app.core.errors import NOT_FOUND, VALIDATION_ERROR, AppError
-from app.services.assessment import exam, question_bank
+from app.services.assessment import exam, proficiency, question_bank
 from app.services.report import rules
 
 #: 练习会话的 run_id 前缀：作答事件的 `run_id = PRACTICE_RUN_PREFIX + session_id`。
@@ -48,6 +53,8 @@ _NOTICE_FEW = "该组合下只有 {count} 道，已全部给出"
 #: r50 子方向补位文案（只在发生补位时出现，不污染 B-1..B-10 的五态 notice）。
 _NOTICE_SUB_EMPTY = "该二级方向暂无可用题目，已改按同方向出题"
 _NOTICE_SUB_FEW = "该二级方向只有 {focus} 道，已补充 {backfill} 道同方向题"
+#: r52 熟练题过滤文案：该组合下的题全部已熟练掌握（与笔试共用 30 天 / 答对 2 次口径）。
+_NOTICE_PROFICIENT_EMPTY = "该组合下的题目都已熟练掌握，可切到「只看错题」回顾，或换个筛选继续练"
 
 #: 判分侧中文错误文案（沿用错误矩阵，**不新增错误码**）。
 _NEED_SELECTION = "先选一个答案，再提交"
@@ -239,13 +246,23 @@ def _compose_paper(
     - `notice` 五态：命中不足给「只有 N 道」、命中 0 给放宽建议、题库空给「未就绪」（AC-12）。
     - r50：指定 `sub_direction` 时先取窄池，不足 `limit` 再用**同方向**宽池补齐；补位题数写进
       `sub_direction_backfill`、`hit_count` 仍是窄池命中数（与 `/stats` 同源），notice 如实说明。
+    - r52：熟练题（`proficiency.proficient_ids()`，与笔试同一份判定）默认不进题单，
+      `filtered_count` 是本次真正被跳过的熟练题数（0 时前端不解释，与前端口径一致）。
     """
     session_id = SESSION_PREFIX + uuid4().hex[:8]
     pool = question_bank.practice_pool()
     if not pool:
-        return {"session_id": session_id, "questions": [], "hit_count": 0, "notice": NOTICE_BANK_EMPTY}
+        return {
+            "session_id": session_id,
+            "questions": [],
+            "hit_count": 0,
+            "notice": NOTICE_BANK_EMPTY,
+            "filtered_count": 0,
+        }
 
     index = attempt_index()
+    #: 熟练题默认不进练习：与笔试同一份判定（阈值只在 config），不在这里写第二套口径。
+    proficient = proficiency.proficient_ids()
     effective_direction, focus_sub = _resolve_focus(direction, sub_direction)
     #: 聚焦时宽池必须锁在子方向的父方向上，否则补位会跨方向取题（r46 同口径）。
     wide_direction = effective_direction if focus_sub else direction
@@ -258,19 +275,24 @@ def _compose_paper(
         scope=scope,
         index=index,
     )
+    wide_available = [
+        question for question in wide if str(question.get("id") or "") not in proficient
+    ]
 
     if not focus_sub:
-        # r50 之前的主路径：不聚焦时逐字节等价（无新增键、无补位、无文案改写）。
-        hit_count = len(wide)
+        # 主路径（r50 之前逐字节等价 + r52 熟练题过滤）。
+        hit_count = len(wide_available)
+        filtered_count = len(wide) - hit_count
         if hit_count == 0:
             return {
                 "session_id": session_id,
                 "questions": [],
                 "hit_count": 0,
-                "notice": NOTICE_EMPTY,
+                "notice": _NOTICE_PROFICIENT_EMPTY if filtered_count else NOTICE_EMPTY,
+                "filtered_count": filtered_count,
             }
         size = hit_count if not limit else min(int(limit), hit_count)
-        ordered = _ordered(wide)
+        ordered = _ordered(wide_available)
         picked = ordered if size >= hit_count else random.sample(ordered, size)
         notice = _NOTICE_FEW.format(count=hit_count) if limit and hit_count < int(limit) else ""
         return {
@@ -278,6 +300,7 @@ def _compose_paper(
             "questions": [_paper_question(question) for question in picked],
             "hit_count": hit_count,
             "notice": notice,
+            "filtered_count": filtered_count,
         }
 
     # --- r50：子方向聚焦优先、不足补位（练习无结构闸门，只按题量判断） ------------------
@@ -291,24 +314,35 @@ def _compose_paper(
         index=index,
         sub_direction=focus_sub,
     )
-    hit_count = len(focus)
-    ordered_focus = _ordered(focus)
+    focus_ids = {str(question.get("id") or "") for question in focus}
+    available_focus = [
+        question for question in focus if str(question.get("id") or "") not in proficient
+    ]
+    hit_count = len(available_focus)
+    filtered_count = len(focus) - hit_count
+    ordered_focus = _ordered(available_focus)
+    backfill = 0
     if not limit:
         # 「全部命中」语义：只出该子方向的题，不补位。
         picked = list(ordered_focus)
-        backfill = 0
     else:
         size = min(int(limit), hit_count)
         picked = (
             list(ordered_focus) if size >= hit_count else random.sample(ordered_focus, size)
         )
-        backfill = 0
         if len(picked) < int(limit):
-            focus_ids = {str(question.get("id") or "") for question in focus}
+            # 补位池同样跳过熟练题，并把宽池里因此少掉的题如实计入过滤数（窄池已数过的不重复）。
+            filtered_count += sum(
+                1
+                for question in wide
+                if str(question.get("id") or "") not in focus_ids
+                and str(question.get("id") or "") in proficient
+            )
             rest = [
                 question
                 for question in _ordered(wide)
                 if str(question.get("id") or "") not in focus_ids
+                and str(question.get("id") or "") not in proficient
             ]
             need = min(int(limit) - len(picked), len(rest))
             if need > 0:
@@ -321,7 +355,8 @@ def _compose_paper(
             "session_id": session_id,
             "questions": [],
             "hit_count": hit_count,
-            "notice": NOTICE_EMPTY,
+            "notice": _NOTICE_PROFICIENT_EMPTY if filtered_count else NOTICE_EMPTY,
+            "filtered_count": filtered_count,
             "sub_direction": focus_sub,
             "sub_direction_backfill": 0,
         }
@@ -340,6 +375,7 @@ def _compose_paper(
         "questions": [_paper_question(question) for question in picked],
         "hit_count": hit_count,
         "notice": notice,
+        "filtered_count": filtered_count,
         "sub_direction": focus_sub,
         "sub_direction_backfill": backfill,
     }
@@ -457,22 +493,24 @@ def stats(
     - `wrong_total` 只数**仍可用且客观**的题（错题本与该数字必须一致，否则前端两个数字打架）；
     - r50：`sub_direction` 与组卷走同一个 `_resolve_focus()`，`hit` 恒等于题单的 `hit_count`
       （两者都是窄池命中数，补位题不计入命中）。
+    - r52：`hit` 与题单同口径排除熟练题（同一份 `proficiency.proficient_ids()`）；`total` /
+      `practiced` / `wrong_total` 仍是全库事实，不因熟练过滤缩水。
     """
     pool = question_bank.practice_pool()
     index = attempt_index()
+    proficient = proficiency.proficient_ids()
     effective_direction, focus_sub = _resolve_focus(direction, sub_direction)
-    hit = len(
-        _filtered(
-            pool,
-            language=language,
-            direction=effective_direction,
-            difficulty=difficulty,
-            essentiality=essentiality,
-            scope=scope,
-            index=index,
-            sub_direction=focus_sub,
-        )
+    focused = _filtered(
+        pool,
+        language=language,
+        direction=effective_direction,
+        difficulty=difficulty,
+        essentiality=essentiality,
+        scope=scope,
+        index=index,
+        sub_direction=focus_sub,
     )
+    hit = sum(1 for question in focused if str(question.get("id") or "") not in proficient)
     wrong_total = sum(
         1
         for question in pool

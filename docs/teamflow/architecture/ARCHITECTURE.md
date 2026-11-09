@@ -211,10 +211,10 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
 | 数据源 | 共享 | 两者都读 `questions` 表，唯一导入源是 `backend/app/seed/questions.json`（幂等导入） |
 | 判分 | 共享 | 全库唯一客观题判分函数 `exam.grade_objective()`（集合相等），练习只调用不重写 |
 | 作答记录 | 共享 | 都写 `question_attempts`，`source` 列区分 `exam` / `practice`（`run_id=practice:<session>` 命名空间） |
-| 熟练度 | 共享 | 阈值只在 `config.py`；练习答对同样计入滑动窗口（「练熟即不再考」是有意口径） |
+| 熟练度 | 共享 | 阈值只在 `config.py`；练习答对同样计入滑动窗口，练习与笔试**同一份**熟练题判定（默认跳过、超期或答错回流，r52） |
 | 取题池 | 刻意不同 | 练习只收客观题 `kind ∈ {single, multiple, judge}`；笔试还收 `text` |
 | 卷面结构 | 刻意不同 | 笔试受 10–12 题 / 客观 ≥8 / 挑战 ≤20% / 方向 ≥2 的结构闸门与 L1–L6 阶梯；练习无卷面闸门，只有筛选与题量 |
-| 抽样 | 刻意不同 | 笔试从「可考池 − 熟练 − 近 3 卷」抽题；练习按用户筛选直接从池内取，可重复练同一题 |
+| 抽样 | 刻意不同 | 笔试从「可考池 − 熟练 − 近 3 卷」抽题；练习按用户筛选从池内取并默认排除熟练题，可重复练同一道未熟练的题（r52） |
 
 理由：两者需要同一套「题面 / 答案 / 判分 / 熟练度」事实，但「卷面必须像一场考试」是笔试独有的产品约束；把结构闸门搬进练习会让「按语言筛 20 道」不可达。
 
@@ -339,12 +339,12 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
 | CI 双 job | `.github/workflows/ci.yml` |
 | 本地工程验证（r43 补记） | `pypdf` 6.21.4 / `python-docx` / `ruff` 均已装，真实 PDF / DOCX 解析与 `python -m ruff check app tests` 可在本机实跑（r42 起纳入每次交付门禁） |
 | AGENTS.md + memory.md + README | 仓库根与 `docs/teamflow/` |
+| CI 实跑（r51 核实更正） | GitHub Actions 共 31 次运行；最近 `CI #31`（commit `a54e4be`，`feat/dev-skill-coach`）成功、耗时 1m6s；#21–#26 曾红灯、后续修复，#27–#31 连续通过。证据：[Actions](https://github.com/miaogan/code_learning/actions) |
 
 ### 7.2 未落盘（明确未完成，不计入「已完成」）
 
 | 项 | 现状 | 归属 |
 | --- | --- | --- |
-| CI 实跑 | workflow 已写，**未在 GitHub 上真跑过** | 验收前 |
 | iOS 真机 HEIC 相册转码行为 | r42 已实测桌面 Chromium 与后端字节嗅探；iOS Safari 无真机，仅按公开行为推断（见 `docs/teamflow/20261108-r42-task-recovery-heic/QA-REPORT.md` §3.2） | 有真机时补测 |
 
 ---

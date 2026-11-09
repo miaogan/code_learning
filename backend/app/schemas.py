@@ -430,6 +430,8 @@ class PracticePaper(BaseModel):
     sub_direction: str = ""
     #: r50：本份题单里**不属于所选二级方向**、因聚焦池题量不足而补齐的题数（0 = 全命中）。
     sub_direction_backfill: int = 0
+    #: r52：本次被熟练度过滤跳过的题数（与笔试同一份 30 天 / 答对 2 次判定；0 = 未过滤）。
+    filtered_count: int = 0
 
 
 class PracticeAnswerRequest(BaseModel):

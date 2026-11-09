@@ -472,7 +472,13 @@ def test_sub_direction_dirty_and_conflicting_values_are_ignored(tmp_db: Any) -> 
     bare = practice.build_paper(limit=0)
     dirty = practice.build_paper(sub_direction="不是子方向", limit=0)
     conflict = practice.build_paper(direction="前端", sub_direction="python", limit=0)
-    assert set(dirty) == set(bare) == {"session_id", "questions", "hit_count", "notice"}
+    assert set(dirty) == set(bare) == {
+        "session_id",
+        "questions",
+        "hit_count",
+        "notice",
+        "filtered_count",
+    }
     assert _ids(dirty) == _ids(bare)
     assert _ids(conflict) == set(), "冲突时 direction 仍是硬过滤"
 
@@ -488,3 +494,89 @@ def test_sub_direction_auto_locks_parent_when_direction_is_all(tmp_db: Any) -> N
     assert not any(item.startswith("fe-") for item in ids)
     assert paper["sub_direction"] == "python"
     assert paper["sub_direction_backfill"] == 4
+
+
+# --- r52：熟练题默认不进练习 -------------------------------------------------
+
+
+def test_paper_skips_proficient_and_reports_filtered_count(tmp_db: Any) -> None:
+    """r52-1：答对 2 次（30 天内、最近一次答对）→ 该题不再进练习题单，并计入 `filtered_count`。"""
+    _seed(_by("q", 5))
+    repository.insert_attempts(
+        [
+            _attempt("q-0", correct=True, minutes_ago=30),
+            _attempt("q-0", correct=True, minutes_ago=20),
+        ]
+    )
+    assert "q-0" in proficiency.proficient_ids(), "前置：2 次答对应判为熟练"
+
+    paper = practice.build_paper(limit=0)
+    assert "q-0" not in _ids(paper), "熟练题必须默认跳过"
+    assert paper["hit_count"] == 4
+    assert paper["filtered_count"] == 1
+    # 「全部」= 除熟练题外的全部；stats.hit 与题单同源（前端两个数字不能打架）。
+    assert practice.stats()["hit"] == 4
+    assert practice.stats()["total"] == 5, "total 仍是全库可用练习题数，不因熟练过滤缩水"
+
+
+def test_proficient_question_returns_when_stale_or_wrong(tmp_db: Any) -> None:
+    """r52-2：超 30 天或最近一次答错 → 熟练状态回流，题目重新进入题单。"""
+    _seed(_by("q", 2))
+    # q-0：两次答对都在 30 天窗口外 → 不是熟练。
+    repository.insert_attempts(
+        [
+            _attempt("q-0", correct=True, minutes_ago=40 * 24 * 60),
+            _attempt("q-0", correct=True, minutes_ago=35 * 24 * 60),
+        ]
+    )
+    # q-1：两次答对在窗口内，但最近一次答错 → 回流。
+    repository.insert_attempts(
+        [
+            _attempt("q-1", correct=True, minutes_ago=60),
+            _attempt("q-1", correct=True, minutes_ago=50),
+            _attempt("q-1", correct=False, minutes_ago=10),
+        ]
+    )
+    assert proficiency.proficient_ids() == set(), "前置：两道题都应回流"
+
+    paper = practice.build_paper(limit=0)
+    assert _ids(paper) == {"q-0", "q-1"}
+    assert paper["filtered_count"] == 0
+
+
+def test_all_proficient_returns_empty_paper_with_notice(tmp_db: Any) -> None:
+    """r52-3：全库熟练 → 空题单 + 专用中文提示（不 500、不误报「放宽难度」）。"""
+    _seed(_by("q", 2))
+    repository.insert_attempts(
+        [
+            _attempt("q-0", correct=True, minutes_ago=30),
+            _attempt("q-0", correct=True, minutes_ago=20),
+            _attempt("q-1", correct=True, minutes_ago=30),
+            _attempt("q-1", correct=True, minutes_ago=20),
+        ]
+    )
+    paper = practice.build_paper(limit=0)
+    assert paper["questions"] == [] and paper["hit_count"] == 0
+    assert paper["filtered_count"] == 2
+    assert paper["notice"] == practice._NOTICE_PROFICIENT_EMPTY
+    assert practice.stats()["hit"] == 0
+
+
+def test_focus_backfill_skips_proficient_and_counts_honestly(tmp_db: Any) -> None:
+    """r52-4：聚焦池全熟练 → 从同方向宽池补位，过滤数包含窄池与宽池两段。"""
+    _seed(_by("py", 2, sub_direction="python"))
+    _seed(_by("jv", 3, sub_direction="java"))
+    repository.insert_attempts(
+        [
+            _attempt("py-0", correct=True, minutes_ago=30),
+            _attempt("py-0", correct=True, minutes_ago=20),
+            _attempt("py-1", correct=True, minutes_ago=30),
+            _attempt("py-1", correct=True, minutes_ago=20),
+        ]
+    )
+    paper = practice.build_paper(direction="后端", sub_direction="python", limit=10)
+    assert _ids(paper) == {"jv-0", "jv-1", "jv-2"}, "窄池全熟练时应从同方向宽池补位"
+    assert paper["hit_count"] == 0
+    assert paper["sub_direction_backfill"] == 3
+    assert paper["notice"] == practice._NOTICE_SUB_EMPTY
+    assert paper["filtered_count"] == 2, "过滤数应等于窄池被跳过的熟练题数"

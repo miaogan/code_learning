@@ -658,6 +658,8 @@ export interface PracticePaper {
   sub_direction: string
   /** r50：聚焦池不足题量时补齐的同方向题数（0 = 全部命中）。 */
   sub_direction_backfill: number
+  /** r52：本次被熟练度过滤跳过的题数（与笔试同一份 30 天 / 答对 2 次判定；0 = 未过滤）。 */
+  filtered_count: number
 }
 
 export interface PracticeAnswerRequest {

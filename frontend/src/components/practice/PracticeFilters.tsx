@@ -133,6 +133,10 @@ export function PracticeFilters({
             value={filters.scope}
             onSelect={(value) => onChange({ scope: value })}
           />
+          {/* r52：范围旁边说清默认行为，免得「全部」被误读成「一道不少」。 */}
+          <p className="sc-meta-line">
+            已熟练掌握的题（30 天内答对 2 次且最近答对）默认跳过，超期或答错会自动回流
+          </p>
         </div>
       </div>
 

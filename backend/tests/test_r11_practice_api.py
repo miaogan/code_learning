@@ -81,8 +81,10 @@ def test_paper_ok_and_no_answer_leak(client: Any) -> None:
         "notice",
         "sub_direction",
         "sub_direction_backfill",
+        "filtered_count",
     }
     assert body["sub_direction"] == "" and body["sub_direction_backfill"] == 0
+    assert body["filtered_count"] == 0, "种子题库无作答记录时不应有熟练过滤"
     assert body["session_id"].startswith("ps_")
     assert body["questions"], "种子题库应有大量可练习题"
     assert len(body["questions"]) == 10, f"limit=10 应给 10 道：{len(body['questions'])}"
@@ -127,6 +129,7 @@ def test_paper_empty_result_is_200(client: Any) -> None:
     body = response.json()
     assert body["questions"] == []
     assert body["hit_count"] == 0
+    assert body["filtered_count"] == 0
     assert body["notice"] == "该组合下没有题目，试试放宽难度或必备度"
 
 

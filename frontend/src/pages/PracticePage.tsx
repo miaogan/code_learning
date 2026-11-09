@@ -37,6 +37,7 @@ import {
   wrongTabLabel,
   type PracticeFiltersState,
 } from '../lib/practice'
+import { filteredNotice } from '../lib/examNotice'
 
 type View = 'setup' | 'running' | 'done'
 type Tab = 'practice' | 'wrong'
@@ -177,6 +178,8 @@ export default function PracticePage() {
 
   const total = paper ? paper.questions.length : 0
   const current = paper && index < paper.questions.length ? paper.questions[index] : null
+  // r52：熟练过滤事实由服务端算（`filtered_count`），前端只解释不重算（与笔试 filteredNotice 同一份）。
+  const filteredHint = paper ? filteredNotice(paper.filtered_count) : null
   const correctCount = Object.values(answers).filter(Boolean).length
   const answeredCount = Object.keys(answers).length
   const wrongTotal = stats ? stats.wrong_total : 0
@@ -358,6 +361,7 @@ export default function PracticePage() {
           </div>
         </div>
         {paper.notice !== '' ? <p className="sc-meta-line">{paper.notice}</p> : null}
+        {filteredHint ? <p className="sc-meta-line">{filteredHint}</p> : null}
         <div
           className="sc-qa-cardwrap"
           tabIndex={-1}
@@ -423,6 +427,7 @@ export default function PracticePage() {
         <>
           {/* r50：补位事实在完成态复显一次，与作答态同一份服务端 notice（不另写一套文案）。 */}
           {paper.notice !== '' ? <p className="sc-meta-line">{paper.notice}</p> : null}
+          {filteredHint ? <p className="sc-meta-line">{filteredHint}</p> : null}
           <PracticeSummary
             total={total}
             correct={correctCount}
@@ -493,7 +498,8 @@ export default function PracticePage() {
       <header className="sc-page-header">
         <h1 className="sc-page-title">在线练习</h1>
         <p className="sc-page-sub">
-          按语言挑题，提交即出对错与解析；判分与笔试同源，答对会累计进熟练度
+          按语言挑题，提交即出对错与解析；已熟练掌握的题默认跳过（30 天内答对 2
+          次且最近答对），判分与笔试同源
         </p>
       </header>
 
