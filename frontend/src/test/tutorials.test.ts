@@ -10,11 +10,15 @@ import {
   chaptersInDirection,
   chaptersInScope,
   filterChaptersByLevel,
+  filterChaptersBySubDirection,
   levelsInChapters,
   parseLearnDirection,
   parseLearnLevel,
+  parseLearnSubDirection,
+  subDirectionsInChapters,
   tutorialHref,
 } from '../lib/tutorials'
+import { subDirectionsOf } from '../lib/questionDirections'
 import type { TutorialLevel } from '../lib/tutorialTypes'
 
 describe('教程内容完整性', () => {
@@ -131,6 +135,77 @@ describe('难度档位', () => {
         hit.forEach((chapter) => {
           expect(chapter.direction).toBe(direction)
           expect(chapter.level).toBe(level)
+        })
+      })
+    })
+  })
+})
+
+describe('子方向', () => {
+  it('每章的子方向都属于该方向的闭集（与后端 rules.SUBDIRECTIONS 同源）', () => {
+    ALL_TUTORIAL_CHAPTERS.forEach((chapter) => {
+      expect(chapter.sub_direction.trim()).not.toBe('')
+      expect(subDirectionsOf(chapter.direction)).toContain(chapter.sub_direction)
+    })
+  })
+
+  it('subDirectionsInChapters 只返回真实存在的子方向，并按闭集顺序排列', () => {
+    expect(subDirectionsInChapters([])).toEqual([])
+    TUTORIAL_DIRECTIONS.forEach((direction) => {
+      const chapters = chaptersInDirection(direction)
+      const subs = subDirectionsInChapters(chapters)
+      expect(subs.length).toBeGreaterThan(0)
+      expect(subs).toEqual(subDirectionsOf(direction).filter((sub) => subs.includes(sub)))
+    })
+  })
+
+  it('filterChaptersBySubDirection：all 原样返回，其余只留该子方向', () => {
+    expect(filterChaptersBySubDirection(ALL_TUTORIAL_CHAPTERS, 'all')).toHaveLength(
+      ALL_TUTORIAL_CHAPTERS.length,
+    )
+    TUTORIAL_DIRECTIONS.forEach((direction) => {
+      const chapters = chaptersInDirection(direction)
+      subDirectionsInChapters(chapters).forEach((sub) => {
+        const hit = filterChaptersBySubDirection(chapters, sub)
+        expect(hit.length).toBeGreaterThan(0)
+        hit.forEach((chapter) => {
+          expect(chapter.direction).toBe(direction)
+          expect(chapter.sub_direction).toBe(sub)
+        })
+      })
+    })
+  })
+
+  it('URL 解析：子方向只在选定方向后有效，越界一律回落 all', () => {
+    expect(parseLearnSubDirection('?direction=前端&sub=react', '前端')).toBe('react')
+    expect(parseLearnSubDirection('?sub=react', '前端')).toBe('react')
+    expect(parseLearnSubDirection('?direction=前端&sub=python', '前端')).toBe('all')
+    expect(parseLearnSubDirection('?direction=前端', '前端')).toBe('all')
+    expect(parseLearnSubDirection('?direction=前端&sub=react', 'all')).toBe('all')
+  })
+
+  it('链接拼接：子方向只在方向已选时写入，默认值不写参数', () => {
+    expect(tutorialHref('前端', 'all', 'react')).toBe(
+      '/learn?direction=%E5%89%8D%E7%AB%AF&sub=react',
+    )
+    expect(tutorialHref('all', 'all', 'react')).toBe('/learn')
+    expect(tutorialHref('前端', '高级', 'react')).toBe(
+      '/learn?direction=%E5%89%8D%E7%AB%AF&level=%E9%AB%98%E7%BA%A7&sub=react',
+    )
+  })
+
+  it('三级组合：方向 + 子方向 + 难度同时生效', () => {
+    TUTORIAL_DIRECTIONS.forEach((direction) => {
+      subDirectionsInChapters(chaptersInDirection(direction)).forEach((sub) => {
+        const scope = filterChaptersBySubDirection(chaptersInDirection(direction), sub)
+        levelsInChapters(scope).forEach((level) => {
+          const hit = filterChaptersByLevel(scope, level)
+          expect(hit.length).toBeGreaterThan(0)
+          hit.forEach((chapter) => {
+            expect(chapter.direction).toBe(direction)
+            expect(chapter.sub_direction).toBe(sub)
+            expect(chapter.level).toBe(level)
+          })
         })
       })
     })

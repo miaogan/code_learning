@@ -26,12 +26,14 @@ VALID_KINDS = ["technical"] * rules.MIN_TECHNICAL_QUESTIONS + ["project"] * (
 #: 首位即挑战题的计划（用于「challenge 父题不给追问」：挑战 1 道 ≤ ceil(9×20%)=2）。
 CHALLENGE_FIRST_KINDS = ["challenge"] + ["technical"] * 5 + ["project"] * 3
 
-#: 四项设定的一组非默认值（同时验证「不写回画像」与「每轮进提示词」）。
+#: 四项设定 + 方向聚焦的一组非默认值（同时验证「不写回画像」与「每轮进提示词」）。
 SETTINGS_VALUES = {
     "target_role": "后端工程师",
     "years_experience": "3-5年",
     "market": "北美",
     "company_size": "初创",
+    "direction": "后端",
+    "sub_direction": "python",
 }
 
 
@@ -187,6 +189,9 @@ def test_create_fills_defaults_when_settings_omitted(
         "years_experience": rules.DEFAULT_EXPERIENCE_BAND,
         "market": rules.DEFAULT_MARKET,
         "company_size": rules.DEFAULT_COMPANY_SIZE,
+        # 未指定方向 = 不限（空串，不占位、不进 focus 的「已聚焦」分支）。
+        "direction": "",
+        "sub_direction": "",
     }
     assert run.settings.model_dump() == expected
     assert _payload_of(run.run_id)["settings"] == expected
@@ -255,6 +260,51 @@ def test_calibration_bands_are_distinct() -> None:
 
     role_text = interview_service.calibration_of(InterviewSettings.model_validate(base))["role"]
     assert "后端工程师" in role_text
+
+
+def test_focus_calibration_covers_three_levels() -> None:
+    """方向聚焦三档（不限 / 只到方向 / 到子方向）口径互不相同，且越界组合被清空。"""
+    base = {
+        "target_role": "后端工程师",
+        "years_experience": rules.DEFAULT_EXPERIENCE_BAND,
+        "market": rules.DEFAULT_MARKET,
+        "company_size": rules.DEFAULT_COMPANY_SIZE,
+    }
+    unset = interview_service.calibration_of(InterviewSettings.model_validate(base))["focus"]
+    direction_only = interview_service.calibration_of(
+        InterviewSettings.model_validate({**base, "direction": "后端"})
+    )["focus"]
+    with_sub = interview_service.calibration_of(
+        InterviewSettings.model_validate({**base, "direction": "前端", "sub_direction": "react"})
+    )["focus"]
+    assert len({unset, direction_only, with_sub}) == 3, "三档 focus 口径必须互不相同"
+    assert "前端" in with_sub and "react" in with_sub
+
+    # 越界方向清空方向；子方向不属于该方向只清子方向（方向本身合法就保留）；
+    # 子方向脱离方向一并清空 —— 任何非法组合都不落进提示词。
+    cases = [
+        (InterviewSettingsPatch(direction="不存在的方向"), "", ""),
+        (InterviewSettingsPatch(direction="前端", sub_direction="python"), "前端", ""),
+        (InterviewSettingsPatch(sub_direction="python"), "", ""),
+    ]
+    for patch, direction, sub_direction in cases:
+        settings = interview_service.fill_settings(patch, None)
+        assert settings.direction == direction, f"{patch!r} 方向归一化不符"
+        assert settings.sub_direction == sub_direction, f"{patch!r} 子方向归一化不符"
+
+
+def test_settings_or_none_rejects_out_of_closure_direction() -> None:
+    """历史 / 报告读路径：越界方向视为脏 payload（None），不得补默认值装成合法。"""
+    base = {
+        "target_role": "后端工程师",
+        "years_experience": "3-5年",
+        "market": "北美",
+        "company_size": "初创",
+    }
+    assert rules.settings_or_none({"settings": {**base, "direction": "不存在的方向"}}) is None
+    assert rules.settings_or_none({"settings": {**base, "direction": "前端", "sub_direction": "python"}}) is None
+    assert rules.settings_or_none({"settings": {**base, "sub_direction": "python"}}) is None
+    assert rules.settings_or_none({"settings": {**base, "direction": "前端", "sub_direction": "react"}}) is not None
 
 
 # --- AC-6：历史窗口带上一答原文；追问继承 kind 与 parent ----------------------

@@ -14,6 +14,7 @@ import { ResumeGate } from '../components/ui/ResumeGate'
 import { RingProgress } from '../components/ui/RingProgress'
 import { backfillNotice, filteredNotice, proficiencyRuleHint } from '../lib/examNotice'
 import { formatElapsed } from '../lib/format'
+import { DIRECTIONS, SUBDIRECTIONS } from '../lib/questionDirections'
 import { useAsync } from '../lib/useAsync'
 import { setFlow } from '../state/flow'
 
@@ -27,17 +28,10 @@ const CREATE_PHASES = ['读取画像方向', '按方向选题组卷', '校验客
 type Stage = 'idle' | 'creating' | 'running' | 'submitting' | 'submitted'
 type View = 'gate' | 'empty' | 'error' | Stage
 
-/** 方向闭集：与后端 `rules.DIRECTIONS` 逐字一致，改动必须同步两处。 */
+/** 方向闭集与二级方向闭集：统一从 lib/questionDirections 派生（与后端 rules 逐字一致）。 */
 const DIRECTION_OPTIONS: { value: string | null; label: string }[] = [
   { value: null, label: '按画像智能组卷' },
-  { value: '前端', label: '前端' },
-  { value: '后端', label: '后端' },
-  { value: '算法与数据结构', label: '算法与数据结构' },
-  { value: '计算机基础', label: '计算机基础' },
-  { value: 'AI 工程', label: 'AI 工程' },
-  { value: '中间件与运维', label: '中间件与运维' },
-  { value: 'SQL 与数据库', label: 'SQL 与数据库' },
-  { value: '研发工程实践', label: '研发工程实践' },
+  ...DIRECTIONS.map((direction) => ({ value: direction as string | null, label: direction })),
 ]
 const DIFFICULTY_OPTIONS: { value: string | null; label: string }[] = [
   { value: null, label: '不限难度' },
@@ -51,18 +45,6 @@ const QUESTION_COUNT_OPTIONS: { value: number | null; label: string }[] = [
   { value: 15, label: '15 题' },
   { value: 20, label: '20 题' },
 ]
-
-/** 二级方向闭集：与后端 `rules.SUBDIRECTIONS` 逐字一致，改动必须同步两处。 */
-const SUBDIRECTIONS: Record<string, string[]> = {
-  '前端': ['react', 'vue3', 'js', 'ts', 'css', 'html', '通用前端'],
-  '后端': ['python', 'java', 'go', '通用后端'],
-  '算法与数据结构': ['动态规划', '二叉树与递归', '链表', '排序', '图', '复杂度', '哈希', '通用算法'],
-  '计算机基础': ['操作系统', '网络', '组成原理', '通用基础'],
-  'AI 工程': ['LLM 与 RAG', 'Agent', 'Prompt 工程', '部署与推理', '通用 AI'],
-  '中间件与运维': ['Docker 与容器', 'Nginx', 'Redis', '消息队列', '监控与日志', 'CI-CD', '通用运维'],
-  'SQL 与数据库': ['SQL 基础', '事务与 ACID', '索引', 'NoSQL', '通用数据库'],
-  '研发工程实践': ['Git 与版本控制', '测试', 'CI-CD', '架构设计', '通用工程实践'],
-}
 
 function isAnswered(value: string[] | string | undefined): boolean {
   if (value === undefined) return false

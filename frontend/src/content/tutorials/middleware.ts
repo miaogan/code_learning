@@ -6,6 +6,7 @@ export const MIDDLEWARE_CHAPTERS: TutorialChapter[] = [
     id: 'mw-cache-strategy',
     title: '缓存与失效策略',
     direction: '中间件与运维',
+    sub_direction: 'Redis',
     level: '基础',
     summary: '先问「缓存放在哪一层」，再讲 TTL、淘汰与穿透/击穿/雪崩三类异常，最后落到 Cache-Aside 的正确写法。',
     sections: [
@@ -138,6 +139,7 @@ export const MIDDLEWARE_CHAPTERS: TutorialChapter[] = [
     id: 'mw-message-queue',
     title: '消息队列与投递语义',
     direction: '中间件与运维',
+    sub_direction: '消息队列',
     level: '进阶',
     summary: '解耦、削峰与最终一致分别靠什么保证；at-least-once 下如何用幂等表把「重复投递」变成无害。',
     sections: [
@@ -257,6 +259,7 @@ export const MIDDLEWARE_CHAPTERS: TutorialChapter[] = [
     id: 'mw-observability',
     title: '可观测性与线上排障',
     direction: '中间件与运维',
+    sub_direction: '监控与日志',
     level: '高级',
     summary: '指标、日志、链路三支柱各回答什么问题，以及一次「接口变慢」从告警到定位的完整路径。',
     sections: [
@@ -385,6 +388,7 @@ export const MIDDLEWARE_CHAPTERS: TutorialChapter[] = [
     id: 'mw-docker',
     title: '容器化与 Docker 基础',
     direction: '中间件与运维',
+    sub_direction: 'Docker 与容器',
     level: '基础',
     summary: '镜像、容器、分层与多阶段构建：为什么「在我机器上是好的」能被 Docker 治好，以及 Dockerfile 的常见写错方式。',
     sections: [

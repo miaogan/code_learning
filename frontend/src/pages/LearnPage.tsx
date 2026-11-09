@@ -11,14 +11,18 @@ import {
   chapterHref,
   chaptersInScope,
   filterChaptersByLevel,
+  filterChaptersBySubDirection,
   levelsInChapters,
   parseLearnDirection,
   parseLearnLevel,
+  parseLearnSubDirection,
+  subDirectionsInChapters,
   tutorialHref,
 } from '../lib/tutorials'
 import type {
   TutorialDirectionFilter,
   TutorialLevelFilter,
+  TutorialSubDirectionFilter,
 } from '../lib/tutorials'
 import { useLearnProgress } from '../state/learnProgress'
 
@@ -38,21 +42,36 @@ export default function LearnPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const search = searchParams.toString()
   const direction = parseLearnDirection(search)
+  const sub = parseLearnSubDirection(search, direction)
   const level = parseLearnLevel(search)
 
   const progressState = useLearnProgress()
   const resume = resumeTarget(progressState)
   const summary = summarizeProgress(progressState, ALL_TUTORIAL_CHAPTERS)
 
-  // 先把方向收窄，再算这一级可选档位，最后按档位过滤。
+  // 逐级收窄：方向 → 子方向 → 难度；每一级的可选项只由上一级的结果派生。
   const scope = chaptersInScope(direction)
+  const subOptions: ChipOption<TutorialSubDirectionFilter>[] = [
+    { value: 'all', label: '全部' },
+    ...subDirectionsInChapters(scope).map((item) => ({ value: item, label: item })),
+  ]
+  const subScope = filterChaptersBySubDirection(scope, sub)
   const levelOptions: ChipOption<TutorialLevelFilter>[] = [
     { value: 'all', label: '全部' },
-    ...levelsInChapters(scope).map((item) => ({ value: item, label: item })),
+    ...levelsInChapters(subScope).map((item) => ({ value: item, label: item })),
   ]
-  const chapters = filterChaptersByLevel(scope, level)
+  const chapters = filterChaptersByLevel(subScope, level)
 
-  /** 第二级只改 `level`，方向保持不变（两层筛选互不覆盖）。 */
+  /** 子方向只改 `sub`，方向保持不变；换子方向清掉难度（新子方向未必有当前档位）。 */
+  const selectSubDirection = (next: TutorialSubDirectionFilter) => {
+    const params = new URLSearchParams(searchParams)
+    if (next === 'all') params.delete('sub')
+    else params.set('sub', next)
+    params.delete('level')
+    setSearchParams(params, { replace: true })
+  }
+
+  /** 难度只改 `level`，方向与子方向保持不变（三级筛选互不覆盖）。 */
   const selectLevel = (next: TutorialLevelFilter) => {
     const params = new URLSearchParams(searchParams)
     if (next === 'all') params.delete('level')
@@ -61,13 +80,17 @@ export default function LearnPage() {
   }
 
   const selectDirection = (next: TutorialDirectionFilter) => {
-    // 换方向必须清掉二级筛选：新方向未必有当前档位，留着就会出现「空结果 + 按钮还亮着」。
+    // 换方向必须清掉二级/三级筛选：新方向未必有当前子方向或档位，留着就会出现「空结果 + 按钮还亮着」。
     const params = new URLSearchParams(searchParams)
     if (next === 'all') params.delete('direction')
     else params.set('direction', next)
+    params.delete('sub')
     params.delete('level')
     setSearchParams(params, { replace: true })
   }
+
+  const scopeLabel = direction === 'all' ? '全部方向' : `「${direction}」方向`
+  const subLabel = sub === 'all' ? '' : `「${sub}」`
 
   return (
     <div className="sc-learn-page">
@@ -121,6 +144,23 @@ export default function LearnPage() {
           </div>
         </div>
 
+        {direction === 'all' ? null : (
+          <div className="sc-lab-filter-row">
+            <span className="sc-lab-filter-label">子方向</span>
+            <div className="sc-lab-filter-body">
+              <ChipRow
+                groupLabel="教程子方向筛选"
+                options={subOptions}
+                value={sub}
+                onSelect={selectSubDirection}
+              />
+              <p className="sc-lab-filter-hint">
+                {`只列「${direction}」方向下有章节的子方向；换子方向会重置难度档位`}
+              </p>
+            </div>
+          </div>
+        )}
+
         <div className="sc-lab-filter-row">
           <span className="sc-lab-filter-label">难度</span>
           <div className="sc-lab-filter-body">
@@ -131,7 +171,7 @@ export default function LearnPage() {
               onSelect={selectLevel}
             />
             <p className="sc-lab-filter-hint">
-              {`当前${direction === 'all' ? '全部方向' : `「${direction}」方向`}共 ${chapters.length} 章 · 难度档位随方向变化，只列有内容的档`}
+              {`当前${scopeLabel}${subLabel}共 ${chapters.length} 章 · 子方向与难度档位都只列有内容的项`}
             </p>
           </div>
         </div>
@@ -145,9 +185,9 @@ export default function LearnPage() {
         />
       ) : chapters.length === 0 ? (
         <EmptyState
-          reason={`「${direction}」方向暂时没有「${level}」层级的教程，看看这个方向的其他档位`}
-          actionLabel="看该方向全部教程"
-          actionTo={tutorialHref(direction)}
+          reason={`${scopeLabel}${subLabel}暂时没有「${level}」层级的教程，看看这个方向的其他档位`}
+          actionLabel={sub === 'all' ? '看该方向全部教程' : '看该子方向全部档位'}
+          actionTo={tutorialHref(direction, 'all', sub)}
         />
       ) : (
         <>
@@ -179,6 +219,7 @@ export default function LearnPage() {
                   </span>
                   <span className="sc-lab-ctags sc-lab-cdir">
                     <Chip label={chapter.direction} tone="direction" />
+                    <Chip label={chapter.sub_direction} tone="direction" />
                   </span>
                   <span className="sc-lab-ctags sc-lab-clevel">
                     <LevelChip level={chapter.level} />
@@ -206,7 +247,7 @@ export default function LearnPage() {
             })}
           </div>
           <p className="sc-lab-listfoot">
-            {`当前${direction === 'all' ? '全部方向' : `「${direction}」方向`}共 ${chapters.length} 章 · ${summary.done} 章读完 · ${summary.reading} 章在读`}
+            {`当前${scopeLabel}${subLabel}共 ${chapters.length} 章 · ${summary.done} 章读完 · ${summary.reading} 章在读`}
           </p>
         </>
       )}

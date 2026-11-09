@@ -104,5 +104,10 @@ export function settingsLine(settings: InterviewSettings | null): string {
     settings.market,
     settings.company_size,
   ].filter((part) => typeof part === 'string' && part.trim().length > 0)
+  // 方向聚焦只在显式选了方向时追加（旧 run 没有这两键，文案保持四项不变）。
+  const focus = [settings.direction, settings.sub_direction]
+    .filter((part): part is string => typeof part === 'string' && part.trim().length > 0)
+    .join(' · ')
+  if (focus.length > 0) parts.push(focus)
   return parts.length > 0 ? parts.join(' · ') : SETTINGS_UNKNOWN
 }

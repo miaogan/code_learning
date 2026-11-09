@@ -6,6 +6,7 @@ export const BACKEND_CHAPTERS: TutorialChapter[] = [
     id: 'be-http-rest',
     title: 'HTTP 与 REST 接口设计',
     direction: '后端',
+    sub_direction: '通用后端',
     level: '基础',
     summary: '用资源和动作来设计接口：方法、状态码、幂等与统一错误结构，一次讲清。',
     sections: [
@@ -123,6 +124,7 @@ export const BACKEND_CHAPTERS: TutorialChapter[] = [
     id: 'be-db-index',
     title: '数据库索引与事务',
     direction: '后端',
+    sub_direction: '通用后端',
     level: '进阶',
     summary: '索引为什么能加速、联合索引怎么排、事务隔离解决什么问题，配一条 EXPLAIN 示例。',
     sections: [
@@ -254,6 +256,7 @@ export const BACKEND_CHAPTERS: TutorialChapter[] = [
     id: 'be-concurrency-idempotency',
     title: '并发控制与接口幂等',
     direction: '后端',
+    sub_direction: '通用后端',
     level: '高级',
     summary: '「读-改-写」在并发下必然丢更新；三种解法各有代价，再叠加幂等键，才能让重试与双击都安全。',
     sections: [
@@ -380,6 +383,7 @@ export const BACKEND_CHAPTERS: TutorialChapter[] = [
     id: 'be-auth-session',
     title: '认证与会话管理',
     direction: '后端',
+    sub_direction: '通用后端',
     level: '进阶',
     summary: '从「HTTP 本身不记得谁是谁」出发，对比 Session 与 JWT 两条路线，把密码存储、令牌过期与注销讲透。',
     sections: [

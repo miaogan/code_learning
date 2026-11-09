@@ -38,6 +38,8 @@ export interface TutorialChapter {
   id: string
   title: string
   direction: TutorialDirection
+  /** 二级方向：属于该 direction 的闭集（与后端 `rules.SUBDIRECTIONS` 同源，见 `lib/questionDirections`）。 */
+  sub_direction: string
   /** 难度档位：决定它在「二级筛选」里归到哪一档，也是卡片上的标签。 */
   level: TutorialLevel
   summary: string

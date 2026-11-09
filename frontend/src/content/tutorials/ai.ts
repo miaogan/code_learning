@@ -6,6 +6,7 @@ export const AI_CHAPTERS: TutorialChapter[] = [
     id: 'ai-transformer',
     title: '注意力机制与 Transformer',
     direction: 'AI 工程',
+    sub_direction: 'LLM 与 RAG',
     level: '高级',
     summary: '从「一句话里每个词该看谁」出发，拆开 Q/K/V、多头注意力与位置编码，理解 Transformer 为什么能并行。',
     sections: [
@@ -131,6 +132,7 @@ export const AI_CHAPTERS: TutorialChapter[] = [
     id: 'ai-rag',
     title: '检索增强生成（RAG）',
     direction: 'AI 工程',
+    sub_direction: 'LLM 与 RAG',
     level: '进阶',
     summary: '把「先查资料再回答」拆成切分、向量检索、重排、拼装上下文四步，并给出控制幻觉与引用来源的做法。',
     sections: [
@@ -253,6 +255,7 @@ export const AI_CHAPTERS: TutorialChapter[] = [
     id: 'ai-llm-basics',
     title: '大模型调用基础',
     direction: 'AI 工程',
+    sub_direction: '通用 AI',
     level: '基础',
     summary: '先把「token、上下文窗口、温度、结构化输出」四个旋钮搞明白，再谈提示词与调用成本。',
     sections: [
@@ -385,6 +388,7 @@ export const AI_CHAPTERS: TutorialChapter[] = [
     id: 'ai-agent-tools',
     title: 'Agent 与工具调用',
     direction: 'AI 工程',
+    sub_direction: 'Agent',
     level: '进阶',
     summary: '模型只会说不会做：把「说」变成「做」靠工具调用与循环，重点讲工具描述怎么写、循环怎么控风险。',
     sections: [

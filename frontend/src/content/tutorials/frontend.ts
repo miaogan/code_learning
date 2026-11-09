@@ -6,6 +6,7 @@ export const FRONTEND_CHAPTERS: TutorialChapter[] = [
     id: 'fe-event-loop',
     title: 'JavaScript 事件循环与异步',
     direction: '前端',
+    sub_direction: 'js',
     level: '进阶',
     summary: '一张调用栈、微任务队列、宏任务队列的调度图，讲清 setTimeout 与 Promise 的执行顺序。',
     sections: [
@@ -130,6 +131,7 @@ export const FRONTEND_CHAPTERS: TutorialChapter[] = [
     id: 'fe-react-render',
     title: 'React 状态与渲染',
     direction: '前端',
+    sub_direction: 'react',
     level: '基础',
     summary: '从「状态变化 → 重新渲染」讲清 useState、useEffect 与受控组件的边界，避免把状态写成副作用。',
     sections: [
@@ -256,6 +258,7 @@ export const FRONTEND_CHAPTERS: TutorialChapter[] = [
     id: 'fe-render-performance',
     title: '渲染性能与浏览器原理',
     direction: '前端',
+    sub_direction: '通用前端',
     level: '高级',
     summary: '从样式计算到合成层，讲清一次改属性会触发哪几个阶段，再用「分片渲染 + 虚拟列表」把长列表卡顿按下去。',
     sections: [
@@ -386,6 +389,7 @@ export const FRONTEND_CHAPTERS: TutorialChapter[] = [
     id: 'fe-typescript',
     title: 'TypeScript 类型系统实战',
     direction: '前端',
+    sub_direction: 'ts',
     level: '进阶',
     summary: '联合类型与收窄、判别联合与穷尽性检查，把「运行时才发现的错」提前到编译期。',
     sections: [

@@ -71,7 +71,7 @@ INTERVIEW_SYSTEM = """你是程序员模拟面试官。依据本场设定与候�
 硬性规则：
 1. 共 9 道题：technical 5 道、project 3 道、challenge 1 道（challenge 占总题量 11%，不超过 20%）。
 2. 必须按 user JSON 的 settings 与 calibration 出题：目标岗位、工作经验、面试市场、公司规模都要改变题目口径，
-   不得只做措辞替换。
+   不得只做措辞替换；calibration.focus 指定了方向 / 子方向时，technical 题必须优先（子方向则必须）覆盖该方向。
 3. technical 题对准画像的 tech_stack / skills；project 题必须点名画像里的具体项目；
    challenge 题给一个超出舒适区的场景题，允许没有标准答案。
 4. 每题 prompt 必须互不相同，不得换句话重复同一道题；不需要输出 id（服务端按 iq-1 起编号）。
@@ -204,18 +204,26 @@ def fill_settings(
         band = rules.DEFAULT_EXPERIENCE_BAND
     market = _market_text(patch.market)
     size = _company_text(patch.company_size)
+    direction = (patch.direction or "").strip()
+    if direction not in rules.DIRECTIONS:
+        direction = ""
+    sub_direction = (patch.sub_direction or "").strip()
+    if not rules.is_valid_sub_direction(direction, sub_direction or None):
+        sub_direction = ""
     return InterviewSettings.model_validate(
         {
             "target_role": role,
             "years_experience": band,
             "market": market,
             "company_size": size,
+            "direction": direction,
+            "sub_direction": sub_direction,
         }
     )
 
 
 def calibration_of(settings: InterviewSettings) -> dict[str, str]:
-    """四项设定 → 提示词口径要点（纯函数，无 IO；AC-2④ 逐档可单测）。
+    """四项设定 + 可选方向 → 提示词口径要点（纯函数，无 IO；AC-2④ 逐档可单测）。
 
     每档至少一条要点、档间集合互不相同：这样「改了配置但题目没变」在单测里立刻暴露。
     """
@@ -227,7 +235,20 @@ def calibration_of(settings: InterviewSettings) -> dict[str, str]:
         "experience": _EXPERIENCE_CALIBRATION[settings.years_experience],
         "market": _MARKET_CALIBRATION[settings.market],
         "company": _COMPANY_CALIBRATION[settings.company_size],
+        "focus": _focus_calibration(settings),
     }
+
+
+def _focus_calibration(settings: InterviewSettings) -> str:
+    """方向聚焦口径：不限 / 只给方向 / 给到子方向，三档措辞互不相同。"""
+    if not settings.direction:
+        return "方向不限：技术题按画像短板与岗位技术栈均衡覆盖，不要只押一个方向"
+    if not settings.sub_direction:
+        return f"本场聚焦「{settings.direction}」：technical 题优先覆盖该方向，project / challenge 可跨方向取材"
+    return (
+        f"本场聚焦「{settings.direction} · {settings.sub_direction}」："
+        "technical 题必须覆盖该子方向，至少两题点出该子方向的真实细节"
+    )
 
 
 # --- 结构闸门（AC-7 双校验：开局 + 结束，同一口径） --------------------------

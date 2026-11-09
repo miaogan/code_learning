@@ -43,6 +43,8 @@ function draftWith(patch: Partial<SetupDraft>): SetupDraft {
     years_experience: DEFAULT_EXPERIENCE_BAND,
     market: DEFAULT_MARKET,
     company_size: DEFAULT_COMPANY_SIZE,
+    direction: '',
+    sub_direction: '',
     ...patch,
   }
 }
@@ -75,12 +77,16 @@ describe('prefillOf：画像预填与来源标注（画像有值 / 画像空 / �
       years_experience: '3-5年',
       market: DEFAULT_MARKET,
       company_size: DEFAULT_COMPANY_SIZE,
+      direction: '',
+      sub_direction: '',
     })
     expect(sources).toEqual({
       target_role: 'profile',
       years_experience: 'profile',
       market: 'default',
       company_size: 'default',
+      direction: 'default',
+      sub_direction: 'default',
     })
   })
 
@@ -94,6 +100,8 @@ describe('prefillOf：画像预填与来源标注（画像有值 / 画像空 / �
       years_experience: DEFAULT_EXPERIENCE_BAND,
       market: DEFAULT_MARKET,
       company_size: DEFAULT_COMPANY_SIZE,
+      direction: '',
+      sub_direction: '',
     })
     expect(sources.target_role).toBe('default')
     expect(sources.years_experience).toBe('default')
@@ -104,7 +112,7 @@ describe('prefillOf：画像预填与来源标注（画像有值 / 画像空 / �
 
     expect(draft.target_role).toBe('')
     expect(draft.years_experience).toBe(DEFAULT_EXPERIENCE_BAND)
-    expect(Object.values(sources)).toEqual(['default', 'default', 'default', 'default'])
+    expect(Object.values(sources)).toEqual(Array(6).fill('default'))
   })
 
   it('超长岗位按 TARGET_ROLE_MAX_CHARS 截断（与服务端 TARGET_ROLE_MAX_CHARS 同值）', () => {
@@ -133,6 +141,21 @@ describe('draftToPatch：表单 → 提交补丁', () => {
 
     expect(patch.target_role).toBe('后端工程师')
   })
+
+  it('方向不限时不下发方向键（服务端按画像均衡出题）', () => {
+    const patch = draftToPatch(draftWith({ direction: '', sub_direction: 'python' }))
+
+    expect('direction' in patch).toBe(false)
+    expect('sub_direction' in patch).toBe(false)
+  })
+
+  it('选了方向才下发，且子方向必须挂在方向上', () => {
+    expect(draftToPatch(draftWith({ direction: '后端' })).sub_direction).toBeUndefined()
+
+    const both = draftToPatch(draftWith({ direction: '后端', sub_direction: 'python' }))
+    expect(both.direction).toBe('后端')
+    expect(both.sub_direction).toBe('python')
+  })
 })
 
 describe('previewLine：开局预览行逐字中文', () => {
@@ -150,6 +173,15 @@ describe('previewLine：开局预览行逐字中文', () => {
         draftWith({ target_role: ' 后端工程师 ', years_experience: '5-10年', market: '北美', company_size: '大厂' }),
       ),
     ).toBe('将按：后端工程师 · 5-10年 · 北美 · 大厂')
+  })
+
+  it('选了方向 / 子方向时追加在四项之后，不限方向不产生多余分隔符', () => {
+    expect(previewLine(draftWith({ target_role: '后端工程师', direction: '前端' }))).toBe(
+      '将按：后端工程师 · 1-3年 · 国内 · 中型 · 前端',
+    )
+    expect(
+      previewLine(draftWith({ target_role: '后端工程师', direction: '前端', sub_direction: 'react' })),
+    ).toBe('将按：后端工程师 · 1-3年 · 国内 · 中型 · 前端 · react')
   })
 })
 

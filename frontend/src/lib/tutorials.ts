@@ -5,6 +5,7 @@
  * 章节 ID 是全局唯一 ASCII slug（URL 直接用），方向与难度只进查询参数。
  */
 import { TUTORIAL_CHAPTERS } from '../content/tutorials'
+import { subDirectionsOf } from './questionDirections'
 import type { TutorialChapter, TutorialDirection, TutorialLevel } from './tutorialTypes'
 
 /** 目录页方向筛选的展示顺序：与内容聚合顺序一致，读起来是一条线。 */
@@ -26,6 +27,8 @@ export const TUTORIAL_LEVELS: TutorialLevel[] = ['基础', '进阶', '高级']
 export type TutorialDirectionFilter = TutorialDirection | 'all'
 /** 难度筛选取值：`all` 表示不过滤。 */
 export type TutorialLevelFilter = TutorialLevel | 'all'
+/** 子方向筛选取值：`all` 表示不过滤（子方向是自由字符串，闭集由 `questionDirections` 提供）。 */
+export type TutorialSubDirectionFilter = string | 'all'
 
 /** 难度由易到难的比较序号：目录排序与「三档齐全」的判定都用它。 */
 const LEVEL_ORDER: Record<TutorialLevel, number> = { 基础: 0, 进阶: 1, 高级: 2 }
@@ -76,6 +79,26 @@ export function filterChaptersByLevel(
   level: TutorialLevelFilter,
 ): TutorialChapter[] {
   return level === 'all' ? chapters : chapters.filter((chapter) => chapter.level === level)
+}
+
+/**
+ * 一组章节里真实存在的子方向，按该方向闭集顺序排（闭集外的历史值追加在后）。
+ * 与难度同理：只列有内容的子方向，避免点了必然空结果。
+ */
+export function subDirectionsInChapters(chapters: TutorialChapter[]): string[] {
+  const direction = chapters[0]?.direction
+  const present = new Set(chapters.map((chapter) => chapter.sub_direction))
+  const ordered = direction ? subDirectionsOf(direction).filter((sub) => present.has(sub)) : []
+  const extra = [...present].filter((sub) => !ordered.includes(sub))
+  return [...ordered, ...extra]
+}
+
+/** 第三级筛选：`all` 原样返回。 */
+export function filterChaptersBySubDirection(
+  chapters: TutorialChapter[],
+  sub: TutorialSubDirectionFilter,
+): TutorialChapter[] {
+  return sub === 'all' ? chapters : chapters.filter((chapter) => chapter.sub_direction === sub)
 }
 
 /** 章节在全量顺序里的前后邻居：末章 `next` 为 `null`，首章 `prev` 为 `null`。 */
@@ -129,19 +152,38 @@ export function parseLearnLevel(search: string): TutorialLevelFilter {
 }
 
 /**
+ * 解析 `/learn` 的 `?sub=`：子方向必须属于当前方向的闭集，
+ * 「方向不限」或越界值一律回落 `all`（子方向只在选定方向后才有意义）。
+ */
+export function parseLearnSubDirection(
+  search: string,
+  direction: TutorialDirectionFilter,
+): TutorialSubDirectionFilter {
+  if (direction === 'all') return 'all'
+  const value = new URLSearchParams(search).get('sub')
+  if (value === null) return 'all'
+  return subDirectionsOf(direction).includes(value) ? value : 'all'
+}
+
+/**
  * 目录页链接：默认值不写参数，链接更短也更好读。
  * 入参放宽为字符串：报告页方向可能不在教程覆盖范围内，调用方先按 `chaptersInDirection` 判空。
  */
 export function tutorialHref(
   direction?: string | null,
   level?: TutorialLevelFilter | null,
+  sub?: TutorialSubDirectionFilter | null,
 ): string {
   const params = new URLSearchParams()
-  if (direction !== null && direction !== undefined && direction !== 'all') {
+  const hasDirection = direction !== null && direction !== undefined && direction !== 'all'
+  if (hasDirection) {
     params.set('direction', direction)
   }
   if (level !== null && level !== undefined && level !== 'all') {
     params.set('level', level)
+  }
+  if (hasDirection && sub !== null && sub !== undefined && sub !== 'all') {
+    params.set('sub', sub)
   }
   const suffix = params.toString()
   return suffix === '' ? '/learn' : `/learn?${suffix}`

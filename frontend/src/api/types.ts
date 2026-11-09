@@ -106,6 +106,9 @@ export interface InterviewSettings {
   years_experience: ExperienceBand
   market: InterviewMarket
   company_size: CompanySize
+  /** 可选方向聚焦：空串 / 缺省 = 不限（老 run 没有这两键）。取值见 lib/questionDirections。 */
+  direction?: string
+  sub_direction?: string
 }
 
 export interface InterviewSettingsPatch {
@@ -113,6 +116,8 @@ export interface InterviewSettingsPatch {
   years_experience?: ExperienceBand
   market?: InterviewMarket
   company_size?: CompanySize
+  direction?: string
+  sub_direction?: string
 }
 
 export interface InterviewCreateRequest {

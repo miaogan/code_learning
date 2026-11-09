@@ -6,6 +6,7 @@ export const ALGORITHM_CHAPTERS: TutorialChapter[] = [
     id: 'algo-complexity',
     title: '时间复杂度与空间复杂度',
     direction: '算法与数据结构',
+    sub_direction: '复杂度',
     level: '基础',
     summary: '用增长趋势而不是秒数衡量算法：常见复杂度、循环嵌套与递归的估算方法。',
     sections: [
@@ -128,6 +129,7 @@ export const ALGORITHM_CHAPTERS: TutorialChapter[] = [
     id: 'algo-hash-pointer',
     title: '哈希表与双指针',
     direction: '算法与数据结构',
+    sub_direction: '哈希',
     level: '进阶',
     summary: '两类最常用的降复杂度工具：哈希表用空间换时间，双指针利用有序性减少枚举。',
     sections: [
@@ -250,6 +252,7 @@ export const ALGORITHM_CHAPTERS: TutorialChapter[] = [
     id: 'algo-dp-graph',
     title: '动态规划与图',
     direction: '算法与数据结构',
+    sub_direction: '动态规划',
     level: '高级',
     summary: '动态规划只需答对三问：状态是什么、怎么转移、边界在哪；图算法则按「边权与目标」挑 BFS / Dijkstra / 拓扑。',
     sections: [
@@ -384,6 +387,7 @@ export const ALGORITHM_CHAPTERS: TutorialChapter[] = [
     id: 'algo-binary-tree',
     title: '二叉树与递归',
     direction: '算法与数据结构',
+    sub_direction: '二叉树与递归',
     level: '基础',
     summary: '四种遍历的写法与口诀、递归三问（子问题/返回值/终止条件），以及 BFS 与 DFS 的选择依据。',
     sections: [

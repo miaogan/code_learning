@@ -6,6 +6,7 @@ export const SQL_CHAPTERS: TutorialChapter[] = [
     id: 'sql-join-null',
     title: '多表连接与 NULL 语义',
     direction: 'SQL 与数据库',
+    sub_direction: 'SQL 基础',
     level: '基础',
     summary: '三种连接各自的语义边界，加上 NULL 的三值逻辑——「统计结果少了几行」八成出在这两处。',
     sections: [
@@ -139,6 +140,7 @@ export const SQL_CHAPTERS: TutorialChapter[] = [
     id: 'sql-window-explain',
     title: '窗口函数与执行计划',
     direction: 'SQL 与数据库',
+    sub_direction: 'SQL 基础',
     level: '进阶',
     summary: '用窗口函数做组内排名与 TopN，再用 EXPLAIN 判断这条 SQL 到底走没走索引、扫了多少行。',
     sections: [
@@ -279,6 +281,7 @@ export const SQL_CHAPTERS: TutorialChapter[] = [
     id: 'sql-lock-isolation',
     title: '事务隔离级别与锁',
     direction: 'SQL 与数据库',
+    sub_direction: '事务与 ACID',
     level: '高级',
     summary: '三种读异常、四个隔离级别、两把常见的锁：把「为什么同一段 SQL 在 MySQL 和 PostgreSQL 上表现不同」讲清。',
     sections: [
@@ -411,6 +414,7 @@ export const SQL_CHAPTERS: TutorialChapter[] = [
     id: 'sql-schema-design',
     title: '表结构设计：范式与反范式',
     direction: 'SQL 与数据库',
+    sub_direction: 'SQL 基础',
     level: '基础',
     summary: '用一张订单表演示三范式怎么拆、什么时候该故意冗余，以及冗余后的一致性怎么守。',
     sections: [

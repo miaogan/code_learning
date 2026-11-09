@@ -2,6 +2,7 @@ import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
 import { Chip } from '../ui/Chip'
 import { InlineError } from '../ui/InlineError'
+import { DIRECTIONS, subDirectionsOf } from '../../lib/questionDirections'
 import {
   COMPANY_SIZES,
   DEFAULT_TARGET_ROLE,
@@ -191,6 +192,52 @@ export function InterviewSetupForm({
             ))}
           </div>
         </div>
+
+        <div className="sc-target-role">
+          <div className="sc-qcard-head">
+            <span className="sc-target-role-label">方向聚焦</span>
+            <SourceBadge source={sourceOf('direction')} />
+          </div>
+          <div className="sc-chips" role="group" aria-label="方向聚焦">
+            <ChoiceChip
+              label="不限"
+              selected={draft.direction === ''}
+              onClick={() => onDraft({ ...draft, direction: '', sub_direction: '' })}
+            />
+            {DIRECTIONS.map((direction) => (
+              <ChoiceChip
+                key={direction}
+                label={direction}
+                selected={draft.direction === direction}
+                onClick={() => onDraft({ ...draft, direction, sub_direction: '' })}
+              />
+            ))}
+          </div>
+          <p className="sc-target-role-hint">不指定时按画像短板与岗位技术栈均衡出题</p>
+        </div>
+
+        {draft.direction ? (
+          <div className="sc-target-role">
+            <div className="sc-qcard-head">
+              <span className="sc-target-role-label">二级方向</span>
+            </div>
+            <div className="sc-chips" role="group" aria-label="二级方向">
+              <ChoiceChip
+                label="不限"
+                selected={draft.sub_direction === ''}
+                onClick={() => setField('sub_direction', '')}
+              />
+              {subDirectionsOf(draft.direction).map((sub) => (
+                <ChoiceChip
+                  key={sub}
+                  label={sub}
+                  selected={draft.sub_direction === sub}
+                  onClick={() => setField('sub_direction', sub)}
+                />
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         {error ? <InlineError message={error} onRetry={onStart} retryLabel="重试" /> : null}
 

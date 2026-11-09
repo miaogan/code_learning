@@ -6,6 +6,7 @@ export const ENGINEERING_CHAPTERS: TutorialChapter[] = [
     id: 'eng-git-review',
     title: 'Git 分支与代码评审',
     direction: '研发工程实践',
+    sub_direction: 'Git 与版本控制',
     level: '基础',
     summary: '分支怎么切、提交怎么拆、评审看什么：把「能跑」的代码变成「能维护、能回滚」的变更。',
     sections: [
@@ -115,6 +116,7 @@ export const ENGINEERING_CHAPTERS: TutorialChapter[] = [
     id: 'eng-test-ci',
     title: '测试分层与 CI 门禁',
     direction: '研发工程实践',
+    sub_direction: '测试',
     level: '进阶',
     summary: '单元、集成、端到端各测什么、比例多少，以及怎么把校验串成「失败即阻断」的流水线门禁。',
     sections: [
@@ -249,6 +251,7 @@ export const ENGINEERING_CHAPTERS: TutorialChapter[] = [
     id: 'eng-incident-capacity',
     title: '故障复盘与容量规划',
     direction: '研发工程实践',
+    sub_direction: '通用工程实践',
     level: '高级',
     summary: '故障先止血再定位，复盘要指向可验证的改进项；容量规划则把「QPS」算成「实例数」，而不是拍脑袋扩容。',
     sections: [
@@ -375,6 +378,7 @@ export const ENGINEERING_CHAPTERS: TutorialChapter[] = [
     id: 'eng-refactoring',
     title: '重构与代码坏味道',
     direction: '研发工程实践',
+    sub_direction: '通用工程实践',
     level: '进阶',
     summary: '认得出才改得动：常见坏味道清单、小步重构的节奏，以及为什么「先补测试再动手」不是句口号。',
     sections: [

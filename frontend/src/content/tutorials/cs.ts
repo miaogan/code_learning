@@ -6,6 +6,7 @@ export const CS_CHAPTERS: TutorialChapter[] = [
     id: 'cs-process-thread',
     title: '进程、线程与并发',
     direction: '计算机基础',
+    sub_direction: '操作系统',
     level: '进阶',
     summary: '进程与线程各自拥有什么、为什么会互相阻塞、锁与死锁是怎么产生的。',
     sections: [
@@ -121,6 +122,7 @@ export const CS_CHAPTERS: TutorialChapter[] = [
     id: 'cs-tcp-http',
     title: 'TCP 与 HTTP 基础',
     direction: '计算机基础',
+    sub_direction: '网络',
     level: '基础',
     summary: '从三次握手到 HTTP 报文：连接怎么建立、请求怎么走、HTTPS 多了什么。',
     sections: [
@@ -243,6 +245,7 @@ export const CS_CHAPTERS: TutorialChapter[] = [
     id: 'cs-memory-virtual',
     title: '内存管理与虚拟内存',
     direction: '计算机基础',
+    sub_direction: '操作系统',
     level: '高级',
     summary: '进程看到的地址是假的：栈、堆、页表、TLB 与缺页各自负责一段，理解了才知道「内存泄漏」与「OOM」到底发生在哪。',
     sections: [
@@ -382,6 +385,7 @@ export const CS_CHAPTERS: TutorialChapter[] = [
     id: 'cs-io-model',
     title: 'IO 模型与零拷贝',
     direction: '计算机基础',
+    sub_direction: '操作系统',
     level: '进阶',
     summary: '从「等数据」到「事件通知」，用 select/poll/epoll 的演进讲清高并发服务为什么不怕慢 IO，再看零拷贝省掉了什么。',
     sections: [

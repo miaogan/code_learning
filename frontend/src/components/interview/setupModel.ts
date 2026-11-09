@@ -35,6 +35,10 @@ export interface SetupDraft {
   years_experience: ExperienceBand
   market: InterviewMarket
   company_size: CompanySize
+  /** 方向聚焦：空串 = 不限（不指定时服务端按画像短板均衡出题）。 */
+  direction: string
+  /** 二级方向：只有 direction 非空时才有意义。 */
+  sub_direction: string
 }
 
 /** 单个字段的来源：画像取值 / 回落默认（用户手改后徽章消失，不再标注来源）。 */
@@ -64,17 +68,21 @@ export function prefillOf(profile: Profile | null): { draft: SetupDraft; sources
       years_experience: hasYears ? bandOfYears(years) : DEFAULT_EXPERIENCE_BAND,
       market: DEFAULT_MARKET,
       company_size: DEFAULT_COMPANY_SIZE,
+      direction: '',
+      sub_direction: '',
     },
     sources: {
       target_role: role.length > 0 ? 'profile' : 'default',
       years_experience: hasYears ? 'profile' : 'default',
       market: 'default',
       company_size: 'default',
+      direction: 'default',
+      sub_direction: 'default',
     },
   }
 }
 
-/** 表单 → 提交补丁（空白目标岗位不下发，交给服务端默认；其余三项始终携带）。 */
+/** 表单 → 提交补丁（空白目标岗位 / 不限方向不下发，交给服务端默认；其余三项始终携带）。 */
 export function draftToPatch(draft: SetupDraft): InterviewSettingsPatch {
   const patch: InterviewSettingsPatch = {
     years_experience: draft.years_experience,
@@ -83,11 +91,21 @@ export function draftToPatch(draft: SetupDraft): InterviewSettingsPatch {
   }
   const role = draft.target_role.trim()
   if (role.length > 0) patch.target_role = role
+  const direction = draft.direction.trim()
+  if (direction.length > 0) {
+    patch.direction = direction
+    const subDirection = draft.sub_direction.trim()
+    if (subDirection.length > 0) patch.sub_direction = subDirection
+  }
   return patch
 }
 
 /** 开局预览行（跳过按钮旁的「将按：…」，空白岗位按默认值展示，与 fill_settings 口径一致）。 */
 export function previewLine(draft: SetupDraft): string {
   const role = draft.target_role.trim() || DEFAULT_TARGET_ROLE
-  return `将按：${role} · ${draft.years_experience} · ${draft.market} · ${draft.company_size}`
+  const base = `将按：${role} · ${draft.years_experience} · ${draft.market} · ${draft.company_size}`
+  const direction = draft.direction.trim()
+  if (direction.length === 0) return base
+  const subDirection = draft.sub_direction.trim()
+  return subDirection.length > 0 ? `${base} · ${direction} · ${subDirection}` : `${base} · ${direction}`
 }

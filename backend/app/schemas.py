@@ -220,21 +220,30 @@ class ProfilePatch(BaseModel):
 
 
 class InterviewSettings(BaseModel):
-    """本场面试的四项设定（r5）：开局可改，落 runs.payload.settings，永不写回画像。"""
+    """本场面试的设定：r5 四项 + r44 可选方向聚焦，落 runs.payload.settings，永不写回画像。
+
+    `direction` / `sub_direction` 空串 = 不限（老 payload 缺这两键时按空串补，四项解析口径不变）；
+    取值闭集由 `services.report.rules` 校验，不在本模块重复字面量。
+    """
 
     target_role: str = Field(default="通用软件工程师", min_length=1)
     years_experience: ExperienceBand = "1-3年"
     market: InterviewMarket = "国内"
     company_size: CompanySize = "中型"
+    direction: str = ""
+    sub_direction: str = ""
 
 
 class InterviewSettingsPatch(BaseModel):
-    """开局请求里的设定补丁：4 键全可选，缺省由服务端按画像/默认值补全。"""
+    """开局请求里的设定补丁：四项 + 可选方向全可选，缺省由服务端按画像/默认值补全。"""
 
     target_role: str | None = None
     years_experience: ExperienceBand | None = None
     market: InterviewMarket | None = None
     company_size: CompanySize | None = None
+    #: 取值见 rules.DIRECTIONS / rules.SUBDIRECTIONS；空 = 不限。
+    direction: str | None = None
+    sub_direction: str | None = None
 
 
 class InterviewCreateRequest(BaseModel):

@@ -111,7 +111,7 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
 | `app/core/config.py` | `Settings`（AI_BASE_URL / AI_API_KEY / AI_MODEL / AI_TIMEOUT_S / DB_PATH / 上传上限） | ✅ |
 | `app/core/db.py` | 连接、`init_db()` 建 7 表、`get_connection()` 依赖 | ✅（表结构见 §3.4；r6 增 `questions` / `question_attempts`） |
 | `app/core/errors.py` | 错误码常量 + `AppError` | ✅ |
-| `app/schemas.py` | pydantic v2 模型（Profile 5 维度 / 题目 / 报告 / 课程）；**HTTP 契约唯一真源** | ✅ 齐备；r5 起含 4 项面试设定（`InterviewSettings` / `InterviewSettingsPatch`）、会话与回合（`InterviewRun` / `InterviewTurn` / `InterviewSession`），`RunSummary` / `Report` 增 `interview_settings` |
+| `app/schemas.py` | pydantic v2 模型（Profile 5 维度 / 题目 / 报告 / 课程）；**HTTP 契约唯一真源** | ✅ 齐备；r5 起含 4 项面试设定（`InterviewSettings` / `InterviewSettingsPatch`）、会话与回合（`InterviewRun` / `InterviewTurn` / `InterviewSession`），`RunSummary` / `Report` 增 `interview_settings`；r44 设定扩为 6 键（可选 `direction` / `sub_direction`，空串 = 不限，老 payload 缺键仍合法） |
 | `app/routers/resume.py` | `POST /api/resumes` 上传 → 校验 → 抽取 → 入库 → 元信息 | ✅ 文本/ PDF / DOCX 抽取（依赖装好后生效） |
 | `app/routers/profile.py` | `POST /api/resumes/{id}/profile`、`GET|PATCH /api/profiles/{id}` | ⛔ 501 待 M2 |
 | `app/routers/interview.py` | 开局 / 每轮作答 / 会话恢复（r5 契约 v2：只转发与错误 envelope，业务在 `services/interview/interview.py`） | ✅ 三路由 |

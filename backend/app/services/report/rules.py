@@ -304,5 +304,9 @@ def settings_or_none(payload: dict[str, Any]) -> InterviewSettings | None:
         or settings.company_size not in COMPANY_SIZES
     ):
         return None
+    if settings.direction and settings.direction not in DIRECTIONS:
+        return None
+    if not is_valid_sub_direction(settings.direction, settings.sub_direction or None):
+        return None
     return settings
 
