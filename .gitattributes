@@ -1,0 +1,4 @@
+# 行尾策略：以下文件的**字节序列**是工程门禁的比对基准（`question_merge --write` 必须可复现），
+# 不能经过任何行尾转换。Windows 上 core.autocrlf=true 会把 LF 转成 CRLF 写进 blob，
+# Linux CI 检出后逐字节比对必红（r19 CI 修复）。
+backend/app/seed/questions.json -text
