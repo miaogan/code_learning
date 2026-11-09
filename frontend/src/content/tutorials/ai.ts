@@ -1,6 +1,6 @@
 import type { TutorialChapter } from '../../lib/tutorialTypes'
 
-/** AI 工程方向：大模型调用基础、Agent 与工具调用、检索增强生成、注意力机制。 */
+/** AI 工程方向：模型训练原理、调用基础、微调与蒸馏、RAG、Agent、LangChain / LangGraph 编排、名词速查。 */
 export const AI_CHAPTERS: TutorialChapter[] = [
   {
     id: 'ai-transformer',
@@ -518,6 +518,568 @@ export const AI_CHAPTERS: TutorialChapter[] = [
               {
                 question: '为什么要限制步数？',
                 answer: '模型可能陷入「调工具→不满意→再调」的循环；步数与费用上限是唯一可靠的剎车，必须程序侧强制。',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'ai-model-basics',
+    title: '大模型是怎么训练出来的',
+    direction: 'AI 工程',
+    sub_direction: 'LLM 与 RAG',
+    level: '基础',
+    summary:
+      '把「预训练 → 前向算 loss → 反向算梯度 → 优化器更新」四步讲清楚：模型学的不是数据库，而是一个预测下一个 token 的函数。',
+    sections: [
+      {
+        id: 'pretrain',
+        title: '预训练：只做一件事，猜下一个 token',
+        blocks: [
+          {
+            kind: 'text',
+            text: '大模型的预训练任务极其单一：给它一段文本，让它预测每个位置的下一个 token。整段语料里每个位置都自带答案，不需要人工标注，这叫自监督学习。模型要猜得准，就必须在参数里压进语法、事实、推理套路——所谓「知识」是这件事的副产品，不是被逐条写进去的。',
+          },
+          {
+            kind: 'list',
+            items: [
+              '训练信号：每个位置的「真实下一个 token」，来自语料本身。',
+              '损失函数：交叉熵。正确答案的概率越高，loss 越小。',
+              '因果掩码：训练时遮住「未来」的 token，防止模型抄答案。',
+              '规模化：语料与参数同时放大时 loss 平滑下降，这就是 Scaling Law 的经验规律。',
+            ],
+          },
+          {
+            kind: 'note',
+            tone: 'info',
+            title: '为什么生成是一个字一个字往外吐',
+            text: '训练时每个位置都要求「看着前文猜下一个」，所以推理也只能自回归地一步步来：生成第 N 个 token 要先有前 N-1 个。能并行的是训练（整段同时算 loss），不是逐字生成。',
+          },
+        ],
+      },
+      {
+        id: 'update',
+        title: '一次参数更新发生了什么',
+        blocks: [
+          {
+            kind: 'text',
+            text: '训练循环重复三件事：前向把输入逐层算成 logits 并算出 loss；反向用链式法则求出每个参数对 loss 的梯度（该往哪个方向调、调多少）；优化器（大模型常用 AdamW）按梯度改参数。一个 batch 走完，参数就更新一次。',
+          },
+          {
+            kind: 'table',
+            headers: ['阶段', '在算什么', '显存大头'],
+            rows: [
+              ['前向', '逐层矩阵运算，得到 logits 与 loss', '各层激活值'],
+              ['反向', '从 loss 往回求每个参数的梯度', '激活值 + 梯度'],
+              ['更新', '优化器按梯度改参数', '优化器状态（Adam 约为参数量的 2 倍）'],
+            ],
+          },
+          {
+            kind: 'note',
+            tone: 'warn',
+            title: '训练显存远大于推理',
+            text: '推理只要放得下权重；训练还要放激活、梯度与优化器状态，全量微调 7B 模型常常要几十 GB 甚至多卡。这也是 LoRA 存在的理由：只训练极少量参数，显存门槛骤降。',
+          },
+        ],
+      },
+      {
+        id: 'example',
+        title: '用两个参数走一遍梯度下降',
+        blocks: [
+          {
+            kind: 'text',
+            text: '下面把「前向 → loss → 梯度 → 更新」压缩成两参数的线性拟合。真实模型只是把同样的流程重复几万亿次、参数多出十几个数量级，直觉完全一致。',
+          },
+          {
+            kind: 'code',
+            language: 'python',
+            caption: '手写一次梯度下降（numpy，无框架）',
+            code: [
+              'import numpy as np',
+              '',
+              'xs = np.array([1.0, 2.0, 3.0, 4.0])',
+              'ys = 2.0 * xs + 1.0  # 真实关系：y = 2x + 1',
+              '',
+              'w, b, lr = 0.0, 0.0, 0.05',
+              'for step in range(200):',
+              '    pred = w * xs + b                     # 前向',
+              '    loss = ((pred - ys) ** 2).mean()      # 均方误差',
+              '    dw = 2 * ((pred - ys) * xs).mean()    # 对 w 的梯度',
+              '    db = 2 * (pred - ys).mean()           # 对 b 的梯度',
+              '    w -= lr * dw                          # 更新',
+              '    b -= lr * db',
+              '    if step % 50 == 0:',
+              '        print(step, round(loss, 4), round(w, 3), round(b, 3))',
+              '# 200 步后 w≈2、b≈1，loss 趋近 0',
+            ].join('\n'),
+          },
+          {
+            kind: 'list',
+            ordered: true,
+            items: [
+              '前向：用当前参数算出预测值，再与真实值比出 loss。',
+              '反向：求 loss 对每个参数的偏导，得到下降方向。',
+              '更新：沿负梯度方向走一步，步长就是学习率。',
+              '学习率太大来回震荡、太小收敛极慢——大模型训练里这是最常调的超参之一。',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'pitfalls',
+        title: '常见误解与自测',
+        blocks: [
+          {
+            kind: 'note',
+            tone: 'warn',
+            title: '参数量大 ≠ 一定好用',
+            text: '参数量只是上限，数据质量与配比、训练时长、后训练（指令微调与对齐）同样决定最终体验。拿「多少 B」当唯一选型依据，常在真实任务上翻车。',
+          },
+          {
+            kind: 'qa',
+            items: [
+              {
+                question: '预训练和微调到底差在哪？',
+                answer: '预训练从随机初始化开始、用海量无标注语料学通用能力；微调是在已有权重上、用少量高质量样本改行为与格式。前者造底座，后者做定制。',
+              },
+              {
+                question: '训练 loss 很低，是否说明模型可用？',
+                answer: '只能说明它拟合了训练分布。要看留出的验证集与真实任务评测，否则可能是过拟合或数据泄漏。',
+              },
+              {
+                question: '为什么长上下文推理更慢更贵？',
+                answer: '注意力要对每个新 token 与全部历史计算，历史越长单步计算与显存越大；KV Cache 能省重复计算，但省不掉显存占用。',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'ai-finetune-distill',
+    title: '微调、对齐与蒸馏',
+    direction: 'AI 工程',
+    sub_direction: 'LLM 与 RAG',
+    level: '高级',
+    summary:
+      '把「让通用模型变专用」的三种手段分清：LoRA 微调改行为、SFT / RLHF / DPO 做对齐、蒸馏与量化把模型压小。',
+    sections: [
+      {
+        id: 'peft',
+        title: '全量微调 vs LoRA：只训一小块参数',
+        blocks: [
+          {
+            kind: 'text',
+            text: '微调是在预训练权重上继续训练。全量微调更新所有参数，贵且容易把原有能力练崩；LoRA（Low-Rank Adaptation）冻结原权重，只学一个低秩增量：把权重更新拆成两个小矩阵 B×A，秩 r 远小于原维度，训练完还能合并回原权重，推理零额外延迟。',
+          },
+          {
+            kind: 'table',
+            headers: ['方案', '训练参数', '成本', '适合场景'],
+            rows: [
+              ['全量微调', '全部参数', '高，常需多卡与并行策略', '数据量大、要改底层能力'],
+              ['LoRA / QLoRA', '低秩增量（+ 量化底座）', '低，单卡可跑', '风格、格式、领域表达习惯'],
+              ['RAG / 提示词', '零参数', '最低', '知识更新频繁、需要引用来源'],
+            ],
+          },
+          {
+            kind: 'note',
+            tone: 'info',
+            title: '先判断是不是「知识」问题',
+            text: '要模型记住经常变的事实，优先 RAG 或提示词；要它稳定按某种格式说话、用领域语气，才考虑微调。两者可以叠加：微调学格式，RAG 补知识。',
+          },
+        ],
+      },
+      {
+        id: 'alignment',
+        title: '从 SFT 到 RLHF / DPO：对齐的是行为',
+        blocks: [
+          {
+            kind: 'list',
+            ordered: true,
+            items: [
+              '继续预训练（可选）：用领域语料补足词汇与表达，成本最高。',
+              'SFT 指令微调：用「指令 → 理想回答」的高质量样本，教模型听懂任务、按格式输出。',
+              '偏好对齐：RLHF 先训奖励模型再用 PPO 优化；DPO 直接用「好答案 / 差答案」成对样本优化，省掉奖励模型与在线采样。',
+              '评测与回归：留出评测集，逐项对比微调前后的能力，防止「练会格式、练废推理」。',
+            ],
+          },
+          {
+            kind: 'text',
+            text: '对齐阶段真正稀缺的是数据而不是算力：样本要一致、去重、覆盖真实输入分布。1000 条干净一致的样本，常常胜过 10 万条噪声标注。',
+          },
+          {
+            kind: 'note',
+            tone: 'warn',
+            title: '灾难性遗忘',
+            text: '只在小领域数据上猛训，通用能力会明显退化。常见缓解：混入一定比例的通用数据、降低学习率、用 LoRA 限制改动范围，并且每次都用固定评测集回归。',
+          },
+        ],
+      },
+      {
+        id: 'distill',
+        title: '蒸馏与量化：把大模型压小',
+        blocks: [
+          {
+            kind: 'text',
+            text: '知识蒸馏让一个小模型（学生）模仿大模型（教师）的输出分布：不只看硬标签，还学教师的软概率，这种「暗知识」包含类别间的相似关系，比 one-hot 信息量大。数据蒸馏则是用大模型批量生成或筛选训练数据，把成本从训练侧挪到生成侧。量化是另一件事：降低权重与激活的数值精度（FP16 → INT8 / INT4），模型更小更快，但会轻微掉精度。',
+          },
+          {
+            kind: 'table',
+            headers: ['手段', '本质', '产物', '代价'],
+            rows: [
+              ['知识蒸馏', '学生模型模仿教师输出分布', '同任务下更小的模型', '上限受教师与数据限制'],
+              ['数据蒸馏', '大模型生成 / 筛选训练样本', '高质量数据集', '需去重与质检，成本前移'],
+              ['量化', '降低数值精度', '同一模型更小更快', '精度轻微下降，需要校准'],
+            ],
+          },
+          {
+            kind: 'note',
+            tone: 'info',
+            title: '三个词别混',
+            text: '蒸馏是「换个更小的模型来学」；量化是「同一个模型用更低的精度存与算」；微调是「同一个模型继续训练」。面试里这三个概念经常被放在一起考辨析。',
+          },
+        ],
+      },
+      {
+        id: 'example',
+        title: '一次 LoRA 微调的关键配置',
+        blocks: [
+          {
+            kind: 'text',
+            text: '下面只列决定「训多少、怎么训」的几项。真实训练还要处理数据模板、截断长度、评测与合并权重，但核心旋钮就是这几个。',
+          },
+          {
+            kind: 'code',
+            language: 'python',
+            caption: 'peft + transformers 的 LoRA 配置骨架',
+            code: [
+              'from peft import LoraConfig, get_peft_model',
+              'from transformers import AutoModelForCausalLM, AutoTokenizer',
+              '',
+              'base = "your-base-model"',
+              'tokenizer = AutoTokenizer.from_pretrained(base)',
+              'model = AutoModelForCausalLM.from_pretrained(base, device_map="auto")',
+              '',
+              'config = LoraConfig(',
+              '    r=8,                    # 低秩维度：越大容量越强、显存越高',
+              '    lora_alpha=16,          # 缩放系数，常取 2×r',
+              '    lora_dropout=0.05,',
+              '    target_modules=["q_proj", "v_proj"],  # 只挂到注意力的投影层',
+              '    task_type="CAUSAL_LM",',
+              ')',
+              'model = get_peft_model(model, config)',
+              'model.print_trainable_parameters()  # 通常只有总参数的 0.1%–1%',
+            ].join('\n'),
+          },
+          {
+            kind: 'list',
+            ordered: true,
+            items: [
+              'r 与 lora_alpha 决定「能改多少」：任务越偏离原分布，r 可以适当调大。',
+              'target_modules 选哪些层决定改动位置，只挂 q/v 是最省的做法。',
+              '训练数据必须与线上输入同分布，否则上线后格式对、内容错。',
+              '训完先在固定评测集上对比底座，再决定是否合并权重上线。',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'pitfalls',
+        title: '常见坑与自测',
+        blocks: [
+          {
+            kind: 'note',
+            tone: 'warn',
+            title: '微调不是「灌知识」的默认答案',
+            text: '把产品文档塞进微调数据，模型可能记住措辞却记不准细节，还无法引用来源。知识型需求先做 RAG；微调留给「怎么说」而不是「说什么」。',
+          },
+          {
+            kind: 'qa',
+            items: [
+              {
+                question: 'LoRA 为什么能省显存？',
+                answer: '原权重冻结，不存它的梯度与优化器状态，只训练两个很小的低秩矩阵；QLoRA 还把底座量化到 4bit，进一步压低占用。',
+              },
+              {
+                question: 'SFT 和 RLHF 各自解决什么？',
+                answer: 'SFT 教模型「照着好答案做」，解决会不会；RLHF / DPO 用偏好数据优化「哪种回答更好」，解决倾向与风格。',
+              },
+              {
+                question: '蒸馏和量化能同时用吗？',
+                answer: '能，而且常见：先蒸馏出小模型，再量化部署。每一步都要单独评测，避免误差叠加后才发现效果崩了。',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'ai-langchain-langgraph',
+    title: 'LangChain 与 LangGraph 编排',
+    direction: 'AI 工程',
+    sub_direction: 'Agent',
+    level: '进阶',
+    summary:
+      '手写调用循环到一定复杂度就该上编排层：LangChain 把「提示词 → 模型 → 解析」组合成流水线，LangGraph 用状态图管理分支、循环与人工介入。',
+    sections: [
+      {
+        id: 'why',
+        title: '框架替你标准化了什么',
+        blocks: [
+          {
+            kind: 'text',
+            text: '自己写循环时，提示词模板、模型切换、工具分发、重试、流式输出、调用追踪都要手搓一遍。LangChain 提供这些组件的统一接口，并用 Runnable 组合成流水线；LangGraph 在此之上提供有状态的图编排，专门处理需要多步循环、条件分支与断点续跑的场景。',
+          },
+          {
+            kind: 'table',
+            headers: ['需求', 'LangChain', 'LangGraph'],
+            rows: [
+              ['线性流水线（提示词 → 模型 → 解析）', 'Runnable / LCEL 管道，最顺手', '也能做，但偏重'],
+              ['多步循环与条件分支', 'AgentExecutor 封装较多、细节偏黑盒', '显式节点 + 条件边，最合适'],
+              ['人工介入 / 断点续跑', '支持有限', 'checkpointer 持久化状态，天然支持'],
+              ['调试与追踪', '接 LangSmith 看每步输入输出', '同样可追踪，还能看到完整状态快照'],
+            ],
+          },
+          {
+            kind: 'note',
+            tone: 'info',
+            title: '框架不是必需品',
+            text: '固定三步、几十行能写清的流程，手写更可控、更好测。等出现「分支 + 循环 + 需要恢复现场」时再上 LangGraph，别为了用框架而用框架。',
+          },
+        ],
+      },
+      {
+        id: 'lc',
+        title: 'LangChain：把组件接成流水线',
+        blocks: [
+          {
+            kind: 'text',
+            text: 'LCEL（LangChain Expression Language）用管道符把 Runnable 串起来：前一个的输出是后一个的输入。每个组件都实现 invoke / batch / stream，所以整条链自然支持单次、批量与流式。',
+          },
+          {
+            kind: 'code',
+            language: 'python',
+            caption: '最小 LCEL 链与一次 RAG 组合',
+            code: [
+              'from langchain_core.prompts import ChatPromptTemplate',
+              'from langchain_core.output_parsers import StrOutputParser',
+              'from langchain_openai import ChatOpenAI',
+              '',
+              'prompt = ChatPromptTemplate.from_messages([',
+              '    ("system", "你只依据资料回答，没有依据就说不知道。"),',
+              '    ("human", "资料：{context}\\n\\n问题：{question}"),',
+              '])',
+              'model = ChatOpenAI(model="your-model", temperature=0)',
+              '',
+              'chain = prompt | model | StrOutputParser()',
+              'answer = chain.invoke({"context": docs, "question": q})',
+              '',
+              '# 接检索器后，整条 RAG 链同样只是拼接：',
+              '# chain = {"context": retriever, "question": RunnablePassthrough()} | prompt | model | parser',
+            ].join('\n'),
+          },
+          {
+            kind: 'list',
+            ordered: true,
+            items: [
+              'prompt 负责把变量填进模板，模型只看到最终文本。',
+              'model 是统一的调用封装，换供应商只换这一层。',
+              'parser 把模型输出解析成结构化结果，失败要能抛出让上层重试。',
+              '整条链可 invoke（单次）、batch（批量）、stream（流式），不必各写一套。',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'graph',
+        title: 'LangGraph：用状态图管分支与循环',
+        blocks: [
+          {
+            kind: 'text',
+            text: 'LangGraph 的核心是一个显式状态：用 TypedDict 定义字段，节点是「读状态 → 返回部分更新」的函数，边决定下一个节点。compile() 后得到可执行图；挂上 checkpointer 后，每个节点的状态都会落库，可以中断、恢复、人工审批后继续。',
+          },
+          {
+            kind: 'code',
+            language: 'python',
+            caption: '带条件边与记忆的最小图',
+            code: [
+              'from typing import Annotated, TypedDict',
+              'from langgraph.graph import StateGraph, END',
+              'from langgraph.checkpoint.memory import MemorySaver',
+              '',
+              'class State(TypedDict):',
+              '    messages: Annotated[list, lambda a, b: a + b]  # 追加而非覆盖',
+              '',
+              'def agent(state: State):',
+              '    return {"messages": [model.invoke(state[\'messages\'])]}',
+              '',
+              'def call_tools(state: State):',
+              '    return {"messages": [run_tool(m) for m in state[\'messages\'][-1].tool_calls]}',
+              '',
+              'def should_continue(state: State):',
+              '    last = state[\'messages\'][-1]',
+              '    return "tools" if last.tool_calls else END',
+              '',
+              'graph = StateGraph(State)',
+              'graph.add_node("agent", agent)',
+              'graph.add_node("tools", call_tools)',
+              'graph.set_entry_point("agent")',
+              'graph.add_conditional_edges("agent", should_continue)',
+              'graph.add_edge("tools", "agent")',
+              'app = graph.compile(checkpointer=MemorySaver())',
+              '',
+              'app.invoke({"messages": [("user", question)]},',
+              '           config={"configurable": {"thread_id": "demo"}})',
+            ].join('\n'),
+          },
+          {
+            kind: 'note',
+            tone: 'warn',
+            title: '图的价值是「可观察的状态」',
+            text: '每一步的输入输出都能落库与重放，出错时能看到是哪一步、带着什么状态走偏了。这比黑盒式 AgentExecutor 好排查得多，也是长任务与人工审批场景选它的主要原因。',
+          },
+        ],
+      },
+      {
+        id: 'pitfalls',
+        title: '常见坑与自测',
+        blocks: [
+          {
+            kind: 'note',
+            tone: 'warn',
+            title: '框架不替你设计',
+            text: '工具描述含糊、状态越滚越大、没有步数与预算上限，换成图也一样出事。上框架前先把单次调用测稳，并强制步数、超时与费用上限。',
+          },
+          {
+            kind: 'qa',
+            items: [
+              {
+                question: 'LangChain 和 LangGraph 该选哪个？',
+                answer: '固定流水线用 LangChain 的 Runnable 就够；需要循环、条件分支、断点续跑或人工介入时用 LangGraph。两者可混用：图里的节点照样可以是一条 LCEL 链。',
+              },
+              {
+                question: 'checkpointer 解决什么问题？',
+                answer: '把每个节点的状态持久化，进程崩了或需要人工审批时能从上次状态继续，而不是从头重跑、重复花钱。',
+              },
+              {
+                question: '用框架会不会让系统更难测？',
+                answer: '不会，前提是把节点写成「状态进、状态出」的纯函数：单测直接喂状态断言返回值，不必启动整张图；整图再用少量端到端用例覆盖。',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'ai-glossary',
+    title: 'AI 关键名词速查',
+    direction: 'AI 工程',
+    sub_direction: '通用 AI',
+    level: '基础',
+    summary:
+      '把面试与文档里高频出现的名词按「训练 / 推理 / 工程」三组归类，每个给一句话解释，并标出最常见的误解。',
+    sections: [
+      {
+        id: 'training',
+        title: '训练与模型',
+        blocks: [
+          {
+            kind: 'table',
+            headers: ['名词', '一句话解释', '常见误解'],
+            rows: [
+              ['预训练', '海量无标注语料上做 next-token 预测，造出底座模型', '以为知识是被逐条写入的'],
+              ['SFT', '用「指令 → 理想回答」样本做监督微调，教模型听懂任务', '以为 SFT 能灌进新知识'],
+              ['RLHF / DPO', '用人类偏好数据优化回答倾向与风格', '以为只是「打分」不改变行为'],
+              ['LoRA', '冻结底座、只训练低秩增量的微调方式', '以为效果必然不如全量微调'],
+              ['蒸馏', '小模型模仿大模型的输出分布', '和量化混为一谈'],
+              ['量化', '降低权重 / 激活的数值精度以省显存提速', '以为量化等于换小模型'],
+              ['Scaling Law', '参数、数据、算力同步放大时 loss 平滑下降的经验规律', '当成「堆参数必然变强」的保证'],
+              ['灾难性遗忘', '只在新领域训练导致通用能力退化', '以为多训几轮总能更好'],
+            ],
+          },
+          {
+            kind: 'note',
+            tone: 'info',
+            title: '一条主线',
+            text: '预训练造底座 → SFT 教任务 → 偏好对齐调风格 → 蒸馏 / 量化压缩部署。四步各解决不同问题，不是互相替代。',
+          },
+        ],
+      },
+      {
+        id: 'inference',
+        title: '推理与调用',
+        blocks: [
+          {
+            kind: 'table',
+            headers: ['名词', '一句话解释', '常见误解'],
+            rows: [
+              ['token', '模型处理文本的最小单位，计费与限长都按它算', '以为一个汉字就是一个 token'],
+              ['embedding', '把文本映射成向量，用于相似度检索与聚类', '和 token 混为一谈'],
+              ['上下文窗口', '单次请求能容纳的 token 上限', '以为窗口越大就一定越好用'],
+              ['logits', '模型对词表每个 token 的原始打分，softmax 后才成概率', '以为输出概率是模型直接给的'],
+              ['temperature', '采样随机性，越低越确定', '以为设 0 就绝对可复现'],
+              ['top_p', '只从累计概率前 p 的候选里采样', '和 temperature 同时调到极端'],
+              ['KV Cache', '缓存历史 token 的注意力键值，避免重复计算', '以为它不占显存'],
+              ['幻觉', '一本正经地编造不存在的事实或引用', '以为换个更大的模型就消失'],
+              ['grounding', '让回答锚定在给定资料上，可核对来源', '以为加了引用就一定有依据'],
+              ['CoT', '让模型先写推理步骤再给结论', '以为所有任务都需要长推理'],
+              ['few-shot', '在提示词里给几个示例，让模型照样子做', '示例越多越好'],
+              ['function calling', '模型按 schema 输出「调哪个工具、传什么参数」', '以为模型真的执行了工具'],
+            ],
+          },
+        ],
+      },
+      {
+        id: 'engineering',
+        title: '工程与评估',
+        blocks: [
+          {
+            kind: 'table',
+            headers: ['名词', '一句话解释', '常见误解'],
+            rows: [
+              ['RAG', '先检索资料再生成回答的固定流程', '以为能解决所有知识问题'],
+              ['向量库', '存 embedding 并支持近邻检索的数据库', '以为它能替代关键词检索'],
+              ['chunk', '文档切分出的片段，是检索的最小单位', '切得越小越精确'],
+              ['rerank', '用更精细的模型对候选片段重新排序', '和向量检索重复'],
+              ['Agent', '模型 + 工具 + 循环，动态决定下一步做什么', '所有需求都该上 Agent'],
+              ['guardrail', '对输入输出做校验、过滤与拦截的防护层', '只靠提示词就能防住'],
+              ['提示注入', '外部内容里藏指令，诱导模型越权执行', '以为模型「应该能分辨」'],
+              ['eval', '用固定样本集量化效果，支持回归对比', '只看几个 demo 就下结论'],
+              ['TTFT', '首个 token 的返回时间，流式体验的关键指标', '只看总耗时'],
+              ['tokens/s', '生成速度（吞吐），与首字延迟是两回事', '和 TTFT 混为一谈'],
+            ],
+          },
+        ],
+      },
+      {
+        id: 'mixup',
+        title: '易混辨析与自测',
+        blocks: [
+          {
+            kind: 'note',
+            tone: 'warn',
+            title: '三组最容易答错的',
+            text: '① 微调 vs RAG vs 提示词：改「怎么说」用微调，补「说什么」用 RAG，临时约束用提示词。② embedding vs token：token 是文本切分单位，embedding 是把文本变成向量。③ 蒸馏 vs 量化：前者换更小的模型学，后者同一模型降精度。',
+          },
+          {
+            kind: 'qa',
+            items: [
+              {
+                question: 'temperature 和 top_p 该怎么配？',
+                answer: '通常只调一个：抽取、判断类任务温度压到 0–0.3；创意任务调高温度或适当放 top_p，两个都调到极端会让输出发散。',
+              },
+              {
+                question: '为什么说「有引用」不等于「有依据」？',
+                answer: '模型可能编造不存在的编号或错误归因。要程序侧校验引用编号真实存在，并抽检引用片段与结论是否真的对应。',
+              },
+              {
+                question: 'Agent 和 RAG 的本质区别？',
+                answer: 'RAG 是固定流程（检索 → 生成）；Agent 由模型动态决定下一步做什么、做几步。流程能写死就不要用 Agent。',
               },
             ],
           },
