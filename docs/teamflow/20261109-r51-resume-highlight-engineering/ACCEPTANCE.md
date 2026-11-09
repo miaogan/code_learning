@@ -4,6 +4,7 @@
 > 实际结果按 §6「r53 交付核对」与 §7「收口批次核对」核对；有意偏差逐条记在 TECHNICAL §6–§7，
 > **未完成项不冒充已完成**。方案原文按「任务夹建后不可变」约定保留，不回改。
 > 远端 CI：`#33` / `1c33046` 成功（1m21s），新门禁全部跑绿。
+> 追加：**r54 在线评测轨道脚手架**已交付（§8），真实模型未实跑。
 
 ## 1. 验证命令（每次交付前全跑）
 
@@ -115,8 +116,30 @@ curl -sS http://127.0.0.1:8000/health
 
 **明确未完成 / 待验证（不冒充完成）**
 
-- [ ] 在线质量评测轨道（`AI_LIVE=1`）、轨迹 jsonl、评分 MAE：仍需真实 Key 与逐例人工打分，`docs/eval/traces/` 不存在
+- [ ] 在线质量评测**真实模型实跑**与评分 MAE：仍需用户同意消耗配额与逐例人工打分；轨迹 jsonl 与版本锁定脚手架已于 §8 落地（`docs/eval/traces/dry-run.jsonl`）
 - [ ] RRF 融合接入计划 UI、`PLAN_VERSION` 升 2：有意不做（TECHNICAL §6 偏差表）
 - [ ] 熔断自动短路、影子对比、幂等缓存接入主链路：可注入组件已实现并单测，默认只观测（§7.2）
 - [ ] WAL：有意不启用，基准显示 `busy_timeout` 已消除写失败
 - [ ] `benchmark.py` 进 CI：有意不进，跨机器分位不稳定会 flaky
+
+## 8. r54 在线评测轨道核对
+
+**已完成**
+
+- [x] `services/eval/live.py` 纯函数层：版本锁定、轨迹白名单、混淆矩阵、Wilson 区间、双轨对比、双开关判定
+- [x] `scripts/eval_live.py` CLI：默认 dry-run / `--check` 只读门禁 / `--live` 真跑 / `--limit`
+- [x] 复用产品真实链路 `PROFILE_SYSTEM` + `ProfileDraft` + `AIClient.complete_model`，不另写客户端
+- [x] 脱敏轨迹 `docs/eval/traces/dry-run.jsonl`（21 个白名单键）+ `LIVE-REPORT.md`（版本锁定 / 指标分母 / 双轨不可比较 / 解读限制）
+- [x] 真跑双开关：`--live` + `AI_LIVE=1` + 运行时就绪；不满足退出码 2、零出网；真跑日志写临时库不污染开发库
+- [x] CI 新增 `Live eval dry-run gate`（仅 dry-run，`--check` 只读）；在线真跑刻意不进 CI
+- [x] 后端新增 10 条测试（版本锁定 / 脱敏 / 分母 / 双开关 / CLI 只读与拒绝出网），`ruff check app tests` 全过
+
+**明确未完成 / 待用户确认（不冒充完成）**
+
+- [ ] **真实模型实跑**：`AI_LIVE=1 python -X utf8 scripts/eval_live.py --live` 需用户明确同意消耗第三方 API 配额，本轮未执行
+- [ ] 提示词 v1 → v2 的因果对比：需至少两个版本的真跑轨迹
+- [ ] 评分 MAE：仍需逐例人工打分
+- [ ] token 成本采集、多次采样 pass@k、`verify_quotes()` 纳入在线链路（逐条理由见 `TECHNICAL.md §8.3`）
+- [ ] 远端 CI 验证 `Live eval dry-run gate`：需下一次 push 后确认
+
+> 当前 `LIVE-REPORT.md` 标注为 **DRY-RUN**，延迟恒为 0；只能证明脚手架可复跑，不能写进简历当模型质量指标。

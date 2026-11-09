@@ -84,9 +84,16 @@ python -X utf8 scripts/eval_question_retrieval.py --check   # 题目侧 FTS5 召
 python -X utf8 scripts/eval_reliability.py                  # 故障注入 → RELIABILITY-REPORT.md
 python -X utf8 scripts/benchmark.py                         # 并发写锁 / 导入 / 检索 → PERF-REPORT.md
 python -X utf8 scripts/seed_eval_demo.py --dry-run          # /eval 看板合成演示数据（不写库）
+python -X utf8 scripts/eval_live.py --check                 # 在线评测脚手架 dry-run 门禁（零网络 / 零 Key）
 ```
 
-> 带 `--check` 的是只读 CI 门禁，不带的是会重写对应报告的生成命令；`benchmark.py` 依赖本机磁盘与 CPU，**刻意不进 CI**（跨机器分位不稳定会导致 flaky）。所有指标来自合成数据 / 同源标注 / 模拟故障，只用于回归检测与实现可用性证明，不代表模型能力或生产 QPS；口径与限制见 `docs/teamflow/20261109-r51-resume-highlight-engineering/TECHNICAL.md §6–§7`。
+> 带 `--check` 的是只读 CI 门禁，不带的是会重写对应报告的生成命令；`benchmark.py` 依赖本机磁盘与 CPU，**刻意不进 CI**（跨机器分位不稳定会导致 flaky）。所有指标来自合成数据 / 同源标注 / 模拟故障，只用于回归检测与实现可用性证明，不代表模型能力或生产 QPS；口径与限制见 `docs/teamflow/20261109-r51-resume-highlight-engineering/TECHNICAL.md §6–§8`。
+>
+> **在线质量评测轨道**：`scripts/eval_live.py` 默认 dry-run，只有 `--check` 进 CI。真跑需
+> `AI_LIVE=1 python -X utf8 scripts/eval_live.py --live`（消耗第三方配额、不进 CI），
+> 产出 `docs/eval/traces/` 脱敏轨迹与 `docs/eval/LIVE-REPORT.md`。版本锁定 prompt/model/rubric，
+> 轨迹只存元数据与 sha256，绝不写简历正文 / Key / 提示词全文。**当前报告标注 DRY-RUN、真实模型未实跑**，
+> 不能当成模型质量指标写进简历。
 
 ## 分支、交付与回滚
 

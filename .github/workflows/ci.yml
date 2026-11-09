@@ -64,3 +64,5 @@ jobs:
         run: python -X utf8 ../scripts/eval_question_retrieval.py --check
       - name: Reliability fault-injection gate
         run: python -X utf8 ../scripts/eval_reliability.py --check
+      - name: Live eval dry-run gate
+        run: python -X utf8 ../scripts/eval_live.py --check

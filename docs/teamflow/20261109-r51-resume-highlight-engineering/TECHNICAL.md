@@ -4,8 +4,8 @@
 > 契约双侧同步、错误 envelope 中文且脱敏、只用 token、测试按 `backend/tests/` 与 `frontend/src/**/*.test.ts` 放置。
 >
 > **阅读顺序（重要）**：§3–§4 是按「任务夹建后不可变」约定保留的**方案原文**，
-> 实际交付以 **§6（M2/M3 实施结果）** 与 **§7（r53 收口批次）** 为准。方案里这几项均未照做，
-> 且是**有意偏差**而非遗漏：`app_version` 列已去掉、评分 MAE / 轨迹 jsonl 未实现、
+> 实际交付以 **§6（M2/M3 实施结果）**、**§7（r53 收口批次）** 与 **§8（r54 在线评测轨道）** 为准。方案里这几项均未照做，
+> 且是**有意偏差**而非遗漏：`app_version` 列已去掉、评分 MAE 未实现（轨迹 jsonl 已于 §8 以 dry-run 形式落地）、
 > `PLAN_VERSION` 保持 1、RRF 未接入计划 UI、虚表实际名 `question_search`（非 `questions_fts`）、
 > 响应字段为 `mode`（非 `degraded`）、FTS 重建按行数一致跳过。偏差理由逐条见 §6 表格。
 
@@ -98,11 +98,12 @@ CREATE INDEX IF NOT EXISTS idx_ai_call_logs_model_kind ON ai_call_logs(model, ki
 | 轨道 | 输入 | 评测对象 | 指标 | 是否进 CI |
 |---|---|---|---|---|
 | **离线回归门禁** | 固定响应快照 + 人工标注 | 解析 / 校验 / 评分 / 降级**管线** | schema 通过率、字段级 P/R、评分 MAE、失败分类正确率、纯函数处理耗时 p95 | 是，零网络 |
-| **在线质量评测** | 同一金标集打真实模型 | 模型 + 提示词版本 | 真实 p50/p95 延迟、token 成本、失败率、多次采样 pass@k | 否，`AI_LIVE=1` 手动跑 |
+| **在线质量评测** | 同一金标集打真实模型 | 模型 + 提示词版本 | 真实 p50/p95 延迟、字段级 P/R、失败分类（token 成本未采集，见 §8） | 否；脚手架见 §8，**真实模型未实跑** |
 
 **离线轨道不能声称「模型准确率提升」**——响应快照固定，管线跑得再稳也不代表模型变好。
 报告与简历话术必须分别写：「管线回归门禁通过率 X%」与「在线评测（v1 提示词 → v2 提示词）字段 P/R 由 A 提升到 B」。
 后者只有真跑过真实模型、留存 prompt/model 版本与轨迹，才能写进简历。
+**§8 已落版本锁定与脱敏轨迹，但真实模型仍未实跑**，所以简历里仍不能写任何在线指标。
 
 ### 3.4 指标定义（分母写死，避免面试被问穿）
 
@@ -122,7 +123,7 @@ python -X utf8 scripts/eval_harness.py --golden docs/eval/golden-v1.json --repor
 python -X utf8 scripts/eval_harness.py --check --baseline v1     # 跌破基线 → 非零退出码，供 CI 使用
 ```
 
-- 版本锁定：脚本记录 `prompt_version` / `model` / `rubric_version` / 输入文件 sha256；轨迹写 `docs/eval/traces/<run>.jsonl` 可回放。
+- 版本锁定：脚本记录 `prompt_version` / `model` / `rubric_version` / 输入文件 sha256；轨迹写 `docs/eval/traces/<run>.jsonl` 可回放（§8 已落地，但只回放元数据、不还原原文）。
 - 评分器隔离：评分逻辑是纯函数 / 规则，**不调用被测模型打分**，防「同源自评偏差」（r48 题库同题）。
 - 报告：Markdown 表格给出每个指标 + 与基线差值 + 是否过门禁 + 样本量与区间；只读聚合 `/api/eval/summary` 供前端 `/eval` 看板展示趋势（业务逻辑下沉 `lib/eval.ts` + 同名测试）。
 
@@ -253,3 +254,49 @@ M2 / M3 已落盘。以下 5 处是**有意偏差**，按「任务夹建后不�
 **后端 667 passed / 1 skipped、前端 268 passed**；`ruff check app tests` / `typecheck` / `lint` / `build` / `question_merge --check` 全绿。
 新增脚本单独 `ruff check` 全过；`eval_reliability.py` 连跑两次报告 sha256 一致（注入固定 seed 的随机源，保证可复算）。
 `CI #33`（`1c33046`）在远端成功、1m21s，4 个新门禁与题库字节门禁全部跑绿。
+
+## 8. 在线质量评测轨道（r54，脚手架已就位 / 真实模型未实跑）
+
+承接 §3.3 的第二条轨道。目标不是「再多一个脚本」，而是把**能被追问的因果证据**所需的地基铺好：
+版本锁定、脱敏轨迹、指标分母、双轨不可混同、防止误触发消耗配额。
+
+### 8.1 交付内容
+
+| 项 | 落盘 | 说明 |
+|---|---|---|
+| 纯函数层 | `backend/app/services/eval/live.py` | `RunConfig` 版本锁定、`TRACE_KEYS` 白名单、`score_case` / `aggregate` / `wilson` / `compare_with_offline` / `should_run_live`；无网络、无数据库、无敏感原文 |
+| CLI | `scripts/eval_live.py` | 默认 dry-run；`--check` 只读门禁；`--live` 真跑；`--limit` 控制样本数 |
+| 被测系统 | 复用 `PROFILE_SYSTEM` + `ProfileDraft` + `AIClient.complete_model(retry_unavailable=True)` | **不另写客户端**，否则评的不是产品 |
+| 轨迹 | `docs/eval/traces/dry-run.jsonl`（真跑为 `live-<run_id>.jsonl`） | jsonl 每行 21 个白名单键：版本元数据 + 输入 sha256 + 合成字段词 + 延迟 / 字符数 / 失败分类；**不含简历正文、Key、提示词全文、模型原始响应** |
+| 报告 | `docs/eval/LIVE-REPORT.md` | 版本锁定表、指标与分母、Wilson 区间、双轨并列（明确不可比较）、解读限制、复跑命令 |
+| 门禁 | CI backend job 新增 `Live eval dry-run gate` | 只跑 dry-run `--check`，零网络、零 Key、只读 |
+
+### 8.2 防误触发：真跑的双开关
+
+`--live` + 环境变量 `AI_LIVE=1` + `resolve_ai().ready` 三者缺一不可；不满足时打印中文原因并**退出码 2**，绝不静默出网。
+真跑前把 `DB_PATH` 指到 `TemporaryDirectory`（`ai_call_logs` 不污染开发库），结束后清理。
+**在线轨道不进 CI**：需要 Key、消耗第三方配额、结果受上游抖动影响；只有 dry-run 的管线门禁进 CI。
+
+### 8.3 有意偏差（继续补记）
+
+| 方案承诺 | 实施 | 理由 |
+|---|---|---|
+| token 成本 | **未采集**，只记请求 / 响应字符数 | `AIClient.complete_model` 不暴露上游 usage，改主链路才能拿真实计费 token；不编造估算值 |
+| 轨迹可回放 | 只回放**元数据与合成字段词** | 写原文就破坏隐私边界；能复算指标但不可还原原文，这是有意交换 |
+| 产品完整链路 | 评 `complete_model` 的结构化输出，**不含 `verify_quotes()`** | 溯源校验是确定性规则，属于离线管线范畴；在线轨道只评模型 + 提示词 |
+| 多次采样 pass@k | 未实现 | 需要按 case 多轮采样与配额预算，属于后续工作 |
+| 评分 MAE | **仍未实现** | 金标只有 `score_band` 区间，缺逐例人工打分，不编造 `human` 标签 |
+| 真实模型实跑 | **未执行** | 需用户明确同意消耗 API 配额；本轮只交付可复跑骨架与 dry-run 证据 |
+
+### 8.4 实测（dry-run，命令输出）
+
+- `python -X utf8 scripts/eval_live.py`：30 例，schema 96.7%、micro-F1 98.5%、Wilson 95% `[83.3%, 99.4%]`；轨迹 21 键、无简历正文。
+- `python -X utf8 scripts/eval_live.py --check`：退出 0，报告 sha256 不变（只读）。
+- `python -X utf8 scripts/eval_live.py --live`（不设 `AI_LIVE=1`）：退出 2，提示需双开关。
+- **注意**：dry-run 的 schema 判定是轻量类型校验，与离线 harness 的 pydantic 校验、真跑的 `ProfileDraft` 校验三者口径不同；报告里已写明「两列数字不可相减」。
+
+### 8.5 诚实边界
+
+> 当前 `LIVE-REPORT.md` 是 **DRY-RUN**，延迟恒为 0、失败分类为占位；它只证明脚本与轨迹格式可复跑。
+> **不能写进简历当成模型质量指标**。要拿到「提示词 v1 → v2 字段 P/R 由 A 提升到 B」这类因果证据，
+> 必须在用户同意消耗配额后真跑至少两个版本、留存各自的 `prompt_version` / `model` 与轨迹，且人工复核标注质量。
