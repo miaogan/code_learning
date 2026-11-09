@@ -38,7 +38,7 @@
 2. `README.md`：顶部加 Actions badge；新增 `## 设计取舍（为什么这么做）` 一章，把 `ARCHITECTURE.md §1.1` 的四条取舍（不做 SSR / 后端选 Python / SQLite 直连不用 ORM / 手写 CSS）与**各自代价**搬到首页，便于面试官 30 秒看到判断力。
 3. `AGENTS.md` 变更记录追加 r51 条目。
 4. **CI 实跑已核实并更正文档**（本机 `gh` 未认证，但 Actions 页面公开可读）：共 32 次运行，最近 `CI #32` 对应 commit `163ebb4`（`feat/dev-skill-coach`）成功、耗时 1m6s；#21–#26 曾红灯、后续修复，#27–#32 连续通过。据此在 `ARCHITECTURE.md §7.1` 补 CI 实跑证据、§7.2 删除过期的「未落盘」条目，README badge 指向同一 workflow。
-   **注意**：`Question bank byte gate` 已随 #32 在远端验证为绿；后续新增的 4 个评测门禁见 §7，需下一次 push 后由远端确认。
+   **注意**：`Question bank byte gate` 已随 #32 跑绿；§7 新增的 4 个评测门禁已随 `CI #33`（`1c33046`，成功、1m21s）在远端全部跑绿。
 
 ## 3. M2 · 离线评测 Harness（方案已定，待实施）
 
@@ -252,4 +252,4 @@ M2 / M3 已落盘。以下 5 处是**有意偏差**，按「任务夹建后不�
 
 **后端 667 passed / 1 skipped、前端 268 passed**；`ruff check app tests` / `typecheck` / `lint` / `build` / `question_merge --check` 全绿。
 新增脚本单独 `ruff check` 全过；`eval_reliability.py` 连跑两次报告 sha256 一致（注入固定 seed 的随机源，保证可复算）。
-CI 的 4 个新门禁需下一次 push 后由远端确认；`Question bank byte gate` 已随 #32 验证为绿。
+`CI #33`（`1c33046`）在远端成功、1m21s，4 个新门禁与题库字节门禁全部跑绿。

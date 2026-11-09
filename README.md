@@ -73,7 +73,7 @@ docker compose ps        # backend 的 STATUS 应带 (healthy)
 | 根 | `curl -sS http://127.0.0.1:8000/health` | `{"status":"ok",...}` |
 | 根 | `grep -riE "sk-\|api_key\|AI_API_KEY" frontend/src frontend/dist \|\| echo NO_KEY_LEAK` | `NO_KEY_LEAK`（AC-8） |
 
-CI 双 job 已在 [GitHub Actions](https://github.com/miaogan/code_learning/actions) 实跑 32 次；最近 `#32` / `163ebb4` 成功（1m6s），#27–#32 连续通过，`Question bank byte gate` 已随 #32 在远端验证为绿。本轮新增的 4 个评测门禁（`Offline eval` / `Retrieval eval` / `Question retrieval eval` / `Reliability fault-injection`）本地均已实跑退出 0，需下一次 push 后由远端确认。
+CI 双 job 已在 [GitHub Actions](https://github.com/miaogan/code_learning/actions) 实跑 33 次；最近 `#33` / `1c33046` 成功（1m21s），#27–#33 连续通过。`Question bank byte gate` 已随 #32 跑绿，本轮新增的 4 个评测门禁（`Offline eval` / `Retrieval eval` / `Question retrieval eval` / `Reliability fault-injection`）已随 #33 在远端全部跑绿。
 
 评测与检索证据（零网络、可复跑）：
 

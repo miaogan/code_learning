@@ -14,7 +14,7 @@
 | 题库种子「素材重算逐字节一致」幂等门禁 | `question_merge --check`，已进 CI |
 | 简历原文不落盘、Key 只存后端 Fernet 密文、错误不含路径/堆栈/端点 | `README.md` 安全边界、`services/ai/user_ai.py` |
 | 异步任务 + 断连恢复 + 部分唯一索引幂等 + 卡片死清扫 | `profile_jobs` / `resume_jobs` |
-| CI 双 job 在 GitHub Actions 实跑 32 次，最近 `#32`（`163ebb4`）成功、#27–#32 连续通过 | [Actions 运行记录](https://github.com/miaogan/code_learning/actions) |
+| CI 双 job 在 GitHub Actions 实跑 33 次，最近 `#33`（`1c33046`）成功、#27–#33 连续通过（含 5 个零网络门禁） | [Actions 运行记录](https://github.com/miaogan/code_learning/actions) |
 | 离线评测门禁：30 例版本化合成金标集，schema 通过率 93.3%、micro-F1 98.5%、±2pp 波动带 | `scripts/eval_harness.py --check`、`docs/eval/REPORT.md` |
 | 模型调用全链路可观测：`ai_call_logs` 落库 + `/eval` 看板（成功率 / p50 / p95 / 失败分类 / 按模型），写库 best-effort 不影响主链路 | `services/ai/ai.py`、`GET /api/eval/summary` |
 | 检索增强：40 章教程 bigram + BM25、题库 FTS5 trigram（降级 LIKE）、可点击 citation；教程侧与题目侧各 20 组标注 recall@5 均 100%，Wilson 95% 下界 83.9% | `docs/eval/RETRIEVAL-REPORT.md`、`docs/eval/QUESTION-RETRIEVAL-REPORT.md` |

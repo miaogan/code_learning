@@ -339,7 +339,7 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
 | CI 双 job | `.github/workflows/ci.yml` |
 | 本地工程验证（r43 补记） | `pypdf` 6.21.4 / `python-docx` / `ruff` 均已装，真实 PDF / DOCX 解析与 `python -m ruff check app tests` 可在本机实跑（r42 起纳入每次交付门禁） |
 | AGENTS.md + memory.md + README | 仓库根与 `docs/teamflow/` |
-| CI 实跑（r51 核实、r53 复核） | GitHub Actions 共 32 次运行；最近 `CI #32`（commit `163ebb4`，`feat/dev-skill-coach`）成功、耗时 1m6s；#21–#26 曾红灯、后续修复，#27–#32 连续通过。`Question bank byte gate` 已随 #32 在远端跑绿。证据：[Actions](https://github.com/miaogan/code_learning/actions) |
+| CI 实跑（r51 核实、r53 复核） | GitHub Actions 共 33 次运行；最近 `CI #33`（commit `1c33046`，`feat/dev-skill-coach`）成功、耗时 1m21s；#21–#26 曾红灯、后续修复，#27–#33 连续通过。题库字节门禁已随 #32 跑绿，4 个评测门禁已随 #33 全部跑绿。证据：[Actions](https://github.com/miaogan/code_learning/actions) |
 
 ### 7.2 未落盘（明确未完成，不计入「已完成」）
 

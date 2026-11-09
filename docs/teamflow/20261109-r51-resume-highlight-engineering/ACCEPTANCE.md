@@ -3,6 +3,7 @@
 > 状态：**M1 / M2 / M3 均已交付（M1 = r51，M2/M3 = r53），r53 收口批次已交付**。§3/§4 原清单是方案阶段写的验收项，
 > 实际结果按 §6「r53 交付核对」与 §7「收口批次核对」核对；有意偏差逐条记在 TECHNICAL §6–§7，
 > **未完成项不冒充已完成**。方案原文按「任务夹建后不可变」约定保留，不回改。
+> 远端 CI：`#33` / `1c33046` 成功（1m21s），新门禁全部跑绿。
 
 ## 1. 验证命令（每次交付前全跑）
 
@@ -30,7 +31,7 @@ curl -sS http://127.0.0.1:8000/health
 - [x] `AGENTS.md` 变更记录追加 r51
 - [x] **CI 在 GitHub 上实跑为绿**：Actions 共 32 次运行，最近 `CI #32`（`163ebb4`，`feat/dev-skill-coach`）成功、1m6s；#21–#26 曾红灯后修复，#27–#32 连续通过。本机 `gh` 未认证，但网页公开可读；`ARCHITECTURE.md §7.1 / §7.2` 已据此更正。
 - [x] **题库字节门禁经远端验证**：`Question bank byte gate` 已随 #32 在远端跑绿。
-- [ ] **本轮新增 4 个评测门禁经远端验证**：`Offline eval` / `Retrieval eval` / `Question retrieval eval` / `Reliability fault-injection` 均已本地实跑退出 0，需下一次 push 后在 Actions 页面确认。
+- [x] **本轮新增 4 个评测门禁经远端验证**：`CI #33`（`1c33046`）成功、1m21s，`Offline eval` / `Retrieval eval` / `Question retrieval eval` / `Reliability fault-injection` 全部跑绿。
 
 ## 3. M2 · 离线评测 Harness（待实施）
 
@@ -110,6 +111,7 @@ curl -sS http://127.0.0.1:8000/health
 - [x] **性能基准**：`benchmark.py` → `PERF-REPORT.md`，并发写 / 导入幂等 / FTS5 检索三组 p50/p95/p99
 - [x] **CI 门禁**：backend 加 `Question retrieval eval` / `Reliability fault-injection`，frontend 加 `Retrieval eval`；YAML 解析通过，全部步骤在等价工作目录下本地退出 0
 - [x] **全量验证**：后端 667 passed / 1 skipped、前端 268 passed；`ruff`（app/tests 与新增脚本）/ `typecheck` / `lint` / `build` / `question_merge --check` / 5 个评测门禁全绿；`eval_reliability.py` 报告两次生成 sha256 一致
+- [x] **远端 CI**：`CI #33`（`1c33046`）成功、1m21s，4 个新门禁与题库字节门禁全部跑绿
 
 **明确未完成 / 待验证（不冒充完成）**
 
@@ -118,4 +120,3 @@ curl -sS http://127.0.0.1:8000/health
 - [ ] 熔断自动短路、影子对比、幂等缓存接入主链路：可注入组件已实现并单测，默认只观测（§7.2）
 - [ ] WAL：有意不启用，基准显示 `busy_timeout` 已消除写失败
 - [ ] `benchmark.py` 进 CI：有意不进，跨机器分位不稳定会 flaky
-- [ ] 本轮 4 个新 CI 门禁经远端验证：需下一次 push 后确认
