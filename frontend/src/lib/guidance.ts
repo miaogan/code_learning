@@ -42,8 +42,10 @@ export interface GuidanceDirection {
   /** 先补的技能，顺序 = `role_fit.first_fix` 顺序（前端不重排）。 */
   skills: GuidanceSkill[]
   courses: Course[]
-  /** 该方向的专项练习入口（只带 `direction` 一个筛选参数）。 */
+  /** 该方向的专项练习入口（r50 起可带短板二级方向聚焦）。 */
   practiceLink: string
+  /** r50：取自 `weakness_map` 的组内众数二级方向；空串 = 旧报告 / 无标签，按方向级回落。 */
+  sub_direction: string
   /** 主攻方向已达标等补充说明；没有则为 `null`。 */
   notice: string | null
 }
@@ -69,6 +71,17 @@ function shortfallNamesOf(report: Report, direction: string): string[] {
   return report.shortfalls
     .filter((shortfall) => shortfall.courses.some((course) => course.direction === direction))
     .map((shortfall) => shortfall.name)
+}
+
+/**
+ * r50：该方向的二级方向只取自报告 `weakness_map` 的组内众数（后端 r49 已算好）。
+ * 按报告原始顺序取第一条非空项 —— 不重排、不发明标签；旧报告缺字段时返回空串。
+ */
+function subDirectionOf(report: Report, direction: string): string {
+  const hit = (report.weakness_map ?? []).find(
+    (item) => item.direction === direction && (item.sub_direction ?? '').trim() !== '',
+  )
+  return (hit?.sub_direction ?? '').trim()
 }
 
 function skillOf(item: RoleFitItem): GuidanceSkill {
@@ -103,13 +116,15 @@ function primaryOf(
       ? `目标岗位「${roleFit.model.label}」属于${direction}方向；本次报告有 ${names.length} 条短板的推荐课程落在这个方向`
       : `目标岗位「${roleFit.model.label}」属于${direction}方向，先把该方向的基础补扎实`
 
+  const sub_direction = subDirectionOf(report, direction)
   return {
     direction,
     kind: 'primary',
     summary,
     skills,
     courses: (grouped.get(direction) ?? []).slice(0, DIRECTION_COURSE_LIMIT),
-    practiceLink: practiceHref({ direction }),
+    practiceLink: practiceHref({ direction, sub_direction }),
+    sub_direction,
     notice: skills.length === 0 ? GUIDANCE_MET_NOTICE : null,
   }
 }
@@ -129,13 +144,15 @@ function extrasOf(
     const names = shortfallNamesOf(report, direction)
     const shown =
       names.length > 2 ? `${names.slice(0, 2).join('、')} 等` : names.join('、')
+    const sub_direction = subDirectionOf(report, direction)
     return {
       direction,
       kind: 'extra',
       summary: `短板「${shown}」的推荐课程落在${direction}方向，可以作为主攻方向之外的补充`,
       skills: [],
       courses: courses.slice(0, DIRECTION_COURSE_LIMIT),
-      practiceLink: practiceHref({ direction }),
+      practiceLink: practiceHref({ direction, sub_direction }),
+      sub_direction,
       notice: null,
     }
   })

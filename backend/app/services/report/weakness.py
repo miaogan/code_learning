@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass
 from typing import Any
 
@@ -73,6 +74,29 @@ def _bank_index() -> dict[str, dict[str, Any]]:
     return {str(row.get("id") or ""): row for row in rows if row.get("id")}
 
 
+def _sub_direction_of(
+    question: dict[str, Any], bank: dict[str, dict[str, Any]], direction: str
+) -> str:
+    """r49：payload 自带值优先、题库行兜底；只认该方向闭集内的合法值，取不到留空。
+
+    与 `_labels_of` 同一口径：不猜、不填默认档。面试题与早期 payload 都没有这个维度，
+    一律空串，调用方据此回落方向级选章。
+    """
+    row = bank.get(str(question.get("id") or "")) or {}
+    value = str(question.get("sub_direction") or row.get("sub_direction") or "").strip()
+    if not value or not rules.is_valid_sub_direction(direction, value):
+        return ""
+    return value
+
+
+def _dominant_sub_direction(counts: Counter[str], direction: str) -> str:
+    """组内众数；平局按 `rules.SUBDIRECTIONS` 顺序取靠前者，保证逐字可复算。"""
+    if not counts:
+        return ""
+    order = {name: index for index, name in enumerate(rules.SUBDIRECTIONS.get(direction, ()))}
+    return min(counts, key=lambda name: (-counts[name], order.get(name, len(order))))
+
+
 def build_summary(item: WeaknessItem) -> str:
     """一句话薄弱描述（模板文案；AI 只可能替换它，绝不改数值）。"""
     labels = [
@@ -103,6 +127,8 @@ def build_weakness_map(runs: list[dict[str, Any]]) -> list[WeaknessItem]:
     bank = _bank_index()
     entries: dict[str, list[tuple[int, str, float]]] = {}
     groups: dict[str, _Group] = {}
+    #: r49：分组键不变，子方向只作为组内众数附加到 WeaknessItem，不参与分组与排序。
+    sub_counts: dict[str, Counter[str]] = {}
 
     for run in runs:
         kind = str(run.get("kind") or "")
@@ -121,6 +147,9 @@ def build_weakness_map(runs: list[dict[str, Any]]) -> list[WeaknessItem]:
             entries.setdefault(key, []).append(
                 (index, str(question.get("id") or ""), float(score))
             )
+            sub = _sub_direction_of(question, bank, direction)
+            if sub:
+                sub_counts.setdefault(key, Counter())[sub] += 1
 
     items: list[WeaknessItem] = []
     for key, group in groups.items():
@@ -135,6 +164,9 @@ def build_weakness_map(runs: list[dict[str, Any]]) -> list[WeaknessItem]:
             key=key,
             point=group.point,
             direction=group.direction,
+            sub_direction=_dominant_sub_direction(
+                sub_counts.get(key, Counter()), group.direction
+            ),
             wrong=wrong,
             total=total,
             rate=round(wrong / total, 3),

@@ -193,7 +193,8 @@ def test_r11_practice_closed_sets() -> None:
     assert _literal_values(PracticeDifficultyFilter) == {rules.FILTER_ANY} | set(rules.DIFFICULTIES)
     assert _literal_values(PracticeEssentialityFilter) == {rules.FILTER_ANY} | set(rules.ESSENTIALITIES)
 
-    # 请求模型的默认值 = 「全部」+ 默认题量（六项都可省略）。
+    # 请求模型的默认值 = 「全部」+ 默认题量（七项都可省略）。
+    # r50 追加 `sub_direction`；缺省 "" = 不聚焦，老客户端请求体逐字可用。
     request_defaults = {name: field.default for name, field in PracticePaperRequest.model_fields.items()}
     assert request_defaults == {
         "language": rules.FILTER_ANY,
@@ -202,6 +203,7 @@ def test_r11_practice_closed_sets() -> None:
         "essentiality": rules.FILTER_ANY,
         "scope": "all",
         "limit": rules.DEFAULT_PRACTICE_LIMIT,
+        "sub_direction": "",
     }, f"PracticePaperRequest 默认值漂移：{request_defaults}"
 
     ts = _ts_source()

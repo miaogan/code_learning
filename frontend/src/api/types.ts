@@ -328,6 +328,8 @@ export interface WeaknessItem {
   /** 展示名，来自 `diagnosis._bucket_name`。 */
   point: string
   direction: string
+  /** r49 纯附加字段：组内题目众数二级方向。旧报告缺该键，学习计划按空串回落方向级选章。 */
+  sub_direction?: string
   wrong: number
   total: number
   /** 错误率 = round(wrong/total, 3)，服务端算好，前端零除法。 */
@@ -619,7 +621,10 @@ export type PracticeScope = 'all' | 'unseen' | 'wrong'
 /** 练习题量：`0` = 本次全部命中。 */
 export type PracticeLimit = 10 | 20 | 0
 
-/** 组卷请求体。六项都有服务端默认值，故前端可只传改动项。 */
+/** 二级方向筛选（r50）：空串 = 不聚焦；闭集由 `subDirectionsOf(direction)` 派生。 */
+export type PracticeSubDirectionFilter = string
+
+/** 组卷请求体。七项都有服务端默认值，故前端可只传改动项。 */
 export interface PracticePaperRequest {
   language?: PracticeLanguageFilter
   direction?: PracticeDirectionFilter
@@ -627,6 +632,7 @@ export interface PracticePaperRequest {
   essentiality?: PracticeEssentialityFilter
   scope?: PracticeScope
   limit?: PracticeLimit
+  sub_direction?: PracticeSubDirectionFilter
 }
 
 /** 题单里的一道题：**不含** `answer`（答案只在判分响应里回显）。 */
@@ -648,6 +654,10 @@ export interface PracticePaper {
   hit_count: number
   /** 空结果 / 截断 / 题库未就绪的中文提示；正常满额时为空串。 */
   notice: string
+  /** r50：实际生效的二级方向；未聚焦为空串。 */
+  sub_direction: string
+  /** r50：聚焦池不足题量时补齐的同方向题数（0 = 全部命中）。 */
+  sub_direction_backfill: number
 }
 
 export interface PracticeAnswerRequest {

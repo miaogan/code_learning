@@ -5,6 +5,7 @@ import type { LearnProgressState } from '../lib/learnProgress'
 import {
   PLAN_DAY_COUNT,
   buildStudyPlan,
+  practiceHref,
   parsePlanState,
   parseStoredPlan,
   planStats,
@@ -83,6 +84,30 @@ describe('buildStudyPlan', () => {
         expect(day.minutes).toBe(sum)
       }
     }
+  })
+
+  it('r50 短板带二级方向时，专项练习链接带 sub 参数', () => {
+    const report = makeReport([
+      weakness('推理服务', 'AI 工程', { sub_direction: '部署与推理' }),
+    ])
+    const plan = buildStudyPlan(report, { dailyMinutes: 30, learned: emptyLearn() })
+    const practice = plan.days
+      .flatMap((day) => day.tasks)
+      .find((task) => task.kind === 'practice' && task.shortfall !== null)
+    expect(practice).toBeDefined()
+    const query = new URLSearchParams((practice?.href ?? '').split('?')[1] ?? '')
+    expect(query.get('direction')).toBe('AI 工程')
+    expect(query.get('sub')).toBe('部署与推理')
+  })
+
+  it('r50 practiceHref 只在非空子方向写 sub（与练习页 ?sub= 同参数名）', () => {
+    expect(practiceHref({ direction: 'AI 工程' })).not.toContain('sub=')
+    expect(practiceHref({ direction: 'AI 工程', sub_direction: '' })).not.toContain('sub=')
+    const query = new URLSearchParams(
+      practiceHref({ direction: 'AI 工程', sub_direction: 'Agent' }).split('?')[1],
+    )
+    expect(query.get('sub')).toBe('Agent')
+    expect(query.get('direction')).toBe('AI 工程')
   })
 
   it('短板不足 7 天时用通用任务补空天，且不编造短板名', () => {
@@ -192,6 +217,65 @@ describe('buildStudyPlan', () => {
     expect(stats.total).toBe(tasks.length)
     expect(stats.completed).toBe(2)
     expect(stats.percent).toBe(Math.round((2 / tasks.length) * 100))
+  })
+  it('r49：短板带子方向时优先选同子方向的高级章', () => {
+    const serving = ALL_TUTORIAL_CHAPTERS.find(
+      (chapter) => chapter.id === 'ai-inference-serving',
+    )
+    const directionFirst = ALL_TUTORIAL_CHAPTERS.find(
+      (chapter) => chapter.direction === 'AI 工程' && chapter.level === '高级',
+    )
+    expect(serving).toBeDefined()
+    expect(directionFirst?.id).not.toBe(serving!.id)
+    const report = makeReport([
+      weakness('推理服务不稳', 'AI 工程', {
+        difficulty: ['challenge'],
+        sub_direction: '部署与推理',
+      }),
+    ])
+    const plan = buildStudyPlan(report, { dailyMinutes: 60, learned: emptyLearn() })
+    const tutorials = plan.days
+      .flatMap((day) => day.tasks)
+      .filter((task) => task.kind === 'tutorial')
+    expect(tutorials.some((task) => task.chapter_id === serving!.id)).toBe(true)
+    expect(tutorials.some((task) => task.chapter_id === directionFirst!.id)).toBe(false)
+  })
+
+  it('r49：子方向暂无教程时逐字回落到方向级选章', () => {
+    const ids = (plan: ReturnType<typeof buildStudyPlan>) =>
+      plan.days
+        .flatMap((day) => day.tasks)
+        .filter((task) => task.kind === 'tutorial')
+        .map((task) => task.id)
+    const plain = buildStudyPlan(makeReport([weakness('HTML 语义化', '前端')]), {
+      dailyMinutes: 60,
+      learned: emptyLearn(),
+    })
+    const tagged = buildStudyPlan(
+      makeReport([weakness('HTML 语义化', '前端', { sub_direction: 'html' })]),
+      { dailyMinutes: 60, learned: emptyLearn() },
+    )
+    expect(ids(plain).length).toBeGreaterThan(0)
+    expect(ids(tagged)).toEqual(ids(plain))
+    expect(ids(tagged).every((id) => id.startsWith('tutorial:'))).toBe(true)
+  })
+
+  it('r49：子方向内没有目标档位时按难度递进取该子方向的低档章', () => {
+    const chapter = ALL_TUTORIAL_CHAPTERS.find(
+      (item) => item.id === 'ai-prompt-engineering',
+    )
+    expect(chapter?.level).toBe('进阶')
+    const report = makeReport([
+      weakness('提示词漂移', 'AI 工程', {
+        difficulty: ['challenge'],
+        sub_direction: 'Prompt 工程',
+      }),
+    ])
+    const plan = buildStudyPlan(report, { dailyMinutes: 60, learned: emptyLearn() })
+    const tutorials = plan.days
+      .flatMap((day) => day.tasks)
+      .filter((task) => task.kind === 'tutorial')
+    expect(tutorials.some((task) => task.chapter_id === 'ai-prompt-engineering')).toBe(true)
   })
 })
 

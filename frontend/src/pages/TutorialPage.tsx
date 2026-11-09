@@ -123,9 +123,13 @@ export default function TutorialPage() {
       <div className="sc-learn-foot">
         <Link
           className="sc-plan-task"
-          to={practiceHref({ direction: chapter.direction, limit: 10 })}
+          to={practiceHref({
+            direction: chapter.direction,
+            sub_direction: chapter.sub_direction,
+            limit: 10,
+          })}
         >
-          <span className="sc-plan-tasklabel">{`${chapter.direction}专项练习 10 题`}</span>
+          <span className="sc-plan-tasklabel">{`${chapter.sub_direction}专项练习 10 题`}</span>
           <span className="sc-plan-taskmeta">读完立刻验证 · 即时对错与解析</span>
         </Link>
       </div>

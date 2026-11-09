@@ -269,7 +269,9 @@ def test_generated_bank_has_no_ai_placeholder(bank_rows: list[dict[str, Any]]) -
 # ---------------------------------------------------------------------------
 
 #: r12 新增来源闭集（与 `question_merge.SOURCES` 同一口径；门禁是唯一断言点故写字面量）。
-R12_SOURCES = ("tiji", "local100", "iq380", "fe-interview", "ai-eng", "mw", "sql", "algo", "devprac")
+#: r47 追加 `ai-adv`（10 号素材，AI 工程高阶题 40 道）。
+#: r48 追加 `ai-sys`（11 号素材，多 Agent 编排 / RAG 评审 / harness 工程 36 道）。
+R12_SOURCES = ("tiji", "local100", "iq380", "fe-interview", "ai-eng", "mw", "sql", "algo", "devprac", "ai-adv", "ai-sys")
 #: 每来源条数：`seed` 是存量 260 行（种子不写 `source`，读侧缺省 `'seed'`）。
 R12_SOURCE_COUNTS = {
     "seed": 260,
@@ -282,9 +284,11 @@ R12_SOURCE_COUNTS = {
     "sql": 50,
     "algo": 30,
     "devprac": 50,
+    "ai-adv": 40,
+    "ai-sys": 36,
 }
-#: 合并后总量（= 存量 260 + 本批 828）。
-R12_TOTAL = 1088
+#: 合并后总量（= 存量 260 + 本批 904，其中 r47 追加 40、r48 追加 36）。
+R12_TOTAL = 1164
 
 
 def test_r12_source_enum_and_per_source_counts(bank_rows: list[dict[str, Any]]) -> None:
@@ -301,7 +305,7 @@ def test_r12_source_enum_and_per_source_counts(bank_rows: list[dict[str, Any]]) 
 
 
 def test_r12_total_after_merge_is_1088(bank_rows: list[dict[str, Any]]) -> None:
-    """r12：合并后总量恰 1088（260 存量 + 828 新增），且 828 道全是客观题。"""
+    """r12/r47/r48：合并后总量恰 1164（260 存量 + 904 新增），且 904 道全是客观题。"""
     assert len(bank_rows) == R12_TOTAL, f"题库总量 {len(bank_rows)} ≠ {R12_TOTAL}"
     merged = [row for row in bank_rows if str(row.get("source") or "") in R12_SOURCES]
     assert len(merged) == R12_TOTAL - R12_SOURCE_COUNTS["seed"]

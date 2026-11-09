@@ -203,4 +203,39 @@ describe('buildGuidance（推荐学习方向）', () => {
     expect(buildGuidance(input)).toEqual([])
     expect(GUIDANCE_EMPTY_NOTICE).not.toBe('')
   })
+
+  it('r50 方向卡取 weakness_map 的二级方向并写进专项练习链接', () => {
+    const input = report({
+      role_fit: roleFit(),
+      shortfalls: [shortfall({ courses: [course({ id: 'ai-1', direction: 'AI 工程' })] })],
+      weakness_map: [
+        {
+          key: 'AI 工程|challenge|advanced',
+          point: 'AI 工程',
+          direction: 'AI 工程',
+          sub_direction: '部署与推理',
+          wrong: 3,
+          total: 4,
+          rate: 0.75,
+          avg: 4,
+          difficulty: ['challenge'],
+          essentiality: ['advanced'],
+          samples: [],
+          summary: '推理服务相关题答错偏多',
+        },
+      ],
+    })
+    const ai = buildGuidance(input).find((item) => item.direction === 'AI 工程')
+    expect(ai?.sub_direction).toBe('部署与推理')
+    expect(queryOf(ai?.practiceLink ?? '').get('sub')).toBe('部署与推理')
+    expect(queryOf(ai?.practiceLink ?? '').get('direction')).toBe('AI 工程')
+  })
+
+  it('r50 旧报告缺二级方向时静默回落方向级（链接不带 sub）', () => {
+    const primary = buildGuidance(
+      report({ role_fit: roleFit(), shortfalls: [shortfall()] }),
+    )[0]
+    expect(primary.sub_direction).toBe('')
+    expect(queryOf(primary.practiceLink).get('sub')).toBeNull()
+  })
 })

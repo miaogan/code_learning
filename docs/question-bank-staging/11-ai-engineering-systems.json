@@ -1,0 +1,642 @@
+[
+  {
+    "n": 1,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "supervisor 编排把「下一步交给谁」完全交给模型自由判断（由模型输出决定交接目标），生产里最典型的失控表现是？",
+    "options": [
+      { "key": "A", "text": "每次交接都重读全量历史，调用成本线性上升" },
+      { "key": "B", "text": "两个角色互相判定该由对方处理，循环转派直到耗尽步数" },
+      { "key": "C", "text": "所有子任务被强制串行执行，无法并行分发" },
+      { "key": "D", "text": "评审角色自动继承写权限并覆盖执行产物" }
+    ],
+    "answer": "B",
+    "explanation": "自由式交接缺少允许转移表与访问约束，模型在职责边界模糊时容易把任务推回上一个角色，形成无限转派；应由编排层用显式状态机限定可迁移的边、记录每个节点的访问次数并叠加全局上限。成本上升、串行化与越权分别是另外三类设计缺陷。"
+  },
+  {
+    "n": 2,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "多个执行角色并发修改同一份任务状态时，下列哪些做法能避免状态分叉？",
+    "options": [
+      { "key": "A", "text": "每个角色只提交结构化增量，由编排层单写者合并" },
+      { "key": "B", "text": "状态以只追加事件日志记录，读取时按版本重放" },
+      { "key": "C", "text": "共享状态带版本号，写入时做乐观并发校验，冲突则重算" },
+      { "key": "D", "text": "每个角色各存一份完整副本，结束后按最后写入者覆盖" }
+    ],
+    "answer": "A,B,C",
+    "explanation": "单写者合并、事件日志重放与版本化乐观校验都能把并发写入收敛到一致状态，且失败可定位；各自持有完整副本再按最后写入覆盖会静默丢掉其他分支的更新，正是状态分叉的成因。"
+  },
+  {
+    "n": 3,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "设计多 Agent 任务的终止条件，最稳妥的方案是？",
+    "options": [
+      { "key": "A", "text": "由评审角色输出「已完成」即结束整个流程" },
+      { "key": "B", "text": "编排层设可校验的完成判据，并叠加全局步数、时长与预算上限" },
+      { "key": "C", "text": "等到所有执行角色都返回空结果才停止" },
+      { "key": "D", "text": "固定轮次后强制结束，不检查产物是否达标" }
+    ],
+    "answer": "B",
+    "explanation": "模型自称完成并不可靠，必须把可程序化校验的完成判据放在编排层，再用全局步数与预算作为硬护栏；只看评审结论容易提前收尾，固定轮次则可能在未达标时截断或已达标后继续空转。"
+  },
+  {
+    "n": 4,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "kind": "judge",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "评审角色与执行角色使用同一个基座模型、同一套提示做自我复核，其结论通常可以视作无偏的独立评审。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": "错误",
+    "explanation": "同一模型往往偏好与自己生成风格相近的输出，还会复现同样的知识盲区，属于同源偏差；应引入异构裁判、人工标注锚点或可程序化验证的判据，并定期用人工样本校准一致率与偏差方向。"
+  },
+  {
+    "n": 5,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "并行分发给五个子 Agent 后按「全部返回才继续」归集，线上最突出的问题是？",
+    "options": [
+      { "key": "A", "text": "尾延迟被最慢的一路拖住，单点失败还会放大成整体失败" },
+      { "key": "B", "text": "结果必然乱序，无法与任务标识对应" },
+      { "key": "C", "text": "模型会直接拒绝并发调用工具" },
+      { "key": "D", "text": "每一路都会重复扣减同一份预算" }
+    ],
+    "answer": "A",
+    "explanation": "等齐策略把整体延迟绑定到最慢分支，并让任一分支的失败放大为全局失败；工程上常用配额数归集、超时取消与降级结果，同时用任务标识保证结果对应关系，这与调用是否被允许或预算如何记账无关。"
+  },
+  {
+    "n": 6,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "多 Agent 链路要做到失败可归因，追踪记录里必须包含哪些信息？",
+    "options": [
+      { "key": "A", "text": "贯穿全链路的统一追踪标识与调用跨度的父子关系" },
+      { "key": "B", "text": "每次交接的发起方、接收方与交接时的状态快照" },
+      { "key": "C", "text": "单步的模型版本、提示版本、工具调用与耗时" },
+      { "key": "D", "text": "只保留最终答案，中间过程靠日志关键字检索" }
+    ],
+    "answer": "A,B,C",
+    "explanation": "统一追踪标识与跨度父子关系才能还原调用树，交接边与状态快照用于定位错误在哪一步被引入，逐步元数据用于成本与延迟归因；只留最终答案无法复现多角色之间的失败传播路径。"
+  },
+  {
+    "n": 7,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "角色之间传递上下文时，兼顾可靠性与成本的合理做法是？",
+    "options": [
+      { "key": "A", "text": "把完整对话历史原样转给每一个下游角色" },
+      { "key": "B", "text": "按角色需要投递结构化任务切片，并附带可追溯的产物引用" },
+      { "key": "C", "text": "只传一句「继续」，让下游自行重新检索全部历史" },
+      { "key": "D", "text": "把所有历史压成一句摘要，且不保留任何原始产物" }
+    ],
+    "answer": "B",
+    "explanation": "按角色裁剪的结构化切片能减少无关信息干扰与调用成本，产物引用保证下游仍可回溯原始证据；全量转发会放大上下文污染，纯摘要会在多跳任务中丢掉关键约束与中间结果。"
+  },
+  {
+    "n": 8,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "多个角色都可能触发「创建工单」这类有副作用的工具时，编排层最该统一约束的是？",
+    "options": [
+      { "key": "A", "text": "让每个角色各自维护自己的重试次数" },
+      { "key": "B", "text": "幂等键与单一写入入口，把重复触发收敛为一次副作用" },
+      { "key": "C", "text": "提高采样温度，减少多个角色做出相同决策" },
+      { "key": "D", "text": "由评审角色在任务结束后删除重复工单" }
+    ],
+    "answer": "B",
+    "explanation": "副作用重复来自并发与重试，必须在编排层用幂等键和单写入口收敛；事后清理既可能已经对外可见，也无法覆盖外部系统的联动。分散记账与调温度都不能保证外部动作只被执行一次。"
+  },
+  {
+    "n": 9,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "关于多 Agent 系统的权限与预算治理，下列哪些做法是合理的？",
+    "options": [
+      { "key": "A", "text": "评审角色只给只读工具，写操作由专门的执行角色承担" },
+      { "key": "B", "text": "全局步数与费用预算在编排层统一记账并限流" },
+      { "key": "C", "text": "各角色工具白名单按最小权限配置，而非继承全集" },
+      { "key": "D", "text": "为方便调试，让所有角色共享同一份高权限密钥" }
+    ],
+    "answer": "A,B,C",
+    "explanation": "读写分离、最小权限白名单与全局统一记账能把误操作和失控成本限制在编排层；共享高权限密钥会让任一角色的越权或注入直接放大成全局风险，且事后无法定位是哪个角色。"
+  },
+  {
+    "n": 10,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "kind": "judge",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "只要给每个子 Agent 单独设置最大步数，就能可靠控制整个多 Agent 任务的总成本与总时长。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": "错误",
+    "explanation": "局部上限不约束交接次数、并行分支数与重试总量，总成本仍可能随分支数线性增长甚至互相触发；必须在编排层设全局预算，并按任务维度统一扣减与提前熔断。"
+  },
+  {
+    "n": 11,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "把角色输出契约（结构化格式与枚举取值）交给编排层校验，主要价值是？",
+    "options": [
+      { "key": "A", "text": "让模型生成更长的推理过程，从而提升准确率" },
+      { "key": "B", "text": "在交接边界挡回不可解析的产物，避免错误向下游扩散" },
+      { "key": "C", "text": "自动降低模型调用的单价与计费档位" },
+      { "key": "D", "text": "可以完全取代工具侧的参数校验" }
+    ],
+    "answer": "B",
+    "explanation": "编排层校验把格式与语义错误截在交接点，可定向重试或降级，防止脏产物被下游角色当作事实继续加工；它与推理长度、计费单价无关，也不能替代工具入参在真正执行前的校验。"
+  },
+  {
+    "n": 12,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "某个执行角色连续失败时，编排层较完整的降级策略包括哪些？",
+    "options": [
+      { "key": "A", "text": "有限次重试并带退避，区分可重试与不可重试错误" },
+      { "key": "B", "text": "重试耗尽后切换备用角色或简化路径，必要时转人工" },
+      { "key": "C", "text": "保留失败轨迹与当时状态，供后续回放定位" },
+      { "key": "D", "text": "无限重试直到成功，避免任务被标记为失败" }
+    ],
+    "answer": "A,B,C",
+    "explanation": "有限重试配合错误分类、明确的降级或人工出口，以及可回放的失败轨迹，才能既保证可用性又保留可诊断性；无限重试会耗尽预算并掩盖真实故障率。"
+  },
+  {
+    "n": 13,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "答案出错时，要把「检索没召回」与「召回了但生成没用好」分开定位，最有效的对照实验是？",
+    "options": [
+      { "key": "A", "text": "把金标片段直接喂给生成环节，观察答案质量是否恢复" },
+      { "key": "B", "text": "把召回条数从五条提到五十条，观察延迟变化" },
+      { "key": "C", "text": "换更大的生成模型，重跑一遍全量评测集" },
+      { "key": "D", "text": "只统计线上用户的点赞率变化趋势" }
+    ],
+    "answer": "A",
+    "explanation": "用金标上下文替换检索结果相当于给生成环节一个能力上界：质量恢复说明瓶颈在检索，仍不达标则是生成或提示的问题。加大候选数、换模型与看点赞都无法把两段职责隔离开。"
+  },
+  {
+    "n": 14,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "用逐句蕴含判定答案忠实度，相比让裁判给整段答案打一个总分，优势在于？",
+    "options": [
+      { "key": "A", "text": "能定位到具体是哪一句缺少上下文支撑" },
+      { "key": "B", "text": "可以分别统计无依据句占比与句级精度" },
+      { "key": "C", "text": "结论更容易与片段级引用做交叉核对" },
+      { "key": "D", "text": "完全不依赖人工标注即可保证判定准确" }
+    ],
+    "answer": "A,B,C",
+    "explanation": "逐句判定给出可定位的粒度、可分解的指标，并能与引用片段对齐；但蕴含判据本身也会判错，需要人工抽样校准，不能认为无需人工就保证准确。"
+  },
+  {
+    "n": 15,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "评测 RAG 时把「答案正确性」与「引用正确性」拆成两个指标，主要因为？",
+    "options": [
+      { "key": "A", "text": "两者都由同一个裁判打分，拆开可以并行计算" },
+      { "key": "B", "text": "答案对却引错出处、或引对出处却答错，都会单独损害可信度" },
+      { "key": "C", "text": "引用正确性只与检索接口的响应速度有关" },
+      { "key": "D", "text": "拆成两个指标后可以减少评测集样本量" }
+    ],
+    "answer": "B",
+    "explanation": "两个维度会各自独立失效：来源标错让用户无法核验，答案错则即使引用了正确片段也没有价值；合并成一个总分会把两类问题互相抵消，掩盖具体缺陷。"
+  },
+  {
+    "n": 16,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "构造上线前的 RAG 评测集，下列哪些做法是合理的？",
+    "options": [
+      { "key": "A", "text": "从真实线上日志按问题类型、难度与语言分层采样" },
+      { "key": "B", "text": "覆盖无答案、时效冲突、多跳与需要拒答的边界样本" },
+      { "key": "C", "text": "为每个样本标注金标片段与可接受答案要点" },
+      { "key": "D", "text": "全部用模型凭空生成问题，省去人工审核环节" }
+    ],
+    "answer": "A,B,C",
+    "explanation": "真实日志分层采样才能贴近线上分布，边界样本与金标标注是分层归因的前提；纯合成问题往往集中在模型擅长的表述上，未经人工审核还会把错误的标准答案写进基线。"
+  },
+  {
+    "n": 17,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "用大模型当裁判自动打分前，先用人工标注样本做校准，最该看的是？",
+    "options": [
+      { "key": "A", "text": "裁判与人工的一致率及偏差方向，例如是否系统性偏松" },
+      { "key": "B", "text": "裁判单次调用的平均响应延迟" },
+      { "key": "C", "text": "评测集文件占用的磁盘大小" },
+      { "key": "D", "text": "裁判模型的单价是否为候选里最低" }
+    ],
+    "answer": "A",
+    "explanation": "校准要量化裁判与人工标注的一致性以及混淆方向，必要时调整评分锚点或更换裁判模型；延迟、文件大小与单价属于成本问题，不能说明打分结果是否可信。"
+  },
+  {
+    "n": 18,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "让裁判对两个候选答案做成对比较时，最该防的偏差与对应措施是？",
+    "options": [
+      { "key": "A", "text": "位置偏差：交换呈现顺序各评一次，只采信一致的结论" },
+      { "key": "B", "text": "长度偏差：一律把长答案截断到固定字数再比较" },
+      { "key": "C", "text": "语言偏差：只允许中文答案参与成对比较" },
+      { "key": "D", "text": "采样偏差：把温度固定为零即可完全消除" }
+    ],
+    "answer": "A",
+    "explanation": "裁判常偏好特定呈现位置，双向交换顺序并只保留一致结论能明显削弱该偏差；截断长度、限定语言与固定采样参数分别针对别的问题，无法抵消位置偏好。"
+  },
+  {
+    "n": 19,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "设计裁判提示时，下列哪些做法有助于提高评分的稳定性？",
+    "options": [
+      { "key": "A", "text": "给出逐档评分锚点与边界样例，而非只说「打一到五分」" },
+      { "key": "B", "text": "要求先列证据再给结论，并输出机器可解析的结构" },
+      { "key": "C", "text": "固定裁判模型版本与打分模板，变更时重新校准" },
+      { "key": "D", "text": "让被测系统自己解释为什么应该获得高分" }
+    ],
+    "answer": "A,B,C",
+    "explanation": "明确的评分锚点、证据先行的结构化输出与版本化模板能降低主观漂移；让被测系统参与自评等于把被评价方拉进裁判，会引入同源偏袒。"
+  },
+  {
+    "n": 20,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "检索层指标里，衡量「相关片段是否至少被召回进候选集」最贴切的是？",
+    "options": [
+      { "key": "A", "text": "生成答案的平均字数" },
+      { "key": "B", "text": "召回率一类集合覆盖指标" },
+      { "key": "C", "text": "裁判给出的语言流畅度评分" },
+      { "key": "D", "text": "首字延迟与每字生成耗时" }
+    ],
+    "answer": "B",
+    "explanation": "候选集是否覆盖相关片段属于集合覆盖问题，用召回率一类指标衡量；相关片段排在什么位置由排序质量指标负责，流畅度与延迟分别属于生成和推理服务维度。"
+  },
+  {
+    "n": 21,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "评测「知识库没有答案时应拒答」的能力，需要同时关注哪些指标？",
+    "options": [
+      { "key": "A", "text": "无答案样本上的正确拒答率" },
+      { "key": "B", "text": "有答案样本上被错误拒答的比例" },
+      { "key": "C", "text": "编造答案且附带伪造引用的比例" },
+      { "key": "D", "text": "拒答话术被语义缓存命中的比例" }
+    ],
+    "answer": "A,B,C",
+    "explanation": "拒答能力是一种权衡：既要看该拒时是否拒，也要看不该拒时是否误伤，还要单独统计编造答案的比例；缓存命中率与回答是否可信无关。"
+  },
+  {
+    "n": 22,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "比较两种文档分块策略的优劣时，最终应以什么作为验收判据？",
+    "options": [
+      { "key": "A", "text": "切片平均长度是否更整齐一致" },
+      { "key": "B", "text": "端到端答案质量与引用正确率在分层评测集上的变化" },
+      { "key": "C", "text": "索引构建任务的执行耗时" },
+      { "key": "D", "text": "向量维度是否比原来更小" }
+    ],
+    "answer": "B",
+    "explanation": "分块最终服务于答案，检索分数与切片整齐度只是中间量；工程上会把构建成本与延迟当作约束，但验收判据必须回到端到端质量与可追溯性。"
+  },
+  {
+    "n": 23,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "kind": "judge",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "把评测集与线上少样本示例库、检索索引快照隔离，并按时间切分构建，可以降低评测集泄漏带来的分数虚高。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": "正确",
+    "explanation": "泄漏不只来自提示词，还可能来自少样本示例、索引里混入的评测文档与模型训练语料；按时间切分并在构建和存储上隔离，能让离线分数更接近真实泛化表现。"
+  },
+  {
+    "n": 24,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "新版本只比基线多答对两三条样本时，判断是否为真实提升应做哪些事？",
+    "options": [
+      { "key": "A", "text": "在同一批样本上做配对比较，关注变化方向一致的用例" },
+      { "key": "B", "text": "重复多次采样或用自助法给出区间估计" },
+      { "key": "C", "text": "按题型与难度分层报告，避免整体均值掩盖局部劣化" },
+      { "key": "D", "text": "立即全量上线，靠线上反馈再验证结论" }
+    ],
+    "answer": "A,B,C",
+    "explanation": "小样本差值常常落在噪声里，配对比较、区间估计与分层报告才能区分真实提升与随机波动；直接全量上线等于把未验证的改动暴露给全部流量。"
+  },
+  {
+    "n": 25,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "要让评测流水线两次运行的结果可比对，需要锁定哪些内容？",
+    "options": [
+      { "key": "A", "text": "采样参数与随机种子、被测模型的确切版本快照" },
+      { "key": "B", "text": "提示模板、检索索引快照与评测集版本号" },
+      { "key": "C", "text": "评分器版本与依赖库版本" },
+      { "key": "D", "text": "只固定评测集，其余交给运行时自行决定" }
+    ],
+    "answer": "A,B,C",
+    "explanation": "被测系统、评分器与输入数据三者的版本都会改变结果；只固定评测集时，模型更新或索引重建会让前后两次分数失去可比性。"
+  },
+  {
+    "n": 26,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "评测流水线里把被测系统与评分系统放在同一模型、同一上下文中，主要风险是？",
+    "options": [
+      { "key": "A", "text": "评分会被被测输出的自辩影响，且两者共享同一失效模式" },
+      { "key": "B", "text": "模型调用次数会固定翻倍，成本不可控" },
+      { "key": "C", "text": "工具调用轨迹将完全无法被记录" },
+      { "key": "D", "text": "评测集会被运行时自动扩充改写" }
+    ],
+    "answer": "A",
+    "explanation": "被测与裁判应分离到不同模型或至少不同调用上下文，否则被测输出会污染判分，同源模型还会一起犯同样的错；调用量、轨迹记录与评测集扩充是另外的工程问题。"
+  },
+  {
+    "n": 27,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "为了能原样复现一次失败用例，评测流水线的轨迹记录应包含哪些？",
+    "options": [
+      { "key": "A", "text": "每一步的工具名、入参与原始返回内容" },
+      { "key": "B", "text": "每步的模型输入输出与当时的中间状态" },
+      { "key": "C", "text": "运行时的环境指纹与随机种子" },
+      { "key": "D", "text": "只有最终得分与是否通过的标记" }
+    ],
+    "answer": "A,B,C",
+    "explanation": "工具往返、逐步模型交互、中间状态与环境指纹共同构成可重放的轨迹；只留最终得分既无法定位失败发生在检索、工具还是生成，也无法原样复跑。"
+  },
+  {
+    "n": 28,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "评测 Agent 需要真实调用外部工具时，控制副作用较合理的做法是？",
+    "options": [
+      { "key": "A", "text": "直接连生产环境，评测结束后统一清理数据" },
+      { "key": "B", "text": "在沙箱中用临时目录、只读数据快照与网络白名单" },
+      { "key": "C", "text": "把所有工具调用替换成模型对调用结果的自述" },
+      { "key": "D", "text": "关闭工具能力，只评测纯文本问答" }
+    ],
+    "answer": "B",
+    "explanation": "沙箱以可丢弃的资源承接真实调用，既保留工具链路的真实性又隔离外部影响；直连生产会污染真实数据，用自述替代或直接关掉工具则让评测失去意义。"
+  },
+  {
+    "n": 29,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "kind": "judge",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "评测流水线把首次通过率与重试后通过率分开上报，比只报最终成功数更能反映系统的首发可靠性。",
+    "options": [
+      { "key": "A", "text": "正确" },
+      { "key": "B", "text": "错误" }
+    ],
+    "answer": "正确",
+    "explanation": "重试会把不稳定失败从指标里抹掉，只报最终成功数等于把补偿机制算进能力；分开上报并把重试次数作为稳定性指标，才能看出真实的首发表现。"
+  },
+  {
+    "n": 30,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "把评测用例并发跑起来时，为避免产生「假失败」应做哪些处理？",
+    "options": [
+      { "key": "A", "text": "对被测服务加信号量或限流，避免触发上游速率限制" },
+      { "key": "B", "text": "把限流错误与业务失败分开归类，不计入质量得分" },
+      { "key": "C", "text": "为每个用例设独立超时与取消，防止个别卡死拖垮整批" },
+      { "key": "D", "text": "并发越高越好，所有失败一律算作系统能力缺陷" }
+    ],
+    "answer": "A,B,C",
+    "explanation": "并发要受被测服务容量约束，限流类错误属于环境问题而非能力缺陷，逐用例超时能隔离长尾；把环境导致的失败算进质量分会得出错误结论。"
+  },
+  {
+    "n": 31,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "把评测接入持续集成流水线做回归门禁，较合理的设计是？",
+    "options": [
+      { "key": "A", "text": "与冻结基线对比，设允许波动带，并保留失败用例的归因分类" },
+      { "key": "B", "text": "只要有一条用例失败就阻断发布，不做任何分层" },
+      { "key": "C", "text": "每次都用最新线上流量重新计算基线" },
+      { "key": "D", "text": "只跑最快的一组用例，其余留到发布之后再补" }
+    ],
+    "answer": "A",
+    "explanation": "非确定性系统存在正常波动，门禁应与冻结基线比较并给出容差，同时按失败类型归因，避免把噪声或环境故障当成能力回退；基线随流量浮动会让门禁彻底失去意义。"
+  },
+  {
+    "n": 32,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "一次评测结果的「版本化」至少应覆盖哪些资产？",
+    "options": [
+      { "key": "A", "text": "评测集与金标答案的修订号" },
+      { "key": "B", "text": "提示模板与检索索引的构建参数" },
+      { "key": "C", "text": "被测模型版本与评分器版本" },
+      { "key": "D", "text": "只需要给最终报告文件加上生成日期" }
+    ],
+    "answer": "A,B,C",
+    "explanation": "报告可复现依赖输入、被测对象与判分器三类资产的版本；只给报告加日期无法还原当时用了哪套索引或哪版评分提示。"
+  },
+  {
+    "n": 33,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "上线一套自动评分器之前，先喂入已知对错样例验证评分器本身，目的是？",
+    "options": [
+      { "key": "A", "text": "排除「判分规则本身写错了」这一层误差" },
+      { "key": "B", "text": "缩短整批评测的运行时间" },
+      { "key": "C", "text": "减少评测集所需的样本数量" },
+      { "key": "D", "text": "直接提高被测模型的准确率" }
+    ],
+    "answer": "A",
+    "explanation": "评分器也是会出错的软件，先用带确定结论的样例校准，才能把后续分数变化归因到被测系统；这与运行耗时、样本量或被测模型能力无关。"
+  },
+  {
+    "n": 34,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "被测系统在相同输入上输出不稳定时，评测流水线更合理的通过口径是？",
+    "options": [
+      { "key": "A", "text": "只运行一次，以该次结果为准" },
+      { "key": "B", "text": "多次独立采样，按通过率报告并附带波动情况" },
+      { "key": "C", "text": "取多次结果里最好的一次作为结论" },
+      { "key": "D", "text": "把温度设为零后就不再需要多次采样" }
+    ],
+    "answer": "B",
+    "explanation": "非确定性输出需要以分布而非单点衡量，多次采样才能给出通过率与波动；取最好一次会系统性高估，即便固定采样参数，服务端版本与批处理差异仍会带来变化。"
+  },
+  {
+    "n": 35,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "让评测流水线与线上服务保持一致，关键做法包括哪些？",
+    "options": [
+      { "key": "A", "text": "复用同一套提示模板与检索客户端配置" },
+      { "key": "B", "text": "评测走与线上相同的工具集合与权限边界" },
+      { "key": "C", "text": "定期用线上真实样本回流扩充回归集" },
+      { "key": "D", "text": "为评测单独搭一套更宽松的提示，让分数更好看" }
+    ],
+    "answer": "A,B,C",
+    "explanation": "评测必须复用生产链路的模板、检索与工具边界，并用线上样本持续校准分布；给评测开小灶会让分数与真实体验脱节，属于典型的评测旁路。"
+  },
+  {
+    "n": 36,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "为评测结果建立失败分类体系（检索未召回、工具异常、格式不合规、超时、判分误判），主要收益是？",
+    "options": [
+      { "key": "A", "text": "可以让报告里的总分自动提高" },
+      { "key": "B", "text": "把「分数下降」转成可行动的归因，并区分环境故障与能力缺陷" },
+      { "key": "C", "text": "可以省去逐步轨迹的记录与存储" },
+      { "key": "D", "text": "允许显著减少评测集的样本规模" }
+    ],
+    "answer": "B",
+    "explanation": "分类体系让回归失败能指向具体环节，也把限流超时等环境噪声从能力评估里剥离；它不改变总分，也不能替代轨迹记录或样本量设计。"
+  }
+]

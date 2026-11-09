@@ -28,7 +28,7 @@ from app.services.report import rules
 
 @pytest.fixture(scope="module")
 def seeded_db(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Path]:
-    """整模块共用一个已灌种的库：1088 题只导入一次，用例之间只读（唯一写用例自己恢复现场）。"""
+    """整模块共用一个已灌种的库：1164 题只导入一次，用例之间只读（唯一写用例自己恢复现场）。"""
     db_file = tmp_path_factory.mktemp("seeded") / "seeded.db"
     previous = os.environ.get("DB_PATH")
     os.environ["DB_PATH"] = str(db_file)

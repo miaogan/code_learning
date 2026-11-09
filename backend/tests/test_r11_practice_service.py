@@ -36,6 +36,7 @@ def _question(
     difficulty: str = "basic",
     essentiality: str = "must_know",
     answer: list[str] | None = None,
+    sub_direction: str = "",
 ) -> dict[str, Any]:
     """一道可入库的题（字段与 `seed/questions.json` 同形，`_usable()` 判为可用）。"""
     options = (
@@ -46,6 +47,7 @@ def _question(
     return {
         "id": question_id,
         "direction": direction,
+        "sub_direction": sub_direction,
         "kind": kind,
         "difficulty": difficulty,
         "essentiality": essentiality,
@@ -422,3 +424,67 @@ def test_session_id_prefix(tmp_db: Any) -> None:
     second = practice.build_paper()["session_id"]
     assert first.startswith("ps_") and len(first) == len("ps_") + 8
     assert first != second
+
+
+# --- r50：二级方向聚焦优先、不足补位 ---------------------------------------
+
+
+def test_sub_direction_focus_hits_only_that_bucket(tmp_db: Any) -> None:
+    """r50-1：聚焦池命中数与 `/stats` 同源；`limit=0` 只出该子方向的题、不补位。"""
+    _seed(_by("py", 5, sub_direction="python"))
+    _seed(_by("jv", 3, sub_direction="java"))
+    paper = practice.build_paper(direction="后端", sub_direction="python", limit=0)
+    assert _ids(paper) == {f"py-{index}" for index in range(5)}
+    assert paper["hit_count"] == 5
+    assert paper["sub_direction"] == "python"
+    assert paper["sub_direction_backfill"] == 0
+    assert practice.stats(direction="后端", sub_direction="python")["hit"] == 5
+
+
+def test_sub_direction_backfill_stays_in_same_direction(tmp_db: Any) -> None:
+    """r50-2：聚焦池不足 `limit` 时用**同方向**宽池补齐并如实计数，不跨方向取题。"""
+    _seed(_by("py", 2, sub_direction="python"))
+    _seed(_by("jv", 5, sub_direction="java"))
+    _seed(_by("fe", 4, direction="前端", sub_direction="react"))
+    paper = practice.build_paper(direction="后端", sub_direction="python", limit=10)
+    ids = _ids(paper)
+    assert {f"py-{index}" for index in range(2)} <= ids
+    assert not any(item.startswith("fe-") for item in ids), "补位不得跨方向"
+    assert paper["hit_count"] == 2
+    assert paper["sub_direction_backfill"] == 5
+    assert len(ids) == 7
+    assert "已补充 5 道同方向题" in paper["notice"]
+
+
+def test_sub_direction_zero_hit_falls_back_with_notice(tmp_db: Any) -> None:
+    """r50-3：子方向 0 题不报 400，退到同方向宽池并明示「已改按同方向出题」。"""
+    _seed(_by("jv", 3, sub_direction="java"))
+    paper = practice.build_paper(direction="后端", sub_direction="go", limit=10)
+    assert _ids(paper) == {f"jv-{index}" for index in range(3)}
+    assert paper["hit_count"] == 0
+    assert paper["sub_direction_backfill"] == 3
+    assert paper["notice"] == "该二级方向暂无可用题目，已改按同方向出题"
+
+
+def test_sub_direction_dirty_and_conflicting_values_are_ignored(tmp_db: Any) -> None:
+    """r50-4：闭集外脏值 / 与 `direction` 冲突 → 静默不聚焦，返回体不新增键（逐字等价）。"""
+    _seed(_by("q", 3, sub_direction="python"))
+    bare = practice.build_paper(limit=0)
+    dirty = practice.build_paper(sub_direction="不是子方向", limit=0)
+    conflict = practice.build_paper(direction="前端", sub_direction="python", limit=0)
+    assert set(dirty) == set(bare) == {"session_id", "questions", "hit_count", "notice"}
+    assert _ids(dirty) == _ids(bare)
+    assert _ids(conflict) == set(), "冲突时 direction 仍是硬过滤"
+
+
+def test_sub_direction_auto_locks_parent_when_direction_is_all(tmp_db: Any) -> None:
+    """r50-5：`direction=all` 时自动锁定子方向父方向，补位不会跨方向。"""
+    _seed(_by("py", 1, sub_direction="python"))
+    _seed(_by("jv", 4, sub_direction="java"))
+    _seed(_by("fe", 4, direction="前端", sub_direction="react"))
+    paper = practice.build_paper(sub_direction="python", limit=10)
+    ids = _ids(paper)
+    assert "py-0" in ids
+    assert not any(item.startswith("fe-") for item in ids)
+    assert paper["sub_direction"] == "python"
+    assert paper["sub_direction_backfill"] == 4

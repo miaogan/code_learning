@@ -12,6 +12,7 @@ import {
   roleGapLabel,
   weaknessCountLabel,
   weaknessRateLabel,
+  weaknessSubDirectionLabel,
 } from '../lib/coach'
 
 /** 造 N 条同构条目：只为验证折叠边界，不关心内容。 */
@@ -122,6 +123,17 @@ describe('polishHref', () => {
     const href = polishHref(long, 'experience', long)
     expect(href).not.toContain('anchor=')
     expect(href).toContain(`focus=${encodeURIComponent(long)}`)
+  })
+})
+
+describe('weaknessSubDirectionLabel（r50 作用域标签）', () => {
+  it('方向 + 子方向拼成一行；旧报告缺字段 / 空白值返回 null（组件零占位）', () => {
+    expect(
+      weaknessSubDirectionLabel({ direction: 'AI 工程', sub_direction: '部署与推理' }),
+    ).toBe('AI 工程 · 部署与推理')
+    expect(weaknessSubDirectionLabel({ direction: 'AI 工程' })).toBeNull()
+    expect(weaknessSubDirectionLabel({ direction: 'AI 工程', sub_direction: '  ' })).toBeNull()
+    expect(weaknessSubDirectionLabel({ direction: '', sub_direction: 'Agent' })).toBe('Agent')
   })
 })
 

@@ -14,6 +14,10 @@
 
 `scope` 三口径（B-1/B-2/B-3）：`all` 不筛；`unseen` = 该题在 `question_attempts` **无任何事件**
 （笔试做过也算做过）；`wrong` = **最近一次**作答为错误（答对即移出）。三者互斥且可叠加其他筛选。
+
+r50 二级方向：与笔试 r46 同口径 —— **聚焦优先、不足补位**。先只在子方向窄池里取题，
+不足 `limit` 时用**同方向**宽池补齐并如实计数；闭集外脏值静默忽略（不造第二套 422）。
+不聚焦时（`sub_direction=""`）整条主路径逐字节等价，既有 B-1..B-10 口径零改动。
 """
 
 from __future__ import annotations
@@ -41,6 +45,9 @@ SESSION_PREFIX = "ps_"
 NOTICE_EMPTY = "该组合下没有题目，试试放宽难度或必备度"
 NOTICE_BANK_EMPTY = "题库未就绪，请稍后重试"
 _NOTICE_FEW = "该组合下只有 {count} 道，已全部给出"
+#: r50 子方向补位文案（只在发生补位时出现，不污染 B-1..B-10 的五态 notice）。
+_NOTICE_SUB_EMPTY = "该二级方向暂无可用题目，已改按同方向出题"
+_NOTICE_SUB_FEW = "该二级方向只有 {focus} 道，已补充 {backfill} 道同方向题"
 
 #: 判分侧中文错误文案（沿用错误矩阵，**不新增错误码**）。
 _NEED_SELECTION = "先选一个答案，再提交"
@@ -105,6 +112,30 @@ def _matches_scope(question_id: str, scope: str, index: dict[str, dict[str, Any]
     return False
 
 
+def _resolve_focus(direction: str, sub_direction: str) -> tuple[str, str]:
+    """r50：归一成 `(实际生效方向, 实际生效二级方向)`，与笔试 r46 逐字同口径。
+
+    - 空串 / 空白 → 不聚焦，方向原样返回；
+    - 闭集外脏值 → 静默忽略（**不**新增 422 / 400，与 r46 一致）；
+    - `direction` 为「全部」而子方向合法 → 自动锁定其父方向，补位才不会跨方向取题；
+    - 子方向与显式 `direction` 冲突 → 忽略子方向（子方向从属于方向，不猜归属）。
+    """
+    sub = str(sub_direction or "").strip()
+    if not sub:
+        return direction, ""
+    owner = next(
+        (name for name, subs in rules.SUBDIRECTIONS.items() if sub in subs),
+        None,
+    )
+    if owner is None:
+        return direction, ""
+    if direction == rules.FILTER_ANY:
+        return owner, sub
+    if direction != owner:
+        return direction, ""
+    return direction, sub
+
+
 def _matches(
     question: dict[str, Any],
     *,
@@ -114,6 +145,7 @@ def _matches(
     essentiality: str,
     scope: str,
     index: dict[str, dict[str, Any]],
+    sub_direction: str = "",
 ) -> bool:
     """逐字段核对全部筛选（B-4：命中必须 100% 合规，判据只此一处）。"""
     if language != rules.FILTER_ANY and str(question.get("language") or "") != language:
@@ -123,6 +155,8 @@ def _matches(
     if difficulty != rules.FILTER_ANY and str(question.get("difficulty") or "") != difficulty:
         return False
     if essentiality != rules.FILTER_ANY and str(question.get("essentiality") or "") != essentiality:
+        return False
+    if sub_direction and str(question.get("sub_direction") or "").strip() != sub_direction:
         return False
     return _matches_scope(str(question.get("id") or ""), scope, index)
 
@@ -136,6 +170,7 @@ def _filtered(
     essentiality: str,
     scope: str,
     index: dict[str, dict[str, Any]],
+    sub_direction: str = "",
 ) -> list[dict[str, Any]]:
     """按全部筛选过一遍题池（组卷与统计共用，`hit` 与 `hit_count` 因此同源同值）。"""
     return [
@@ -149,6 +184,7 @@ def _filtered(
             essentiality=essentiality,
             scope=scope,
             index=index,
+            sub_direction=sub_direction,
         )
     ]
 
@@ -174,47 +210,9 @@ def _paper_question(question: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _compose_paper(
-    language: str = rules.FILTER_ANY,
-    direction: str = rules.FILTER_ANY,
-    difficulty: str = rules.FILTER_ANY,
-    essentiality: str = rules.FILTER_ANY,
-    scope: str = rules.FILTER_ANY,
-    limit: int = rules.DEFAULT_PRACTICE_LIMIT,
-) -> dict[str, Any]:
-    """组一份练习题单（纯本地、零 AI）：返回 `session_id` / `questions` / `hit_count` / `notice`。
-
-    - `hit_count` 是**全部筛选后的命中总数**（不受 `limit` 截断），与 `/stats` 的 `hit` 同源；
-    - 取样：候选先按 `(难度档 rank, language, id)` 稳定排序，再 `random.sample` 取
-      `min(limit, hit)`（`limit == 0` 取全部）—— 排序稳定 + sample 天然去重，故题单内 id 唯一；
-    - `notice` 五态：命中不足给「只有 N 道」、命中 0 给放宽建议、题库空给「未就绪」（AC-12）。
-    """
-    session_id = SESSION_PREFIX + uuid4().hex[:8]
-    pool = question_bank.practice_pool()
-    if not pool:
-        return {"session_id": session_id, "questions": [], "hit_count": 0, "notice": NOTICE_BANK_EMPTY}
-
-    index = attempt_index()
-    candidates = _filtered(
-        pool,
-        language=language,
-        direction=direction,
-        difficulty=difficulty,
-        essentiality=essentiality,
-        scope=scope,
-        index=index,
-    )
-    hit_count = len(candidates)
-    if hit_count == 0:
-        return {
-            "session_id": session_id,
-            "questions": [],
-            "hit_count": 0,
-            "notice": NOTICE_EMPTY,
-        }
-
-    size = hit_count if not limit else min(int(limit), hit_count)
-    ordered = sorted(
+def _ordered(candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """稳定排序（难度档 → 语言 → id）：组卷与补位共用同一把尺子，取样天然去重。"""
+    return sorted(
         candidates,
         key=lambda question: (
             _difficulty_rank(str(question.get("difficulty") or "")),
@@ -222,13 +220,128 @@ def _compose_paper(
             str(question.get("id") or ""),
         ),
     )
-    picked = ordered if size >= hit_count else random.sample(ordered, size)
-    notice = _NOTICE_FEW.format(count=hit_count) if limit and hit_count < int(limit) else ""
+
+
+def _compose_paper(
+    language: str = rules.FILTER_ANY,
+    direction: str = rules.FILTER_ANY,
+    difficulty: str = rules.FILTER_ANY,
+    essentiality: str = rules.FILTER_ANY,
+    scope: str = rules.FILTER_ANY,
+    limit: int = rules.DEFAULT_PRACTICE_LIMIT,
+    sub_direction: str = "",
+) -> dict[str, Any]:
+    """组一份练习题单（纯本地、零 AI）：返回 `session_id` / `questions` / `hit_count` / `notice`。
+
+    - `hit_count` 是**全部筛选后的命中总数**（不受 `limit` 截断），与 `/stats` 的 `hit` 同源；
+    - 取样：候选先按 `(难度档 rank, language, id)` 稳定排序，再 `random.sample` 取
+      `min(limit, hit)`（`limit == 0` 取全部）—— 排序稳定 + sample 天然去重，故题单内 id 唯一；
+    - `notice` 五态：命中不足给「只有 N 道」、命中 0 给放宽建议、题库空给「未就绪」（AC-12）。
+    - r50：指定 `sub_direction` 时先取窄池，不足 `limit` 再用**同方向**宽池补齐；补位题数写进
+      `sub_direction_backfill`、`hit_count` 仍是窄池命中数（与 `/stats` 同源），notice 如实说明。
+    """
+    session_id = SESSION_PREFIX + uuid4().hex[:8]
+    pool = question_bank.practice_pool()
+    if not pool:
+        return {"session_id": session_id, "questions": [], "hit_count": 0, "notice": NOTICE_BANK_EMPTY}
+
+    index = attempt_index()
+    effective_direction, focus_sub = _resolve_focus(direction, sub_direction)
+    #: 聚焦时宽池必须锁在子方向的父方向上，否则补位会跨方向取题（r46 同口径）。
+    wide_direction = effective_direction if focus_sub else direction
+    wide = _filtered(
+        pool,
+        language=language,
+        direction=wide_direction,
+        difficulty=difficulty,
+        essentiality=essentiality,
+        scope=scope,
+        index=index,
+    )
+
+    if not focus_sub:
+        # r50 之前的主路径：不聚焦时逐字节等价（无新增键、无补位、无文案改写）。
+        hit_count = len(wide)
+        if hit_count == 0:
+            return {
+                "session_id": session_id,
+                "questions": [],
+                "hit_count": 0,
+                "notice": NOTICE_EMPTY,
+            }
+        size = hit_count if not limit else min(int(limit), hit_count)
+        ordered = _ordered(wide)
+        picked = ordered if size >= hit_count else random.sample(ordered, size)
+        notice = _NOTICE_FEW.format(count=hit_count) if limit and hit_count < int(limit) else ""
+        return {
+            "session_id": session_id,
+            "questions": [_paper_question(question) for question in picked],
+            "hit_count": hit_count,
+            "notice": notice,
+        }
+
+    # --- r50：子方向聚焦优先、不足补位（练习无结构闸门，只按题量判断） ------------------
+    focus = _filtered(
+        pool,
+        language=language,
+        direction=effective_direction,
+        difficulty=difficulty,
+        essentiality=essentiality,
+        scope=scope,
+        index=index,
+        sub_direction=focus_sub,
+    )
+    hit_count = len(focus)
+    ordered_focus = _ordered(focus)
+    if not limit:
+        # 「全部命中」语义：只出该子方向的题，不补位。
+        picked = list(ordered_focus)
+        backfill = 0
+    else:
+        size = min(int(limit), hit_count)
+        picked = (
+            list(ordered_focus) if size >= hit_count else random.sample(ordered_focus, size)
+        )
+        backfill = 0
+        if len(picked) < int(limit):
+            focus_ids = {str(question.get("id") or "") for question in focus}
+            rest = [
+                question
+                for question in _ordered(wide)
+                if str(question.get("id") or "") not in focus_ids
+            ]
+            need = min(int(limit) - len(picked), len(rest))
+            if need > 0:
+                extra = rest if need >= len(rest) else random.sample(rest, need)
+                picked = [*picked, *extra]
+                backfill = len(extra)
+
+    if not picked:
+        return {
+            "session_id": session_id,
+            "questions": [],
+            "hit_count": hit_count,
+            "notice": NOTICE_EMPTY,
+            "sub_direction": focus_sub,
+            "sub_direction_backfill": 0,
+        }
+
+    if hit_count == 0:
+        notice = _NOTICE_SUB_EMPTY
+    elif backfill > 0:
+        notice = _NOTICE_SUB_FEW.format(focus=hit_count, backfill=backfill)
+    elif limit and hit_count < int(limit):
+        notice = _NOTICE_FEW.format(count=hit_count)
+    else:
+        notice = ""
+
     return {
         "session_id": session_id,
         "questions": [_paper_question(question) for question in picked],
         "hit_count": hit_count,
         "notice": notice,
+        "sub_direction": focus_sub,
+        "sub_direction_backfill": backfill,
     }
 
 
@@ -336,23 +449,28 @@ def stats(
     difficulty: str = rules.FILTER_ANY,
     essentiality: str = rules.FILTER_ANY,
     scope: str = rules.FILTER_ANY,
+    sub_direction: str = "",
 ) -> dict[str, Any]:
     """练习统计：`total` / `practiced` / `wrong_total` 不带筛选，`hit` 带筛选。
 
     - `practiced` 的唯一读取口径是 `repository.count_practiced_questions()`（练习 + 笔试都算）；
-    - `wrong_total` 只数**仍可用且客观**的题（错题本与该数字必须一致，否则前端两个数字打架）。
+    - `wrong_total` 只数**仍可用且客观**的题（错题本与该数字必须一致，否则前端两个数字打架）；
+    - r50：`sub_direction` 与组卷走同一个 `_resolve_focus()`，`hit` 恒等于题单的 `hit_count`
+      （两者都是窄池命中数，补位题不计入命中）。
     """
     pool = question_bank.practice_pool()
     index = attempt_index()
+    effective_direction, focus_sub = _resolve_focus(direction, sub_direction)
     hit = len(
         _filtered(
             pool,
             language=language,
-            direction=direction,
+            direction=effective_direction,
             difficulty=difficulty,
             essentiality=essentiality,
             scope=scope,
             index=index,
+            sub_direction=focus_sub,
         )
     )
     wrong_total = sum(

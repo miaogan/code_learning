@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.schemas import WeaknessItem
 from app.services.assessment import question_bank
 from app.services.report import diagnosis, rules, weakness
 from app.services.report.markdown import format_score
@@ -212,3 +213,58 @@ def test_sample_evidence_matches_shortfall_format() -> None:
         f"Q1 · {format_score(3.0)}/10",
         f"Q2 · {format_score(8.0)}/10",
     ]
+
+
+# --- r49：二级方向作为附加字段 -----------------------------------------------
+def _tagged(question_id: str, sub: str) -> dict[str, Any]:
+    return {**_question(question_id, direction="AI 工程"), "sub_direction": sub}
+
+
+def test_r49_dominant_sub_direction_is_additive() -> None:
+    """组内众数子方向只是附加字段：分组键、条数、题量与排序一律不变。"""
+    run = _exam_run(
+        questions=[
+            _tagged("sd-a1", "部署与推理"),
+            _tagged("sd-a2", "部署与推理"),
+            _tagged("sd-a3", "Agent"),
+        ],
+        scores={"sd-a1": 2.0, "sd-a2": 3.0, "sd-a3": 4.0},
+    )
+    items = weakness.build_weakness_map([run])
+    assert len(items) == 1
+    assert items[0].sub_direction == "部署与推理"
+    assert items[0].key == "AI 工程|basic|must_know"
+    assert items[0].total == 3
+    # 同一输入两次完全一致（分组与排序没有被新字段扰动）
+    assert [item.key for item in weakness.build_weakness_map([run])] == [items[0].key]
+
+
+def test_r49_invalid_sub_direction_stays_blank() -> None:
+    """越界值不猜、不兜底：只留空串，调用方据此回落方向级选章。"""
+    run = _exam_run(
+        questions=[_tagged("sd-b1", "不存在的子方向")],
+        scores={"sd-b1": 2.0},
+    )
+    items = weakness.build_weakness_map([run])
+    assert items[0].sub_direction == ""
+
+
+def test_r49_tie_breaks_by_closed_set_order() -> None:
+    """平局按闭集顺序取靠前者，保证逐字可复算（不依赖 dict 插入顺序）。"""
+    first, second = rules.SUBDIRECTIONS["AI 工程"][:2]
+    run = _exam_run(
+        questions=[_tagged("sd-c1", second), _tagged("sd-c2", first)],
+        scores={"sd-c1": 2.0, "sd-c2": 3.0},
+    )
+    items = weakness.build_weakness_map([run])
+    assert items[0].sub_direction == first
+
+
+def test_r49_legacy_payload_defaults_to_blank() -> None:
+    """旧报告 / 旧 payload 不带该键时反序列化为空串，退化路径保持可用。"""
+    item = WeaknessItem(key="k", point="p", wrong=0, total=1, rate=0.0, avg=0.0, summary="s")
+    assert item.sub_direction == ""
+    restored = WeaknessItem.model_validate_json(
+        '{"key":"k","point":"p","wrong":0,"total":1,"rate":0.0,"avg":0.0,"summary":"s"}'
+    )
+    assert restored.sub_direction == ""

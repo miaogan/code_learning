@@ -28,6 +28,7 @@ def _question(
     difficulty: str = "basic",
     essentiality: str = "must_know",
     answer: list[str] | None = None,
+    sub_direction: str = "",
 ) -> dict[str, Any]:
     options = (
         [_option("A", "正确"), _option("B", "错误")]
@@ -37,6 +38,7 @@ def _question(
     return {
         "id": question_id,
         "direction": direction,
+        "sub_direction": sub_direction,
         "kind": kind,
         "difficulty": difficulty,
         "essentiality": essentiality,
@@ -72,7 +74,15 @@ def test_paper_ok_and_no_answer_leak(client: Any) -> None:
     response = client.post("/api/practice/paper", json=PAPER_BODY)
     assert response.status_code == 200, response.text[:300]
     body = response.json()
-    assert set(body) == {"session_id", "questions", "hit_count", "notice"}
+    assert set(body) == {
+        "session_id",
+        "questions",
+        "hit_count",
+        "notice",
+        "sub_direction",
+        "sub_direction_backfill",
+    }
+    assert body["sub_direction"] == "" and body["sub_direction_backfill"] == 0
     assert body["session_id"].startswith("ps_")
     assert body["questions"], "种子题库应有大量可练习题"
     assert len(body["questions"]) == 10, f"limit=10 应给 10 道：{len(body['questions'])}"
@@ -317,3 +327,33 @@ def test_practice_run_prefix_constant() -> None:
     """服务层常量与事件命名空间一致（前端/文档引用同一个前缀）。"""
     assert practice.PRACTICE_RUN_PREFIX == "practice:"
     assert practice.ATTEMPT_SOURCE == "practice"
+
+
+# --- r50：二级方向筛选的 HTTP 契约 ------------------------------------------
+
+
+def test_paper_sub_direction_fields_and_stats_hit(client: Any) -> None:
+    """r50：请求体带 `sub_direction` → 题单回传生效值与补位数，`/stats` 的 hit 同源。"""
+    response = client.post(
+        "/api/practice/paper", json={**PAPER_BODY, "sub_direction": "部署与推理"}
+    )
+    assert response.status_code == 200, response.text[:300]
+    body = response.json()
+    assert body["sub_direction"] == "部署与推理"
+    assert isinstance(body["sub_direction_backfill"], int)
+    stats = client.get(
+        "/api/practice/stats",
+        params={"direction": "AI 工程", "sub_direction": "部署与推理"},
+    )
+    assert stats.status_code == 200
+    assert stats.json()["hit"] == body["hit_count"]
+
+
+def test_paper_sub_direction_dirty_value_is_not_422(client: Any) -> None:
+    """r50：闭集外脏值按 r46 口径静默忽略，不造第二套 422、也不落进题单事实。"""
+    response = client.post(
+        "/api/practice/paper", json={**PAPER_BODY, "sub_direction": "不是子方向"}
+    )
+    assert response.status_code == 200, response.text[:300]
+    assert response.json()["sub_direction"] == ""
+    assert response.json()["sub_direction_backfill"] == 0

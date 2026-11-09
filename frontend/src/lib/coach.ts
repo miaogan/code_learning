@@ -109,6 +109,21 @@ export function weaknessCountLabel(wrong: number, total: number): string {
   return `错 ${wrong} / 共 ${total} 题`
 }
 
+/**
+ * r50：薄弱地图的作用域标签（方向 · 二级方向）。
+ * `point` 对面试短板是题型名、不是方向，故这行是**新增信息**而非重复；
+ * 旧报告缺 `sub_direction` 时返回 `null`，组件不挂载节点（逐字等价、零占位）。
+ */
+export function weaknessSubDirectionLabel(item: {
+  direction: string
+  sub_direction?: string
+}): string | null {
+  const sub = (item.sub_direction ?? '').trim()
+  if (!sub) return null
+  const direction = item.direction.trim()
+  return direction === '' ? sub : `${direction} · ${sub}`
+}
+
 /** 差距：`0` 渲染「达标」而不是 `0`（0 与「未统计」歧义）；负数视为已达标。 */
 export function roleGapLabel(gap: number): string {
   if (!Number.isFinite(gap) || gap <= 0) return '达标'

@@ -7,8 +7,8 @@
  * 三条不能破的口径：
  * 1. 任务只能指回站内真实入口（教程章节 / 小节、练习筛选、模拟笔试面试）；
  * 2. 短板不足时用通用任务补位，**绝不编造短板名**；
- * 3. 教程章只有「方向 + 难度」没有显式前置字段 —— 「先读基础章」是**难度递进代理**，
- *    UI 文案不得宣称那是真实课程依赖。
+ * 3. 教程章有「方向 / 子方向 / 难度」但没有显式前置字段 —— 「先读基础章」是**难度递进代理**，
+ *    UI 文案不得宣称那是真实课程依赖；短板带子方向时优先选同子方向章，挑不到静默回落方向级。
  */
 import type { Report, WeaknessItem } from '../api/types'
 import type { LearnProgressState } from './learnProgress'
@@ -96,6 +96,8 @@ function labelOf(map: Record<string, string>, value: string): string {
 /** 拼 `/practice` 链接：只写真实生效的筛选参数（默认值不写，链接更短也更好读）。 */
 export function practiceHref(params: {
   direction?: string | null
+  /** r50：二级方向聚焦；空串 / null = 不聚焦，URL 用 `sub`（与学习目录页同参数名）。 */
+  sub_direction?: string | null
   difficulty?: string | null
   essentiality?: string | null
   scope?: string | null
@@ -104,6 +106,9 @@ export function practiceHref(params: {
   const query = new URLSearchParams()
   if (params.direction !== null && params.direction !== undefined && params.direction !== 'all') {
     query.set('direction', params.direction)
+  }
+  if (params.sub_direction !== null && params.sub_direction !== undefined && params.sub_direction !== '') {
+    query.set('sub', params.sub_direction)
   }
   if (
     params.difficulty !== null &&
@@ -152,9 +157,8 @@ function seenCount(learned: LearnProgressState | undefined, chapterId: string): 
   return learned?.chapters[chapterId]?.seen.length ?? 0
 }
 
-/** 在目标档位取章；该档没有章就退最近的低档，再没有就取该方向第一章。 */
-function pickChapter(direction: string, level: TutorialLevel): TutorialChapter | null {
-  const chapters = chaptersInDirection(direction)
+/** 在一组章节里按「目标档位 → 就近低档 → 任意章」取章，纯确定性。 */
+function pickInScope(chapters: TutorialChapter[], level: TutorialLevel): TutorialChapter | null {
   if (chapters.length === 0) return null
   const exact = chapters.find((chapter) => chapter.level === level)
   if (exact !== undefined) return exact
@@ -162,6 +166,31 @@ function pickChapter(direction: string, level: TutorialLevel): TutorialChapter |
     .filter((chapter) => LEVEL_ORDER[chapter.level] < LEVEL_ORDER[level])
     .sort((a, b) => LEVEL_ORDER[b.level] - LEVEL_ORDER[a.level])
   return lower[0] ?? chapters[0]
+}
+
+/**
+ * r49：短板带子方向时，先在该方向的同子方向章节里挑，挑不到再回落方向级。
+ *
+ * 分组键、任务 id 形态与「无子方向」时的逐章顺序都不变 —— 旧报告 / 老 payload
+ * 缺 `sub_direction` 时走的就是原来那条方向级分支，结果逐字节可复算。
+ * 回落是静默的：教程任务仍指回站内真实章节，不编造不存在的子方向章节。
+ */
+function pickChapter(
+  direction: string,
+  level: TutorialLevel,
+  subDirection?: string,
+): TutorialChapter | null {
+  const chapters = chaptersInDirection(direction)
+  if (chapters.length === 0) return null
+  const sub = (subDirection ?? '').trim()
+  if (sub !== '') {
+    const focused = pickInScope(
+      chapters.filter((chapter) => chapter.sub_direction === sub),
+      level,
+    )
+    if (focused !== null) return focused
+  }
+  return pickInScope(chapters, level)
 }
 
 function tutorialMinutes(minutes: PlanMinutes): number {
@@ -231,7 +260,7 @@ function tasksForItem(
   const reason = `${parts.join(' · ')}｜${item.summary}`
   const tasks: StudyTask[] = []
 
-  const chapter = pickChapter(item.direction, targetLevel(item))
+  const chapter = pickChapter(item.direction, targetLevel(item), item.sub_direction)
   if (chapter !== null) {
     // 「先读基础章」只是难度递进的代理：目标章不是基础章、且该方向基础章一节都没读过时插一条。
     if (LEVEL_ORDER[chapter.level] > LEVEL_ORDER['基础']) {
@@ -261,7 +290,14 @@ function tasksForItem(
     direction: item.direction,
     chapter_id: null,
     section_id: null,
-    href: practiceHref({ direction: item.direction, difficulty, essentiality, limit: 10 }),
+    // r50：短板已带二级方向时，练习直接落到同一子方向（服务端聚焦不足会自动补位）。
+    href: practiceHref({
+      direction: item.direction,
+      sub_direction: item.sub_direction ?? '',
+      difficulty,
+      essentiality,
+      limit: 10,
+    }),
     reason,
     shortfall: item.point,
   })

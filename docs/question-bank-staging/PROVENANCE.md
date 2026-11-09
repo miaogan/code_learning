@@ -72,3 +72,37 @@
 上游 URL、LICENSE 全文与 AI 改写说明在 `NOTICE-fe-interview.md`；
 `backend/tests/test_r12_question_merge.py::test_license_notice_present_when_third_party_source_in_seed`
 把它钉成机器门槛。本文件只覆盖 01/02/03 三份自建素材，不与 NOTICE 重复叙述。
+
+## 6 追加素材 `10-ai-engineering-advanced.json`（r47，2026-11-09）
+
+| 文件 | `source` | 种子 id 前缀 | 条数 | 来源性质 | 上游 / LICENSE |
+| --- | --- | --- | --- | --- | --- |
+| `10-ai-engineering-advanced.json` | `ai-adv` | `aiadv-` | 40 | 自建：AI 生成 + 人工逐条复核 | 无上游，无第三方 LICENSE |
+
+- 面向「高级 AI 应用工程师」，全部为 AI 工程方向、`language=""` 的通用题；
+  子方向分布：部署与推理 12 / LLM 与 RAG 12 / Agent 7 / Prompt 工程 6 / 通用 AI 3；
+  难度：challenge 30 / intermediate 10；题型：single 24 / multiple 11 / judge 5。
+- 与 01/02/03 的差异：**素材显式声明 `sub_direction`**（合法值由 `rules.SUBDIRECTIONS` 校验后随行落盘，
+  非法值不猜、回落方向通用兜底），因此新题不会被统一标成「通用 AI」；老素材不带该键，键序断言不变。
+- 题干与既有全库做过 2-gram Jaccard 查重（阈值 0.62，实测最高相似度 < 0.40），
+  `--write` 报表确认读入 40 / 新增 40 / 越界 0 / 字面重复 0 / 近重复 0。
+- 未引用任何第三方题目文本；`--check` 逐字节 0 差异是唯一幂等判据，
+  回滚按 `question_merge.SOURCES` 全量删本批行（含 `aiadv-`），存量 260 行不受影响。
+
+## 7 追加素材 `11-ai-engineering-systems.json`（r48，2026-11-09）
+
+| 文件 | `source` | 种子 id 前缀 | 条数 | 来源性质 | 上游 / LICENSE |
+| --- | --- | --- | --- | --- | --- |
+| `11-ai-engineering-systems.json` | `ai-sys` | `aisys-` | 36 | 自建：AI 生成 + 人工逐条复核 | 无上游，无第三方 LICENSE |
+
+- 承接 r47，继续面向「高级 AI 应用工程师」，但主题收敛到**系统设计与评测基础设施**，
+  三组各 12 道：多 Agent 编排（`Agent`）、RAG 评审（`LLM 与 RAG`）、harness / 评测流水线工程（`通用 AI`）。
+- 全部为 `difficulty=challenge`、`essentiality=advanced`、`language=""` 的 AI 工程通用题；
+  题型：单选 18 / 多选 14 / 判断 4（判断「正确」「错误」各 2，避免扰动判定题极性分布）。
+- 沿用 r47 的显式 `sub_direction` 通道（合法值随行落盘），三组分别落在 `Agent` / `LLM 与 RAG` / `通用 AI`；
+  与 01/02/03 老素材的键序互不干扰。
+- 与全库逐条做过题干 2-gram Jaccard 查重（阈值 0.62，实测 ≥0.40 的配对为 0）；
+  解析不含孤立字母引用、正确项长度比均 ≤3、越界丢弃 0。
+- `--write` 报表确认读入 36 / 新增 36 / 字面重复 0 / 近重复 0；
+  `--check` 逐字节 0 差异是唯一幂等判据，回滚按 `question_merge.SOURCES` 全量删本批行（含 `aisys-`），
+  存量 260 行不受影响。

@@ -116,6 +116,7 @@ export default function PracticePage() {
         {
           language: filters.language,
           direction: filters.direction,
+          sub_direction: filters.sub_direction,
           difficulty: filters.difficulty,
           essentiality: filters.essentiality,
           scope: filters.scope,
@@ -136,6 +137,7 @@ export default function PracticePage() {
   }, [
     filters.language,
     filters.direction,
+    filters.sub_direction,
     filters.difficulty,
     filters.essentiality,
     filters.scope,
@@ -189,6 +191,7 @@ export default function PracticePage() {
       const next = await api.practicePaper({
         language: nextFilters.language,
         direction: nextFilters.direction,
+        sub_direction: nextFilters.sub_direction,
         difficulty: nextFilters.difficulty,
         essentiality: nextFilters.essentiality,
         scope: nextFilters.scope,
@@ -284,6 +287,7 @@ export default function PracticePage() {
       {
         language: wrongLanguage,
         direction: 'all',
+        sub_direction: '',
         difficulty: 'all',
         essentiality: 'all',
         scope: 'wrong',
@@ -416,21 +420,34 @@ export default function PracticePage() {
     if (view === 'running') return renderRunning()
     if (view === 'done' && paper) {
       return (
-        <PracticeSummary
-          total={total}
-          correct={correctCount}
-          wrongCount={wrongTotal}
-          filtersLabel={filtersLabel(filters)}
-          onWrongBook={() => changeTab('wrong')}
-          onAgain={() => void startPaper(filters, retrain)}
-          onReset={resetToSetup}
-        />
+        <>
+          {/* r50：补位事实在完成态复显一次，与作答态同一份服务端 notice（不另写一套文案）。 */}
+          {paper.notice !== '' ? <p className="sc-meta-line">{paper.notice}</p> : null}
+          <PracticeSummary
+            total={total}
+            correct={correctCount}
+            wrongCount={wrongTotal}
+            filtersLabel={filtersLabel(filters)}
+            onWrongBook={() => changeTab('wrong')}
+            onAgain={() => void startPaper(filters, retrain)}
+            onReset={resetToSetup}
+          />
+        </>
       )
     }
     return (
       <PracticeFilters
         filters={filters}
-        onChange={(patch) => setFilters((previous) => ({ ...previous, ...patch }))}
+        onChange={(patch) =>
+          setFilters((previous) => {
+            const next = { ...previous, ...patch }
+            // r50：二级方向从属于方向，换方向必须清空子方向（与学习目录页同口径）。
+            if (patch.direction !== undefined && patch.direction !== previous.direction) {
+              next.sub_direction = ''
+            }
+            return next
+          })
+        }
         hitCount={stats ? stats.hit : null}
         hitLoading={statsLoading}
         globalStats={stats}

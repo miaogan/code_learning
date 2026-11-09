@@ -46,7 +46,7 @@ import { reportKeyRequired } from '../state/aiGate'
 /** 练习统计查询参数（r11）：与题单同口径，但**不带 limit**（命中数不受题量截断）。 */
 export type PracticeStatsParams = Pick<
   PracticePaperRequest,
-  'language' | 'direction' | 'difficulty' | 'essentiality' | 'scope'
+  'language' | 'direction' | 'difficulty' | 'essentiality' | 'scope' | 'sub_direction'
 >
 
 /** 前端唯一 HTTP 出口：页面不得直接 fetch。 */

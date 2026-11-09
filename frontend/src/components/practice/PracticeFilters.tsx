@@ -10,6 +10,7 @@ import {
   limitLabel,
   relaxSuggestions,
   scopeChips,
+  subDirectionChips,
   type PracticeFiltersState,
 } from '../../lib/practice'
 import { Button } from '../ui/Button'
@@ -28,7 +29,8 @@ export interface PracticeFiltersProps {
 }
 
 /**
- * 设置态筛选卡（r11 · DESIGN §2.1）：5 组筛选 + 命中行 + 全库进度 + 开始按钮。
+ * 设置态筛选卡（r11 · DESIGN §2.1）：6 组筛选 + 命中行 + 全库进度 + 开始按钮。
+ * r50 新增「二级方向」组：从属于方向，未选方向时只给提示，不给空 chip 行。
  *
  * 纯展示 + 回调：本组件**不发请求**、不持有筛选状态（状态归页面），
  * 因此 0 命中建议、命中行占位都能用纯函数单独测试。
@@ -77,6 +79,24 @@ export function PracticeFilters({
             value={filters.direction}
             onSelect={(value) => onChange({ direction: value })}
           />
+        </div>
+      </div>
+
+      <div className="sc-qa-filter-row">
+        <span className="sc-qa-filter-label">二级方向</span>
+        <div className="sc-qa-filter-body">
+          {filters.direction === 'all' ? (
+            <p className="sc-qa-hint">
+              先选一个方向，再按二级方向聚焦；该方向题目不足时会自动补充同方向的其他题
+            </p>
+          ) : (
+            <ChipRow
+              groupLabel="二级方向筛选"
+              options={subDirectionChips(filters.direction)}
+              value={filters.sub_direction}
+              onSelect={(value) => onChange({ sub_direction: value })}
+            />
+          )}
         </div>
       </div>
 

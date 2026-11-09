@@ -10,6 +10,7 @@ import {
   foldWeakness,
   weaknessCountLabel,
   weaknessRateLabel,
+  weaknessSubDirectionLabel,
 } from '../../lib/coach'
 import { Card } from '../ui/Card'
 
@@ -61,40 +62,50 @@ export function WeaknessMap({ items }: WeaknessMapProps) {
           </tr>
         </thead>
         <tbody>
-          {visible.map((item, index) => (
-            <tr key={item.key}>
-              <td className="sc-mono">{index + 1}</td>
-              <td>
-                <p className="sc-weak-name">{item.point}</p>
-                <p className="sc-weak-summary">{item.summary}</p>
-                <div className="sc-weak-line">
-                  {item.difficulty.map((value) => (
-                    <span className="sc-chip" key={`difficulty-${value}`}>
-                      {difficultyLabel(value)}
-                    </span>
-                  ))}
-                  {item.essentiality.map((value) => (
-                    <span className="sc-chip" key={`essentiality-${value}`}>
-                      {essentialityLabel(value)}
-                    </span>
-                  ))}
-                </div>
-                {item.samples.length > 0 ? (
+          {visible.map((item, index) => {
+            const scopeLabel = weaknessSubDirectionLabel(item)
+            return (
+              <tr key={item.key}>
+                <td className="sc-mono">{index + 1}</td>
+                <td>
+                  <p className="sc-weak-name">{item.point}</p>
+                  <p className="sc-weak-summary">{item.summary}</p>
                   <div className="sc-weak-line">
-                    {item.samples.map((sample) => (
-                      <span className="sc-chip" key={sample.question_id}>
-                        {sample.evidence}
+                    {scopeLabel !== null ? (
+                      <span className="sc-chip" key="sub-direction">
+                        {scopeLabel}
+                      </span>
+                    ) : null}
+                    {item.difficulty.map((value) => (
+                      <span className="sc-chip" key={`difficulty-${value}`}>
+                        {difficultyLabel(value)}
+                      </span>
+                    ))}
+                    {item.essentiality.map((value) => (
+                      <span className="sc-chip" key={`essentiality-${value}`}>
+                        {essentialityLabel(value)}
                       </span>
                     ))}
                   </div>
-                ) : null}
-                <p className="sc-weak-count sc-mono">{weaknessCountLabel(item.wrong, item.total)}</p>
-              </td>
-              <td>
-                <span className="sc-weak-rate sc-mono">{weaknessRateLabel(item.rate)}</span>
-              </td>
-            </tr>
-          ))}
+                  {item.samples.length > 0 ? (
+                    <div className="sc-weak-line">
+                      {item.samples.map((sample) => (
+                        <span className="sc-chip" key={sample.question_id}>
+                          {sample.evidence}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                  <p className="sc-weak-count sc-mono">
+                    {weaknessCountLabel(item.wrong, item.total)}
+                  </p>
+                </td>
+                <td>
+                  <span className="sc-weak-rate sc-mono">{weaknessRateLabel(item.rate)}</span>
+                </td>
+              </tr>
+            )
+          })}
         </tbody>
       </table>
 

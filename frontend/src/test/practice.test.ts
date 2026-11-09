@@ -12,6 +12,7 @@ import {
   SCOPE_LABEL,
   WRONG_BOOK_EMPTY_REASON,
   accuracyText,
+  allowedSubDirections,
   answerText,
   filtersLabel,
   formatWrongTime,
@@ -21,6 +22,7 @@ import {
   parsePracticeSearch,
   promptPreview,
   relaxSuggestions,
+  subDirectionChips,
   wrongTabLabel,
   type PracticeFiltersState,
 } from '../lib/practice'
@@ -150,11 +152,44 @@ describe('practice 文案与纯逻辑', () => {
     expect(DEFAULT_PRACTICE_FILTERS).toEqual({
       language: 'all',
       direction: 'all',
+      sub_direction: '',
       difficulty: 'all',
       essentiality: 'all',
       scope: 'all',
       limit: 10,
     })
+  })
+
+  it('r50 二级方向闭集：从属于方向，未选方向时可取全库子方向', () => {
+    expect(subDirectionChips('all')).toEqual([])
+    expect(subDirectionChips('AI 工程')[0]).toEqual({ value: '', label: '全部' })
+    expect(subDirectionChips('AI 工程').map((chip) => chip.value)).toContain('部署与推理')
+    expect(allowedSubDirections('AI 工程')).toContain('Agent')
+    expect(allowedSubDirections('all')).toContain('部署与推理')
+    expect(allowedSubDirections('all')).toContain('python')
+  })
+
+  it('r50 0 命中建议含「二级方向=全部」，且不影响既有前三条次序', () => {
+    expect(relaxSuggestions({ ...ALL_FILTERS, sub_direction: 'react' })).toEqual([
+      '二级方向=全部',
+    ])
+    expect(
+      relaxSuggestions({
+        ...ALL_FILTERS,
+        difficulty: 'basic',
+        essentiality: 'must_know',
+        direction: '前端',
+        sub_direction: 'react',
+        language: 'go',
+        scope: 'wrong',
+      }),
+    ).toEqual(['难度=全部', '必备度=全部', '方向=全部'])
+  })
+
+  it('r50 完成态描述显式带上聚焦的二级方向', () => {
+    expect(filtersLabel({ ...ALL_FILTERS, sub_direction: '部署与推理' })).toBe(
+      '全部语言 · 全部方向 · 全部难度 · 全部必备度 · 部署与推理',
+    )
   })
 })
 
@@ -172,11 +207,25 @@ describe('parsePracticeSearch（7 天计划的筛选链接 → 首渲染筛选�
     ).toEqual({
       language: 'all',
       direction: '前端',
+      sub_direction: '',
       difficulty: 'basic',
       essentiality: 'must_know',
       scope: 'wrong',
       limit: 0,
     })
+  })
+
+  it('r50 `?sub=` 落在方向闭集内时生效；方向缺省时按全库子方向接受', () => {
+    expect(parsePracticeSearch('?direction=AI 工程&sub=部署与推理').sub_direction).toBe(
+      '部署与推理',
+    )
+    expect(parsePracticeSearch('?sub=python').sub_direction).toBe('python')
+  })
+
+  it('r50 `?sub=` 越界 / 与方向冲突时静默回落，不抛错', () => {
+    expect(parsePracticeSearch('?direction=前端&sub=python').sub_direction).toBe('')
+    expect(parsePracticeSearch('?sub=不存在').sub_direction).toBe('')
+    expect(parsePracticeSearch('?sub=').sub_direction).toBe('')
   })
 
   it('空串语言是闭集成员（通用），不能被当成「全部」', () => {

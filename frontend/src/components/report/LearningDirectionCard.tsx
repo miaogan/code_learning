@@ -8,7 +8,7 @@ import {
   buildGuidance,
 } from '../../lib/guidance'
 import { progressView } from '../../lib/learnProgress'
-import { chaptersInDirection, tutorialHref } from '../../lib/tutorials'
+import { chaptersInDirection, subDirectionsInChapters, tutorialHref } from '../../lib/tutorials'
 import { useLearnProgress } from '../../state/learnProgress'
 import { Card } from '../ui/Card'
 
@@ -64,6 +64,17 @@ export function LearningDirectionCard({ report }: LearningDirectionCardProps) {
         const doneCount = chapters.filter(
           (chapter) => progressView(progress.chapters[chapter.id], chapter).status === 'done',
         ).length
+        // r50：短板子方向只有在「该方向确实有这一章」时才用于聚焦；否则静默回落方向级，
+        // 避免把用户送进一个空筛选结果（与学习目录页的空子方向口径一致）。
+        const focusedSub =
+          item.sub_direction !== '' &&
+          subDirectionsInChapters(chapters).includes(item.sub_direction)
+            ? item.sub_direction
+            : ''
+        const progressMeta =
+          doneCount > 0
+            ? `${chapterCount} 章 · 已读完 ${doneCount}`
+            : `${chapterCount} 章 · 概念到自测`
         return (
           <div className="sc-profile-dim" key={item.direction}>
             <p className="sc-role-target">
@@ -92,16 +103,21 @@ export function LearningDirectionCard({ report }: LearningDirectionCardProps) {
 
             <div className="sc-plan-tasks">
               <Link className="sc-plan-task" to={item.practiceLink}>
-                <span className="sc-plan-tasklabel">{`${item.direction}专项练习 10 题`}</span>
-                <span className="sc-plan-taskmeta">方向筛选 · 全部难度</span>
+                <span className="sc-plan-tasklabel">
+                  {`${focusedSub || item.direction}专项练习 10 题`}
+                </span>
+                <span className="sc-plan-taskmeta">
+                  {focusedSub !== '' ? `${focusedSub} · 全部难度` : '方向筛选 · 全部难度'}
+                </span>
               </Link>
               {chapterCount > 0 ? (
-                <Link className="sc-plan-task" to={tutorialHref(item.direction)}>
+                <Link
+                  className="sc-plan-task"
+                  to={tutorialHref(item.direction, null, focusedSub || null)}
+                >
                   <span className="sc-plan-tasklabel">站内教程</span>
                   <span className="sc-plan-taskmeta">
-                    {doneCount > 0
-                      ? `${chapterCount} 章 · 已读完 ${doneCount}`
-                      : `${chapterCount} 章 · 概念到自测`}
+                    {focusedSub !== '' ? `${progressMeta} · 已筛 ${focusedSub}` : progressMeta}
                   </span>
                 </Link>
               ) : null}

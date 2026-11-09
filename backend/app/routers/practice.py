@@ -23,6 +23,7 @@ from app.schemas import (
     PracticePaperRequest,
     PracticeScope,
     PracticeStats,
+    PracticeSubDirectionFilter,
     PracticeWrongBook,
 )
 from app.services.assessment import practice as practice_service
@@ -40,6 +41,7 @@ def create_paper(payload: PracticePaperRequest) -> PracticePaper:
             payload.essentiality,
             payload.scope,
             payload.limit,
+            payload.sub_direction,
         )
     )
 
@@ -60,9 +62,10 @@ def get_stats(
     difficulty: PracticeDifficultyFilter = "all",
     essentiality: PracticeEssentialityFilter = "all",
     scope: PracticeScope = "all",
+    sub_direction: PracticeSubDirectionFilter = "",
 ) -> PracticeStats:
     return PracticeStats(
-        **practice_service.stats(language, direction, difficulty, essentiality, scope)
+        **practice_service.stats(language, direction, difficulty, essentiality, scope, sub_direction)
     )
 
 

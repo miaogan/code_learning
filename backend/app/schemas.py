@@ -70,6 +70,9 @@ PracticeEssentialityFilter = Literal["all", "must_know", "advanced", "nice_to_kn
 PracticeScope = Literal["all", "unseen", "wrong"]
 #: 练习题量闭集（`rules.PRACTICE_LIMITS`，`0` = 全部命中）。
 PracticeLimit = Literal[10, 20, 0]
+#: 练习二级方向筛选（r50）：空串 = 不聚焦。闭集来自 `rules.SUBDIRECTIONS`，
+#: 与 r46 笔试同口径 —— 越界脏值由服务层**静默忽略**，不在模型层造第二套 422。
+PracticeSubDirectionFilter = str
 
 
 class HealthResponse(BaseModel):
@@ -397,6 +400,8 @@ class PracticePaperRequest(BaseModel):
     essentiality: PracticeEssentialityFilter = "all"
     scope: PracticeScope = "all"
     limit: PracticeLimit = 10
+    #: r50：二级方向聚焦，空串 = 不限；与 `direction` 冲突时按笔试 r46 口径归一。
+    sub_direction: PracticeSubDirectionFilter = ""
 
 
 class PracticeQuestion(BaseModel):
@@ -421,6 +426,10 @@ class PracticePaper(BaseModel):
     hit_count: int
     #: 空 / 截断 / 题库未就绪的中文提示（正常满额时为空串）。
     notice: str = ""
+    #: r50：实际生效的二级方向（闭集内取值）；未聚焦或脏参数归一后为空串。
+    sub_direction: str = ""
+    #: r50：本份题单里**不属于所选二级方向**、因聚焦池题量不足而补齐的题数（0 = 全命中）。
+    sub_direction_backfill: int = 0
 
 
 class PracticeAnswerRequest(BaseModel):
@@ -515,6 +524,9 @@ class WeaknessItem(BaseModel):
     key: str = Field(description="分组键 `方向|难度,|必备度,`，前端 React key 与 AI 合并键")
     point: str = Field(description="展示名，来自 `diagnosis._bucket_name`（与主轴同口径）")
     direction: str = Field(default="", description="组内题目的方向；无标签组为空串")
+    #: r49 纯附加字段：组内题目出现最多的合法二级方向。不进分组 key、不改条数与排序，
+    #: 缺省 "" 让旧报告反序列化零改动；前端学习计划据此优先选同子方向的教程章。
+    sub_direction: str = Field(default="", description="组内题目众数二级方向；无标签组为空串")
     wrong: int = Field(description="低于 `rules.SEVERITY_MEDIUM_BELOW` 的题数")
     total: int
     rate: float = Field(description="错误率 = round(wrong/total, 3)，服务端算好")

@@ -40,7 +40,7 @@ from app.services.assessment import question_bank, question_shuffle
 from app.services.report import rules
 
 #: 本批来源闭集（顺序即报表与批次落盘顺序）。
-SOURCES: tuple[str, ...] = ("tiji", "local100", "iq380", "fe-interview", "ai-eng", "mw", "sql", "algo", "devprac")
+SOURCES: tuple[str, ...] = ("tiji", "local100", "iq380", "fe-interview", "ai-eng", "mw", "sql", "algo", "devprac", "ai-adv", "ai-sys")
 
 #: 来源 → 素材文件名（`docs/question-bank-staging/` 下的可复现输入，必须随仓库提交）。
 STAGING_FILES: dict[str, str] = {
@@ -53,6 +53,8 @@ STAGING_FILES: dict[str, str] = {
     "sql": "07-sql.json",
     "algo": "08-basic-algo.json",
     "devprac": "09-dev-practice.json",
+    "ai-adv": "10-ai-engineering-advanced.json",
+    "ai-sys": "11-ai-engineering-systems.json",
 }
 
 #: 来源 → 种子 id 前缀（避开 legacy `fe-/be-/al-/cs-` 与 r11 九个语言前缀，保证
@@ -60,6 +62,8 @@ STAGING_FILES: dict[str, str] = {
 #: `iq380-` 刻意不用 `iq-`：面试发言 id 也是 `iq-{序号}`（`interview.py` 写
 #: `runs.payload.questions[].id`），同名不同域，数据不撞但 grep / 日志会混淆，故加宽前缀。
 #: `aieng-` 为「AI 工程」方向题，独立前缀避免与面试发言 `iq-` 或既有语言前缀混淆。
+#: `aiadv-` 是面向高级 AI 应用工程师的补题批次（10 号素材），独立于 `aieng-` 便于按批审计。
+#: `aisys-` 是 11 号素材：多 Agent 编排 / RAG 评审 / 评测流水线工程，按批独立可审计。
 ID_PREFIX: dict[str, str] = {
     "tiji": "tiji-",
     "local100": "l100-",
@@ -70,6 +74,8 @@ ID_PREFIX: dict[str, str] = {
     "sql": "sql-",
     "algo": "algo-",
     "devprac": "devprac-",
+    "ai-adv": "aiadv-",
+    "ai-sys": "aisys-",
 }
 
 #: 近重复口径：字符 n-gram 的 Jaccard 下界（常量只在这里，别处不得再写一个阈值）。
@@ -78,7 +84,7 @@ NEAR_DUP_JACCARD = 0.62
 
 #: 批内冲突取舍的来源优先级（高 → 低），与 `SOURCES` 顺序一致但**语义不同**：
 #: 前者决定谁赢，后者决定写盘顺序。
-SOURCE_PRIORITY: tuple[str, ...] = ("tiji", "local100", "iq380", "fe-interview", "ai-eng", "mw", "sql", "algo", "devprac")
+SOURCE_PRIORITY: tuple[str, ...] = ("tiji", "local100", "iq380", "fe-interview", "ai-eng", "mw", "sql", "algo", "devprac", "ai-adv", "ai-sys")
 
 #: 判断题的固定选项（与存量 seed 的 36 道逐字一致：前端按 options 原样渲染，文案不可改）。
 #: 素材里 4 条 key 是中文（`正确`/`错误`）、其余 116 条 key 已是 A/B —— 一律按本常量重建。
@@ -264,7 +270,7 @@ def normalize_record(raw: dict[str, Any], source: str, index: int) -> dict[str, 
     if direction not in rules.DIRECTIONS:
         return None
 
-    return {
+    row: dict[str, Any] = {
         "id": f"{ID_PREFIX[source]}{index:03d}",
         "direction": direction,
         "kind": kind,
@@ -277,6 +283,12 @@ def normalize_record(raw: dict[str, Any], source: str, index: int) -> dict[str, 
         "explanation": explanation,
         "source": source,
     }
+    # 10 号素材起支持显式 sub_direction：合法值直接随行落盘，非法值不猜、交给
+    # `_carry_sub_directions()` 兜底。没带该字段的老素材不新增键，保持 r12 的键序断言。
+    declared = str(raw.get("sub_direction") or "").strip()
+    if declared and rules.is_valid_sub_direction(direction, declared):
+        row["sub_direction"] = declared
+    return row
 
 
 def load_staging(staging_dir: Path = STAGING_DIR) -> list[dict[str, Any]]:
@@ -477,10 +489,17 @@ def build_seed(
 
 
 def _carry_sub_directions(rows: list[dict[str, Any]], raw: Sequence[dict[str, Any]]) -> None:
-    """按 id 沿用既有 seed 的 `sub_direction`；缺失或越界时落到该方向的通用兜底（原地写入）。"""
+    """素材显式声明优先，其次按 id 沿用既有 seed 标注，最后落到方向通用兜底（原地写入）。
+
+    10 号素材自带 `sub_direction`，不能让「按 id 继承」把新题一律覆盖成通用 AI；
+    存量行与老素材仍走原来的继承口径，逐字节结果不变。
+    """
     tagged = {str(row.get("id") or ""): row.get("sub_direction") for row in raw}
     for row in rows:
         direction = str(row.get("direction") or "")
+        declared = row.get("sub_direction")
+        if declared is not None and rules.is_valid_sub_direction(direction, declared):
+            continue
         inherited = tagged.get(str(row.get("id") or ""))
         row["sub_direction"] = (
             inherited

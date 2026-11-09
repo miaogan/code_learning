@@ -5,6 +5,7 @@
  * 集中一处才能被 vitest 直接断言（本项目无 DOM 测试库，纯函数是唯一可靠的前端断言方式）。
  * 组件只消费这里导出的常量 / 函数，不自己拼字符串。
  */
+import { DIRECTIONS, subDirectionsOf } from './questionDirections'
 import type {
   ExamDifficulty,
   ExamKind,
@@ -18,10 +19,12 @@ import type {
   QuestionLanguage,
 } from '../api/types'
 
-/** 五个筛选维度 + 题量：页面持有这一整块状态（无全局 store，刷新即重置）。 */
+/** 六个筛选维度 + 题量：页面持有这一整块状态（无全局 store，刷新即重置）。 */
 export interface PracticeFiltersState {
   language: PracticeLanguageFilter
   direction: PracticeDirectionFilter
+  /** r50：空串 = 不聚焦；取值闭集由 `allowedSubDirections(direction)` 派生。 */
+  sub_direction: string
   difficulty: PracticeDifficultyFilter
   essentiality: PracticeEssentialityFilter
   scope: PracticeScope
@@ -32,6 +35,7 @@ export interface PracticeFiltersState {
 export const DEFAULT_PRACTICE_FILTERS: PracticeFiltersState = {
   language: 'all',
   direction: 'all',
+  sub_direction: '',
   difficulty: 'all',
   essentiality: 'all',
   scope: 'all',
@@ -141,6 +145,25 @@ export function directionChips(): { value: PracticeDirectionFilter; label: strin
   ]
 }
 
+/**
+ * r50：某个方向下**可选**的二级方向全集。`direction='all'` 时返回全库子方向
+ * （服务端会把合法子方向自动归一到其父方向，见 `_resolve_focus`）。
+ */
+export function allowedSubDirections(direction: PracticeDirectionFilter): string[] {
+  return direction === 'all' ? DIRECTIONS.flatMap(subDirectionsOf) : subDirectionsOf(direction)
+}
+
+/** r50：二级方向 chip 组；未选方向时为空数组（由筛选卡显示「先选方向」提示）。 */
+export function subDirectionChips(
+  direction: PracticeDirectionFilter,
+): { value: string; label: string }[] {
+  if (direction === 'all') return []
+  return [
+    { value: '', label: '全部' },
+    ...subDirectionsOf(direction).map((sub) => ({ value: sub, label: sub })),
+  ]
+}
+
 export function difficultyChips(): { value: PracticeDifficultyFilter; label: string }[] {
   return [
     { value: 'all', label: '全部' },
@@ -215,7 +238,8 @@ export function promptPreview(prompt: string, max = 88): string {
 export const RELAX_OPTIONS: { label: string; patch: Partial<PracticeFiltersState> }[] = [
   { label: '难度=全部', patch: { difficulty: 'all' } },
   { label: '必备度=全部', patch: { essentiality: 'all' } },
-  { label: '方向=全部', patch: { direction: 'all' } },
+  { label: '方向=全部', patch: { direction: 'all', sub_direction: '' } },
+  { label: '二级方向=全部', patch: { sub_direction: '' } },
   { label: '语言=全部', patch: { language: 'all' } },
   { label: '范围=全部', patch: { scope: 'all' } },
 ]
@@ -229,6 +253,7 @@ export function relaxSuggestions(filters: PracticeFiltersState): string[] {
   if (filters.difficulty !== 'all') active.push('难度=全部')
   if (filters.essentiality !== 'all') active.push('必备度=全部')
   if (filters.direction !== 'all') active.push('方向=全部')
+  if (filters.sub_direction !== '') active.push('二级方向=全部')
   if (filters.language !== 'all') active.push('语言=全部')
   if (filters.scope !== 'all') active.push('范围=全部')
   return active.slice(0, 3)
@@ -242,6 +267,8 @@ export function filtersLabel(filters: PracticeFiltersState): string {
     filters.difficulty === 'all' ? '全部难度' : DIFFICULTY_LABEL[filters.difficulty],
     filters.essentiality === 'all' ? '全部必备度' : ESSENTIALITY_LABEL[filters.essentiality],
   ]
+  // r50：聚焦的二级方向必须出现在完成态描述里，否则用户看不出本轮练的是哪一块
+  if (filters.sub_direction !== '') parts.push(filters.sub_direction)
   // 「错题重练」一轮的 scope 必须是可见条件，否则用户看不出这轮为什么只有错题
   if (filters.scope !== 'all') parts.push(SCOPE_LABEL[filters.scope])
   return parts.join(' · ')
@@ -283,6 +310,7 @@ export function parsePracticeSearch(search: string): PracticeFiltersState {
 
   const language = params.get('language')
   const direction = params.get('direction')
+  const sub = params.get('sub')
   const difficulty = params.get('difficulty')
   const essentiality = params.get('essentiality')
   const scope = params.get('scope')
@@ -298,6 +326,17 @@ export function parsePracticeSearch(search: string): PracticeFiltersState {
       direction !== null && directions.has(direction)
         ? (direction as PracticeDirectionFilter)
         : DEFAULT_PRACTICE_FILTERS.direction,
+    // r50：子方向必须落在所选方向的闭集里（direction=all 时允许全库子方向，服务端会锁父方向）；
+    // 越界值与 direction 一起回落默认，不让脏 query 选出空题单。
+    sub_direction:
+      sub !== null &&
+      allowedSubDirections(
+        direction !== null && directions.has(direction)
+          ? (direction as PracticeDirectionFilter)
+          : 'all',
+      ).includes(sub)
+        ? sub
+        : DEFAULT_PRACTICE_FILTERS.sub_direction,
     difficulty:
       difficulty !== null && difficulties.has(difficulty)
         ? (difficulty as PracticeDifficultyFilter)
