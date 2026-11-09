@@ -1,6 +1,9 @@
 # Skill Coach · 开发者能力提升教练
 
+[![CI](https://github.com/miaogan/code_learning/actions/workflows/ci.yml/badge.svg?branch=feat/dev-skill-coach)](https://github.com/miaogan/code_learning/actions/workflows/ci.yml?query=branch%3Afeat%2Fdev-skill-coach)
+
 把「我不知道该补什么」变成一条可验证的闭环：**上传简历 → 技术画像 → 模拟面试 / 笔试 → 带证据的短板报告 → 精选基础课程**。
+技术选型与代价见 [设计取舍](#设计取舍为什么这么做)。
 
 - 画像的每条技能与项目都带 `sourceQuote`（简历原文），可溯源、可编辑。
 - 每道题有得分，每条短板能指回具体题目（如 `Q3 · 4/10`）。
@@ -70,6 +73,8 @@ docker compose ps        # backend 的 STATUS 应带 (healthy)
 | 根 | `curl -sS http://127.0.0.1:8000/health` | `{"status":"ok",...}` |
 | 根 | `grep -riE "sk-\|api_key\|AI_API_KEY" frontend/src frontend/dist \|\| echo NO_KEY_LEAK` | `NO_KEY_LEAK`（AC-8） |
 
+CI 双 job 已在 [GitHub Actions](https://github.com/miaogan/code_learning/actions) 实跑（共 31 次；最近 `#31` / `a54e4be` 成功）；后端 job 另含 `question_merge --check` 题库字节门禁，该步骤在下一次 push 后由远端验证。
+
 ## 分支、交付与回滚
 
 - **分支**：`feat/dev-skill-coach`，从基线提交 `32487b4` 起，本需求全部改动都在此分支上。
@@ -100,6 +105,21 @@ docs/teamflow/   架构总览、产品记忆、每需求一个任务夹
 - 上传的简历**不落原文件**，只存抽取后的正文；错误响应不含路径、堆栈与模型端点。
 - r23 起登录后才能使用：服务端会话 + HttpOnly Cookie（`sc_session`），6 张业务表按 `user_id` 隔离，
   跨用户按 id 取数一律 404；不开放注册，账号由管理员用 `app.admin_cli` 创建。
+
+## 设计取舍（为什么这么做）
+
+> 这里只记**放弃的方案与付出的代价**；完整论证见 [ARCHITECTURE §1.1](./docs/teamflow/architecture/ARCHITECTURE.md)。
+
+| 取舍 | 放弃了什么 | 代价与兜底 |
+|---|---|---|
+| 不做 SSR / Next.js | SSR、文件路由、RSC | 首屏无 HTML 直出、路由表手写；首屏只等本地 `/health`，可接受 |
+| 后端选 Python 而非 Node | 单运行时（全 TS）的部署便利 | 两套工具链；用三步启动、`docker compose` 与 CI 双 job 兜住 |
+| SQLite 直连、不用 ORM / 迁移框架 | SQLModel、Alembic | 手写 SQL、改字段要自己写幂等补列；结构化产物以 JSON 文本列存，schema 演进上移到 pydantic 校验；DDL 只在 `core/db.py`、SQL 只在 `core/repository.py`，并有静态门禁 |
+| 手写 CSS + token，不引 UI 库 / Tailwind | 原子类的书写效率 | 类名集中维护；新增组件必须复用 `tokens.css`，禁止裸色值与裸尺寸，改尺寸要回写 DESIGN §0.7 推导 |
+
+**能力边界（避免误读）**：本项目是「LLM 应用工程化与可靠性」实践 —— AI 侧是 OpenAI 兼容单次调用 + pydantic 结构化校验，
+**没有**向量检索、多 Agent 编排或模型训练；题库 / 教程 / 学习计划属于规则与内容工程，不是 RAG 系统。
+评测体系、检索增强与引用归因的实施方案见 [r51 技术方案](./docs/teamflow/20261109-r51-resume-highlight-engineering/TECHNICAL.md)。
 
 ## 验收速览
 
