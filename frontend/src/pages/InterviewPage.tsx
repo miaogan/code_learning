@@ -21,7 +21,13 @@ import { ConfirmModal } from '../components/ui/ConfirmModal'
 import { InlineError } from '../components/ui/InlineError'
 import { PhaseLoader } from '../components/ui/PhaseLoader'
 import { ResumeGate } from '../components/ui/ResumeGate'
+import {
+  clearInterviewSession,
+  readInterviewSession,
+  writeInterviewSession,
+} from '../lib/interviewSession'
 import { useAsync } from '../lib/useAsync'
+import { useAuth } from '../state/auth'
 import { setFlow } from '../state/flow'
 
 /** 页面阶段（TECHNICAL §4.1）：gate / empty / error 由画像请求派生，其余为用户推进后的确定态。 */
@@ -100,6 +106,9 @@ export default function InterviewPage() {
   const [finishError, setFinishError] = useState<string | null>(null)
 
   const profile = profileAsync.data
+  /** 本地会话锚点按账号隔离（与上传会话同一口径）。 */
+  const { me } = useAuth()
+  const userId = me?.id ?? null
 
   // 画像到手即预填（同一画像只应用一次，重载不覆盖用户手改）。
   useEffect(() => {
@@ -111,6 +120,18 @@ export default function InterviewPage() {
     setPrefill(prefilled.draft)
     setSources(prefilled.sources)
   }, [profile])
+
+  /**
+   * 站内导航（顶栏 / 报告页 / 画像页）指向的都是裸 `/interview`：URL 没带 run_id 时，
+   * 用本地锚点把还在服务端的在途会话接回来（写入点在开局 / 恢复 / 每轮评分成功后）。
+   * 只补 query，恢复交给下面的 effect —— 与「手动带 run_id 进来」走同一条路径。
+   */
+  useEffect(() => {
+    if (runIdParam !== null || userId === null) return
+    const stored = readInterviewSession(userId)
+    if (stored === null) return
+    setSearchParams({ run_id: stored }, { replace: true })
+  }, [runIdParam, userId, setSearchParams])
 
   // ?run_id= 恢复：GET 会话镜像 → running 续答 / completed 只读。
   useEffect(() => {
@@ -128,14 +149,19 @@ export default function InterviewPage() {
         setTrack(EMPTY_TRACK)
         setRestore({ status: 'idle', error: null })
         setStage(restored.status === 'completed' ? 'ended' : 'chat')
+        // 还在跑就刷新锚点（离开时仍能接回）；已完成为只读，不再当作「在途会话」。
+        if (restored.status === 'completed') clearInterviewSession(userId)
+        else writeInterviewSession(userId, restored.run_id)
         if (restored.status === 'completed') setFlow({ hasInterview: true })
       })
       .catch((error: unknown) => {
         if (controller.signal.aborted) return
+        // 服务端已没有这场（404）：锚点作废，避免下次进页面反复接一个不存在的会话。
+        if (error instanceof ApiError && error.status === 404) clearInterviewSession(userId)
         setRestore({ status: 'error', error: messageOf(error, '无法恢复本场面试') })
       })
     return () => controller.abort()
-  }, [runIdParam, restoreTick])
+  }, [runIdParam, restoreTick, userId])
 
   // 开局计时（三段文案按秒步进）+ 单轮评分计时。
   useEffect(() => {
@@ -183,6 +209,8 @@ export default function InterviewPage() {
       setAnswer('')
       setStage('chat')
       setSearchParams({ run_id: run.run_id }, { replace: true })
+      // 开局成功即落本地锚点：中途离开也能从裸 `/interview` 接回来。
+      writeInterviewSession(userId, run.run_id)
     } catch (error) {
       if (controller.signal.aborted) return
       setTrack({ ...EMPTY_TRACK, error: messageOf(error, '开局失败，请重试') })
@@ -231,7 +259,11 @@ export default function InterviewPage() {
       setTrack((prev) => ({ ...prev, submitting: false, elapsedS: 0 }))
       if (!turn.next_question) {
         setStage('ended')
+        clearInterviewSession(userId)
         setFlow({ hasInterview: true })
+      } else {
+        // 还在答题：刷新锚点（超过 24h 的旧锚点不该再被接回来）。
+        writeInterviewSession(userId, session.run_id)
       }
     } catch (error) {
       setTrack((prev) => ({
@@ -256,6 +288,7 @@ export default function InterviewPage() {
       setAnswer('')
       setTrack(EMPTY_TRACK)
       setStage('ended')
+      clearInterviewSession(userId)
       setFlow({ hasInterview: true })
     } catch (error) {
       setFinishError(messageOf(error, '结束失败，请重试'))
@@ -276,6 +309,7 @@ export default function InterviewPage() {
     setFinishOpen(false)
     setFinishError(null)
     setSearchParams({}, { replace: true })
+    clearInterviewSession(userId)
     const prefilled = prefillOf(profile)
     setDraft(prefilled.draft)
     setPrefill(prefilled.draft)

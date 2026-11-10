@@ -98,10 +98,15 @@ export function readUploadSession(
   return session
 }
 
+/**
+ * 写会话。`userId` 为空（登录态未就绪 / 已登出）时**不写**：否则会落到 `sc.upload.anon`
+ * 这个跨账号共享的键上 —— 恢复时按真实 userId 读不到，而且会变成别人也能读到的脏数据。
+ */
 export function writeUploadSession(
   userId: string | null,
   session: Omit<UploadSession, 'version' | 'saved_at'>,
-): UploadSession {
+): UploadSession | null {
+  if (userId === null) return null
   const next: UploadSession = { ...session, version: 1, saved_at: new Date().toISOString() }
   safeSetItem(uploadSessionKey(userId), JSON.stringify(next))
   return next

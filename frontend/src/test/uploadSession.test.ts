@@ -65,6 +65,13 @@ describe('上传会话（r42 断连恢复锚点）', () => {
     expect(readUploadSession('u-2')).toBeNull()
   })
 
+  it('账号未就绪（userId 为空）不写会话，避免落到共享的 anon 键', () => {
+    const written = writeUploadSession(null, { source: 'file', profile_job_id: 'pj-1' })
+    expect(written).toBeNull()
+    expect(store.get(uploadSessionKey(null))).toBeUndefined()
+    expect(readUploadSession(null)).toBeNull()
+  })
+
   it('超过 24 小时自动失效并清掉脏数据', () => {
     writeUploadSession('u-1', { source: 'file', profile_job_id: 'pj-1', meta: META })
     const saved = readUploadSession('u-1')

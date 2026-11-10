@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { ApiError, api } from '../api/client'
 import type {
   PracticeAnswerResult,
@@ -63,7 +63,8 @@ function messageOf(error: unknown, fallback: string): string {
  */
 export default function PracticePage() {
   // 报告页「7 天计划」的专项练习链接带筛选参数：首渲染按 query 落到对应筛选，其余入口仍走默认值。
-  const { search } = useLocation()
+  const { pathname, search } = useLocation()
+  const navigate = useNavigate()
   const [tab, setTab] = useState<Tab>('practice')
   const [view, setView] = useState<View>('setup')
   const [filters, setFilters] = useState<PracticeFiltersState>(() => parsePracticeSearch(search))
@@ -80,6 +81,8 @@ export default function PracticePage() {
   const [answerError, setAnswerError] = useState<string | null>(null)
   const [retrain, setRetrain] = useState(false)
   const [exitOpen, setExitOpen] = useState(false)
+  /** 站内跳转待确认的链接（作答中离开保护，与笔试页同一套写法）。 */
+  const [pendingLeave, setPendingLeave] = useState<string | null>(null)
 
   const [stats, setStats] = useState<PracticeStats | null>(null)
   const [statsLoading, setStatsLoading] = useState(true)
@@ -185,6 +188,45 @@ export default function PracticePage() {
   const wrongTotal = stats ? stats.wrong_total : 0
   const bankEmpty = stats !== null && stats.total === 0
   const firstLoading = stats === null && statsLoading
+  /** 本轮已有进度（答过题或当前题已勾选）：离开会丢卷面，值得拦一道。 */
+  const hasProgress = answeredCount > 0 || selected.length > 0
+
+  /**
+   * 作答中离开保护：卷面进度只在页面 state（已提交的对错已落服务端并计入熟练度），
+   * 刷新/关闭浏览器或站内跳转都会静默丢掉本轮 —— 因此刷新走原生提示、站内链接先确认，
+   * 与笔试页「作答中离开保护」同一套写法。
+   */
+  useEffect(() => {
+    if (view !== 'running' || !hasProgress) {
+      setPendingLeave(null)
+      return
+    }
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    const onClickCapture = (event: MouseEvent) => {
+      const target = event.target instanceof Element ? event.target.closest('a[href]') : null
+      if (!target) return
+      const href = target.getAttribute('href')
+      if (!href || href.startsWith('#') || /^[a-z]+:/i.test(href) || href === pathname) return
+      event.preventDefault()
+      event.stopPropagation()
+      setPendingLeave(href)
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    document.addEventListener('click', onClickCapture, true)
+    return () => {
+      window.removeEventListener('beforeunload', onBeforeUnload)
+      document.removeEventListener('click', onClickCapture, true)
+    }
+  }, [view, hasProgress, pathname])
+
+  const confirmLeave = () => {
+    const href = pendingLeave
+    setPendingLeave(null)
+    if (href !== null) navigate(href)
+  }
 
   const startPaper = async (nextFilters: PracticeFiltersState, isRetrain: boolean) => {
     paperRequestRef.current = { filters: { ...nextFilters }, retrain: isRetrain }
@@ -544,6 +586,16 @@ export default function PracticePage() {
           reloadStats()
         }}
         onCancel={() => setExitOpen(false)}
+      />
+
+      <ConfirmModal
+        open={pendingLeave !== null}
+        title="离开本轮练习"
+        message="本轮进度不保留，已提交的对错仍会计入熟练度"
+        confirmLabel="离开"
+        cancelLabel="继续练习"
+        onConfirm={confirmLeave}
+        onCancel={() => setPendingLeave(null)}
       />
     </div>
   )
