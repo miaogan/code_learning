@@ -870,3 +870,52 @@ export interface PasswordChangeRequest {
   new_password: string
 }
 
+/* ------------------------------------------------------------------ *
+ * r65 AI 学习教练（检索增强 + 引用白名单，与 backend/app/schemas.py 逐字镜像）
+ *
+ * `CoachMaterial.href` 是双份契约：既是上传给模型的上下文，也是服务端校验引用
+ * 的**允许集合**——模型给出的 href 只要不是材料里的原文就会被丢弃并计数。
+ * ------------------------------------------------------------------ */
+
+export interface CoachMaterial {
+  title: string
+  /** 站内路径（教程小节锚点 / 站内页面）；非 `/` 开头的会被服务端丢弃。 */
+  href: string
+  direction?: string
+  sub_direction?: string
+  level?: string
+  /** 交给了模型的小节摘要（截断后的纯文本）。 */
+  detail?: string
+}
+
+export interface CoachAdviceRequest {
+  materials: CoachMaterial[]
+  focus?: string
+  goal?: string
+}
+
+export interface CoachAction {
+  label: string
+  href: string
+  why: string
+  minutes: number
+}
+
+export interface CoachBlock {
+  title: string
+  reason: string
+  actions: CoachAction[]
+}
+
+export interface CoachAdvice {
+  summary: string
+  blocks: CoachBlock[]
+  /** 真正交给模型的材料条数；0 表示没有调用模型。 */
+  materials_used: number
+  /** 因 href 不在白名单被丢弃的动作条数（幻觉引用计数器）。 */
+  dropped_citations: number
+  /** 空材料 / 引用全不可核对时的中文说明；正常出建议时为空串。 */
+  notice: string
+}
+
+

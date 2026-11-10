@@ -17,6 +17,17 @@ export type TutorialDirection =
  */
 export type TutorialLevel = '基础' | '进阶' | '高级'
 
+/**
+ * 交互式演示的闭集（r66）：每个 id 对应 `lib/tutorialDemos.ts` 的帧生成函数与
+ * `components/learn/TutorialDemo` 里的一个渲染器；新增演示必须三处同步。
+ */
+export type TutorialDemoId =
+  | 'complexity-growth'
+  | 'binary-search'
+  | 'two-pointer'
+  | 'tree-traversal'
+  | 'dp-knapsack'
+
 /** 正文块：渲染层按 kind 分支，新增块类型必须同步 `TutorialArticle`。 */
 export type TutorialBlock =
   | { kind: 'text'; text: string }
@@ -25,6 +36,7 @@ export type TutorialBlock =
   | { kind: 'note'; tone: 'info' | 'warn'; title: string; text: string }
   | { kind: 'table'; headers: string[]; rows: string[][] }
   | { kind: 'qa'; items: { question: string; answer: string }[] }
+  | { kind: 'demo'; demo: TutorialDemoId; title: string; caption?: string }
 
 export interface TutorialSection {
   /** 章内唯一、ASCII：用于文内锚点与 `aria-labelledby`。 */

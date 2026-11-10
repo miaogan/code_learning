@@ -980,3 +980,53 @@ class AiTestResult(BaseModel):
 class PasswordChangeRequest(BaseModel):
     old_password: str = Field(min_length=1)
     new_password: str = Field(min_length=1)
+
+
+# --- r65 AI 学习教练（检索增强 + 引用白名单） ---------------------------------
+#
+# 材料由前端组装（教程正文只在 `frontend/src/lib/tutorials.ts`，后端没有语料），
+# 因此这里同时是「上传上下文」与「引用白名单」的契约：`href` 必须逐字出现，
+# 模型给的 href 命中不了允许集合 → 该条建议直接丢弃并计入 `dropped_citations`。
+
+
+class CoachMaterial(BaseModel):
+    """一条站内材料：`href` 是后续引用校验的唯一凭据。"""
+
+    title: str = ""
+    href: str = ""
+    direction: str = ""
+    sub_direction: str = ""
+    level: str = ""
+    detail: str = ""
+
+
+class CoachAdviceRequest(BaseModel):
+    materials: list[CoachMaterial] = Field(default_factory=list)
+    focus: str = Field(default="", description="本次聚焦的方向 / 岗位，空串表示由模型自行收窄")
+    goal: str = Field(default="", description="用户本次想解决的问题，空串表示按薄弱方向默认目标")
+
+
+class CoachAction(BaseModel):
+    """一条可执行动作：`href` 已通过白名单校验，前端可直接跳转。"""
+
+    label: str
+    href: str
+    why: str = ""
+    minutes: int = 30
+
+
+class CoachBlock(BaseModel):
+    title: str
+    reason: str = ""
+    actions: list[CoachAction] = Field(default_factory=list)
+
+
+class CoachAdvice(BaseModel):
+    summary: str = ""
+    blocks: list[CoachBlock] = Field(default_factory=list)
+    #: 通过清洗后真正交给模型的材料条数（0 表示未调用模型）。
+    materials_used: int = 0
+    #: 因 href 不在白名单被丢弃的动作条数（幻觉引用计数器）。
+    dropped_citations: int = 0
+    #: 空材料 / 全部引用不可核对时的中文说明；正常出建议时为空串。
+    notice: str = ""

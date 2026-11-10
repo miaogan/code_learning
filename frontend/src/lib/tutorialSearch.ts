@@ -67,6 +67,8 @@ function blockText(block: TutorialBlock): string[] {
       return [block.headers.join(' '), ...block.rows.map((row) => row.join(' '))]
     case 'qa':
       return block.items.flatMap((item) => [item.question, item.answer])
+    case 'demo':
+      return block.caption ? [block.title, block.caption] : [block.title]
     default:
       return []
   }

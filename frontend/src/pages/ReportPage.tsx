@@ -5,6 +5,7 @@ import type { Report } from '../api/types'
 import { scoreRingState } from '../components/interview/scoreModel'
 import { SettingsBar } from '../components/interview/SettingsBar'
 import { AnswerReview } from '../components/report/AnswerReview'
+import { CoachAdvice } from '../components/report/CoachAdvice'
 import { CoachBlocks } from '../components/report/CoachBlocks'
 import { LearningDirectionCard } from '../components/report/LearningDirectionCard'
 import { ShortfallCard } from '../components/report/ShortfallCard'
@@ -486,6 +487,8 @@ export default function ReportPage() {
 
             {/* 调研改造（boss / LeetCode 借鉴）：逐题复盘 → 7 天补短板计划，同样排在主轴之后 */}
             <AnswerReview runIds={report.run_ids} />
+            {/* r65：检索增强的学习教练建议，排在 7 天计划之前（先有建议，再有排程） */}
+            <CoachAdvice report={report} />
             <div className="sc-lab-week">
               <WeekPlan report={report} userId={cacheScope} />
             </div>

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { activeSectionIndex } from '../../lib/tutorials'
 import type { TutorialBlock, TutorialChapter } from '../../lib/tutorialTypes'
+import { TutorialDemo } from './TutorialDemo'
 
 function headingId(sectionId: string): string {
   return `tutorial-${sectionId}`
@@ -83,6 +84,9 @@ function BlockView({ block }: { block: TutorialBlock }) {
           ))}
         </div>
       )
+
+    case 'demo':
+      return <TutorialDemo block={block} />
   }
 }
 

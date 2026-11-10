@@ -4,6 +4,8 @@ import type {
   AiTestResult,
   AnswerRequest,
   ApiErrorBody,
+  CoachAdvice,
+  CoachAdviceRequest,
   Course,
   EvalSummary,
   ExamAnswers,
@@ -165,6 +167,10 @@ export const api = {
   /** r51 题目全文检索：FTS5 优先，环境不支持时服务端降级并给中文 notice。 */
   searchQuestions: (payload: QuestionSearchRequest): Promise<QuestionSearchResponse> =>
     request<QuestionSearchResponse>('/api/search/questions', jsonInit('POST', payload)),
+
+  /** r65 AI 学习教练：材料由前端组装上传，服务端按 href 白名单校验引用后回建议。 */
+  coachAdvice: (payload: CoachAdviceRequest, signal?: AbortSignal): Promise<CoachAdvice> =>
+    request<CoachAdvice>('/api/coach/advice', jsonInit('POST', payload, signal)),
 
   /* ---------- r23 登录态与个人设置 ---------- */
 

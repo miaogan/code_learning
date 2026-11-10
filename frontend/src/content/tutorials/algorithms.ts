@@ -28,6 +28,12 @@ export const ALGORITHM_CHAPTERS: TutorialChapter[] = [
               'O(n^2)：双重循环枚举组合，数据量大时最先出问题。',
             ],
           },
+          {
+            kind: 'demo',
+            demo: 'complexity-growth',
+            title: '同一批数据，不同复杂度的操作次数差多少',
+            caption: '切换数据量看四条曲线的真实操作次数。条形按对数压缩绘制，右侧数字是未压缩的真实值。',
+          },
         ],
       },
       {
@@ -54,6 +60,12 @@ export const ALGORITHM_CHAPTERS: TutorialChapter[] = [
             tone: 'info',
             title: '常数不是不重要',
             text: '复杂度相同不代表实际速度相同。数组顺序访问通常比链表快，因为缓存友好；但数据量很大时，复杂度更低的算法最终会胜出。',
+          },
+          {
+            kind: 'demo',
+            demo: 'binary-search',
+            title: '为什么「每次减半」能让 8 个数 3 步定位',
+            caption: '逐步观察 low / high / mid 的收缩过程：每比较一次，候选区间就砍掉一半。',
           },
         ],
       },
@@ -215,6 +227,12 @@ export const ALGORITHM_CHAPTERS: TutorialChapter[] = [
               '循环条件是 left < right，避免同一个元素被用两次。',
             ],
           },
+          {
+            kind: 'demo',
+            demo: 'two-pointer',
+            title: '每一步只移动一个指针',
+            caption: '有序数组求和偏小就右移左指针、偏大就左移右指针，两个指针都不会回退。',
+          },
         ],
       },
       {
@@ -312,7 +330,7 @@ export const ALGORITHM_CHAPTERS: TutorialChapter[] = [
               '            dp[j] = max(dp[j], dp[j - w] + v)',
               '    return dp[capacity]',
               '',
-              'print(max_value(5, [2, 3, 4], [3, 4, 5]))   # 8',
+              'print(max_value(5, [2, 3, 4], [3, 4, 5]))   # 7',
             ].join('\n'),
           },
           {
@@ -322,6 +340,12 @@ export const ALGORITHM_CHAPTERS: TutorialChapter[] = [
               '逆序是 0-1 背包的标记：写错方向不会报错，只会得到「物品可以无限取」的结果。',
               '容量很大但物品少时，改用「按价值做下标」或 meet-in-the-middle。',
             ],
+          },
+          {
+            kind: 'demo',
+            demo: 'dp-knapsack',
+            title: '一维 dp 的逆序更新',
+            caption: '容量 5、物品 (重量, 价值) = (2,3) (3,4) (4,5)：逆序只在「能变大」时才落一帧。',
           },
         ],
       },
@@ -414,6 +438,12 @@ export const ALGORITHM_CHAPTERS: TutorialChapter[] = [
             tone: 'info',
             title: '二叉搜索树（BST）',
             text: '左子树所有节点 < 根 < 右子树所有节点。它的中序遍历就是升序序列——「BST + 中序」是排序类题目的固定组合。',
+          },
+          {
+            kind: 'demo',
+            demo: 'tree-traversal',
+            title: '四种遍历的访问顺序',
+            caption: '同一棵树上切换前序 / 中序 / 后序 / 层序，观察「根」在序列里的位置与访问路径的差别。',
           },
         ],
       },
