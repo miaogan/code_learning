@@ -7752,6 +7752,7 @@ html {
 /* ---------- r63 学习档案（只读汇总页 + Markdown 导出） ---------- */
 .sc-archive-actions {
   align-items: center;
+  flex-wrap: wrap;
   margin-bottom: var(--sp-4);
 }
 
@@ -7872,5 +7873,184 @@ html {
   font-size: var(--fs-meta);
   line-height: var(--lh-meta);
   color: var(--text-tertiary);
+}
+
+/* r63 续：档案页仪器式排版 —— 头部发丝网格 + 等宽读数条 + 齐备度面板 + 卡片编号。
+   全部取 tokens 变量（网格用 --lab-grid-line，尺寸用 --sp-* / --fs-* / --lh-*）。 */
+.sc-archive-hero {
+  isolation: isolate;
+  position: relative;
+  padding-bottom: var(--sp-5);
+  margin-bottom: var(--sp-5);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.sc-archive-hero::before {
+  content: '';
+  position: absolute;
+  inset: calc(var(--sp-5) * -1) calc(var(--sp-6) * -1) 0;
+  z-index: -1;
+  background-image: linear-gradient(var(--lab-grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--lab-grid-line) 1px, transparent 1px);
+  background-size: var(--sp-6) var(--sp-6);
+  pointer-events: none;
+}
+
+.sc-archive-kicker {
+  margin: 0 0 var(--sp-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-kicker);
+  line-height: var(--lh-kicker);
+  letter-spacing: var(--ls-kicker);
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.sc-archive-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--sp-1);
+  margin-top: var(--sp-5);
+}
+
+.sc-archive-stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--border-subtle);
+  border-left: 2px solid var(--border-strong);
+  background: var(--bg-surface);
+}
+
+.sc-archive-stat.is-accent {
+  border-left-color: var(--accent);
+  background: var(--accent-wash-06);
+}
+
+.sc-archive-stat-label {
+  font-family: var(--font-mono);
+  font-size: var(--fs-kicker);
+  line-height: var(--lh-kicker);
+  letter-spacing: var(--ls-kicker);
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.sc-archive-stat-value {
+  font-family: var(--font-mono);
+  font-size: var(--fs-value-md);
+  line-height: var(--lh-value-md);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.sc-archive-stat.is-accent .sc-archive-stat-value {
+  color: var(--accent);
+}
+
+.sc-archive-stat-unit {
+  margin-left: var(--sp-1);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--text-tertiary);
+}
+
+.sc-archive-stat > .sc-archive-stat-hint {
+  font-family: var(--font-sans);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  letter-spacing: normal;
+  color: var(--text-tertiary);
+}
+
+.sc-archive-coverage-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+}
+
+.sc-archive-coverage-meter {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--sp-1);
+}
+
+.sc-archive-coverage-num {
+  font-family: var(--font-mono);
+  font-size: var(--fs-value-md);
+  line-height: var(--lh-value-md);
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+}
+
+.sc-archive-coverage-unit {
+  margin-left: var(--sp-1);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--text-tertiary);
+}
+
+.sc-archive-coverage-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--sp-2) var(--sp-4);
+  margin: var(--sp-3) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sc-archive-coverage-item {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+}
+
+.sc-archive-coverage-flag {
+  flex: 0 0 var(--sp-4);
+  font-family: var(--font-mono);
+  color: var(--text-tertiary);
+}
+
+.sc-archive-coverage-item.is-covered .sc-archive-coverage-flag {
+  color: var(--success);
+}
+
+.sc-archive-coverage-label {
+  flex: 0 0 auto;
+  color: var(--text-primary);
+}
+
+.sc-archive-coverage-hint {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--text-tertiary);
+  overflow-wrap: anywhere;
+}
+
+.sc-archive-coverage-item .sc-archive-link,
+.sc-coach-note .sc-archive-link {
+  flex: none;
+  margin-top: 0;
+  margin-left: var(--sp-2);
+}
+
+.sc-archive-cardtitle {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+}
+
+.sc-archive-index {
+  font-family: var(--font-mono);
+  font-size: var(--fs-kicker);
+  line-height: var(--lh-kicker);
+  letter-spacing: var(--ls-kicker);
+  color: var(--accent);
 }
 

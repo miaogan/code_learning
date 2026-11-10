@@ -76,6 +76,23 @@ export interface ArchiveSnapshot {
   plan: ArchivePlan | null
 }
 
+export interface ArchiveEvidence {
+  key: 'profile' | 'versions' | 'scores' | 'report' | 'learn' | 'plan'
+  label: string
+  covered: boolean
+  /** 补齐方式的中文一句（页面只在未齐备时展示，判断用 `covered`，不靠文案）。 */
+  hint: string
+  /** 补齐入口（站内路由）。 */
+  to: string
+}
+
+export interface ArchiveCoverage {
+  covered: number
+  total: number
+  percent: number
+  items: ArchiveEvidence[]
+}
+
 export interface ArchiveInput {
   profile: Profile | null
   versions: ResumeVersionSummary[]
@@ -172,6 +189,65 @@ export function buildArchiveSnapshot(input: ArchiveInput): ArchiveSnapshot {
   }
 }
 
+/**
+ * 证据齐备度：档案里 6 类痕迹各算一项，用来回答「这份档案还差什么」。
+ * 只判「有没有」，不判好坏 —— 齐备度更接近 1 也只说明记录更全，不代表能力更强。
+ */
+export function evidenceCoverage(snapshot: ArchiveSnapshot): ArchiveCoverage {
+  const items: ArchiveEvidence[] = [
+    {
+      key: 'profile',
+      label: '技术画像',
+      covered:
+        snapshot.profile !== null && (snapshot.profile.skills.length > 0 || snapshot.profile.tech.length > 0),
+      hint: '上传简历并生成画像',
+      to: '/',
+    },
+    {
+      key: 'versions',
+      label: '简历版本',
+      covered: snapshot.versions.count > 0,
+      hint: '上传第一份简历即开始存档',
+      to: '/',
+    },
+    {
+      key: 'scores',
+      label: '测评成绩',
+      covered: snapshot.scores.judgedCount > 0,
+      hint: '完成一场有计分的模拟面试或笔试',
+      to: '/interview',
+    },
+    {
+      key: 'report',
+      label: '诊断报告',
+      covered: snapshot.weaknessesAvailable,
+      hint: '生成诊断报告后才有薄弱方向',
+      to: '/report',
+    },
+    {
+      key: 'learn',
+      label: '学习记录',
+      covered: snapshot.learn.percent > 0,
+      hint: '读一节教程就会产生进度',
+      to: '/learn',
+    },
+    {
+      key: 'plan',
+      label: '计划打卡',
+      covered: snapshot.plan !== null && snapshot.plan.completed > 0,
+      hint: '在报告页勾掉一个计划任务',
+      to: '/report',
+    },
+  ]
+  const covered = items.filter((item) => item.covered).length
+  return {
+    covered,
+    total: items.length,
+    percent: Math.round((covered / items.length) * 100),
+    items,
+  }
+}
+
 function examScoreText(value: number | null): string {
   if (value === null) return '暂无记录'
   return Number.isInteger(value) ? String(value) : value.toFixed(1)
@@ -207,6 +283,17 @@ export function archiveMarkdown(snapshot: ArchiveSnapshot, now: Date = new Date(
     '> 本档案由「逃跑计划」站内记录汇总，只反映你在本站的测评与学习痕迹，不代表能力评级或求职结果。',
     '',
   )
+
+  lines.push('## 证据齐备度', '')
+  const coverage = evidenceCoverage(snapshot)
+  lines.push(`- 已齐备 ${coverage.covered} / ${coverage.total} 项（${coverage.percent}%）`)
+  const missing = coverage.items.filter((item) => !item.covered)
+  if (missing.length === 0) {
+    lines.push('- 六类痕迹都已留下记录（齐备度只说明记录全，不代表能力强）')
+  } else {
+    lines.push(`- 还缺：${missing.map((item) => `${item.label}（${item.hint}）`).join('、')}`)
+  }
+  lines.push('')
 
   lines.push('## 目标与画像', '')
   if (profile === null) {

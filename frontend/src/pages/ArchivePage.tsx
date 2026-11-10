@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import { api, ApiError } from '../api/client'
@@ -8,12 +8,15 @@ import { Card } from '../components/ui/Card'
 import { EmptyState } from '../components/ui/EmptyState'
 import { InlineError } from '../components/ui/InlineError'
 import { PhaseLoader } from '../components/ui/PhaseLoader'
+import { Toast } from '../components/ui/Toast'
 import {
   archiveFileName,
   archiveMarkdown,
   buildArchiveSnapshot,
   DEFAULT_ARCHIVE_MINUTES,
+  evidenceCoverage,
   isEmptyArchive,
+  type ArchiveSnapshot,
 } from '../lib/archive'
 import { formatChars, formatScore, formatWhen } from '../lib/format'
 import { buildStudyPlan, PLAN_MINUTES } from '../lib/studyPlan'
@@ -62,9 +65,52 @@ function ScoreText({ value, scale }: { value: number | null; scale: 10 | 100 }) 
   return <span>{text} / {scale}</span>
 }
 
-/** 学习档案（r63）：一份跨模块的只读汇总 + Markdown 导出；所有读数都由 `lib/archive` 单点计算。 */
+/** 顶部读数条的一格：大数字 + 单位 + 一行口径说明。 */
+function Stat({
+  label,
+  value,
+  unit,
+  hint,
+  accent = false,
+}: {
+  label: string
+  value: string
+  unit?: string
+  hint: string
+  accent?: boolean
+}) {
+  return (
+    <div className={accent ? 'sc-archive-stat is-accent' : 'sc-archive-stat'}>
+      <span className="sc-archive-stat-label">{label}</span>
+      <span className="sc-archive-stat-value">
+        {value}
+        {unit === undefined ? null : <span className="sc-archive-stat-unit">{unit}</span>}
+      </span>
+      <span className="sc-archive-stat-hint">{hint}</span>
+    </div>
+  )
+}
+
+/** 卡标题带编号（等宽序号 + 发丝线），六块卡一眼能数清。 */
+function CardTitle({ index, title }: { index: string; title: string }) {
+  return (
+    <h3 className="sc-coach-blocktitle sc-archive-cardtitle">
+      <span className="sc-archive-index">{index}</span>
+      {title}
+    </h3>
+  )
+}
+
+function planValue(snapshot: ArchiveSnapshot): string {
+  if (snapshot.plan === null || snapshot.plan.total === 0) return '—'
+  return `${snapshot.plan.completed}/${snapshot.plan.total}`
+}
+
+/** 学习档案（r63）：一份跨模块的只读汇总 + Markdown 导出/复制；读数全部由 `lib/archive` 单点计算。 */
 export default function ArchivePage() {
   const progress = useLearnProgress()
+  const [toast, setToast] = useState<string | null>(null)
+  const [toastSeq, setToastSeq] = useState(0)
 
   const dataAsync = useAsync<ArchiveData>(async (signal) => {
     const [profile, versions, runs, report] = await Promise.all([
@@ -114,6 +160,8 @@ export default function ArchivePage() {
     [data, progress, plan, planDone],
   )
 
+  const coverage = useMemo(() => (snapshot === null ? null : evidenceCoverage(snapshot)), [snapshot])
+
   const exportArchive = () => {
     if (snapshot === null) return
     const text = archiveMarkdown(snapshot)
@@ -128,14 +176,56 @@ export default function ArchivePage() {
     window.setTimeout(() => URL.revokeObjectURL(url), 0)
   }
 
+  const copyArchive = async () => {
+    if (snapshot === null) return
+    try {
+      await navigator.clipboard.writeText(archiveMarkdown(snapshot))
+      setToast('已复制 Markdown，可直接粘进笔记')
+      setToastSeq((seq) => seq + 1)
+    } catch {
+      setToast('复制失败：浏览器没给剪贴板权限，可改用「导出 Markdown」')
+      setToastSeq((seq) => seq + 1)
+    }
+  }
+
   return (
-    <div className="sc-page">
-      <header className="sc-page-header">
+    <div className="sc-page sc-archive">
+      <header className="sc-archive-hero">
+        <p className="sc-archive-kicker">EVIDENCE ARCHIVE</p>
         <h1 className="sc-page-title">学习档案</h1>
         <p className="sc-page-sub">
-          把画像、成绩、薄弱方向、学习进度与计划打卡汇总到一处，可导出 Markdown 存档。
+          把画像、成绩、薄弱方向、学习进度与计划打卡汇总到一处，可一键导出或复制 Markdown。
           只汇总你在本站的记录，不代表能力评级，也不承诺求职结果。
         </p>
+        {snapshot !== null && coverage !== null && !isEmptyArchive(snapshot) && (
+          <div className="sc-archive-stats">
+            <Stat
+              label="档案齐备度"
+              value={String(coverage.percent)}
+              unit="%"
+              hint={`已齐备 ${coverage.covered} / ${coverage.total} 项痕迹`}
+              accent
+            />
+            <Stat
+              label="计分测评"
+              value={String(snapshot.scores.judgedCount)}
+              unit="场"
+              hint={`面试 ${snapshot.scores.interviewCount} · 笔试 ${snapshot.scores.examCount}`}
+            />
+            <Stat
+              label="读完章节"
+              value={String(snapshot.learn.done)}
+              unit="章"
+              hint={`小节进度 ${snapshot.learn.percent}%`}
+            />
+            <Stat
+              label="计划打卡"
+              value={planValue(snapshot)}
+              unit="个"
+              hint={snapshot.plan === null ? '生成报告后才有计划' : `完成 ${snapshot.plan.percent}%`}
+            />
+          </div>
+        )}
       </header>
 
       {dataAsync.status === 'loading' && data === null && (
@@ -153,18 +243,63 @@ export default function ArchivePage() {
         />
       )}
 
-      {snapshot !== null && !isEmptyArchive(snapshot) && (
+      {snapshot !== null && coverage !== null && !isEmptyArchive(snapshot) && (
         <>
           <div className="sc-btn-row sc-archive-actions">
             <Button variant="secondary" onClick={exportArchive}>
               导出 Markdown
             </Button>
-            <span className="sc-archive-hint">导出内容与本页同源，文件名带当天日期。</span>
+            <Button variant="ghost" onClick={() => void copyArchive()}>
+              复制 Markdown
+            </Button>
+            <span className="sc-archive-hint">导出与复制同源，文件名带当天日期。</span>
           </div>
+
+          <Card className="sc-archive-span">
+            <div className="sc-archive-coverage-head">
+              <div>
+                <h3 className="sc-coach-blocktitle">证据齐备度</h3>
+                <p className="sc-archive-hint">
+                  只判六类痕迹「有没有留下记录」，不判好坏；点「去补齐」可直接到对应入口。
+                </p>
+              </div>
+              <div className="sc-archive-coverage-meter">
+                <span className="sc-archive-coverage-num">
+                  {coverage.percent}
+                  <span className="sc-archive-coverage-unit">%</span>
+                </span>
+                <span className="sc-archive-muted">
+                  已齐备 {coverage.covered} / {coverage.total} 项
+                </span>
+              </div>
+            </div>
+            <Bar percent={coverage.percent} />
+            <ul className="sc-archive-coverage-list">
+              {coverage.items.map((item) => (
+                <li
+                  key={item.key}
+                  className={item.covered ? 'sc-archive-coverage-item is-covered' : 'sc-archive-coverage-item'}
+                >
+                  <span className="sc-archive-coverage-flag" aria-hidden="true">
+                    {item.covered ? '✓' : '○'}
+                  </span>
+                  <span className="sc-archive-coverage-label">{item.label}</span>
+                  <span className="sc-archive-coverage-hint">
+                    {item.covered ? '已留下记录' : item.hint}
+                  </span>
+                  {item.covered ? null : (
+                    <Link className="sc-archive-link" to={item.to}>
+                      去补齐
+                    </Link>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </Card>
 
           <div className="sc-archive-grid">
             <Card>
-              <h3 className="sc-coach-blocktitle">目标与画像</h3>
+              <CardTitle index="01" title="目标与画像" />
               {snapshot.profile === null ? (
                 <p className="sc-coach-note">
                   还没有技术画像：上传简历并生成画像后，这里会给出证据盘点的摘要。
@@ -211,7 +346,7 @@ export default function ArchivePage() {
             </Card>
 
             <Card>
-              <h3 className="sc-coach-blocktitle">测评成绩</h3>
+              <CardTitle index="02" title="测评成绩" />
               {snapshot.scores.judgedCount === 0 ? (
                 <p className="sc-coach-note">
                   还没有已计分的测评记录：完成一场模拟面试或模拟笔试后会出现在这里。
@@ -245,7 +380,7 @@ export default function ArchivePage() {
             </Card>
 
             <Card>
-              <h3 className="sc-coach-blocktitle">简历版本</h3>
+              <CardTitle index="03" title="简历版本" />
               {snapshot.versions.latest === null ? (
                 <p className="sc-coach-note">
                   还没有简历版本：上传第一份简历即开始存档。
@@ -272,7 +407,7 @@ export default function ArchivePage() {
             </Card>
 
             <Card>
-              <h3 className="sc-coach-blocktitle">薄弱方向</h3>
+              <CardTitle index="04" title="薄弱方向" />
               {!snapshot.weaknessesAvailable ? (
                 <p className="sc-coach-note">
                   还没有诊断报告：完成一次有计分的测评并生成报告后，薄弱方向才会出现在这里。
@@ -290,7 +425,9 @@ export default function ArchivePage() {
                         {item.direction}
                         {item.subDirection === '' ? '' : ` · ${item.subDirection}`}
                       </span>
-                      <span className="sc-archive-weak-rate">错 {item.wrong} / {item.total}</span>
+                      <span className="sc-archive-weak-rate">
+                        错 {item.wrong} / {item.total}
+                      </span>
                       <Bar percent={Math.round(item.rate * 100)} />
                     </li>
                   ))}
@@ -304,7 +441,7 @@ export default function ArchivePage() {
             </Card>
 
             <Card>
-              <h3 className="sc-coach-blocktitle">学习进度</h3>
+              <CardTitle index="05" title="学习进度" />
               <Kv label="已读完" value={`${snapshot.learn.done} 章`} />
               <Kv label="读到一半" value={`${snapshot.learn.reading} 章`} />
               <Kv label="参与统计" value={`${snapshot.learn.chapters} 章`} />
@@ -319,7 +456,7 @@ export default function ArchivePage() {
             </Card>
 
             <Card>
-              <h3 className="sc-coach-blocktitle">7 天计划</h3>
+              <CardTitle index="06" title="7 天计划" />
               {snapshot.plan === null ? (
                 <p className="sc-coach-note">
                   还没有可用的 7 天计划：生成诊断报告后，报告页会按短板排出计划。
@@ -337,6 +474,9 @@ export default function ArchivePage() {
                   />
                   <Bar percent={snapshot.plan.percent} />
                   <p className="sc-archive-hint">打卡只记「做完」，不计入熟练度或成绩。</p>
+                  <Link className="sc-archive-link" to="/report">
+                    去报告页打卡
+                  </Link>
                 </>
               )}
             </Card>
@@ -346,6 +486,10 @@ export default function ArchivePage() {
             本页只读、不修改任何记录；学习进度与计划打卡换设备登录同一账号可接着看。
           </p>
         </>
+      )}
+
+      {toast === null ? null : (
+        <Toast message={toast} seq={toastSeq} onClose={() => setToast(null)} />
       )}
     </div>
   )

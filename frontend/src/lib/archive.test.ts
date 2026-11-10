@@ -6,6 +6,7 @@ import {
   archiveFileName,
   archiveMarkdown,
   buildArchiveSnapshot,
+  evidenceCoverage,
   isEmptyArchive,
   MAX_ARCHIVE_WEAKNESSES,
   type ArchiveInput,
@@ -289,9 +290,102 @@ describe('archiveMarkdown', () => {
     expect(empty).toContain('本次报告里没有形成薄弱方向')
   })
 
+  it('首节给出证据齐备度与缺口清单', () => {
+    const text = archiveMarkdown(buildArchiveSnapshot(input()), NOW)
+    expect(text).toContain('## 证据齐备度')
+    expect(text).toContain('- 已齐备 6 / 6 项（100%）')
+    expect(text).toContain('六类痕迹都已留下记录')
+    expect(text.indexOf('## 证据齐备度')).toBeLessThan(text.indexOf('## 目标与画像'))
+  })
+
+  it('齐备度不足时逐项列出「还缺什么 + 怎么补」', () => {
+    const empty = archiveMarkdown(
+      buildArchiveSnapshot(
+        input({
+          profile: null,
+          versions: [],
+          runs: [],
+          report: null,
+          progress: EMPTY_LEARN_PROGRESS,
+          plan: null,
+        }),
+      ),
+      NOW,
+    )
+    expect(empty).toContain('- 已齐备 0 / 6 项（0%）')
+    expect(empty).toContain('还缺：技术画像（上传简历并生成画像）')
+    expect(empty).toContain('计划打卡（在报告页勾掉一个计划任务）')
+  })
+
   it('坐标不足 1 条薄弱方向时不带序号以外的假数据', () => {
     const text = archiveMarkdown(buildArchiveSnapshot(input({ report: report(null) })), NOW)
     expect(text).toContain('还没有诊断报告')
+  })
+})
+
+describe('evidenceCoverage', () => {
+  it('六类痕迹齐全时 6 / 6（100%），每项都给站内补齐入口', () => {
+    const coverage = evidenceCoverage(buildArchiveSnapshot(input()))
+    expect(coverage.covered).toBe(6)
+    expect(coverage.total).toBe(6)
+    expect(coverage.percent).toBe(100)
+    expect(coverage.items.map((item) => item.key)).toEqual([
+      'profile',
+      'versions',
+      'scores',
+      'report',
+      'learn',
+      'plan',
+    ])
+    expect(coverage.items.every((item) => item.covered)).toBe(true)
+    expect(coverage.items.every((item) => item.to.startsWith('/'))).toBe(true)
+    expect(coverage.items.every((item) => item.hint !== '')).toBe(true)
+  })
+
+  it('空档案 0 / 6（0%），每项都未齐备且带补齐提示', () => {
+    const coverage = evidenceCoverage(
+      buildArchiveSnapshot(
+        input({
+          profile: null,
+          versions: [],
+          runs: [],
+          report: null,
+          progress: EMPTY_LEARN_PROGRESS,
+          plan: null,
+        }),
+      ),
+    )
+    expect(coverage.covered).toBe(0)
+    expect(coverage.percent).toBe(0)
+    expect(coverage.items.every((item) => !item.covered)).toBe(true)
+  })
+
+  it('画像存在但能力项与技术栈都为空时不算齐备', () => {
+    const coverage = evidenceCoverage(
+      buildArchiveSnapshot(
+        input({
+          profile: profile({ skills: [], tech_stack: [], projects: [] }),
+          versions: [],
+          runs: [],
+          report: null,
+          progress: EMPTY_LEARN_PROGRESS,
+          plan: null,
+        }),
+      ),
+    )
+    expect(coverage.items[0].key).toBe('profile')
+    expect(coverage.items[0].covered).toBe(false)
+  })
+
+  it('只有诊断报告时只算一项（1 / 6 = 17%）', () => {
+    const coverage = evidenceCoverage(
+      buildArchiveSnapshot(
+        input({ profile: null, versions: [], runs: [], progress: EMPTY_LEARN_PROGRESS, plan: null }),
+      ),
+    )
+    expect(coverage.covered).toBe(1)
+    expect(coverage.percent).toBe(17)
+    expect(coverage.items.filter((item) => item.covered).map((item) => item.key)).toEqual(['report'])
   })
 })
 
