@@ -36,7 +36,7 @@ const DIRECTION_OPTIONS: ChipOption<TutorialDirectionFilter>[] = [
  *
  * 筛选状态只活在 URL（`?direction=&level=`），刷新与分享都能复现；
  * 第二级只列「当前方向真实存在的档位」，所以永远不会出现点了必然没结果的按钮。
- * 阅读进度是本地痕迹（`state/learnProgress`，按账号隔离），卡片与入口只读它。
+ * 阅读进度以服务端为权威、本地只作缓存（`state/learnProgress`，按账号隔离），卡片与入口只读它。
  */
 export default function LearnPage() {
   const [searchParams, setSearchParams] = useSearchParams()

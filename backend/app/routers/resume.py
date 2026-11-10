@@ -12,7 +12,7 @@ import time
 import uuid
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi import APIRouter, Depends, File, Query, UploadFile
 
 from app.core import repository
 from app.core.config import get_settings
@@ -35,10 +35,12 @@ from app.schemas import (
     ResumeJobStarted,
     ResumeJobStatus,
     ResumeMeta,
+    ResumeVersionDetail,
+    ResumeVersionSummary,
 )
 from app.services.ai import user_ai
 from app.services.ai.ai import AIClient
-from app.services.resume import image_resume, resume_polish
+from app.services.resume import image_resume, resume_polish, versions as resume_versions
 from app.services.resume.parser import ensure_upload_size, max_upload_bytes, parse_resume
 
 router = APIRouter(prefix="/api/resumes", tags=["resume"], dependencies=[Depends(current_user)])
@@ -79,6 +81,31 @@ async def upload_resume(
         mime=file.content_type or "application/octet-stream",
     )
     return meta
+
+
+# --- 版本对比（r60）-----------------------------------------------------------
+
+
+@router.get(
+    "",
+    response_model=list[ResumeVersionSummary],
+    summary="简历版本列表（含该版本最近一次测评成绩）",
+)
+def list_versions(limit: int = Query(20, ge=1, le=50)) -> list[ResumeVersionSummary]:
+    """只读投影：documents 版本元信息 + 该版本已完成测评的最近一次分数（无正文）。"""
+    return resume_versions.list_versions(limit)
+
+
+@router.get(
+    "/{resume_id}",
+    response_model=ResumeVersionDetail,
+    summary="单份简历版本详情（展示元信息 + 画像 + 成绩）",
+)
+def read_version(resume_id: str) -> ResumeVersionDetail:
+    detail = resume_versions.get_version(resume_id)
+    if detail is None:
+        raise AppError(NOT_FOUND, "没有找到这份简历，请重新上传后重试", status=404)
+    return detail
 
 
 async def _read_images(files: list[UploadFile]) -> tuple[list[bytes], list[str]]:

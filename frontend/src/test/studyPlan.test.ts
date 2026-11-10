@@ -4,12 +4,17 @@ import { ALL_TUTORIAL_CHAPTERS } from '../lib/tutorials'
 import type { LearnProgressState } from '../lib/learnProgress'
 import {
   PLAN_DAY_COUNT,
+  PLAN_VERSION,
   buildStudyPlan,
-  practiceHref,
+  mergePlanState,
   parsePlanState,
   parseStoredPlan,
+  planPushPayload,
   planStats,
+  practiceHref,
+  samePlanState,
   type PlanMinutes,
+  type PlanState,
 } from '../lib/studyPlan'
 
 function makeReport(weakness: WeaknessItem[] | null): Report {
@@ -304,5 +309,55 @@ describe('计划本地存储的解析', () => {
   it('计划快照可原样读回（version / 时长 / 结构校验）', () => {
     const plan = buildStudyPlan(makeReport([weakness('事件循环', '前端')]), { dailyMinutes: 60 })
     expect(parseStoredPlan(JSON.stringify(plan))).toEqual(plan)
+  })
+})
+
+/* ---------- r61 打卡上云：上推载荷与跨设备合并 ---------- */
+
+function planState(dailyMinutes: PlanMinutes, done: Record<string, true>): PlanState {
+  return { version: PLAN_VERSION, daily_minutes: dailyMinutes, done }
+}
+
+describe('打卡上云载荷', () => {
+  it('只带 true 条目（取消打卡不在 map 里）', () => {
+    const payload = planPushPayload(planState(30, { a: true, c: true }))
+    expect(payload).toEqual({ daily_minutes: 30, done: { a: true, c: true } })
+    expect(JSON.stringify(payload)).not.toContain('false')
+  })
+})
+
+describe('打卡状态跨设备合并', () => {
+  it('云端没有记录时保留本机时长与打卡（首次上云）', () => {
+    const merged = mergePlanState(planState(60, { a: true }), {
+      daily_minutes: 30,
+      done: {},
+      updated_at: '',
+    })
+    expect(merged.daily_minutes).toBe(60)
+    expect(merged.done).toEqual({ a: true })
+  })
+
+  it('云端有记录时时长以云端为准，打卡取并集', () => {
+    const merged = mergePlanState(planState(15, { a: true }), {
+      daily_minutes: 60,
+      done: { b: true, c: false },
+      updated_at: '2026-11-10T00:00:00+00:00',
+    })
+    expect(merged.daily_minutes).toBe(60)
+    expect(merged.done).toEqual({ a: true, b: true })
+    expect(merged.version).toBe(PLAN_VERSION)
+  })
+})
+
+describe('打卡状态等价判断', () => {
+  it('键集合与时长一致即等价，false 残留不影响', () => {
+    expect(
+      samePlanState(planState(30, { a: true }), { daily_minutes: 30, done: { a: true, b: false } }),
+    ).toBe(true)
+  })
+
+  it('时长或多出一个已打卡项都算有差异', () => {
+    expect(samePlanState(planState(30, { a: true }), { daily_minutes: 15, done: { a: true } })).toBe(false)
+    expect(samePlanState(planState(30, { a: true }), { daily_minutes: 30, done: { a: true, b: true } })).toBe(false)
   })
 })

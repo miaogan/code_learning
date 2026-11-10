@@ -14,10 +14,14 @@ import type {
   InterviewCreateRequest,
   InterviewRun,
   InterviewSession,
+  InterviewSessionSummary,
   InterviewTurn,
+  LearnProgress,
   LoginRequest,
   Me,
   PasswordChangeRequest,
+  PlanState,
+  PlanStatePayload,
   Profile,
   ProfileJobStarted,
   ProfileJobStatus,
@@ -41,6 +45,8 @@ import type {
   ResumeJobStarted,
   ResumeJobStatus,
   ResumeMeta,
+  ResumeVersionDetail,
+  ResumeVersionSummary,
   RunSummary,
   TimelineEvent,
 } from './types'
@@ -242,6 +248,32 @@ export const api = {
   latestProfileJob: (signal?: AbortSignal): Promise<ProfileJobStatus> =>
     request<ProfileJobStatus>('/api/profile-jobs/latest', { signal }),
 
+  /** r60：简历版本列表（上传时间倒序），每条含该版本最近一次测评成绩，不含正文。 */
+  listResumeVersions: (limit = 20, signal?: AbortSignal): Promise<ResumeVersionSummary[]> =>
+    request<ResumeVersionSummary[]>(`/api/resumes?${queryString({ limit })}`, { signal }),
+
+  /** r60：单份简历版本详情（展示元信息 + 画像）；未生成画像时 `profile` 为 `null`。 */
+  getResumeVersion: (resumeId: string, signal?: AbortSignal): Promise<ResumeVersionDetail> =>
+    request<ResumeVersionDetail>(`/api/resumes/${encodeURIComponent(resumeId)}`, { signal }),
+
+  /* ---------- r61 学习进度与计划打卡（整份状态读写，本地仅缓存） ---------- */
+
+  /** 阅读进度：该账号还没同步过时返回空状态。 */
+  learnProgress: (signal?: AbortSignal): Promise<LearnProgress> =>
+    request<LearnProgress>('/api/learn/progress', { signal }),
+
+  /** 保存阅读进度（整份覆盖），返回落库后的状态。 */
+  saveLearnProgress: (payload: LearnProgress): Promise<LearnProgress> =>
+    request<LearnProgress>('/api/learn/progress', jsonInit('PUT', payload)),
+
+  /** 7 天计划打卡状态：`updated_at` 为空串表示这份报告还没同步过。 */
+  planState: (reportId: string, signal?: AbortSignal): Promise<PlanState> =>
+    request<PlanState>(`/api/plans/${encodeURIComponent(reportId)}`, { signal }),
+
+  /** 保存计划打卡状态（整份覆盖）。 */
+  savePlanState: (reportId: string, payload: PlanStatePayload): Promise<PlanState> =>
+    request<PlanState>(`/api/plans/${encodeURIComponent(reportId)}`, jsonInit('PUT', payload)),
+
   /** 成长时间线（r3）：服务端已按 `occurred_at` 倒序 + 已算好 `comparison`。 */
   timeline: (limit = 20, signal?: AbortSignal): Promise<TimelineEvent[]> =>
     request<TimelineEvent[]>(`/api/timeline?limit=${encodeURIComponent(String(limit))}`, { signal }),
@@ -274,6 +306,10 @@ export const api = {
       `/api/interviews/${encodeURIComponent(runId)}/answers`,
       jsonInit('POST', payload),
     ),
+
+  /** r62 历史面试列表：在途场次也列出，点进去可接着答或只读回放。 */
+  listInterviews: (limit = 8, signal?: AbortSignal): Promise<InterviewSessionSummary[]> =>
+    request<InterviewSessionSummary[]>(`/api/interviews?limit=${limit}`, { signal }),
 
   /** 会话回溯（r5）：刷新 / 重进 ?run_id= 时恢复整场对话与设定。 */
   getInterview: (runId: string, signal?: AbortSignal): Promise<InterviewSession> =>

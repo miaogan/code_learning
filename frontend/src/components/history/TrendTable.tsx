@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { RunKind, RunSummary } from '../../api/types'
-import { formatScore } from '../../lib/format'
+import { formatScore, formatWhen } from '../../lib/format'
 import { Chip } from '../ui/Chip'
 import { settingsTextOf } from './trendModel'
 
@@ -22,14 +22,6 @@ const FLAT = '持平'
 const DASH = '—'
 /** 与 DESIGN §2.6「<640px 转卡片堆叠」同一断点。 */
 const NARROW_QUERY = '(max-width: 640px)'
-
-/** 服务端存的是 UTC ISO8601（`repository._now()`），展示按本机时区到分钟；解析失败原样回显。 */
-function formatWhen(createdAt: string): string {
-  const date = new Date(createdAt)
-  if (Number.isNaN(date.getTime())) return createdAt
-  const pad = (value: number): string => String(value).padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
-}
 
 /** 数值口径：整数不带 `.0`，否则保留 1 位（与 `format.ts` / `markdown.py` 同一规则）。 */
 function trimmed(value: number): string {

@@ -28,6 +28,30 @@ export interface ResumeMeta {
 }
 
 /**
+ * r60 简历版本摘要：上传展示元信息 + 该版本最近一次测评成绩。
+ * `interview_avg` / `exam_total` 与历史页同源（后端 `history.score_of`），页面零换算；
+ * 两者为 `null` 表示「该版本还没有这一类的有分记录」——不是 0 分。
+ */
+export interface ResumeVersionSummary {
+  resume_id: string
+  file_name: string
+  source_type: 'pdf' | 'docx' | 'txt' | 'image'
+  chars: number
+  sections: number
+  created_at: string
+  has_profile: boolean
+  interview_avg: number | null
+  exam_total: number | null
+  /** 该版本下已完成的测评场数（面试 + 笔试）。 */
+  judged_count: number
+}
+
+/** r60 单版详情：摘要 + 画像；未生成画像时 `profile` 为 `null`。 */
+export interface ResumeVersionDetail extends ResumeVersionSummary {
+  profile: Profile | null
+}
+
+/**
  * 一条来源证据（r3：旧→新累积）。`quote` 必须在来源简历正文里**逐字命中**（AC-6 的可溯源真源）；
  * `resume_id`/`file_name`/`captured_at` 由服务端回填，缺失时前端原样展示「来源未记录」而不猜。
  */
@@ -180,6 +204,20 @@ export interface InterviewSession {
   answered_count: number
   total: number
   current_id: string | null
+  interview_avg: number | null
+}
+
+/**
+ * r62 历史面试列表行（`GET /api/interviews`）：在途场次也会返回，
+ * 读数是 `/api/interviews/{run_id}` 同一套投影（`total` / `answered_count` / `interview_avg`）。
+ */
+export interface InterviewSessionSummary {
+  run_id: string
+  status: 'running' | 'completed'
+  created_at: string
+  settings: InterviewSettings | null
+  total: number
+  answered_count: number
   interview_avg: number | null
 }
 
@@ -342,6 +380,31 @@ export interface Course {
   level: CourseLevel
   url: string | null
   why: string
+}
+
+/* ---------- r61 学习进度与 7 天计划打卡（服务端权威副本，本地只做缓存） ---------- */
+
+export interface LearnChapterProgress {
+  seen: string[]
+  last_section_id: string | null
+  updated_at: number
+}
+
+export interface LearnProgress {
+  last_chapter_id: string | null
+  chapters: Record<string, LearnChapterProgress>
+}
+
+export interface PlanStatePayload {
+  daily_minutes: 15 | 30 | 60
+  /** task_id → 是否已打卡；服务端只保留 `true` 条目。 */
+  done: Record<string, boolean>
+}
+
+export interface PlanState extends PlanStatePayload {
+  report_id: string
+  /** 空串表示该报告还没有任何打卡记录（前端据此把本地记录回推上去）。 */
+  updated_at: string
 }
 
 export interface Shortfall {

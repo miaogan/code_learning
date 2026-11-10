@@ -180,3 +180,81 @@ export function summarizeProgress(
     percent: total === 0 ? 0 : Math.round((seen / total) * 100),
   }
 }
+
+/* ---------- r61 上云：本地缓存 ↔ 服务端整份状态的映射与跨设备合并 ---------- */
+
+/** 服务端口径（snake_case，`LearnProgress` 逐字镜像）；本文件的内部状态用 camelCase。 */
+export interface LearnProgressWire {
+  last_chapter_id: string | null
+  chapters: Record<string, { seen: string[]; last_section_id: string | null; updated_at: number }>
+}
+
+export function learnProgressFromWire(wire: LearnProgressWire): LearnProgressState {
+  const chapters: Record<string, ChapterProgress> = {}
+  for (const [id, item] of Object.entries(wire.chapters ?? {})) {
+    chapters[id] = {
+      seen: [...(item.seen ?? [])],
+      lastSectionId: item.last_section_id ?? null,
+      updatedAt: item.updated_at ?? 0,
+    }
+  }
+  return { lastChapterId: wire.last_chapter_id ?? null, chapters }
+}
+
+/** 章节与已读小节都排序产出：同一份数据序列化后逐字节可比，避免「顺序不同被判成有差异」。 */
+export function learnProgressToWire(state: LearnProgressState): LearnProgressWire {
+  const chapters: LearnProgressWire['chapters'] = {}
+  for (const id of Object.keys(state.chapters).sort()) {
+    const item = state.chapters[id]
+    chapters[id] = {
+      seen: [...new Set(item.seen)].sort(),
+      last_section_id: item.lastSectionId,
+      updated_at: item.updatedAt,
+    }
+  }
+  return { last_chapter_id: state.lastChapterId, chapters }
+}
+
+/** 两次序列化是否等价（仅用于「要不要再推一次」的判断）。 */
+export function sameLearnProgress(a: LearnProgressState, b: LearnProgressState): boolean {
+  return JSON.stringify(learnProgressToWire(a)) === JSON.stringify(learnProgressToWire(b))
+}
+
+/**
+ * 跨设备合并：`seen` 取并集（读过就是读过，不存在「取消读过」），
+ * 章节内「续读位置 / 活跃时间」取 `updatedAt` 较新的那份（相同则本设备优先）。
+ *
+ * 「继续学习」入口按合并后最活跃的章节推导 —— 打开旧章不会刷新 `updatedAt`，
+ * 所以这条规则等价于「哪台设备最近真正读过东西」。
+ */
+export function mergeLearnProgress(
+  local: LearnProgressState,
+  remote: LearnProgressState,
+): LearnProgressState {
+  const chapters: Record<string, ChapterProgress> = {}
+  for (const [id, item] of Object.entries(remote.chapters)) {
+    chapters[id] = { seen: [...item.seen], lastSectionId: item.lastSectionId, updatedAt: item.updatedAt }
+  }
+  for (const [id, item] of Object.entries(local.chapters)) {
+    const other = chapters[id]
+    if (other === undefined) {
+      chapters[id] = { seen: [...item.seen], lastSectionId: item.lastSectionId, updatedAt: item.updatedAt }
+      continue
+    }
+    const localIsNewer = item.updatedAt >= other.updatedAt
+    chapters[id] = {
+      seen: [...new Set([...other.seen, ...item.seen])].sort(),
+      lastSectionId: localIsNewer ? item.lastSectionId : other.lastSectionId,
+      updatedAt: Math.max(item.updatedAt, other.updatedAt),
+    }
+  }
+
+  const mostRecent = Object.entries(chapters).reduce<{ id: string | null; at: number }>(
+    (best, [id, item]) => (item.updatedAt > best.at ? { id, at: item.updatedAt } : best),
+    { id: null, at: 0 },
+  )
+  return {
+    lastChapterId: mostRecent.id ?? local.lastChapterId ?? remote.lastChapterId,
+    chapters,
+  }
+}

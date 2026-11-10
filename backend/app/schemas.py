@@ -212,6 +212,31 @@ class Profile(ProfileDraft):
     updated_at: str
 
 
+class ResumeVersionSummary(BaseModel):
+    """简历版本摘要（r60 版本对比）：上传的展示元信息 + 该版本最近一次测评成绩。
+
+    `interview_avg` / `exam_total` 与历史页同源（`services.interview.history.score_of`），
+    页面零换算；`judged_count` 是该版本下已完成测评的场数（含面试与笔试）。
+    """
+
+    resume_id: str
+    file_name: str
+    source_type: Literal["pdf", "docx", "txt", "image"] = "pdf"
+    chars: int
+    sections: int
+    created_at: str
+    has_profile: bool = Field(default=False, description="该版本是否已生成过画像")
+    interview_avg: float | None = Field(default=None, description="最近一场已完成面试的均分 /10")
+    exam_total: float | None = Field(default=None, description="最近一场已完成笔试的卷面总分 /100")
+    judged_count: int = Field(default=0, description="该版本下已完成的测评场数")
+
+
+class ResumeVersionDetail(ResumeVersionSummary):
+    """单份简历版本详情：摘要 + 画像（未生成画像时 `profile=None`）。"""
+
+    profile: Profile | None = Field(default=None, description="该版本最近一次生成的画像")
+
+
 class ProfilePatch(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
@@ -296,6 +321,18 @@ class InterviewSession(BaseModel):
     answered_count: int
     total: int
     current_id: str | None = None
+    interview_avg: float | None = None
+
+
+class InterviewSessionSummary(BaseModel):
+    """GET /api/interviews：历史面试列表的一行（在途场次也列出，方便回去接着答）。"""
+
+    run_id: str
+    status: str
+    created_at: str
+    settings: InterviewSettings | None = None
+    total: int
+    answered_count: int
     interview_avg: float | None = None
 
 
@@ -537,6 +574,35 @@ class QuestionSearchResponse(BaseModel):
     total: int
     mode: str
     notice: str = ""
+
+
+class LearnChapterProgress(BaseModel):
+    """单个教程章节的已读状态（r61 上云：与前端 localStorage 结构逐字同构）。"""
+
+    seen: list[str] = Field(default_factory=list, description="已读小节 id（章节内唯一）")
+    last_section_id: str | None = Field(default=None, description="该章读到的小节 id")
+    updated_at: int = Field(default=0, description="毫秒时间戳，仅用于跨设备合并取新")
+
+
+class LearnProgress(BaseModel):
+    """整份阅读进度：`last_chapter_id` 是「继续学习」入口，`chapters` 按章节 id 索引。"""
+
+    last_chapter_id: str | None = None
+    chapters: dict[str, LearnChapterProgress] = Field(default_factory=dict)
+
+
+class PlanStatePayload(BaseModel):
+    """7 天计划打卡状态：`daily_minutes` 是时长偏好，`done` 只记「做完」。"""
+
+    daily_minutes: Literal[15, 30, 60] = 30
+    done: dict[str, bool] = Field(default_factory=dict, description="task_id → 是否已打卡")
+
+
+class PlanState(PlanStatePayload):
+    """读回的计划状态：`updated_at` 空串表示该报告还没有任何打卡记录（前端据此决定是否回推本地）。"""
+
+    report_id: str
+    updated_at: str = ""
 
 
 class Course(BaseModel):

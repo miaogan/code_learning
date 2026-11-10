@@ -28,3 +28,14 @@ export function severityLabel(severity: 'high' | 'medium' | 'low'): string {
   if (severity === 'medium') return '中'
   return '低'
 }
+
+/**
+ * 时间戳：服务端存的是 UTC ISO8601（`repository._now()`），展示按本机时区到分钟；
+ * 解析失败时原样回显，不猜一个假时间。
+ */
+export function formatWhen(createdAt: string): string {
+  const date = new Date(createdAt)
+  if (Number.isNaN(date.getTime())) return createdAt
+  const pad = (value: number): string => String(value).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+}

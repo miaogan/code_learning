@@ -1,21 +1,25 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { api } from '../../api/client'
 import type { Report } from '../../api/types'
 import { useLearnProgress } from '../../state/learnProgress'
 import {
   PLAN_DAY_COUNT,
   PLAN_EMPTY_NOTICE,
   PLAN_LEGACY_NOTICE,
-  PLAN_LOCAL_ONLY_NOTICE,
   PLAN_MINUTES,
+  PLAN_SYNCED_NOTICE,
   PLAN_VERSION,
   buildStudyPlan,
   isDayDone,
+  mergePlanState,
   parsePlanState,
   parseStoredPlan,
+  planPushPayload,
   planStateStorageKey,
   planStats,
   planStorageKey,
+  samePlanState,
   type PlanMinutes,
   type PlanState,
   type StudyPlan,
@@ -29,6 +33,7 @@ export interface WeekPlanProps {
 }
 
 const DEFAULT_MINUTES: PlanMinutes = 30
+const PUSH_DELAY_MS = 800
 
 /** 读打卡状态：存储不可用（隐私模式 / 配额满）时退回空状态，不影响计划展示。 */
 function readState(key: string): PlanState {
@@ -70,10 +75,10 @@ function writePlan(key: string, plan: StudyPlan): void {
 }
 
 /**
- * 「7 天学习计划」（r41 功能 B · B1 纯前端确定性排程）。
+ * 「7 天学习计划」（r41 功能 B · B1 纯前端确定性排程 · r61 打卡上云）。
  *
- * 计划来自报告短板 + 站内教程目录 + 本地已读小节：按每日可用时长装箱到 7 天，
- * 任务粒度打卡。**打卡不进评分、不调接口**，计划与打卡都只存本机浏览器（界面上明说）。
+ * 计划来自报告短板 + 站内教程目录 + 已读小节：按每日可用时长装箱到 7 天，任务粒度打卡。
+ * **打卡不进评分**；状态以服务端为权威、本地 localStorage 只作缓存（离线时照常可勾）。
  */
 export function WeekPlan({ report, userId }: WeekPlanProps) {
   const learned = useLearnProgress()
@@ -83,11 +88,61 @@ export function WeekPlan({ report, userId }: WeekPlanProps) {
   )
   const planKey = useMemo(() => planStorageKey(userId, report.id), [userId, report.id])
   const [planState, setPlanState] = useState<PlanState>(() => readState(stateKey))
+  /** 云端是否已对齐：对齐前不允许推送，避免「本机旧状态」把别的设备刚写的打卡覆盖掉。 */
+  const syncedRef = useRef(false)
+  const stateRef = useRef(planState)
+  const pushTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // 换账号 / 换报告时切到对应的本地状态，而不是沿用上一份报告的打卡。
   useEffect(() => {
-    setPlanState(readState(stateKey))
-  }, [stateKey])
+    stateRef.current = planState
+  }, [planState])
+
+  // 换账号 / 换报告时切到对应的本地状态，并与云端对齐（云端空记录 = 首次上云，把本地推上去）。
+  useEffect(() => {
+    let cancelled = false
+    syncedRef.current = false
+    const local = readState(stateKey)
+    setPlanState(local)
+    void (async () => {
+      try {
+        const remote = await api.planState(report.id)
+        if (cancelled) return
+        const merged = mergePlanState(local, remote)
+        writeState(stateKey, merged)
+        setPlanState(merged)
+        if (!samePlanState(merged, remote)) {
+          await api.savePlanState(report.id, planPushPayload(merged))
+        }
+      } catch {
+        // 离线 / 服务端不可用：本地照常打卡，下次改动会再推一次（不弹框、不阻塞页面）
+      } finally {
+        if (!cancelled) syncedRef.current = true
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [stateKey, report.id])
+
+  // 离开页面时立刻补发还没到点的防抖推送（否则最后 1 秒内的勾选会丢）。
+  useEffect(() => {
+    const reportId = report.id
+    return () => {
+      if (pushTimer.current === null) return
+      clearTimeout(pushTimer.current)
+      pushTimer.current = null
+      void api.savePlanState(reportId, planPushPayload(stateRef.current)).catch(() => {})
+    }
+  }, [report.id])
+
+  const pushSoon = () => {
+    if (!syncedRef.current) return
+    if (pushTimer.current !== null) clearTimeout(pushTimer.current)
+    pushTimer.current = setTimeout(() => {
+      pushTimer.current = null
+      void api.savePlanState(report.id, planPushPayload(stateRef.current)).catch(() => {})
+    }, PUSH_DELAY_MS)
+  }
 
   const minutes = planState.daily_minutes
 
@@ -114,6 +169,7 @@ export function WeekPlan({ report, userId }: WeekPlanProps) {
       writeState(stateKey, next)
       return next
     })
+    pushSoon()
   }
 
   const changeMinutes = (value: PlanMinutes) => {
@@ -122,6 +178,7 @@ export function WeekPlan({ report, userId }: WeekPlanProps) {
       writeState(stateKey, next)
       return next
     })
+    pushSoon()
   }
 
   if (report.weakness_map === null) {
@@ -154,7 +211,7 @@ export function WeekPlan({ report, userId }: WeekPlanProps) {
         <h3 className="sc-coach-blocktitle">7 天学习计划</h3>
         <p className="sc-coach-meta">{`已完成 ${stats.completed} / ${stats.total} 项 · ${stats.percent}%`}</p>
       </div>
-      <p className="sc-coach-note">{PLAN_LOCAL_ONLY_NOTICE}</p>
+      <p className="sc-coach-note">{PLAN_SYNCED_NOTICE}</p>
 
       <div className="sc-plan-duration" role="group" aria-label="每天可用时长">
         <span className="sc-plan-duration-label">每天可用</span>

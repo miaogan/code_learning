@@ -256,6 +256,35 @@ CREATE VIRTUAL TABLE IF NOT EXISTS question_search USING fts5(
 """
 
 
+#: r61 学习进度与 7 天计划打卡上云：两张小表按 (user_id, 维度) 存整份状态。
+#: `seen` / `done` 存 JSON 文本（与前端 localStorage 结构逐字同构，读写零转换）。
+R61_SCHEMA = """
+CREATE TABLE IF NOT EXISTS learn_progress (
+    user_id         TEXT PRIMARY KEY,
+    last_chapter_id TEXT NOT NULL DEFAULT '',
+    updated_at      TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS learn_chapters (
+    user_id         TEXT NOT NULL,
+    chapter_id      TEXT NOT NULL,
+    seen            TEXT NOT NULL DEFAULT '[]',
+    last_section_id TEXT NOT NULL DEFAULT '',
+    updated_at      INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, chapter_id)
+);
+
+CREATE TABLE IF NOT EXISTS plan_states (
+    user_id       TEXT NOT NULL,
+    report_id     TEXT NOT NULL,
+    daily_minutes INTEGER NOT NULL DEFAULT 30,
+    done          TEXT NOT NULL DEFAULT '{}',
+    updated_at    TEXT NOT NULL,
+    PRIMARY KEY (user_id, report_id)
+);
+"""
+
+
 def fts5_available(conn: sqlite3.Connection) -> bool:
     """探测当前 SQLite 是否编译了 FTS5；不抛异常，缺能力即返回 False。"""
     row = conn.execute("SELECT sqlite_compileoption_used('ENABLE_FTS5') AS enabled").fetchone()
@@ -350,6 +379,7 @@ def init_db() -> None:
                 conn.executescript(R51_FTS_SCHEMA)
             except sqlite3.OperationalError as exc:
                 logger.warning("db.fts5_unavailable error=%s", type(exc).__name__)
+        conn.executescript(R61_SCHEMA)      # 12. r61 学习进度 / 计划打卡表
 
 
 def _dedupe_running_profile_jobs(conn: sqlite3.Connection) -> None:

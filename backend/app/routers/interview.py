@@ -20,12 +20,14 @@ from app.schemas import (
     InterviewCreateRequest,
     InterviewRun,
     InterviewSession,
+    InterviewSessionSummary,
     InterviewTurn,
 )
 from app.services.ai import user_ai
 from app.services.interview.interview import (
     create_run as create_interview_run,
     finish_run as finish_interview_run,
+    list_sessions as list_interview_sessions,
     load_session,
     score_answer as score_interview_answer,
 )
@@ -33,6 +35,11 @@ from app.services.interview.interview import (
 router = APIRouter(
     prefix="/api/interviews", tags=["interview"], dependencies=[Depends(current_user)]
 )
+
+
+@router.get("", response_model=list[InterviewSessionSummary], summary="历史面试列表（含在途场次）")
+def get_runs(limit: int = 10) -> list[InterviewSessionSummary]:
+    return list_interview_sessions(limit)
 
 
 @router.post("", response_model=InterviewRun, summary="补全设定并开局（只投放第 1 条发言）")

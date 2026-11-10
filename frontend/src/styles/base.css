@@ -7650,3 +7650,102 @@ html {
   }
 }
 
+/* r60 简历版本对比：两栏版本选择器 + 差异表（复用 .sc-trend-table 的行/表头口径）。 */
+.sc-versions-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-5);
+}
+
+.sc-versions-picker .sc-field {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.sc-versions-picker .sc-filter-select {
+  width: 100%;
+}
+
+/* 右三列（旧版 / 新版 / 变化）统一右对齐，数字才能按位对齐读出差异。 */
+.sc-version-table th:nth-child(n + 2),
+.sc-version-table td:nth-child(n + 2) {
+  text-align: right;
+}
+
+.sc-version-chips {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin-top: var(--sp-3);
+}
+
+@media (max-width: 640px) {
+  .sc-versions-picker .sc-field {
+    flex-basis: 100%;
+  }
+}
+
+/* r62 历史面试列表（模拟面试配置态下方）：在途可接着答、已完成只读回放。 */
+.sc-iq-sessions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  margin-top: var(--sp-6);
+  padding-top: var(--sp-5);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.sc-iq-sessions-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+
+.sc-iq-sessions-title {
+  margin: 0;
+  font-size: var(--fs-card);
+  line-height: var(--lh-card);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.sc-iq-sessions-list {
+  display: grid;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sc-iq-session {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-8);
+}
+
+.sc-iq-session-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+}
+
+.sc-iq-session-sub {
+  margin: 0;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-secondary);
+}
+

@@ -31,6 +31,7 @@ from app.schemas import (
     InterviewRun,
     InterviewSession,
     InterviewSessionQuestion,
+    InterviewSessionSummary,
     InterviewSettings,
     InterviewSettingsPatch,
     InterviewTurn,
@@ -831,3 +832,24 @@ def load_session(run_id: str) -> InterviewSession:
         current_id=current_id,
         interview_avg=score_of(INTERVIEW_KIND, payload),
     )
+
+
+def list_sessions(limit: int = 10) -> list[InterviewSessionSummary]:
+    """历史面试列表（r62）：按创建时间倒序，**在途场次也列**，供回去接着答或只读复盘。"""
+    rows = repository.list_runs(kind=INTERVIEW_KIND, limit=max(1, min(limit, 50)))
+    summaries: list[InterviewSessionSummary] = []
+    for run in rows:
+        payload: dict[str, Any] = dict(run.get("payload") or {})
+        entries = _entries(payload)
+        summaries.append(
+            InterviewSessionSummary(
+                run_id=str(run.get("id") or ""),
+                status=str(run.get("status") or RUN_RUNNING),
+                created_at=str(run.get("created_at") or ""),
+                settings=_settings_or_none(payload),
+                total=_total_of(payload, entries),
+                answered_count=sum(1 for entry in entries if _score_of(entry) is not None),
+                interview_avg=score_of(INTERVIEW_KIND, payload),
+            )
+        )
+    return summaries

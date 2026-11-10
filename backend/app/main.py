@@ -43,6 +43,7 @@ from app.routers import (
     exam,
     history,
     interview,
+    learn,
     practice,
     profile,
     report,
@@ -269,6 +270,8 @@ def create_app() -> FastAPI:
     # r51：模型调用质量看板与题目全文检索（只读 / 登录态 / 按用户隔离）。
     app.include_router(eval_router.router)
     app.include_router(search.router)
+    # r61：学习进度与 7 天计划打卡上云（整份状态读写，按账号隔离）。
+    app.include_router(learn.router)
 
     @app.get("/health", response_model=HealthResponse, tags=["ops"], summary="探活（AC-8）")
     def health() -> HealthResponse:

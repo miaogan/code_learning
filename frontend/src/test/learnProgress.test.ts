@@ -1,10 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  EMPTY_LEARN_PROGRESS,
   type ChapterProgress,
   type LearnProgressState,
+  learnProgressFromWire,
+  learnProgressToWire,
+  mergeLearnProgress,
   progressView,
   resumeHref,
   resumeTarget,
+  sameLearnProgress,
   summarizeProgress,
 } from '../lib/learnProgress'
 import type { TutorialChapter } from '../lib/tutorialTypes'
@@ -205,5 +210,185 @@ describe('阅读进度存储按账号分区', () => {
     }))
     state.bindLearnProgressToUser('user-b')
     expect(state.getLearnProgress()).toEqual({ lastChapterId: null, chapters: {} })
+  })
+})
+
+/* ---------- r61 上云：服务端 ↔ 本地状态的映射与跨设备合并 ---------- */
+
+describe('进度上云的序列化', () => {
+  it('服务端 snake_case 映射回本地 camelCase，缺字段按空值兜底', () => {
+    const wire = learnProgressFromWire({
+      last_chapter_id: 'fe-event-loop',
+      chapters: { 'fe-event-loop': { seen: ['why', 'order'], last_section_id: 'order', updated_at: 1000 } },
+    })
+    expect(wire.lastChapterId).toBe('fe-event-loop')
+    expect(wire.chapters['fe-event-loop']).toEqual({
+      seen: ['why', 'order'],
+      lastSectionId: 'order',
+      updatedAt: 1000,
+    })
+
+    const empty = learnProgressFromWire({ last_chapter_id: null, chapters: {} })
+    expect(empty).toEqual(EMPTY_LEARN_PROGRESS)
+  })
+
+  it('上推时章节按 id 排序且 seen 去重，同一份数据序列化逐字节一致', () => {
+    const a: LearnProgressState = {
+      lastChapterId: 'b',
+      chapters: {
+        b: { seen: ['x', 'x', 'y'], lastSectionId: 'y', updatedAt: 2 },
+        a: { seen: ['z'], lastSectionId: null, updatedAt: 1 },
+      },
+    }
+    const b: LearnProgressState = {
+      lastChapterId: 'b',
+      chapters: {
+        a: { seen: ['z'], lastSectionId: null, updatedAt: 1 },
+        b: { seen: ['y', 'x'], lastSectionId: 'y', updatedAt: 2 },
+      },
+    }
+    expect(JSON.stringify(learnProgressToWire(a))).toBe(JSON.stringify(learnProgressToWire(b)))
+    expect(sameLearnProgress(a, b)).toBe(true)
+  })
+
+  it('只要有一处不同就判成有差异', () => {
+    const base: LearnProgressState = {
+      lastChapterId: 'a',
+      chapters: { a: { seen: ['x'], lastSectionId: 'x', updatedAt: 1 } },
+    }
+    expect(
+      sameLearnProgress(base, {
+        lastChapterId: 'a',
+        chapters: { a: { seen: ['x', 'y'], lastSectionId: 'y', updatedAt: 2 } },
+      }),
+    ).toBe(false)
+  })
+})
+
+describe('进度跨设备合并', () => {
+  it('已读小节取并集，续读位置听较新的那份', () => {
+    const merged = mergeLearnProgress(
+      { lastChapterId: 'ch', chapters: { ch: { seen: ['a'], lastSectionId: 'a', updatedAt: 1000 } } },
+      { lastChapterId: 'ch', chapters: { ch: { seen: ['a', 'b'], lastSectionId: 'b', updatedAt: 2000 } } },
+    )
+    expect(merged.chapters.ch.seen).toEqual(['a', 'b'])
+    expect(merged.chapters.ch.lastSectionId).toBe('b')
+    expect(merged.chapters.ch.updatedAt).toBe(2000)
+  })
+
+  it('活跃时间平局时本机优先，且不影响并集', () => {
+    const merged = mergeLearnProgress(
+      { lastChapterId: 'ch', chapters: { ch: { seen: ['a'], lastSectionId: 'a', updatedAt: 1000 } } },
+      { lastChapterId: 'ch', chapters: { ch: { seen: ['b'], lastSectionId: 'b', updatedAt: 1000 } } },
+    )
+    expect(merged.chapters.ch.seen).toEqual(['a', 'b'])
+    expect(merged.chapters.ch.lastSectionId).toBe('a')
+  })
+
+  it('两侧独有的章节都保留，「继续学习」跟着最活跃的一章走', () => {
+    const merged = mergeLearnProgress(
+      { lastChapterId: 'local-only', chapters: { 'local-only': { seen: ['a'], lastSectionId: 'a', updatedAt: 500 } } },
+      { lastChapterId: 'remote-only', chapters: { 'remote-only': { seen: ['b'], lastSectionId: 'b', updatedAt: 900 } } },
+    )
+    expect(Object.keys(merged.chapters).sort()).toEqual(['local-only', 'remote-only'])
+    expect(merged.lastChapterId).toBe('remote-only')
+  })
+
+  it('两侧都空时保持空状态', () => {
+    expect(mergeLearnProgress(EMPTY_LEARN_PROGRESS, EMPTY_LEARN_PROGRESS)).toEqual(EMPTY_LEARN_PROGRESS)
+  })
+})
+
+describe('登录后与云端对齐', () => {
+  function stubFetch(remote: unknown, pushes: unknown[]): void {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url: string, init: { method?: string; body?: string } = {}) => {
+        if (init.method === 'PUT') {
+          pushes.push(JSON.parse(init.body ?? '{}'))
+          return { ok: true, status: 200, json: async () => JSON.parse(init.body ?? '{}') }
+        }
+        return { ok: true, status: 200, json: async () => remote }
+      }),
+    )
+  }
+
+  beforeEach(() => {
+    store.clear()
+    vi.resetModules()
+    vi.unstubAllGlobals()
+    installWindow()
+  })
+
+  it('拉云端后合并本机记录，差异再推一次（并集不丢本机旧进度）', async () => {
+    store.set(
+      'sc.learn.user-a',
+      JSON.stringify({
+        lastChapterId: 'fe-event-loop',
+        chapters: { 'fe-event-loop': { seen: ['order'], lastSectionId: 'order', updatedAt: 1000 } },
+      }),
+    )
+    const pushes: unknown[] = []
+    stubFetch(
+      {
+        last_chapter_id: 'fe-event-loop',
+        chapters: { 'fe-event-loop': { seen: ['why'], last_section_id: 'why', updated_at: 2000 } },
+      },
+      pushes,
+    )
+
+    const state = await import('../state/learnProgress')
+    state.bindLearnProgressToUser('user-a')
+
+    await vi.waitFor(() => expect(pushes.length).toBe(1))
+    const entry = state.getLearnProgress().chapters['fe-event-loop']
+    expect(entry?.seen).toEqual(['order', 'why'])
+    expect(entry?.lastSectionId).toBe('why')
+    expect(JSON.parse(store.get('sc.learn.user-a') ?? '{}').chapters['fe-event-loop'].seen).toEqual([
+      'order',
+      'why',
+    ])
+  })
+
+  it('云端没有记录时把本机进度整份推上去（首次上云）', async () => {
+    store.set(
+      'sc.learn.user-a',
+      JSON.stringify({
+        lastChapterId: 'fe-event-loop',
+        chapters: { 'fe-event-loop': { seen: ['why'], lastSectionId: 'why', updatedAt: 1000 } },
+      }),
+    )
+    const pushes: unknown[] = []
+    stubFetch({ last_chapter_id: null, chapters: {} }, pushes)
+
+    const state = await import('../state/learnProgress')
+    state.bindLearnProgressToUser('user-a')
+
+    await vi.waitFor(() => expect(pushes.length).toBe(1))
+    expect(pushes[0]).toMatchObject({
+      last_chapter_id: 'fe-event-loop',
+      chapters: { 'fe-event-loop': { seen: ['why'], last_section_id: 'why' } },
+    })
+    expect(state.getLearnProgress().chapters['fe-event-loop']?.seen).toEqual(['why'])
+  })
+
+  it('拉取失败时保留本机进度，不抛错也不推送', async () => {
+    store.set(
+      'sc.learn.user-a',
+      JSON.stringify({
+        lastChapterId: 'fe-event-loop',
+        chapters: { 'fe-event-loop': { seen: ['why'], lastSectionId: 'why', updatedAt: 1000 } },
+      }),
+    )
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new Error('offline')
+      }),
+    )
+
+    const state = await import('../state/learnProgress')
+    expect(() => state.bindLearnProgressToUser('user-a')).not.toThrow()
+    expect(state.getLearnProgress().chapters['fe-event-loop']?.seen).toEqual(['why'])
   })
 })

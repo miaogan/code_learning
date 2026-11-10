@@ -17,6 +17,7 @@ import ReportPage from './pages/ReportPage'
 import SettingsPage from './pages/SettingsPage'
 import TutorialPage from './pages/TutorialPage'
 import UploadPage from './pages/UploadPage'
+import VersionsPage from './pages/VersionsPage'
 import { PRODUCT_NAME, PRODUCT_TAGLINE } from './lib/brand'
 import { resetResumePrompt } from './lib/resumePrompt'
 import { logout, startAuth, useAuth } from './state/auth'
@@ -37,6 +38,7 @@ const TOOL_ITEMS = [
   { key: 'practice', label: '练习', to: '/practice' },
   { key: 'history', label: '成绩趋势', to: '/history' },
   { key: 'polish', label: '简历润色', to: '/polish' },
+  { key: 'versions', label: '版本对比', to: '/versions' },
 ]
 
 /** 侧栏「设置」组：只读看板（模型质量）与账号 / AI 配置，从工具组里分出来。 */
@@ -142,6 +144,7 @@ export default function App() {
               <Route path="/history" element={<HistoryPage />} />
               <Route path="/eval" element={<EvalPage />} />
               <Route path="/polish" element={<PolishPage />} />
+              <Route path="/versions" element={<VersionsPage />} />
               <Route path="/practice" element={<PracticePage />} />
               <Route path="/learn" element={<LearnPage />} />
               <Route path="/learn/:chapterId" element={<TutorialPage />} />

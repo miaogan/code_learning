@@ -11,6 +11,7 @@ import type {
 import { ChatStream } from '../components/interview/ChatStream'
 import { Composer } from '../components/interview/Composer'
 import { InterviewSetupForm } from '../components/interview/InterviewSetupForm'
+import { SessionList } from '../components/interview/SessionList'
 import { draftToPatch, prefillOf } from '../components/interview/setupModel'
 import type { SetupDraft, SetupSources } from '../components/interview/setupModel'
 import { SessionSummary } from '../components/interview/SessionSummary'
@@ -453,6 +454,7 @@ export default function InterviewPage() {
           onStart={() => void startSession(draftToPatch(draft))}
           onSkip={() => void startSession()}
         />
+        <SessionList />
       </div>
     )
   }

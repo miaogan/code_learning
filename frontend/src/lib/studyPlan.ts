@@ -78,9 +78,9 @@ export interface PlanState {
 
 export const PLAN_LEGACY_NOTICE = '旧报告不含薄弱地图，重新生成后可生成按短板排的学习计划'
 export const PLAN_EMPTY_NOTICE = '本次测评还没有可排入计划的短板，完成一轮有计分的测评后再来'
-/** 必须在界面上明说：计划与打卡都在本机，不跨设备；且不进评分。 */
-export const PLAN_LOCAL_ONLY_NOTICE =
-  '计划与打卡只保存在这台设备的浏览器里：换设备或换浏览器看不到，也不会同步。打卡只记「做完」，不计入熟练度或成绩。'
+/** 必须在界面上明说：打卡只记「做完」，不进评分；r61 起随账号同步（本地只是缓存）。 */
+export const PLAN_SYNCED_NOTICE =
+  '计划与打卡保存在账号下：换设备登录同一账号可以接着打卡。打卡只记「做完」，不计入熟练度或成绩。'
 
 const LEVEL_ORDER: Record<TutorialLevel, number> = { 基础: 0, 进阶: 1, 高级: 2 }
 
@@ -523,6 +523,52 @@ export function planStorageKey(userId: string, reportId: string): string {
 
 export function planStateStorageKey(userId: string, reportId: string): string {
   return `sc.planState.${userId}.${reportId}`
+}
+
+/* ---------- r61 打卡上云：本地状态 ↔ 服务端副本的映射与合并 ---------- */
+
+/** 服务端返回的打卡状态；`updated_at` 为空串表示这份报告还没有任何云端记录。 */
+export interface RemotePlanState {
+  daily_minutes: PlanMinutes
+  done: Record<string, boolean>
+  updated_at?: string
+}
+
+/** 上推载荷：只带「已打卡」条目，取消打卡等价于不在 map 里（服务端同样只存 `true`）。 */
+export function planPushPayload(state: PlanState): {
+  daily_minutes: PlanMinutes
+  done: Record<string, boolean>
+} {
+  const done: Record<string, boolean> = {}
+  for (const [taskId, flag] of Object.entries(state.done)) {
+    if (flag) done[taskId] = true
+  }
+  return { daily_minutes: state.daily_minutes, done }
+}
+
+/**
+ * 云端优先、打卡取并集：云端已有记录时时长以云端为准（跨设备改过的偏好不能被本机旧值覆盖），
+ * 打卡保留两侧的 `true`（打卡是单调的，不存在「云端取消本机打卡」这种语义）。
+ */
+export function mergePlanState(local: PlanState, remote: RemotePlanState): PlanState {
+  const hasRemote = (remote.updated_at ?? '') !== ''
+  const minutes = hasRemote && PLAN_MINUTES.includes(remote.daily_minutes)
+    ? remote.daily_minutes
+    : local.daily_minutes
+  const done: Record<string, true> = { ...local.done }
+  for (const [taskId, flag] of Object.entries(remote.done)) {
+    if (flag === true) done[taskId] = true
+  }
+  return { ...local, daily_minutes: minutes, done }
+}
+
+/** 两次打卡状态是否等价（`done` 只比较键集合，不比较 `false` 残留）。 */
+export function samePlanState(a: RemotePlanState, b: RemotePlanState): boolean {
+  if (a.daily_minutes !== b.daily_minutes) return false
+  const keysA = Object.keys(a.done).filter((taskId) => a.done[taskId])
+  const keysB = Object.keys(b.done).filter((taskId) => b.done[taskId])
+  if (keysA.length !== keysB.length) return false
+  return keysA.every((taskId) => b.done[taskId] === true)
 }
 
 /** 解析计划快照：版本 / 时长 / 结构任一不合法就整份丢弃（调用方重算）。 */

@@ -1,16 +1,24 @@
 /**
- * 阅读进度 store（r25）：与 `state/flow.ts` 同一套模式 —— 单例 + useSyncExternalStore + localStorage。
+ * 阅读进度 store（r25 起本地、r61 起上云）：与 `state/flow.ts` 同一套模式 —— 单例 + useSyncExternalStore。
  *
- * 两个必须守住的点：
+ * 三个必须守住的点：
  * 1. **按账号分区**（`sc.learn.<userId>`）：同一台机器多人用时，退出后不能把上一个人的进度留给下一个人；
- * 2. **只写不读后端**：进度是本地阅读痕迹，属于「刷新就能恢复」的体验数据，不进后端也不计入任何成绩。
+ * 2. **服务端权威、本地缓存**（r61）：登录后先拉服务端并合并本地旧记录（首次上云＝把本地推上去），
+ *    之后每次改动防抖整份 PUT；请求失败静默保留本地，下次改动再试，绝不因网络把页面卡住；
+ * 3. **只记「读过」不记「掌握」**：进度不进任何成绩与熟练度口径，界面文案照此写。
  */
 import { useSyncExternalStore } from 'react'
+import { api } from '../api/client'
 import {
   EMPTY_LEARN_PROGRESS,
+  learnProgressFromWire,
+  learnProgressToWire,
+  mergeLearnProgress,
+  sameLearnProgress,
   type ChapterProgress,
   type LearnProgressState,
 } from '../lib/learnProgress'
+
 
 const STORAGE_PREFIX = 'sc.learn'
 
@@ -59,6 +67,12 @@ let storageKey = keyFor(null)
 let current: LearnProgressState = readStorage(storageKey)
 const listeners = new Set<() => void>()
 
+/** 当前绑定的账号：`null` 时不发任何请求（登录页尚未知道身份）。 */
+let syncUserId: string | null = null
+/** 防抖句柄：滚动会高频触发已读，整份 PUT 只按最后一次状态发一次。 */
+let pushTimer: ReturnType<typeof setTimeout> | null = null
+const PUSH_DELAY_MS = 800
+
 function subscribe(listener: () => void): () => void {
   listeners.add(listener)
   return () => listeners.delete(listener)
@@ -68,23 +82,78 @@ function snapshot(): LearnProgressState {
   return current
 }
 
-function commit(next: LearnProgressState): void {
-  current = next
+function persist(): void {
   try {
-    window.localStorage.setItem(storageKey, JSON.stringify(next))
+    window.localStorage.setItem(storageKey, JSON.stringify(current))
   } catch {
     /* 隐私模式 / 配额满：内存里的进度仍然生效，本次会话可用 */
   }
-  listeners.forEach((listener) => listener())
 }
 
-/** 登录态变化时切到该用户自己的进度（见 `state/auth.ts` 的 emit）。 */
+function commit(next: LearnProgressState, scheduleSync = true): void {
+  current = next
+  persist()
+  listeners.forEach((listener) => listener())
+  if (scheduleSync) schedulePush()
+}
+
+function schedulePush(): void {
+  if (syncUserId === null) return
+  if (pushTimer !== null) clearTimeout(pushTimer)
+  pushTimer = setTimeout(() => {
+    pushTimer = null
+    void pushProgress()
+  }, PUSH_DELAY_MS)
+}
+
+async function pushProgress(): Promise<void> {
+  if (syncUserId === null) return
+  try {
+    await api.saveLearnProgress(learnProgressToWire(current))
+  } catch {
+    /* 离线 / 服务端 5xx：本地照常用，下一次改动会再推一次（不弹框、不重试风暴） */
+  }
+}
+
+/**
+ * 登录后对齐服务端：远端为空（首次上云）直接把本地推上去；
+ * 否则按小节并集合并，再把差异回写，保证下一次进来看到的是合并结果。
+ */
+async function hydrate(userId: string): Promise<void> {
+  let remote: LearnProgressState
+  try {
+    remote = learnProgressFromWire(await api.learnProgress())
+  } catch {
+    return
+  }
+  if (syncUserId !== userId) return
+
+  const merged = mergeLearnProgress(current, remote)
+  commit(merged, false)
+  if (sameLearnProgress(merged, remote)) return
+  if (pushTimer !== null) {
+    clearTimeout(pushTimer)
+    pushTimer = null
+  }
+  void pushProgress()
+}
+
+/** 登录态变化时切到该用户自己的进度并做一次云端对齐（见 `state/auth.ts` 的 emit）。 */
 export function bindLearnProgressToUser(userId: string | null): void {
   const nextKey = keyFor(userId)
-  if (nextKey === storageKey) return
+  syncUserId = userId
+  if (pushTimer !== null) {
+    clearTimeout(pushTimer)
+    pushTimer = null
+  }
+  if (nextKey === storageKey) {
+    if (userId !== null) void hydrate(userId)
+    return
+  }
   storageKey = nextKey
   current = readStorage(storageKey)
   listeners.forEach((listener) => listener())
+  if (userId !== null) void hydrate(userId)
 }
 
 export function getLearnProgress(): LearnProgressState {

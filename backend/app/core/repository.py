@@ -124,6 +124,46 @@ def get_document_stats(document_id: str) -> dict[str, Any] | None:
     }
 
 
+def get_document_version(document_id: str) -> dict[str, Any] | None:
+    """简历版本详情元信息（`get_document_stats` 的补集：含 mime 与上传时间，仍不含正文）。"""
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT file_name, mime, chars, sections, created_at FROM documents "
+            "WHERE id = ? AND user_id = ?",
+            (document_id, _uid()),
+        ).fetchone()
+    if row is None:
+        return None
+    return {
+        "file_name": str(row["file_name"]),
+        "mime": str(row["mime"] or ""),
+        "chars": int(row["chars"]),
+        "sections": int(row["sections"]),
+        "created_at": str(row["created_at"]),
+    }
+
+
+def list_documents(limit: int = 20) -> list[dict[str, Any]]:
+    """简历版本列表（上传时间倒序）：只取展示元信息，正文不参与（r60 版本对比）。"""
+    with connection() as conn:
+        rows = conn.execute(
+            "SELECT id, file_name, mime, chars, sections, created_at FROM documents "
+            "WHERE user_id = ? ORDER BY created_at DESC LIMIT ?",
+            (_uid(), limit),
+        ).fetchall()
+    return [
+        {
+            "resume_id": row["id"],
+            "file_name": row["file_name"],
+            "mime": str(row["mime"] or ""),
+            "chars": int(row["chars"]),
+            "sections": int(row["sections"]),
+            "created_at": str(row["created_at"]),
+        }
+        for row in rows
+    ]
+
+
 # --- profiles ------------------------------------------------------------
 
 _PROFILE_UPSERT = (
@@ -172,6 +212,17 @@ def latest_profile() -> Profile | None:
         row = conn.execute(
             "SELECT payload FROM profiles WHERE user_id = ? ORDER BY updated_at DESC LIMIT 1",
             (_uid(),),
+        ).fetchone()
+    return None if row is None else _profile_of(row)
+
+
+def latest_profile_for_document(document_id: str) -> Profile | None:
+    """某份简历最近一次生成的画像（r60 版本对比：同一份简历多次重算时取最新）。"""
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT payload FROM profiles WHERE user_id = ? AND document_id = ? "
+            "ORDER BY updated_at DESC LIMIT 1",
+            (_uid(), document_id),
         ).fetchone()
     return None if row is None else _profile_of(row)
 
@@ -478,6 +529,23 @@ def list_runs(kind: str | None = None, limit: int = 20) -> list[dict[str, Any]]:
         params = (_uid(), kind, limit)
     with connection() as conn:
         rows = conn.execute(sql, params).fetchall()
+    return [_run_dict(row) for row in rows]
+
+
+def list_runs_for_document(document_id: str, limit: int = 100) -> list[dict[str, Any]]:
+    """某份简历关联的**已完成** run（经 `profiles.document_id` 关联，倒序）。
+
+    r60 版本对比要拿「这个简历版本下的测评成绩」：`runs` 只带 `profile_id`，
+    而一份简历可能重算过多次画像，故按 `document_id` 聚合（`r.status` 过滤掉在途卷子）。
+    """
+    with connection() as conn:
+        rows = conn.execute(
+            "SELECT r.id, r.kind, r.profile_id, r.payload, r.status, r.created_at "
+            "FROM runs r JOIN profiles p ON p.id = r.profile_id "
+            "WHERE r.user_id = ? AND p.document_id = ? AND r.status = ? "
+            "ORDER BY r.created_at DESC LIMIT ?",
+            (_uid(), document_id, RUN_COMPLETED, limit),
+        ).fetchall()
     return [_run_dict(row) for row in rows]
 
 
@@ -1393,3 +1461,97 @@ def search_questions(
     ]
     notice = "" if mode == "fts5" else "当前环境未启用全文索引，已按关键词包含匹配"
     return {"items": items, "total": len(items), "mode": mode, "notice": notice}
+
+
+def _json_map(value: Any) -> dict[str, bool]:
+    """JSON 列解码（对象口径）：坏值 / 非对象一律退化为 `{}`。"""
+    if isinstance(value, dict):
+        return {str(key): bool(flag) for key, flag in value.items()}
+    if not isinstance(value, str):
+        return {}
+    try:
+        decoded = json.loads(value)
+    except json.JSONDecodeError:
+        return {}
+    return {str(key): bool(flag) for key, flag in decoded.items()} if isinstance(decoded, dict) else {}
+
+
+def get_learn_progress() -> dict[str, Any]:
+    """整份阅读进度（r61 上云）：空库返回空状态，由前端把本地进度回推上来。"""
+    with connection() as conn:
+        meta = conn.execute(
+            "SELECT last_chapter_id FROM learn_progress WHERE user_id = ?", (_uid(),)
+        ).fetchone()
+        rows = conn.execute(
+            "SELECT chapter_id, seen, last_section_id, updated_at FROM learn_chapters "
+            "WHERE user_id = ? ORDER BY chapter_id",
+            (_uid(),),
+        ).fetchall()
+    chapters = {
+        str(row["chapter_id"]): {
+            "seen": [str(item) for item in _json_list(row["seen"])],
+            "last_section_id": str(row["last_section_id"]) or None,
+            "updated_at": int(row["updated_at"] or 0),
+        }
+        for row in rows
+    }
+    return {
+        "last_chapter_id": (str(meta["last_chapter_id"]) or None) if meta is not None else None,
+        "chapters": chapters,
+    }
+
+
+def save_learn_progress(last_chapter_id: str | None, chapters: dict[str, dict[str, Any]]) -> None:
+    """整份覆盖写：章节行先清后插（同一条连接内原子生效，章节数上限由服务层夹取）。"""
+    with connection() as conn:
+        conn.execute(
+            "INSERT INTO learn_progress (user_id, last_chapter_id, updated_at) VALUES (?, ?, ?) "
+            "ON CONFLICT(user_id) DO UPDATE SET last_chapter_id = excluded.last_chapter_id, "
+            "updated_at = excluded.updated_at",
+            (_uid(), last_chapter_id or "", _now()),
+        )
+        conn.execute("DELETE FROM learn_chapters WHERE user_id = ?", (_uid(),))
+        conn.executemany(
+            "INSERT INTO learn_chapters (user_id, chapter_id, seen, last_section_id, updated_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            [
+                (
+                    _uid(),
+                    chapter_id,
+                    _json_text(item.get("seen") or []),
+                    str(item.get("last_section_id") or ""),
+                    int(item.get("updated_at") or 0),
+                )
+                for chapter_id, item in chapters.items()
+            ],
+        )
+
+
+def get_plan_state(report_id: str) -> dict[str, Any]:
+    """某份报告的打卡状态；从未写过时 `updated_at` 为空串（前端据此回推本地记录）。"""
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT daily_minutes, done, updated_at FROM plan_states "
+            "WHERE user_id = ? AND report_id = ?",
+            (_uid(), report_id),
+        ).fetchone()
+    if row is None:
+        return {"report_id": report_id, "daily_minutes": 30, "done": {}, "updated_at": ""}
+    return {
+        "report_id": report_id,
+        "daily_minutes": int(row["daily_minutes"] or 30),
+        "done": _json_map(row["done"]),
+        "updated_at": str(row["updated_at"]),
+    }
+
+
+def save_plan_state(report_id: str, daily_minutes: int, done: dict[str, bool]) -> None:
+    """整份覆盖写（打卡 map 最多几十条，无需增量）。"""
+    with connection() as conn:
+        conn.execute(
+            "INSERT INTO plan_states (user_id, report_id, daily_minutes, done, updated_at) "
+            "VALUES (?, ?, ?, ?, ?) ON CONFLICT(user_id, report_id) DO UPDATE SET "
+            "daily_minutes = excluded.daily_minutes, done = excluded.done, "
+            "updated_at = excluded.updated_at",
+            (_uid(), report_id, int(daily_minutes), _json_text(done), _now()),
+        )
