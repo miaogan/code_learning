@@ -2363,13 +2363,6 @@ input:not([type='radio']):not([type='checkbox']):not([type='file']):disabled {
   border-top: 1px solid var(--border-hair);
 }
 
-.sc-toolnav-label {
-  padding: 0 var(--sp-3);
-  font-size: var(--fs-meta);
-  line-height: var(--lh-meta);
-  color: var(--text-tertiary);
-}
-
 .sc-toolnav-item {
   display: flex;
   align-items: center;
@@ -2408,10 +2401,6 @@ input:not([type='radio']):not([type='checkbox']):not([type='file']):disabled {
   padding-top: 0;
   border-top: none;
   border-bottom: 1px solid var(--border-hair);
-}
-
-.sc-toolnav.is-horizontal .sc-toolnav-label {
-  padding: 0;
 }
 
 .sc-toolnav.is-horizontal .sc-toolnav-item {
@@ -3938,11 +3927,18 @@ input:not([type='radio']):not([type='checkbox']):not([type='file']):disabled {
     flex: none;
   }
 
-  /* 工具条并入同一条滚动行：去掉它自身的边线与内边距，避免出现两条分割线 */
+  /* 工具条并入同一条滚动行：去掉它自身的边线与内边距，避免出现两条分割线；
+     两组之间用一条竖发丝线分隔，竖排的 group 标题在横排里隐藏（否则会挤在中间像个小标签）。 */
   .sc-topstepper .sc-toolnav.is-horizontal {
     margin: 0;
-    padding: 0;
+    padding: 0 0 0 var(--sp-3);
+    border-top: none;
     border-bottom: none;
+    border-left: 1px solid var(--border-subtle);
+  }
+
+  .sc-topstepper .sc-nav-label {
+    display: none;
   }
 
   /* 44 触控：整项（含文字区）都可点，不再只有 16 高的圆点 */
@@ -5132,7 +5128,20 @@ body {
   padding: var(--lab-page-pad-y) var(--lab-page-pad-x) var(--sp-9);
 }
 
-/* ---------- 侧栏：编号承担「流程位置」，不再用圆点 ---------- */
+/* ---------- 侧栏：编号承担「流程位置」，两组共用一条 group 标题样式 ---------- */
+.sc-nav-label {
+  display: block;
+  margin-bottom: var(--sp-2);
+  padding: 0 var(--sp-3);
+  font-family: var(--font-mono);
+  font-size: var(--fs-nano);
+  letter-spacing: var(--ls-kicker);
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+/* [流程] 与 [工具] 两组标题、行高（36 = padding 8×2 + 20）与左侧竖条口径完全一致，
+ * 避免此前「步骤 36 高 / 工具 32 高、两组左缘不齐」的参差感。 */
 .sc-stepper.is-vertical {
   counter-reset: scstep;
   gap: var(--sp-1);
@@ -5141,7 +5150,7 @@ body {
 .sc-stepper.is-vertical .sc-step {
   counter-increment: scstep;
   display: grid;
-  grid-template-columns: 24px minmax(0, 1fr) 16px;
+  grid-template-columns: 24px minmax(0, 1fr);
   gap: var(--sp-2);
   padding: var(--sp-2) var(--sp-3);
   border-left: 2px solid transparent;
@@ -5152,7 +5161,7 @@ body {
 }
 
 .sc-stepper.is-vertical .sc-step:hover {
-  background: transparent;
+  background: var(--overlay-04);
   color: var(--text-secondary);
 }
 
@@ -5187,24 +5196,15 @@ body {
   color: var(--accent);
 }
 
+/* 工具组：去掉分隔线（两组都有 group 标题，已经分得开），改为纯留白； */
 .sc-toolnav {
   margin-top: var(--sp-6);
-  padding-top: var(--sp-5);
-  border-top: 1px solid var(--border-subtle);
 }
 
-.sc-toolnav-label {
-  padding: 0 var(--sp-3);
-  font-family: var(--font-mono);
-  font-size: var(--fs-nano);
-  letter-spacing: var(--ls-kicker);
-  text-transform: uppercase;
-  color: var(--text-tertiary);
-}
-
+/* 工具项缩进到步骤文字列（padding 12 + 编号 24 + gap 8 = 44），两组左缘不再是「编号 vs 文字」的参差。 */
 .sc-toolnav-item {
-  height: var(--btn-h-sm);
-  padding: 0 var(--sp-3);
+  height: calc(var(--sp-2) * 2 + var(--lh-small));
+  padding: 0 var(--sp-3) 0 calc(var(--sp-3) + 24px + var(--sp-2));
   border-left: 2px solid transparent;
   border-radius: 2px;
   font-size: var(--fs-small);
@@ -5213,7 +5213,7 @@ body {
 }
 
 .sc-toolnav-item:hover {
-  background: transparent;
+  background: var(--overlay-04);
   color: var(--text-primary);
 }
 

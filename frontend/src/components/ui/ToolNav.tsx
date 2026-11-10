@@ -33,7 +33,7 @@ export function ToolNav({ items, label = '工具', orientation = 'vertical' }: T
 
   return (
     <nav className={classes.join(' ')} aria-label={label}>
-      <span className="sc-toolnav-label">{label}</span>
+      <span className="sc-nav-label">{label}</span>
       {items.map((item) => {
         // 学习模块有子页面（`/learn/:chapterId`），只判全等会让文章页的侧栏失去高亮。
         const active = pathname === item.to || pathname.startsWith(`${item.to}/`)
