@@ -1555,3 +1555,284 @@ def save_plan_state(report_id: str, daily_minutes: int, done: dict[str, bool]) -
             "updated_at = excluded.updated_at",
             (_uid(), report_id, int(daily_minutes), _json_text(done), _now()),
         )
+
+
+# --- radar（r67 技术雷达：清单 / 快照 / 评估 / 采集轮次 / 生成任务）----------
+#
+# 技术清单、快照与评估是**全局知识**（不按账号切）；生成任务 `radar_jobs` 带 `user_id`，
+# 读 / 采纳 / 废弃按账号隔离（AC-9）。列名投影与状态语义留在 `services/radar/store.py`，
+# 这里按「唯一 SQL 出口」约定只出读写；任务行以 `sqlite3.Row` 返回，JSON 列解码仍归塑形层。
+
+
+def radar_upsert_tech(item: dict[str, Any]) -> None:
+    """按 `tech_slug` 幂等写入：已存在只刷新 last_seen 与可变字段（首次见到的时间不动）。"""
+    stamp = _now()
+    with connection() as conn:
+        conn.execute(
+            "INSERT INTO radar_techs (tech_slug, name, direction, sub_direction, source_key, url,"
+            " summary, first_seen_at, last_seen_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(tech_slug) DO UPDATE SET name = excluded.name,"
+            " direction = excluded.direction, sub_direction = excluded.sub_direction,"
+            " url = excluded.url, summary = excluded.summary, last_seen_at = excluded.last_seen_at",
+            (
+                item["slug"], item["name"], item["direction"], item["sub_direction"],
+                item["source_key"], item["url"], item["summary"], stamp, stamp,
+            ),
+        )
+
+
+def radar_insert_snapshot(item: dict[str, Any]) -> None:
+    """补一条 star / fork 快照（`star_delta_7d` 由最新两条快照差值推出）。"""
+    with connection() as conn:
+        conn.execute(
+            "INSERT INTO radar_snapshots (tech_slug, taken_at, stars, forks, repo_created_at,"
+            " pushed_at, suspect) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (
+                item["slug"], _now(), int(item.get("stars") or 0), int(item.get("forks") or 0),
+                str(item.get("repo_created_at") or ""), str(item.get("pushed_at") or ""),
+                1 if item.get("suspect") else 0,
+            ),
+        )
+
+
+def radar_previous_stars(slug: str) -> int | None:
+    """最近一条快照的 star 数（第一条快照返回 None，增速按 0 处理）。"""
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT stars FROM radar_snapshots WHERE tech_slug = ? ORDER BY id DESC LIMIT 1",
+            (slug,),
+        ).fetchone()
+    return None if row is None else int(row["stars"])
+
+
+def radar_insert_assessment(
+    tech_slug: str,
+    run_id: int,
+    result: dict[str, Any],
+    *,
+    input_sha256: str,
+    profile_digest: str,
+    prompt_version: str,
+    model: str,
+    rule_based: bool,
+) -> bool:
+    """写一条评估；同 `(tech_slug, input_sha256)` 已存在则跳过（返回 False = 可复算幂等）。"""
+    with connection() as conn:
+        cursor = conn.execute(
+            "INSERT OR IGNORE INTO radar_assessments (tech_slug, run_id, verdict, relevance,"
+            " adoption, maturity, effort, reasons_json, evidence_json, profile_digest,"
+            " prompt_version, model, input_sha256, rule_based, created_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                tech_slug, run_id, result["verdict"], int(result["relevance"]),
+                int(result["adoption"]), int(result["maturity"]), int(result["effort"]),
+                _json_text(result.get("reasons") or []),
+                _json_text(result.get("evidence") or []),
+                profile_digest, prompt_version, model, input_sha256,
+                1 if rule_based else 0, _now(),
+            ),
+        )
+        return cursor.rowcount > 0
+
+
+def radar_list_techs(limit: int = 50, *, tech_slug: str = "") -> list[dict[str, Any]]:
+    """技术清单：最新评估 + 最新快照 + 当前账号最近一条生成任务，按评估时间倒序取前 N 条。"""
+    where = " WHERE t.tech_slug = ?" if tech_slug else ""
+    params: list[Any] = [_uid()]
+    if tech_slug:
+        params.append(tech_slug)
+    params.append(limit)
+    with connection() as conn:
+        rows = conn.execute(
+            "SELECT t.tech_slug, t.name, t.direction, t.sub_direction, t.source_key, t.url,"
+            " t.summary, a.verdict, a.relevance, a.adoption, a.maturity, a.effort,"
+            " a.reasons_json, a.evidence_json, a.rule_based, a.created_at AS assessed_at,"
+            " (SELECT s.stars FROM radar_snapshots s WHERE s.tech_slug = t.tech_slug"
+            "  ORDER BY s.id DESC LIMIT 1) AS stars,"
+            " (SELECT s.stars FROM radar_snapshots s WHERE s.tech_slug = t.tech_slug"
+            "  ORDER BY s.id DESC LIMIT 1 OFFSET 1) AS prev_stars,"
+            " (SELECT s.suspect FROM radar_snapshots s WHERE s.tech_slug = t.tech_slug"
+            "  ORDER BY s.id DESC LIMIT 1) AS suspect,"
+            " (SELECT j.job_id FROM radar_jobs j WHERE j.tech_slug = t.tech_slug"
+            "  AND j.user_id = ? ORDER BY j.created_at DESC LIMIT 1) AS job_id"
+            " FROM radar_techs t LEFT JOIN radar_assessments a ON a.id = ("
+            "   SELECT MAX(a2.id) FROM radar_assessments a2 WHERE a2.tech_slug = t.tech_slug)"
+            f"{where}"
+            " ORDER BY a.created_at DESC, t.last_seen_at DESC LIMIT ?",
+            params,
+        ).fetchall()
+    items: list[dict[str, Any]] = []
+    for row in rows:
+        items.append(
+            {
+                "tech_slug": row["tech_slug"],
+                "name": row["name"],
+                "direction": row["direction"],
+                "sub_direction": row["sub_direction"],
+                "source_key": row["source_key"],
+                "url": row["url"],
+                "summary": row["summary"],
+                "verdict": row["verdict"] or "skip",
+                "relevance": int(row["relevance"] or 1),
+                "adoption": int(row["adoption"] or 1),
+                "maturity": int(row["maturity"] or 1),
+                "effort": int(row["effort"] or 1),
+                "reasons": _json_list(row["reasons_json"]),
+                "evidence": _json_list(row["evidence_json"]),
+                "rule_based": bool(row["rule_based"]),
+                "assessed_at": row["assessed_at"] or "",
+                "stars": int(row["stars"] or 0),
+                "star_delta_7d": max(
+                    int(row["stars"] or 0) - int(row["prev_stars"]), 0
+                ) if row["prev_stars"] is not None else 0,
+                "suspect": bool(row["suspect"]),
+                "job_id": row["job_id"] or "",
+            }
+        )
+    return items
+
+
+def radar_cross_source_count() -> dict[str, int]:
+    """跨源出现次数：同名技术被几个源提到（评估信号之一，无记录记 0）。"""
+    with connection() as conn:
+        rows = conn.execute(
+            "SELECT tech_slug, COUNT(DISTINCT source_key) AS n FROM radar_techs GROUP BY tech_slug"
+        ).fetchall()
+    return {str(row["tech_slug"]): int(row["n"]) for row in rows}
+
+
+def radar_create_run(trigger: str) -> int:
+    """开一轮采集，返回自增 `run_id`（采集结束后由 `radar_finish_run` 补终态）。"""
+    with connection() as conn:
+        cursor = conn.execute(
+            "INSERT INTO radar_runs (trigger, started_at) VALUES (?, ?)", (trigger, _now())
+        )
+        return int(cursor.lastrowid or 0)
+
+
+def radar_finish_run(
+    run_id: int, sources: list[dict[str, Any]], degraded: bool, techs_seen: int
+) -> None:
+    with connection() as conn:
+        conn.execute(
+            "UPDATE radar_runs SET finished_at = ?, sources_json = ?, degraded = ?, techs_seen = ?"
+            " WHERE run_id = ?",
+            (_now(), _json_text(sources), 1 if degraded else 0, techs_seen, run_id),
+        )
+
+
+def radar_latest_run() -> dict[str, Any]:
+    """最近一轮采集；空库给一份「从未采集」的零值，调用方无需判 None。"""
+    with connection() as conn:
+        row = conn.execute("SELECT * FROM radar_runs ORDER BY run_id DESC LIMIT 1").fetchone()
+    if row is None:
+        return {"run_id": 0, "trigger": "", "started_at": "", "finished_at": "",
+                "degraded": False, "techs_seen": 0, "sources": []}
+    return {
+        "run_id": int(row["run_id"]),
+        "trigger": row["trigger"],
+        "started_at": row["started_at"],
+        "finished_at": row["finished_at"],
+        "degraded": bool(row["degraded"]),
+        "techs_seen": int(row["techs_seen"]),
+        "sources": _json_list(row["sources_json"]),
+    }
+
+
+def radar_insert_job(job_id: str, tech_slug: str, *, trigger: str, parent_job_id: str) -> bool:
+    """插入生成任务行；同一技术已有未终态任务时撞部分唯一索引，返回 False（AC-3 幂等）。"""
+    stamp = _now()
+    try:
+        with connection() as conn:
+            conn.execute(
+                "INSERT INTO radar_jobs (job_id, tech_slug, user_id, status, stage, progress,"
+                " trigger, parent_job_id, created_at, updated_at)"
+                " VALUES (?, ?, ?, 'queued', 'chapter', 0, ?, ?, ?, ?)",
+                (job_id, tech_slug, _uid(), trigger, parent_job_id, stamp, stamp),
+            )
+        return True
+    except sqlite3.IntegrityError:
+        return False
+
+
+def radar_active_job(tech_slug: str) -> dict[str, Any] | None:
+    """该技术当前未终态的任务归属（`{job_id, user_id}`），没有则 `None`。"""
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT job_id, user_id FROM radar_jobs WHERE tech_slug = ?"
+            " AND status IN ('queued', 'running') ORDER BY created_at DESC LIMIT 1",
+            (tech_slug,),
+        ).fetchone()
+    return None if row is None else {"job_id": str(row["job_id"]), "user_id": str(row["user_id"])}
+
+
+def radar_get_job_row(job_id: str) -> sqlite3.Row | None:
+    """按 id 读任务行（当前账号隔离）；行交给塑形层解析 JSON 列。"""
+    with connection() as conn:
+        return conn.execute(
+            "SELECT * FROM radar_jobs WHERE job_id = ? AND user_id = ?",
+            (job_id, _uid()),
+        ).fetchone()
+
+
+def radar_job_rows(limit: int = 20) -> list[sqlite3.Row]:
+    with connection() as conn:
+        return conn.execute(
+            "SELECT * FROM radar_jobs WHERE user_id = ? ORDER BY created_at DESC LIMIT ?",
+            (_uid(), limit),
+        ).fetchall()
+
+
+def radar_update_job(job_id: str, payload: dict[str, Any]) -> None:
+    """按**字段名白名单**调用方的 payload 更新任务行（列名拼装在 SQL 唯一出口内）。"""
+    if not payload:
+        return
+    values = {**payload, "updated_at": _now()}
+    columns = ", ".join(f"{key} = ?" for key in values)
+    with connection() as conn:
+        conn.execute(
+            f"UPDATE radar_jobs SET {columns} WHERE job_id = ?", [*values.values(), job_id]
+        )
+
+
+def radar_sweep_stale_jobs(minutes: int) -> None:
+    """读路径惰性清扫（AC-4）：running 超过阈值按 failed 落库，避免僵尸行永远「生成中」。"""
+    with connection() as conn:
+        conn.execute(
+            "UPDATE radar_jobs SET status = 'failed', error_message = '生成中断，请重试',"
+            " updated_at = strftime('%Y-%m-%dT%H:%M:%S', 'now') || '+00:00'"
+            " WHERE status = 'running'"
+            " AND (julianday('now') - julianday(created_at)) * 24 * 60 > ?",
+            (minutes,),
+        )
+
+
+def radar_tech_name(tech_slug: str) -> str:
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT name FROM radar_techs WHERE tech_slug = ?", (tech_slug,)
+        ).fetchone()
+    return "" if row is None else str(row["name"])
+
+
+def radar_tech_card(tech_slug: str) -> dict[str, Any] | None:
+    """生成用的技术卡片：名称 / 方向 / 简介 / 链接 + 最新评估结论（不存在返回 None）。"""
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT t.tech_slug, t.name, t.direction, t.sub_direction, t.url, t.summary,"
+            " a.verdict FROM radar_techs t LEFT JOIN radar_assessments a ON a.id = ("
+            "   SELECT MAX(a2.id) FROM radar_assessments a2 WHERE a2.tech_slug = t.tech_slug)"
+            " WHERE t.tech_slug = ?",
+            (tech_slug,),
+        ).fetchone()
+    if row is None:
+        return None
+    return {
+        "slug": row["tech_slug"],
+        "name": row["name"],
+        "direction": row["direction"],
+        "sub_direction": row["sub_direction"],
+        "url": row["url"],
+        "summary": row["summary"],
+        "verdict": row["verdict"] or "",
+    }

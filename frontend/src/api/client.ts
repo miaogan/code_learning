@@ -42,6 +42,14 @@ import type {
   PracticeWrongBook,
   QuestionSearchRequest,
   QuestionSearchResponse,
+  RadarGenerateRequest,
+  RadarJobAccepted,
+  RadarJobItem,
+  RadarJobList,
+  RadarManualRequest,
+  RadarRunSummary,
+  RadarTechItem,
+  RadarTechList,
   Report,
   ReportGenerateRequest,
   ResumeJobStarted,
@@ -171,6 +179,44 @@ export const api = {
   /** r65 AI 学习教练：材料由前端组装上传，服务端按 href 白名单校验引用后回建议。 */
   coachAdvice: (payload: CoachAdviceRequest, signal?: AbortSignal): Promise<CoachAdvice> =>
     request<CoachAdvice>('/api/coach/advice', jsonInit('POST', payload, signal)),
+
+  /* ---------- r67 技术雷达（先锋 = 清单 / 国子监 = 生成任务） ---------- */
+
+  /** 技术清单：最新评估 + 最新快照 + 当前账号在该技术上的任务 id。 */
+  radarTechs: (limit = 50, signal?: AbortSignal): Promise<RadarTechList> =>
+    request<RadarTechList>(`/api/radar/techs?${queryString({ limit })}`, { signal }),
+
+  /** 立即跑一轮采集与评估（离线模式下只读内置样本）。 */
+  radarRun: (): Promise<RadarRunSummary> =>
+    request<RadarRunSummary>('/api/radar/run', { method: 'POST' }),
+
+  /** 最近一轮采集摘要（含每个源的可用性）。 */
+  radarLatestRun: (signal?: AbortSignal): Promise<RadarRunSummary> =>
+    request<RadarRunSummary>('/api/radar/runs/latest', { signal }),
+
+  /** 手工录入一条技术线索：不联网，直接进清单。 */
+  radarManual: (payload: RadarManualRequest): Promise<RadarTechItem> =>
+    request<RadarTechItem>('/api/radar/manual', jsonInit('POST', payload)),
+
+  /** 受理样例生成：立即返回 `job_id`，生成在服务端后台跑（`reused=true` 表示命中在途任务）。 */
+  radarGenerate: (payload: RadarGenerateRequest): Promise<RadarJobAccepted> =>
+    request<RadarJobAccepted>('/api/radar/generate', jsonInit('POST', payload)),
+
+  /** 本账号的样例任务（含进度、章节草稿、题目样例），在途任务靠页面轮询刷新。 */
+  radarJobs: (limit = 20, signal?: AbortSignal): Promise<RadarJobList> =>
+    request<RadarJobList>(`/api/radar/jobs?${queryString({ limit })}`, { signal }),
+
+  /** 扩充入库：通过自检的题写进练习池，章节草稿留档（不并入官方教程）。 */
+  radarAdopt: (jobId: string): Promise<RadarJobItem> =>
+    request<RadarJobItem>(`/api/radar/jobs/${encodeURIComponent(jobId)}/adopt`, {
+      method: 'POST',
+    }),
+
+  /** 废弃：整份草稿作废（与「扩充入库」互斥）。 */
+  radarDiscard: (jobId: string): Promise<RadarJobItem> =>
+    request<RadarJobItem>(`/api/radar/jobs/${encodeURIComponent(jobId)}/discard`, {
+      method: 'POST',
+    }),
 
   /* ---------- r23 登录态与个人设置 ---------- */
 

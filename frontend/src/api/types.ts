@@ -918,4 +918,139 @@ export interface CoachAdvice {
   notice: string
 }
 
+/* ------------------------------------------------------------------ *
+ * r67 技术雷达（与 backend/app/schemas.py 逐字镜像）
+ *
+ * 技术清单 / 快照 / 评估是**全局知识**，只有生成任务 `radar_jobs` 按账号隔离。
+ * `tech_slug` 形如 `github:owner/repo`，含 `/` 与 `:` → 生成入口走 body 传参。
+ * ------------------------------------------------------------------ */
+
+export interface RadarSourceStatus {
+  source_key: string
+  status: string
+  items: number
+  latency_ms: number
+  message: string
+}
+
+export interface RadarRunSummary {
+  run_id: number
+  trigger: string
+  started_at: string
+  finished_at: string
+  degraded: boolean
+  techs_seen: number
+  sources: RadarSourceStatus[]
+  notice: string
+}
+
+export interface RadarTechItem {
+  tech_slug: string
+  name: string
+  direction: string
+  sub_direction: string
+  source_key: string
+  url: string
+  summary: string
+  verdict: string
+  verdict_label: string
+  relevance: number
+  adoption: number
+  maturity: number
+  effort: number
+  reasons: string[]
+  evidence: string[]
+  rule_based: boolean
+  assessed_at: string
+  stars: number
+  star_delta_7d: number
+  suspect: boolean
+  job_id: string
+}
+
+export interface RadarTechList {
+  items: RadarTechItem[]
+  total: number
+  notice: string
+}
+
+export interface RadarManualRequest {
+  name: string
+  url?: string
+  summary?: string
+  direction?: string
+  sub_direction?: string
+}
+
+export interface RadarGenerateRequest {
+  tech_slug: string
+}
+
+export interface RadarJobAccepted {
+  job_id: string
+  tech_slug: string
+  status: string
+  /** true = 命中在途任务，没有重复烧 token。 */
+  reused: boolean
+}
+
+export interface RadarChapterSection {
+  id: string
+  title: string
+  body: string
+  bullets: string[]
+}
+
+export interface RadarChapterDraft {
+  id: string
+  title: string
+  direction: string
+  sub_direction: string
+  level: string
+  summary: string
+  sections: RadarChapterSection[]
+}
+
+export interface RadarQuestionOption {
+  key: string
+  text: string
+}
+
+export interface RadarQuestionSample {
+  id: string
+  direction: string
+  sub_direction: string
+  kind: string
+  difficulty: string
+  essentiality: string
+  prompt: string
+  options: RadarQuestionOption[]
+  answer: string[]
+  language: string
+  explanation: string
+}
+
+export interface RadarJobItem {
+  job_id: string
+  tech_slug: string
+  tech_name: string
+  /** `queued` / `running` / `succeeded` / `adopted` / `discarded` / `failed`。 */
+  status: string
+  stage: string
+  progress: number
+  chapter: RadarChapterDraft | null
+  questions: RadarQuestionSample[]
+  /** 自检丢弃的题数（答案键不在选项、选项数不合法等）。 */
+  discarded_count: number
+  error_message: string
+  trigger: string
+  created_at: string
+  updated_at: string
+}
+
+export interface RadarJobList {
+  items: RadarJobItem[]
+  total: number
+}
+
 

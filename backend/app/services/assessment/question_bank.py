@@ -157,6 +157,15 @@ def practice_pool() -> list[dict[str, Any]]:
     return [row for row in load_questions() if rules.is_objective_kind(str(row.get("kind") or ""))]
 
 
+def exam_pool() -> list[dict[str, Any]]:
+    """笔试卷池：可用题里**排除雷达生成题**（r67 AC-6：技术雷达样例只进练习池）。
+
+    雷达题（`source="radar"`）来自模型生成、未经人工复核，只允许在练习里试做，
+    不能进模拟笔试卷面（那里是能力验证与诊断的正式证据）。
+    """
+    return [row for row in load_questions() if str(row.get("source") or "") != "radar"]
+
+
 def find_question(question_id: str) -> dict[str, Any] | None:
     """按 id 取一道**可用**题（练习提交判分用）；不存在或不可用返回 `None`（由调用方映射 404）。"""
     target = str(question_id or "").strip()

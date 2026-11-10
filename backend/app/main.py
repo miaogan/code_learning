@@ -47,12 +47,14 @@ from app.routers import (
     learn,
     practice,
     profile,
+    radar,
     report,
     resume,
     search,
     timeline,
 )
 from app.schemas import HealthResponse
+from app.services import radar as radar_service
 from app.services.ai.ai import close_ai_pool
 from app.services.assessment import question_bank
 
@@ -86,8 +88,11 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     question_bank.ensure_seeded()
     # r51：题库导入后重建 FTS 索引（无 FTS5 能力时数据层自行降级为 LIKE，不影响启动）。
     repository.rebuild_question_search()
+    # r67：应用内定时采集（`RADAR_SCHEDULE=inapp` 才起，其余模式完全由手动按钮驱动）。
+    radar_service.start_scheduler()
     yield
-    # 关停时释放 AI 连接池（进程内共享客户端，keep-alive 连接不能留给下一次启动）。
+    # 关停时先停调度器（避免 task 在连接池关闭后仍在跑），再释放 AI 连接池。
+    await radar_service.stop_scheduler()
     await close_ai_pool()
 
 
@@ -275,6 +280,8 @@ def create_app() -> FastAPI:
     app.include_router(learn.router)
     # r65：AI 学习教练（检索增强 + 引用白名单校验，材料由前端组装后随请求上传）。
     app.include_router(coach.router)
+    # r67：技术雷达（先锋清单 / 采集 / 国子监生成任务，任务按账号隔离）。
+    app.include_router(radar.router)
 
     @app.get("/health", response_model=HealthResponse, tags=["ops"], summary="探活（AC-8）")
     def health() -> HealthResponse:

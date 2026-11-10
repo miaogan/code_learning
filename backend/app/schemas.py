@@ -1030,3 +1030,154 @@ class CoachAdvice(BaseModel):
     dropped_citations: int = 0
     #: 空材料 / 全部引用不可核对时的中文说明；正常出建议时为空串。
     notice: str = ""
+
+
+# --- r67 技术雷达（先锋 / 国子监） --------------------------------------------
+#
+# 技术清单 / 快照 / 评估是全局知识；只有生成任务 `radar_jobs` 按账号隔离。
+# `tech_slug` 形如 `github:owner/repo`，含 `/` 与 `:`，故**一律走 body 传参**，
+# 不做路径参数端点（生成入口 `POST /api/radar/generate`）。
+
+
+class RadarSourceStatus(BaseModel):
+    """单个采集源的本轮结果：`ok` / `degraded` / `offline`（形状同 `sources.fetch_all`）。"""
+
+    source_key: str
+    status: str = "ok"
+    items: int = 0
+    latency_ms: int = 0
+    message: str = ""
+
+
+class RadarRunSummary(BaseModel):
+    """一轮采集的结果摘要（`/runs/latest` 也返回它）。"""
+
+    run_id: int = 0
+    trigger: str = ""
+    started_at: str = ""
+    finished_at: str = ""
+    degraded: bool = False
+    techs_seen: int = 0
+    sources: list[RadarSourceStatus] = Field(default_factory=list)
+    notice: str = ""
+
+
+class RadarTechItem(BaseModel):
+    """先锋页一条技术：最新评估 + 最新快照 + 当前账号在该技术上的任务。"""
+
+    tech_slug: str
+    name: str
+    direction: str
+    sub_direction: str = ""
+    source_key: str = ""
+    url: str = ""
+    summary: str = ""
+    verdict: str = "skip"
+    verdict_label: str = ""
+    relevance: int = 1
+    adoption: int = 1
+    maturity: int = 1
+    effort: int = 1
+    reasons: list[str] = Field(default_factory=list)
+    evidence: list[str] = Field(default_factory=list)
+    rule_based: bool = False
+    assessed_at: str = ""
+    stars: int = 0
+    star_delta_7d: int = 0
+    suspect: bool = False
+    job_id: str = ""
+
+
+class RadarTechList(BaseModel):
+    items: list[RadarTechItem] = Field(default_factory=list)
+    total: int = 0
+    #: 本轮采集的概括说明（离线 / 降级 / 丢弃引用等），空串表示无特别情况。
+    notice: str = ""
+
+
+class RadarManualRequest(BaseModel):
+    """手工录入一条技术线索（不联网，直接进清单）。"""
+
+    name: str = Field(min_length=1)
+    url: str = ""
+    summary: str = ""
+    direction: str = ""
+    sub_direction: str = ""
+
+
+class RadarGenerateRequest(BaseModel):
+    tech_slug: str = Field(min_length=1)
+
+
+class RadarJobAccepted(BaseModel):
+    """生成入口响应：`reused=True` 表示命中在途任务，未重复烧 token（AC-3）。"""
+
+    job_id: str
+    tech_slug: str
+    status: str = "queued"
+    reused: bool = False
+
+
+class RadarChapterSection(BaseModel):
+    id: str
+    title: str
+    body: str
+    bullets: list[str] = Field(default_factory=list)
+
+
+class RadarChapterDraft(BaseModel):
+    """章节草稿：`id` 一律 `radar-` 前缀（不占用官方 40 章的 id 命名空间）。"""
+
+    id: str
+    title: str
+    direction: str = ""
+    sub_direction: str = ""
+    level: str = "intermediate"
+    summary: str = ""
+    sections: list[RadarChapterSection] = Field(default_factory=list)
+
+
+class RadarQuestionOption(BaseModel):
+    key: str
+    text: str
+
+
+class RadarQuestionSample(BaseModel):
+    id: str
+    direction: str = ""
+    sub_direction: str = ""
+    kind: str
+    difficulty: str
+    essentiality: str = "advanced"
+    prompt: str
+    options: list[RadarQuestionOption] = Field(default_factory=list)
+    answer: list[str] = Field(default_factory=list)
+    language: str = ""
+    explanation: str = ""
+
+
+class RadarJobItem(BaseModel):
+    """国子监一条任务：进度 + 草稿 + 自检丢弃计数。
+
+    `status` ∈ `queued` / `running` / `succeeded` / `adopted` / `discarded` / `failed`；
+    `adopted` 与 `discarded` 是互斥终态（AC-8）。
+    """
+
+    job_id: str
+    tech_slug: str
+    tech_name: str = ""
+    status: str = "queued"
+    stage: str = "chapter"
+    progress: int = 0
+    chapter: RadarChapterDraft | None = None
+    questions: list[RadarQuestionSample] = Field(default_factory=list)
+    discarded_count: int = 0
+    error_message: str = ""
+    trigger: str = "manual"
+    created_at: str = ""
+    updated_at: str = ""
+
+
+class RadarJobList(BaseModel):
+    items: list[RadarJobItem] = Field(default_factory=list)
+    total: int = 0

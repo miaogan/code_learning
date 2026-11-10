@@ -285,6 +285,91 @@ CREATE TABLE IF NOT EXISTS plan_states (
 """
 
 
+#: r67 技术雷达：五张表（采集 → 快照 → 评估 → 生成任务 → 采集轮次）。
+#: 表名一律 `radar_*` —— `learn_chapters` 已被 r61 学习进度占用，不可复用。
+R67_SCHEMA = """
+CREATE TABLE IF NOT EXISTS radar_techs (
+    tech_slug      TEXT PRIMARY KEY,
+    name           TEXT NOT NULL,
+    direction      TEXT NOT NULL,
+    sub_direction  TEXT NOT NULL DEFAULT '',
+    source_key     TEXT NOT NULL,
+    url            TEXT NOT NULL,
+    summary        TEXT NOT NULL DEFAULT '',
+    first_seen_at  TEXT NOT NULL,
+    last_seen_at   TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS radar_snapshots (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    tech_slug       TEXT NOT NULL,
+    taken_at        TEXT NOT NULL,
+    stars           INTEGER NOT NULL DEFAULT 0,
+    forks           INTEGER NOT NULL DEFAULT 0,
+    repo_created_at TEXT NOT NULL DEFAULT '',
+    pushed_at       TEXT NOT NULL DEFAULT '',
+    suspect         INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS radar_assessments (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    tech_slug      TEXT NOT NULL,
+    run_id         INTEGER NOT NULL DEFAULT 0,
+    verdict        TEXT NOT NULL,
+    relevance      INTEGER NOT NULL,
+    adoption       INTEGER NOT NULL,
+    maturity       INTEGER NOT NULL,
+    effort         INTEGER NOT NULL,
+    reasons_json   TEXT NOT NULL DEFAULT '[]',
+    evidence_json  TEXT NOT NULL DEFAULT '[]',
+    profile_digest TEXT NOT NULL DEFAULT '',
+    prompt_version TEXT NOT NULL DEFAULT 'radar-r1',
+    model          TEXT NOT NULL DEFAULT '',
+    input_sha256   TEXT NOT NULL,
+    rule_based     INTEGER NOT NULL DEFAULT 0,
+    created_at     TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS radar_jobs (
+    job_id          TEXT PRIMARY KEY,
+    tech_slug       TEXT NOT NULL,
+    user_id         TEXT NOT NULL DEFAULT 'default',
+    status          TEXT NOT NULL DEFAULT 'queued',
+    stage           TEXT NOT NULL DEFAULT 'chapter',
+    progress        INTEGER NOT NULL DEFAULT 0,
+    chapter_json    TEXT NOT NULL DEFAULT '',
+    questions_json  TEXT NOT NULL DEFAULT '[]',
+    discarded_count INTEGER NOT NULL DEFAULT 0,
+    error_message   TEXT NOT NULL DEFAULT '',
+    trigger         TEXT NOT NULL DEFAULT 'manual',
+    parent_job_id   TEXT NOT NULL DEFAULT '',
+    created_at      TEXT NOT NULL,
+    updated_at      TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS radar_runs (
+    run_id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    trigger        TEXT NOT NULL,
+    started_at     TEXT NOT NULL,
+    finished_at    TEXT NOT NULL DEFAULT '',
+    sources_json   TEXT NOT NULL DEFAULT '[]',
+    degraded       INTEGER NOT NULL DEFAULT 0,
+    techs_seen     INTEGER NOT NULL DEFAULT 0
+);
+"""
+
+#: r67 索引：`idx_radar_jobs_active` 是**部分唯一索引**，保证「同一技术同时只 1 个未终态任务」
+#: （AC-3 幂等的真值）。建索引前必须先收敛存量 running/queued 行（见 `init_db()` 第 14 步）。
+R67_INDEXES = """
+CREATE INDEX IF NOT EXISTS idx_radar_snapshots_tech ON radar_snapshots (tech_slug, taken_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_radar_assess_unique
+    ON radar_assessments (tech_slug, input_sha256);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_radar_jobs_active
+    ON radar_jobs (tech_slug) WHERE status IN ('queued', 'running');
+CREATE INDEX IF NOT EXISTS idx_radar_jobs_user ON radar_jobs (user_id, created_at);
+"""
+
+
 def fts5_available(conn: sqlite3.Connection) -> bool:
     """探测当前 SQLite 是否编译了 FTS5；不抛异常，缺能力即返回 False。"""
     row = conn.execute("SELECT sqlite_compileoption_used('ENABLE_FTS5') AS enabled").fetchone()
@@ -380,6 +465,20 @@ def init_db() -> None:
             except sqlite3.OperationalError as exc:
                 logger.warning("db.fts5_unavailable error=%s", type(exc).__name__)
         conn.executescript(R61_SCHEMA)      # 12. r61 学习进度 / 计划打卡表
+        conn.executescript(R67_SCHEMA)      # 13. r67 技术雷达五表
+        _sweep_stale_radar_jobs(conn)       # 14. 建部分唯一索引前收敛重启遗留的未终态任务
+        conn.executescript(R67_INDEXES)     # 15. r67 索引（含 jobs 的 active 唯一索引）
+
+
+def _sweep_stale_radar_jobs(conn: sqlite3.Connection) -> None:
+    """r67 生成任务在**进程重启后不续跑**：新进程里 queued/running 一定没有活的 `asyncio` 任务，
+    直接按 failed + 中文原因落库（AC-4「不会永远停在生成中」的服务端兜底）。对干净库 0 行更新。
+    """
+    conn.execute(
+        "UPDATE radar_jobs SET status = 'failed', error_message = '任务中断，请重新生成', "
+        "updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now') || '+00:00' "
+        "WHERE status IN ('queued', 'running')"
+    )
 
 
 def _dedupe_running_profile_jobs(conn: sqlite3.Connection) -> None:

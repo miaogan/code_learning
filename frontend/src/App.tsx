@@ -6,10 +6,12 @@ import { Stepper, type StepItem, type StepState } from './components/ui/Stepper'
 import { ToolNav } from './components/ui/ToolNav'
 import EvalPage from './pages/EvalPage'
 import ExamPage from './pages/ExamPage'
+import GuozijianPage from './pages/GuozijianPage'
 import HistoryPage from './pages/HistoryPage'
 import InterviewPage from './pages/InterviewPage'
 import LearnPage from './pages/LearnPage'
 import LoginPage from './pages/LoginPage'
+import PioneerPage from './pages/PioneerPage'
 import PolishPage from './pages/PolishPage'
 import PracticePage from './pages/PracticePage'
 import ProfilePage from './pages/ProfilePage'
@@ -43,6 +45,8 @@ const TOOL_ITEMS = [
   { key: 'polish', label: '简历润色', to: '/polish' },
   { key: 'versions', label: '版本对比', to: '/versions' },
   { key: 'archive', label: '学习档案', to: '/archive' },
+  { key: 'pioneer', label: '先锋', to: '/pioneer' },
+  { key: 'guozijian', label: '国子监', to: '/guozijian' },
 ]
 
 /** 侧栏「设置」组：只读看板（模型质量）与账号 / AI 配置，从工具组里分出来。 */
@@ -151,6 +155,8 @@ export default function App() {
               <Route path="/versions" element={<VersionsPage />} />
               <Route path="/archive" element={<ArchivePage />} />
               <Route path="/practice" element={<PracticePage />} />
+              <Route path="/pioneer" element={<PioneerPage />} />
+              <Route path="/guozijian" element={<GuozijianPage />} />
               <Route path="/search" element={<SearchPage />} />
               <Route path="/learn" element={<LearnPage />} />
               <Route path="/learn/:chapterId" element={<TutorialPage />} />

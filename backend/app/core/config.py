@@ -67,6 +67,15 @@ _NUMERIC_ENV_FIELDS: tuple[str, ...] = (
     "ai_vision_timeout_s",
     "login_max_failures",
     "login_lockout_minutes",
+    "radar_fetch_timeout_s",
+    "radar_fetch_max_bytes",
+    "radar_run_max_techs",
+    "radar_min_stars",
+    "radar_max_assess_per_round",
+    "radar_assess_timeout_s",
+    "radar_gen_timeout_s",
+    "radar_gen_max_questions",
+    "radar_job_stale_minutes",
 )
 
 #: r41：视觉档未开通时的**唯一**中文说明（图片入口直接透传，不静默降级成 PDF 提示）。
@@ -202,6 +211,36 @@ class Settings(BaseSettings):
     proficiency_correct_threshold: int = 2
     #: 组卷时排除最近 N 卷已出过的题（不足时由 6 层阶梯兜底，绝不因此 400）。
     recent_paper_exclude: int = 3
+
+    # --- r67 技术雷达（先锋 / 国子监） ----------------------------------------
+    #: 离线模式：不访问任何上游，只读 `seed/radar_samples.json`（AC-1 的零成本出口）。
+    radar_offline: bool = False
+    #: 调度口径：`inapp` = 应用内 asyncio 循环（单进程 uvicorn）；`off` = 只允许手动采集。
+    radar_schedule: str = "inapp"
+    #: 应用内调度的采集时刻（逗号分隔 HH:MM，+08:00）。跨日空窗接受，用手动采集弥补。
+    radar_slots: str = "08:00,12:00,18:00"
+    #: 单源超时（秒）：实测 2.6–10.5s，取 8s 让慢源不进下一轮。
+    radar_fetch_timeout_s: float = 8.0
+    #: 单源读字节上限（流式读，超限截断并标记）：OpenAI Blog RSS 实测 836KB。
+    radar_fetch_max_bytes: int = 2_000_000
+    #: 一轮最多评估多少条技术（防止一次采集把库撑爆）。
+    radar_run_max_techs: int = 40
+    #: GitHub 检索的最低 star 门槛（噪声过滤，不是质量判断）。
+    radar_min_stars: int = 100
+    #: 每轮最多几条走模型评估（其余走规则评估，成本闸门）。
+    radar_max_assess_per_round: int = 3
+    #: 评估专用超时（秒）：输出是小 JSON，不跟全局 600s 一起等。
+    radar_assess_timeout_s: float = 60.0
+    #: 生成任务级硬上限（秒）：章节 + 题目 + 答案自检三次调用。
+    radar_gen_timeout_s: float = 300.0
+    #: 单次生成最多保留几道样例题（自检不通过的会被丢弃，不占这个额度）。
+    radar_gen_max_questions: int = 5
+    #: 读路径惰性清扫阈值（分钟）：running 超过该时长按 failed 落库（AC-4）。
+    radar_job_stale_minutes: int = 15
+    #: GitHub Search API token（未认证配额低且易 403；留空退化为「无 token 检索」）。
+    github_token: str = ""
+    #: 采集后是否自动为「必学」项生成样例（默认关：每条都要烧模型配额）。
+    radar_auto_generate: bool = False
 
     def resolve_ai(self) -> AiRuntime:
         """唯一解析出口：把 env 收敛成一个 `AiRuntime`，**永不 raise**（配置错置 `ready=False`）。"""

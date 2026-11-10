@@ -82,7 +82,7 @@ def create_run(
     proficient = proficiency.proficient_ids(now=now)
     recent = repository.list_recent_exam_question_ids(settings.recent_paper_exclude)
     paper = exam_selector.select_paper(
-        question_bank.load_questions(),
+        question_bank.exam_pool(),
         profile,
         proficient=proficient,
         recent=recent,

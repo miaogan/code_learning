@@ -55,6 +55,9 @@
 - [x] **r3 遗留 4 条已立项闭合**（2026-11-01 · 任务夹 `docs/teamflow/20261101-r4-r3-acceptance-closure/`）：r3 判定「⚠️ 有条件通过」，本需求把 R-1（润色页「原版」Tab 改为渲染 `documents.text` 整篇正文，按 DESIGN §240，走补契约 `resume_text` 而非降级设计）、D-2（导出文件名取简历原名，契约补 `file_name`，无文件名回退日期格式）、D-3（删 `profile_merge.py` 的 `CONTRACT_READY` 死分支与四个双份模型）、D-4（合并摘要条补「查看历史能力项」入口）四条已于 2026-11-01 全部闭合并**通过验收**（判定「✅ 通过」，见该任务夹 `ACCEPTANCE.md`），不做任何新功能。R-2（仓库根 `nul`）已由 host 手动删除并确认目录干净，不再处理。**本轮新发现 2 条 P3（不阻断，留后续清理）**：①**已关闭**（2026-11-02 · r18，见 `docs/teamflow/20261102-r18-p3-code-closure/ACCEPTANCE.md`）`backend/app/services/profile.py` 的 `_with_summary()` 恒真 `model_fields` 判断已删除（`ProfileWithMerge` 恒有 `merge_summary`，删后响应逐字段等价）；②仍开放：DESIGN（r3）§0.5-4 摘要条 48 高推导需按 border-box 的 1px 边框补偿回写（实现取 `calc(var(--sp-1) - 1px)`）。
 - [x] r3 的两处取舍已由验收定稿（2026-10-31）：①AC-7「能力项不足」只落 payload `tech_fallback`、暂不加 InterviewPage/ExamPage 页面提示（接受，页面提示留后续需求）；②润色建议缓存保持**进程内**（接受，`/full` 如实标 `regenerated: true`，满足 AC-10「采纳/临时岗位不入库」边界；跨重启复用需另立需求并先评估该边界）。
 
+- [x] **r67 技术雷达（先锋 / 国子监）已交付**（2026-11-10，见 `docs/teamflow/20261110-r67-tech-radar/`）：跨需求可复用的约定三条 —— ①**雷达生成题只进练习池**：`services/assessment/question_bank.py::exam_pool()` 过滤 `source != "radar"`（笔试取池改调它），`practice_pool()` 不动即自动包含；②**`services/radar/store.py` 只是委托层**，`radar_*` 五表的 SQL 全部在 `core/repository.py`（工程门禁 `test_sql_only_through_repository` 拒绝服务层裸 SQL），新任务表沿用 r30/r42 范式（部分唯一索引幂等 + `asyncio.wait_for` 硬上限 + 读路径惰性清扫 + 启动清扫）；③**服务层不得出现 30 整数字面量**（`test_proficiency_thresholds_only_from_config`），用派生常量（`PUSHED_RECENT_DAYS = 5 * 6`）且保留原信号键名；**契约类不得有 `source` 字段**（`test_r12_source_not_in_http_contract`），需要时只留在内部 dict。开放项（未做，按需另立需求）：调度为单进程应用内循环（多副本会重复跑，无租约）、雷达结果未并入 r58 画像七轴、真实外网采集端到端未验（离线样本为合成数据）。
+
+
 ## 待决策清单（2026-11-03 统一规整）
 
 > 把散落在各需求验收里的开放项收敛到一处；每项标「需谁拍板 / 选项 / 建议 / 成本」。默认**不擅自开工**，拍板后再进任务夹。

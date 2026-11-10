@@ -8679,5 +8679,450 @@ html {
   }
 }
 
+/* ---------- r67 技术雷达：先锋清单 / 国子监样例 ---------- */
+.sc-radar-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+
+.sc-radar-toolbarleft {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.sc-radar-recent {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+}
+
+.sc-radar-notice {
+  padding: var(--sp-1) var(--sp-2);
+  border-left: 2px solid var(--warn-line-35);
+  border-radius: var(--radius-4);
+  background: var(--warn-tint-12);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--warn);
+}
+
+.sc-radar-error {
+  margin: var(--sp-3) 0 0;
+  padding: var(--sp-2) var(--sp-3);
+  border-left: 2px solid var(--danger-line-55);
+  border-radius: var(--radius-4);
+  background: var(--danger-tint-08);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--danger);
+}
+
+.sc-radar-manual {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: end;
+  gap: var(--sp-3);
+  margin-top: var(--sp-3);
+}
+
+.sc-radar-manual .sc-btn-row {
+  grid-column: 1 / -1;
+}
+
+.sc-radar-listhead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-3);
+}
+
+.sc-radar-count {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+}
+
+/* 清单与题样共用的列表重置 */
+.sc-radar-list,
+.sc-radar-joblist,
+.sc-radar-sections,
+.sc-radar-bullets,
+.sc-radar-qlist,
+.sc-radar-options {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sc-radar-list,
+.sc-radar-joblist {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+/* 一行技术：左侧信息可换行，右侧操作按钮不压缩 */
+.sc-radar-techrow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--sp-3);
+  padding: var(--sp-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-8);
+  background: var(--bg-raised);
+  transition: border-color var(--fast) var(--ease);
+}
+
+.sc-radar-techrow:hover {
+  border-color: var(--border-strong);
+}
+
+.sc-radar-rowmain {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  min-width: 0;
+}
+
+.sc-radar-rowtitle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.sc-radar-rowact {
+  display: flex;
+  align-items: flex-start;
+}
+
+.sc-radar-name {
+  font-size: var(--fs-card);
+  line-height: var(--lh-card);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.sc-radar-source {
+  font-family: var(--font-mono);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+}
+
+/* 判定标签：必须学 / 值得了解 / 观望 / 可跳过 */
+.sc-radar-verdict {
+  display: inline-flex;
+  align-items: center;
+  height: var(--chip-h);
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-4);
+  background: var(--overlay-06);
+  color: var(--text-secondary);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  font-weight: 600;
+}
+
+.sc-radar-verdict.is-must {
+  background: var(--success-tint-10);
+  border-color: var(--success-line-55);
+  color: var(--success);
+}
+
+.sc-radar-verdict.is-worth {
+  background: var(--accent-tint);
+  border-color: var(--accent-line-30);
+  color: var(--accent);
+}
+
+.sc-radar-verdict.is-watch {
+  background: var(--warn-tint-12);
+  border-color: var(--warn-line-35);
+  color: var(--warn);
+}
+
+.sc-radar-verdict.is-skip {
+  background: var(--overlay-06);
+  border-color: var(--border-subtle);
+  color: var(--text-tertiary);
+}
+
+.sc-radar-meta,
+.sc-radar-dims {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+}
+
+.sc-radar-summary {
+  margin: 0;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--text-secondary);
+}
+
+.sc-radar-reasons {
+  margin: 0;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-secondary);
+}
+
+/* 国子监：左任务列表 + 右详情，窄屏单栏 */
+.sc-radar-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-4);
+}
+
+.sc-radar-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+
+.sc-radar-detailhead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+
+.sc-radar-jobrow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  width: 100%;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border-subtle);
+  border-left: 2px solid transparent;
+  border-radius: var(--radius-4);
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color var(--fast) var(--ease),
+    border-color var(--fast) var(--ease);
+}
+
+.sc-radar-jobrow:hover {
+  background: var(--overlay-04);
+}
+
+.sc-radar-jobrow.is-active {
+  background: var(--accent-tint);
+  border-left-color: var(--accent);
+}
+
+.sc-radar-jobrowtitle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.sc-radar-jobmeta {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+}
+
+/* 任务状态：排队 / 生成中 / 已完成 / 已入库 / 已废弃 / 失败 */
+.sc-radar-jobstatus {
+  display: inline-flex;
+  align-items: center;
+  height: var(--chip-h);
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-4);
+  background: var(--overlay-06);
+  color: var(--text-secondary);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  font-weight: 600;
+}
+
+.sc-radar-jobstatus.is-queued {
+  color: var(--text-secondary);
+}
+
+.sc-radar-jobstatus.is-running {
+  background: var(--accent-tint);
+  border-color: var(--accent-line-30);
+  color: var(--accent);
+}
+
+.sc-radar-jobstatus.is-succeeded {
+  background: var(--success-tint-10);
+  border-color: var(--success-line-55);
+  color: var(--success);
+}
+
+.sc-radar-jobstatus.is-adopted {
+  background: var(--accent-tint);
+  border-color: var(--accent-line-30);
+  color: var(--accent);
+}
+
+.sc-radar-jobstatus.is-discarded {
+  background: var(--overlay-06);
+  border-color: var(--border-subtle);
+  color: var(--text-tertiary);
+}
+
+.sc-radar-jobstatus.is-failed {
+  background: var(--danger-tint-12);
+  border-color: var(--danger-line-35);
+  color: var(--danger);
+}
+
+.sc-radar-progress {
+  height: var(--sp-2);
+  border-radius: var(--radius-pill);
+  background: var(--bg-inset);
+  overflow: hidden;
+}
+
+.sc-radar-progressfill {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  transition: width var(--slow) var(--ease);
+}
+
+/* 章节草稿与题样 */
+.sc-radar-chapter,
+.sc-radar-questions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.sc-radar-sections,
+.sc-radar-bullets,
+.sc-radar-qlist,
+.sc-radar-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.sc-radar-section {
+  padding-left: var(--sp-3);
+  border-left: 1px solid var(--border-hair);
+}
+
+.sc-radar-sectitle {
+  display: block;
+  margin-bottom: var(--sp-1);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--text-primary);
+}
+
+.sc-radar-bullets li {
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+}
+
+.sc-radar-q {
+  padding: var(--sp-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-8);
+  background: var(--bg-raised);
+}
+
+.sc-radar-qprompt {
+  margin: 0 0 var(--sp-2);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--text-primary);
+}
+
+.sc-radar-qtag {
+  margin-right: var(--sp-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--accent);
+}
+
+.sc-radar-option {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  padding: var(--sp-1) var(--sp-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-4);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-secondary);
+}
+
+.sc-radar-option.is-answer {
+  border-color: var(--success-line-55);
+  background: var(--success-tint-10);
+  color: var(--success);
+}
+
+.sc-radar-okey {
+  font-family: var(--font-mono);
+  font-size: var(--fs-meta);
+  color: var(--text-tertiary);
+}
+
+.sc-radar-option.is-answer .sc-radar-okey {
+  color: var(--success);
+}
+
+.sc-radar-actions {
+  margin-top: var(--sp-2);
+}
+
+@media (min-width: 900px) {
+  .sc-radar-workspace {
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+    align-items: start;
+  }
+}
+
+@media (max-width: 640px) {
+  .sc-radar-manual {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sc-radar-techrow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sc-radar-rowact {
+    justify-content: flex-end;
+  }
+}
+
 
 

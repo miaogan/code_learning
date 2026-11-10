@@ -1,0 +1,157 @@
+"""r67 雷达仓储层（**委托层**）：塑形 + 状态语义，SQL 全部经 `core/repository.py` 唯一出口。
+
+技术清单 / 快照 / 评估是**全局知识**（不按账号切）；生成任务 `radar_jobs` 带 `user_id`，
+读 / 采纳 / 废弃按账号隔离（AC-9）。JSON 列（`chapter_json` / `questions_json` /
+`reasons_json` / `sources_json`）的解码归本层，仓储层只负责读写。
+"""
+
+from __future__ import annotations
+
+import json
+import uuid
+from typing import Any
+
+from app.core import repository
+from app.core.context import get_current_user_id
+
+ACTIVE_STATUSES: tuple[str, ...] = ("queued", "running")
+TERMINAL_STATUSES: tuple[str, ...] = ("succeeded", "adopted", "discarded", "failed")
+
+
+def upsert_tech(item: dict[str, Any]) -> None:
+    """按 `tech_slug` 幂等写入：已存在只刷新 last_seen 与可变字段（首次见到的时间不动）。"""
+    repository.radar_upsert_tech(item)
+
+
+def insert_snapshot(item: dict[str, Any]) -> None:
+    repository.radar_insert_snapshot(item)
+
+
+def previous_stars(slug: str) -> int | None:
+    """最近一条快照的 star 数（第一条快照返回 None，增速按 0 处理）。"""
+    return repository.radar_previous_stars(slug)
+
+
+def insert_assessment(tech_slug: str, run_id: int, result: dict[str, Any], *, input_sha256: str,
+                      profile_digest: str, prompt_version: str, model: str,
+                      rule_based: bool) -> bool:
+    """写一条评估；同 `(tech_slug, input_sha256)` 已存在则跳过（返回 False = 可复算幂等）。"""
+    return repository.radar_insert_assessment(
+        tech_slug,
+        run_id,
+        result,
+        input_sha256=input_sha256,
+        profile_digest=profile_digest,
+        prompt_version=prompt_version,
+        model=model,
+        rule_based=rule_based,
+    )
+
+
+def list_techs(limit: int = 50, *, tech_slug: str = "") -> list[dict[str, Any]]:
+    """技术清单：最新评估 + 最新快照 + 当前在途任务，按评估时间倒序取前 N 条。
+
+    `tech_slug` 非空时只取该条（手工录入后回读用，不让调用方自己拼一份投影）。
+    """
+    return repository.radar_list_techs(limit, tech_slug=tech_slug)
+
+
+def cross_source_count() -> dict[str, int]:
+    """跨源出现次数：同名技术被几个源提到（评估信号之一，无记录记 0）。"""
+    return repository.radar_cross_source_count()
+
+
+def create_run(trigger: str) -> int:
+    return repository.radar_create_run(trigger)
+
+
+def finish_run(run_id: int, sources: list[dict[str, Any]], degraded: bool, techs_seen: int) -> None:
+    repository.radar_finish_run(run_id, sources, degraded, techs_seen)
+
+
+def latest_run() -> dict[str, Any]:
+    return repository.radar_latest_run()
+
+
+def create_job(tech_slug: str, *, trigger: str = "manual", parent_job_id: str = "") -> tuple[str, bool]:
+    """建生成任务：命中 active 部分唯一索引时返回**已存在**的 job_id（AC-3 不重复烧 token）。
+
+    该技术正被**其他账号**生成时抛 `ValueError('occupied')`，由路由转成 409 中文提示
+    （任务行带 user_id，读路径按账号隔离，不能把别人的 job_id 交给当前用户）。
+    """
+    job_id = f"rj-{uuid.uuid4().hex[:12]}"
+    if repository.radar_insert_job(
+        job_id, tech_slug, trigger=trigger, parent_job_id=parent_job_id
+    ):
+        return job_id, False
+    active = repository.radar_active_job(tech_slug)
+    if active is None or active["user_id"] != get_current_user_id():
+        raise ValueError("occupied")
+    return active["job_id"], True
+
+
+def get_job(job_id: str) -> dict[str, Any] | None:
+    row = repository.radar_get_job_row(job_id)
+    return None if row is None else _job_row(row)
+
+
+def list_jobs(limit: int = 20) -> list[dict[str, Any]]:
+    return [_job_row(row) for row in repository.radar_job_rows(limit)]
+
+
+_JOB_FIELDS = frozenset(
+    {"status", "stage", "progress", "chapter_json", "questions_json",
+     "discarded_count", "error_message"}
+)
+
+
+def update_job(job_id: str, **fields: Any) -> None:
+    """按字段名白名单更新任务行（`chapter_json` / `questions_json` 由调用方先序列化）。"""
+    payload = {key: value for key, value in fields.items() if key in _JOB_FIELDS}
+    repository.radar_update_job(job_id, payload)
+
+
+def sweep_stale_jobs(minutes: int) -> None:
+    """读路径惰性清扫（AC-4）：running 超过阈值按 failed 落库，避免僵尸行永远「生成中」。"""
+    repository.radar_sweep_stale_jobs(minutes)
+
+
+def tech_name(tech_slug: str) -> str:
+    return repository.radar_tech_name(tech_slug)
+
+
+def tech_card(tech_slug: str) -> dict[str, Any] | None:
+    """生成用的技术卡片：名称 / 方向 / 简介 / 链接 + 最新评估结论（不存在返回 None）。"""
+    return repository.radar_tech_card(tech_slug)
+
+
+def _json_list(text: str | None) -> list[Any]:
+    try:
+        payload = json.loads(text or "[]")
+    except ValueError:
+        return []
+    return payload if isinstance(payload, list) else []
+
+
+def _job_row(row: Any) -> dict[str, Any]:
+    chapter = None
+    if row["chapter_json"]:
+        try:
+            chapter = json.loads(row["chapter_json"])
+        except ValueError:
+            chapter = None
+    return {
+        "job_id": row["job_id"],
+        "tech_slug": row["tech_slug"],
+        "tech_name": tech_name(row["tech_slug"]),
+        "status": row["status"],
+        "stage": row["stage"],
+        "progress": int(row["progress"]),
+        "chapter": chapter,
+        "questions": _json_list(row["questions_json"]),
+        "discarded_count": int(row["discarded_count"]),
+        "error_message": row["error_message"],
+        "trigger": row["trigger"],
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+    }
