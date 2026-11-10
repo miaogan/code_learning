@@ -14,6 +14,7 @@ import PolishPage from './pages/PolishPage'
 import PracticePage from './pages/PracticePage'
 import ProfilePage from './pages/ProfilePage'
 import ReportPage from './pages/ReportPage'
+import SearchPage from './pages/SearchPage'
 import SettingsPage from './pages/SettingsPage'
 import TutorialPage from './pages/TutorialPage'
 import UploadPage from './pages/UploadPage'
@@ -35,6 +36,7 @@ const STEP_BASE = [
 
 /** 侧栏「工具」组：日常使用的非线性出口，不混进步骤（DESIGN §1.1）。 */
 const TOOL_ITEMS = [
+  { key: 'search', label: '搜索', to: '/search' },
   { key: 'learn', label: '学习', to: '/learn' },
   { key: 'practice', label: '练习', to: '/practice' },
   { key: 'history', label: '成绩趋势', to: '/history' },
@@ -149,6 +151,7 @@ export default function App() {
               <Route path="/versions" element={<VersionsPage />} />
               <Route path="/archive" element={<ArchivePage />} />
               <Route path="/practice" element={<PracticePage />} />
+              <Route path="/search" element={<SearchPage />} />
               <Route path="/learn" element={<LearnPage />} />
               <Route path="/learn/:chapterId" element={<TutorialPage />} />
               <Route path="/settings" element={<SettingsPage />} />

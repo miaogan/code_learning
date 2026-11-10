@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import type { RunSummary } from '../api/types'
-import { TREND_META, buildSeries, chartGeometry, scoreText } from '../lib/trendChart'
+import {
+  TREND_META,
+  TREND_TARGET,
+  buildSeries,
+  chartGeometry,
+  scoreText,
+  targetStatus,
+} from '../lib/trendChart'
 
 /** 服务端口径：时间倒序（最新的在前）。 */
 function run(
@@ -99,5 +106,48 @@ describe('scoreText 数值口径', () => {
     expect(scoreText(8)).toBe('8')
     expect(scoreText(6.25)).toBe('6.3')
     expect(scoreText(70)).toBe('70')
+  })
+})
+
+describe('targetStatus 目标线', () => {
+  it('目标线是产品刻度：面试 7/10、笔试 75/100', () => {
+    expect(TREND_TARGET.interview).toBe(7)
+    expect(TREND_TARGET.exam).toBe(75)
+  })
+
+  it('超出目标时给正向差值', () => {
+    const series = buildSeries([run('a', 'interview', 8.5, '2026-11-08T10:00:00Z')], 'interview')
+    const status = targetStatus(series)
+    expect(status.target).toBe(7)
+    expect(status.gap).toBe(1.5)
+    expect(status.text).toBe('最新超出目标 1.5/10')
+  })
+
+  it('正好达标与还差都按分数量纲说话', () => {
+    const equal = buildSeries([run('a', 'exam', 75, '2026-11-08T10:00:00Z')], 'exam')
+    expect(targetStatus(equal).text).toBe('最新正好达到目标 75/100')
+    expect(targetStatus(equal).gap).toBe(0)
+
+    const below = buildSeries([run('b', 'exam', 50, '2026-11-08T10:00:00Z')], 'exam')
+    expect(targetStatus(below).text).toBe('最新距目标还差 25/100')
+    expect(targetStatus(below).gap).toBe(-25)
+  })
+
+  it('没有计分记录时差值为 null，不把「没成绩」当 0 分差', () => {
+    const empty = buildSeries([], 'interview')
+    const status = targetStatus(empty)
+    expect(status.gap).toBeNull()
+    expect(status.text).toBe('目标 7/10：暂无计分记录，先完成一次测评')
+  })
+})
+
+describe('chartGeometry 目标线投影', () => {
+  it('目标线与数据点用同一套归一：笔试 75 落在 0–100 的 3/4 高度', () => {
+    const series = buildSeries([run('a', 'exam', 75, '2026-11-08T10:00:00Z')], 'exam')
+    const geometry = chartGeometry(series, 480, 180)
+    expect(geometry.target).toBe(75)
+    // 画布 180、上下边距 22 → 内高 136，底边 158；75/100 归一后 158 − 0.75 × 136 = 56
+    expect(geometry.targetY).toBeCloseTo(56)
+    expect(geometry.dots[0].y).toBeCloseTo(geometry.targetY)
   })
 })

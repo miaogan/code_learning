@@ -7610,6 +7610,19 @@ html {
   fill: var(--accent);
 }
 
+/* r64 目标线：产品设定的比对刻度（`lib/trendChart` 的 TREND_TARGET），
+   虚线 + 警示色，与实线的真实数据一眼可分；读数写在图注里，不占画布。 */
+.sc-chart-target {
+  stroke: var(--warn-line-55);
+  stroke-dasharray: 4 4;
+}
+
+.sc-chart-target-label {
+  fill: var(--warn);
+  font-family: var(--font-mono);
+  font-size: var(--fs-nano);
+}
+
 .sc-chart-note {
   margin: 0;
   color: var(--text-tertiary);
@@ -8052,5 +8065,177 @@ html {
   line-height: var(--lh-kicker);
   letter-spacing: var(--ls-kicker);
   color: var(--accent);
+}
+
+/* ============================================================
+   r64 · 全站检索（教程小节 BM25 + 题库 FTS5 合一）
+   两组检索能力早已存在，只是没有入口。本段只补展示层：
+   输入条、两组命中的分组头与命中行、窄屏收窄。
+   命中行用 grid 三列（正文 / 标签 / 箭头），窄屏隐藏标签列，
+   正文列 minmax(0,1fr) 保证长题面与摘要能换行而不撑破布局。
+   ============================================================ */
+.sc-search-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-4) var(--sp-5);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-8);
+  box-shadow: var(--elev-1);
+}
+
+.sc-search-input {
+  flex: 1 1 280px;
+  min-width: 0;
+}
+
+.sc-search-barmeta {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+}
+
+.sc-search-results {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+}
+
+.sc-search-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.sc-search-grouphead {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-3);
+  padding-bottom: var(--sp-2);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.sc-search-grouptag {
+  font-family: var(--font-mono);
+  font-size: var(--fs-nano);
+  line-height: var(--lh-meta);
+  letter-spacing: var(--ls-kicker);
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+}
+
+.sc-search-grouptitle {
+  margin: 0;
+  font-size: var(--fs-card);
+  line-height: var(--lh-card);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.sc-search-groupcount {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-tertiary);
+}
+
+.sc-search-hits {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.sc-search-hit {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto var(--sp-4);
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--bg-surface);
+  border: 1px solid transparent;
+  border-radius: var(--radius-4);
+  transition:
+    background-color var(--fast) var(--ease),
+    border-color var(--fast) var(--ease);
+}
+
+.sc-search-hit:hover {
+  background: var(--overlay-04);
+  border-color: var(--border-subtle);
+}
+
+.sc-search-hit-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  min-width: 0;
+}
+
+.sc-search-hit-title {
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.sc-search-hit-snippet {
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--text-tertiary);
+  overflow-wrap: anywhere;
+}
+
+.sc-search-hit-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex: none;
+}
+
+.sc-search-go {
+  font-family: var(--font-mono);
+  color: var(--text-tertiary);
+  transition: color var(--fast) var(--ease);
+}
+
+.sc-search-hit:hover .sc-search-go {
+  color: var(--accent);
+}
+
+.sc-search-hint {
+  margin: 0;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+}
+
+.sc-search-foot {
+  margin: 0;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+}
+
+@media (max-width: 640px) {
+  /* 窄屏标签列隐藏：命中行的首要信息是「标题 + 摘要」，方向与难度可在点开后再看。 */
+  .sc-search-hit {
+    grid-template-columns: minmax(0, 1fr) var(--sp-4);
+  }
+
+  .sc-search-hit-meta {
+    display: none;
+  }
+
+  /* 输入条换行后计数独占一行右对齐，不再与输入框抢宽度。 */
+  .sc-search-barmeta {
+    width: 100%;
+    text-align: right;
+  }
 }
 

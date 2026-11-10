@@ -1,5 +1,12 @@
 import type { RunSummary } from '../../api/types'
-import { TREND_META, buildSeries, chartGeometry, scoreText } from '../../lib/trendChart'
+import {
+  TREND_META,
+  TREND_TARGET,
+  buildSeries,
+  chartGeometry,
+  scoreText,
+  targetStatus,
+} from '../../lib/trendChart'
 import type { TrendSeries } from '../../lib/trendChart'
 import { Card } from '../ui/Card'
 
@@ -16,12 +23,14 @@ function deltaText(series: TrendSeries): string {
 
 function SeriesChart({ series }: { series: TrendSeries }) {
   const geometry = chartGeometry(series, CHART_WIDTH, CHART_HEIGHT)
-  const { dots, path, yTicks, padX, width, height } = geometry
+  const { dots, path, yTicks, padX, width, height, target, targetY } = geometry
   const first = dots[0]
   const last = dots[dots.length - 1]
   const latestText = series.latest === null ? '—' : `${scoreText(series.latest)} ${series.unit}`
+  const targetText = `${scoreText(target)}${series.unit}`
+  const status = targetStatus(series)
 
-  const ariaLabel = `${series.title}：共 ${dots.length} 次，最高 ${series.max}${series.unit}；最新 ${latestText}`
+  const ariaLabel = `${series.title}：共 ${dots.length} 次，最高 ${series.max}${series.unit}；最新 ${latestText}；目标线 ${targetText}`
 
   return (
     <figure className="sc-chart">
@@ -52,6 +61,18 @@ function SeriesChart({ series }: { series: TrendSeries }) {
           </g>
         ))}
 
+        <line
+          className="sc-chart-target"
+          x1={padX}
+          y1={targetY}
+          x2={width - padX}
+          y2={targetY}
+          strokeWidth={1}
+        />
+        <text className="sc-chart-target-label" x={width - padX} y={targetY - 5} textAnchor="end">
+          {`目标 ${targetText}`}
+        </text>
+
         {path === '' ? null : <path className="sc-chart-line" d={path} strokeWidth={2} />}
 
         {dots.map((dot) => (
@@ -71,7 +92,7 @@ function SeriesChart({ series }: { series: TrendSeries }) {
       </svg>
 
       <p className="sc-chart-note">
-        {`${deltaText(series)} · 共 ${dots.length} 次（按时间从旧到新）`}
+        {`${deltaText(series)} · 共 ${dots.length} 次（按时间从旧到新） · ${status.text}`}
       </p>
     </figure>
   )
@@ -100,7 +121,10 @@ export function TrendChart({ rows }: TrendChartProps) {
         <p className="sc-coach-meta">
           按时间从旧到新；面试 {TREND_META.interview.max}
           {TREND_META.interview.unit} 与笔试 {TREND_META.exam.max}
-          {TREND_META.exam.unit} 量纲不同，分开画、不共轴。未计分的记录不落点。
+          {TREND_META.exam.unit} 量纲不同，分开画、不共轴。未计分的记录不落点。虚线是产品设定的目标线（面试{' '}
+          {TREND_TARGET.interview}
+          {TREND_META.interview.unit}、笔试 {TREND_TARGET.exam}
+          {TREND_META.exam.unit}），只作自我比对，不代表市场统计或招聘分数线。
         </p>
       </div>
 

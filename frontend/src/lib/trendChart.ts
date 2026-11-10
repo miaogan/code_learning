@@ -11,6 +11,41 @@ export const TREND_META: Record<RunKind, { title: string; max: number; unit: str
   exam: { title: '模拟笔试 · 总分', max: 100, unit: '/100' },
 }
 
+/**
+ * 目标线（r64）：**产品设定的比对刻度**，不是市场统计、也不是招聘分数线。
+ * 面试满分 10 取 7、笔试满分 100 取 75，都相当于 70% 分；
+ * 将来若有真实口径，只改这一个常量，两张图的线、图注与文案会一起变。
+ */
+export const TREND_TARGET: Record<RunKind, number> = { interview: 7, exam: 75 }
+
+/** 目标线状态：给图注用的一句中文 + 可读的差值，页面不自己算。 */
+export interface TargetStatus {
+  target: number
+  /** 最新 − 目标，保留 1 位；没有计分记录时为 null（不把「没成绩」当 0 分差）。 */
+  gap: number | null
+  text: string
+}
+
+/** 最新一次相对目标线的位置：超出 / 正好 / 还差 / 暂无记录，四种出口都有中文说明。 */
+export function targetStatus(series: TrendSeries): TargetStatus {
+  const target = TREND_TARGET[series.kind]
+  if (series.latest === null) {
+    return {
+      target,
+      gap: null,
+      text: `目标 ${scoreText(target)}${series.unit}：暂无计分记录，先完成一次测评`,
+    }
+  }
+  const gap = round1(series.latest - target)
+  if (gap === 0) {
+    return { target, gap, text: `最新正好达到目标 ${scoreText(target)}${series.unit}` }
+  }
+  if (gap > 0) {
+    return { target, gap, text: `最新超出目标 ${scoreText(gap)}${series.unit}` }
+  }
+  return { target, gap, text: `最新距目标还差 ${scoreText(Math.abs(gap))}${series.unit}` }
+}
+
 export interface TrendPoint {
   id: string
   score: number
@@ -99,6 +134,10 @@ export interface ChartGeometry {
   path: string
   /** 纵轴刻度：上限 / 中值 / 0（从下到上不必排序，组件按 `label` 渲染）。 */
   yTicks: ChartTick[]
+  /** 目标线的分数值（见 `TREND_TARGET`）。 */
+  target: number
+  /** 目标线的画布纵坐标，口径与 `dots` 完全一致。 */
+  targetY: number
 }
 
 /**
@@ -144,5 +183,8 @@ export function chartGeometry(
   const tickValues = [series.max, series.max / 2, 0]
   const yTicks = tickValues.map((value) => ({ value, y: yOf(value), label: scoreText(value) }))
 
-  return { width, height, padX, padY, dots, path, yTicks }
+  const target = TREND_TARGET[series.kind]
+  const targetY = yOf(target)
+
+  return { width, height, padX, padY, dots, path, yTicks, target, targetY }
 }
