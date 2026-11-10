@@ -31,14 +31,18 @@ const STEP_BASE = [
   { key: 'report', label: '诊断报告', to: '/report' },
 ] as const
 
-/** 侧栏「工具」组：非线性的能力出口，不混进步骤（DESIGN §1.1）。 */
+/** 侧栏「工具」组：日常使用的非线性出口，不混进步骤（DESIGN §1.1）。 */
 const TOOL_ITEMS = [
   { key: 'learn', label: '学习', to: '/learn' },
   { key: 'practice', label: '练习', to: '/practice' },
   { key: 'history', label: '成绩趋势', to: '/history' },
-  { key: 'eval', label: '模型质量', to: '/eval' },
   { key: 'polish', label: '简历润色', to: '/polish' },
-  { key: 'settings', label: '设置', to: '/settings' },
+]
+
+/** 侧栏「设置」组：只读看板（模型质量）与账号 / AI 配置，从工具组里分出来。 */
+const SETTINGS_ITEMS = [
+  { key: 'eval', label: '模型质量', to: '/eval' },
+  { key: 'settings', label: '配置', to: '/settings' },
 ]
 
 /** 全局壳：顶栏 56 + 侧栏 240（<1024 收为顶部横向步骤条），主区 max 1080。 */
@@ -102,7 +106,7 @@ export default function App() {
         </Link>
         <div className="sc-topbar-right">
           <span className="sc-storage">数据按账号隔离保存</span>
-          <Link className="sc-topbar-link" to="/settings" title="账号与 AI 设置">
+          <Link className="sc-topbar-link" to="/settings" title="配置：账号与 AI 服务">
             {me.display_name}
           </Link>
           <Button variant="ghost" size="sm" onClick={() => void logout()}>
@@ -115,6 +119,7 @@ export default function App() {
         <aside className="sc-sidebar">
           <Stepper steps={steps} orientation="vertical" />
           <ToolNav items={TOOL_ITEMS} />
+          <ToolNav items={SETTINGS_ITEMS} label="设置" />
         </aside>
         <main className="sc-main">
           <div className="sc-topstepper">
@@ -124,6 +129,7 @@ export default function App() {
                 TOOL_ITEMS 渲染横向工具条（组件早已支持 orientation="horizontal"）；
                 桌面由 `@media (min-width:1024px) { .sc-topstepper: display:none }` 隐藏本容器。 */}
             <ToolNav items={TOOL_ITEMS} orientation="horizontal" />
+            <ToolNav items={SETTINGS_ITEMS} label="设置" orientation="horizontal" />
           </div>
           <div className="sc-page">
             <AiKeyModal />

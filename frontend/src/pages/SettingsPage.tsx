@@ -126,9 +126,9 @@ export default function SettingsPage() {
   return (
     <section>
       <header className="sc-page-header">
-        <h1 className="sc-page-title">账号与 AI 设置</h1>
+        <h1 className="sc-page-title">配置</h1>
         <p className="sc-page-sub">
-          {me.display_name} · {me.email}
+          {me.display_name} · {me.email} · 账号与 AI 服务
         </p>
       </header>
 
