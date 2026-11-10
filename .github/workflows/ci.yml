@@ -27,6 +27,10 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - name: Install
         run: npm ci
+      # 只扫生产依赖：devDependencies（vite / vitest / eslint）不进构建产物，
+      # 且其漏洞不随镜像分发。阈值取 high，moderate 由 Dependabot 跟进。
+      - name: Dependency audit
+        run: npm audit --omit=dev --audit-level=high
       - name: Typecheck
         run: npm run typecheck
       - name: Lint
@@ -52,6 +56,12 @@ jobs:
           cache-dependency-path: backend/requirements.txt
       - name: Install
         run: pip install -r requirements.txt
+      # requirements.txt 用 >= 不钉版本，漏洞会随上游新版本漂移；
+      # 门禁只在「已发布的已知漏洞」上红，不查传递依赖的许可问题。
+      - name: Dependency audit
+        run: |
+          pip install --disable-pip-version-check pip-audit
+          pip-audit -r requirements.txt --progress-spinner off
       - name: Lint
         run: python -m ruff check app tests
       - name: Question bank byte gate

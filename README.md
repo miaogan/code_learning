@@ -85,10 +85,12 @@ docker compose ps        # backend 的 STATUS 应带 (healthy)
 | `backend/` | `python -m pytest -q` | 全部通过（AI 全链路注入 `FakeAI`，**零网络**） |
 | `backend/` | `python -m ruff check app tests` | All checks passed |
 | `frontend/` | `npm run typecheck && npm run lint && npm test && npm run build` | 无错误，生成 `frontend/dist/` |
+| `backend/` | `pip-audit -r requirements.txt` | `No known vulnerabilities found` |
+| `frontend/` | `npm audit --omit=dev --audit-level=high` | 无 high / critical（当前 2 条 moderate 属 `react-router`，见下方 CI 说明） |
 | 根 | `curl -sS http://127.0.0.1:8000/health` | `{"status":"ok",...}` |
 | 根 | `grep -riE "sk-\|api_key\|AI_API_KEY" frontend/src frontend/dist \|\| echo NO_KEY_LEAK` | `NO_KEY_LEAK`（AC-8） |
 
-CI 双 job 已在 [GitHub Actions](https://github.com/miaogan/code_learning/actions) 实跑 33 次；最近 `#33` / `1c33046` 成功（1m21s），#27–#33 连续通过。`Question bank byte gate` 已随 #32 跑绿，本轮新增的 4 个评测门禁（`Offline eval` / `Retrieval eval` / `Question retrieval eval` / `Reliability fault-injection`）已随 #33 在远端全部跑绿。
+CI 双 job 已在 [GitHub Actions](https://github.com/miaogan/code_learning/actions) 实跑（#27 起连续通过）。工作流覆盖类型检查 / lint / 测试 / 构建、题库字节门禁、5 个离线评测门禁，以及前后端依赖漏洞审计（`pip-audit` 对 `requirements.txt`，`npm audit --omit=dev` 只扫进构建产物的生产依赖，阈值 high）。依赖版本漂移由 [Dependabot](./.github/dependabot.yml) 每周提 PR（pip / npm / github-actions 三路）。已知未修的 2 条 moderate 属 `react-router` 6.x（`GHSA-wrjc-x8rr-h8h6` 开放重定向），修复要求升到 7.x（破坏性路由 API 变更），故留在升级批次里单独验证。
 
 评测与检索证据（零网络、可复跑）：
 
@@ -159,3 +161,11 @@ docs/teamflow/   架构总览、产品记忆、每需求一个任务夹
 ## 验收速览
 
 闭环是否成立，按 PRD 的 AC-1 ~ AC-10 逐条走：上传 → 画像 → 面试/笔试 → 报告 → 课程。每条 AC 的验收证据、端点判分口径与错误码见任务夹 [TECHNICAL §2](./docs/teamflow/20261031-r1-dev-skill-coach/TECHNICAL.md) 与 `ACCEPTANCE.md`；后端测试全部注入 `FakeAI`，不依赖真实模型与外网即可复跑。
+
+## 许可证
+
+本项目代码与文档以 **MIT** 发布，全文见 [LICENSE](./LICENSE)。
+
+- **第三方题库素材**：`backend/app/seed/questions.json` 中 `source = "fe-interview"` 的 20 道题改写自 [haizlin/fe-interview](https://github.com/haizlin/fe-interview)（MIT），上游链接、改写说明与许可全文见 [NOTICE-fe-interview.md](./docs/question-bank-staging/NOTICE-fe-interview.md)；其余素材为自建，来源留痕见 [PROVENANCE.md](./docs/question-bank-staging/PROVENANCE.md)。
+- **依赖许可**：后端依赖闭包内仅 `certifi` 为 MPL-2.0（文件级弱 copyleft，未修改其源码即不产生源码开放义务），其余为 MIT / BSD / Apache-2.0 / PSF；前端生产依赖闭包全部 MIT。**没有** GPL / AGPL / SSPL / EUPL 依赖，也无 vendored 第三方源码、字体或图标打包。
+- **镜像与系统包**：容器基础镜像（`python:3.11-slim` / `nginx:alpine`）自带系统包按各自许可证随镜像分发，本项目未修改这些包。

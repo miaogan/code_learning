@@ -36,6 +36,8 @@ backend/.test-scaffold.db
 *.sqlite3-shm
 # 后端 pytest 临时目录（backend/tests/conftest.py 的 SCRATCH_DIR，运行后自建）
 backend/tests/.tmp/
+# pytest 在仓库根的临时目录（tmp_path 工厂，形如 pytest-of-user/）
+pytest-of-*/
 
 # 密钥（示例文件保留）
 .env

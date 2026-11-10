@@ -84,6 +84,8 @@
 
 - 2026-11-10：品牌与路线升级（r56）：产品更名「逃跑计划 / Escape Plan」，定位为外包工程师的 AI 应用 / Agent 后端跃迁工作台；顶栏、登录页、首页与 API 统一新叙事，README 明确「盘点证据 → 能力验证 → 项目补强」路线。保留历史任务夹、路由、存储键、数据库与 Docker 兼容标识，不新增跃迁看板或虚构生产经验（产物见 `docs/teamflow/20261110-r56-escape-plan-rebrand/`）。
 
+- 2026-11-10：开源前置补齐（CI / 许可证 / 仓库信息）：①新增根 `LICENSE`（MIT，`Copyright (c) 2026 miaogan`），README 补「许可证」小节（代码 MIT + fe-interview MIT 素材 NOTICE + 依赖许可结论 + 基础镜像系统包说明）；②`.github/workflows/ci.yml` 双 job 各加一步依赖审计 —— 后端 `pip-audit -r requirements.txt`（实测 No known vulnerabilities）、前端 `npm audit --omit=dev --audit-level=high`（只扫进构建产物的生产依赖，当前 2 条 moderate 属 `react-router` 6.x，修复需升 7.x，留待单独升级验证）；③新增 `.github/dependabot.yml`（pip `/backend`、npm `/frontend`、github-actions `/`，每周）；④`.gitignore` 补 `pytest-of-*/`（仓库根 pytest 临时目录）；⑤README 自检表补两条审计命令，并把易过期的「CI 实跑 33 次 / #33」改成不含次数的表述。**未完成**：仓库元数据（description / topics / LICENSE 识别 / 默认分支）需 GitHub 端权限，当前 `GH_TOKEN`（`ghu_` 用户令牌）调 `gh repo edit` 与 `PATCH /repos` 均返回 403 `Resource not accessible by integration`，须账号本人用 UI 或带 `repo` 权限的 PAT 操作。
+
 <!-- teamflow:begin -->
 ## TeamFlow 托管区（本块由 TeamFlow 自动维护，团队请勿手改）
 

@@ -1,0 +1,34 @@
+version: 2
+updates:
+  # 后端运行时 + 测试依赖（requirements.txt 未钉版本，靠这条每周收安全更新）
+  - package-ecosystem: pip
+    directory: /backend
+    schedule:
+      interval: weekly
+      time: '03:00'
+      timezone: Asia/Shanghai
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: deps(pip)
+
+  # 前端依赖（React / Vite / vitest 等）
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+      time: '03:00'
+      timezone: Asia/Shanghai
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: deps(npm)
+
+  # CI 里的 actions/checkout、setup-node、setup-python 等
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      time: '03:00'
+      timezone: Asia/Shanghai
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: deps(actions)
