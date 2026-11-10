@@ -1,112 +1,347 @@
 import { describe, expect, it } from 'vitest'
-import type { Profile } from '../api/types'
+import type { Report, RoleFit, RunSummary, WeaknessItem } from '../api/types'
 import {
-  RADAR_REFERENCE,
-  radarAxes,
-  radarCoverage,
+  CAPABILITY_BASELINE,
+  CAPABILITY_TITLE,
+  capabilityAxes,
+  capabilityCoverage,
   radarPath,
   radarPoints,
+  radarPolygon,
 } from '../lib/profileRadar'
+import { DIRECTIONS } from '../lib/questionDirections'
 
-/** 最小画像：只关心雷达读的 5 个维度，其余字段留空值。 */
-function makeProfile(overrides: Partial<Profile> = {}): Profile {
+function weak(overrides: Partial<WeaknessItem>): WeaknessItem {
   return {
-    id: 'p1',
-    resume_id: 'r1',
-    updated_at: '2026-11-10T00:00:00Z',
-    skills: [],
-    tech_stack: [],
-    years_experience: null,
-    projects: [],
-    target_role: null,
+    key: 'k',
+    point: 'p',
+    direction: 'AI 工程',
+    wrong: 0,
+    total: 0,
+    rate: 0,
+    avg: 0,
+    difficulty: [],
+    essentiality: [],
+    samples: [],
+    summary: '',
     ...overrides,
   }
 }
 
-function skill(name: string, status?: 'active' | 'historical') {
-  return { name, source_quote: `${name} 证据`, status }
+function reportWith(items: WeaknessItem[] | null): Report {
+  return {
+    id: 'r1',
+    run_ids: [],
+    interview_avg: null,
+    exam_total: null,
+    shortfalls: [],
+    generated_at: '2026-11-10T00:00:00Z',
+    interview_settings: null,
+    weakness_map: items,
+    resume_pointers: null,
+    resume_pointers_notice: null,
+    role_fit: null,
+  }
 }
 
-describe('radarAxes 填充度口径', () => {
-  it('空画像：5 维全 0，年限与岗位显示未填写', () => {
-    const axes = radarAxes(makeProfile())
-    expect(axes).toHaveLength(5)
-    expect(axes.every((axis) => axis.ratio === 0)).toBe(true)
-    expect(radarCoverage(axes)).toBe(0)
-    expect(axes[2].reading).toBe('未填写')
-    expect(axes[4].reading).toBe('未填写')
-    expect(axes[0].reading).toBe('0 个技能')
+function run(kind: RunSummary['kind'], score: number | null, id = 'x'): RunSummary {
+  return {
+    id,
+    kind,
+    score,
+    shortfall_count: null,
+    created_at: '2026-11-10T00:00:00Z',
+    interview_settings: null,
+  }
+}
+
+function axisOf(input: Parameters<typeof capabilityAxes>[0], key: string) {
+  return capabilityAxes(input).find((axis) => axis.key === key)
+}
+
+function roleFit(overrides: Partial<RoleFit>): RoleFit {
+  return {
+    target_role: 'AI 应用工程师',
+    role_source: 'profile',
+    role_source_label: '简历画像',
+    model: null,
+    items: [],
+    missing_must: [],
+    first_fix: [],
+    conclusion: null,
+    notice: null,
+    ...overrides,
+  }
+}
+
+describe('capabilityAxes 轴定义', () => {
+  it('七条轴顺序与标题固定为技术力 / 深度 / 广度 / 基础扎实度 / 稳定度 / 学习力 / 岗位匹配', () => {
+    const axes = capabilityAxes({ report: null, runs: [] })
+    expect(axes.map((axis) => axis.key)).toEqual([
+      'technique',
+      'depth',
+      'breadth',
+      'fundamentals',
+      'stability',
+      'learning',
+      'readiness',
+    ])
+    expect(axes.map((axis) => axis.title)).toEqual([
+      '技术力',
+      '深度',
+      '广度',
+      '基础扎实度',
+      '稳定度',
+      '学习力',
+      '岗位匹配',
+    ])
+    expect(CAPABILITY_TITLE.readiness).toBe('岗位匹配')
   })
 
-  it('历史条目不计入（与主卡片、confirmedDimensions 同一口径）', () => {
-    const axes = radarAxes(
-      makeProfile({ skills: [skill('Python'), skill('旧技能', 'historical')] }),
-    )
-    expect(axes[0].reading).toBe('1 个技能')
-    expect(axes[0].ratio).toBeCloseTo(1 / RADAR_REFERENCE.skills)
-  })
-
-  it('超过参考上限按满轴夹取，但读数仍是真实计数', () => {
-    const many = Array.from({ length: 12 }, (_unused, index) => skill(`S${index}`))
-    const axes = radarAxes(makeProfile({ skills: many }))
-    expect(axes[0].ratio).toBe(1)
-    expect(axes[0].reading).toBe('12 个技能')
-  })
-
-  it('年限按 5 年满轴；0 年是已填写但比例为 0', () => {
-    const five = radarAxes(makeProfile({ years_experience: 5 }))[2]
-    expect(five.ratio).toBe(1)
-    expect(five.filled).toBe(true)
-
-    const two = radarAxes(makeProfile({ years_experience: 2 }))[2]
-    expect(two.ratio).toBeCloseTo(0.4)
-    expect(two.reading).toBe('2 年')
-
-    const fresh = radarAxes(makeProfile({ years_experience: 0 }))[2]
-    expect(fresh.ratio).toBe(0)
-    expect(fresh.filled).toBe(true)
-    expect(fresh.reading).toBe('0 年')
-  })
-
-  it('目标岗位只认非空白字符串', () => {
-    expect(radarAxes(makeProfile({ target_role: '   ' }))[4].filled).toBe(false)
-    const filled = radarAxes(makeProfile({ target_role: 'AI 应用工程师' }))[4]
-    expect(filled.ratio).toBe(1)
-    expect(filled.reading).toBe('AI 应用工程师')
-  })
-
-  it('项目按 3 段满轴，覆盖数统计已填写维度', () => {
-    const axes = radarAxes(
-      makeProfile({
-        projects: [
-          { name: 'A', role: null, period: null, bullets: [], source_quote: 'A 证据' },
-        ],
-        target_role: 'Agent 后端',
-      }),
-    )
-    expect(axes[3].ratio).toBeCloseTo(1 / RADAR_REFERENCE.projects)
-    expect(radarCoverage(axes)).toBe(2)
+  it('没有任何测评数据：七条轴都是 0 且不算已填，不伪造读数', () => {
+    const axes = capabilityAxes({ report: null, runs: [] })
+    expect(axes).toHaveLength(7)
+    expect(axes.every((axis) => axis.ratio === 0 && !axis.filled)).toBe(true)
+    expect(axes.every((axis) => axis.reading === '暂无测评数据')).toBe(true)
+    expect(capabilityCoverage(axes)).toBe(0)
   })
 })
 
-describe('radarPoints / radarPath 投影', () => {
-  it('第一条轴在正上方，按半径投影', () => {
-    const points = radarPoints([1, 1, 1, 1, 1], 100, 100, 40)
+describe('技术力：最近一次有分的测评', () => {
+  it('面试按 /10 归一，未计分记录跳过（不补 0）', () => {
+    const axis = axisOf(
+      { report: null, runs: [run('exam', null), run('interview', 6.5)] },
+      'technique',
+    )
+    expect(axis?.ratio).toBeCloseTo(0.65)
+    expect(axis?.reading).toBe('最近一次面试 6.5/10')
+    expect(axis?.filled).toBe(true)
+  })
+
+  it('笔试按 /100 归一，整数不带小数', () => {
+    const axis = axisOf({ report: null, runs: [run('exam', 72)] }, 'technique')
+    expect(axis?.ratio).toBeCloseTo(0.72)
+    expect(axis?.reading).toBe('最近一次笔试 72/100')
+  })
+
+  it('服务端已倒序：只取第一条有分记录，不自行重排', () => {
+    const axis = axisOf(
+      { report: null, runs: [run('exam', 80), run('exam', 40)] },
+      'technique',
+    )
+    expect(axis?.ratio).toBeCloseTo(0.8)
+  })
+})
+
+describe('学习力：同类测评相邻对比', () => {
+  it('面试与笔试不互相比较，分别统计提升或持平的比例', () => {
+    // 旧 → 新：面试 5 → 6（提升），6 → 6（持平）；笔试 60 → 50（下降）⇒ 2/3
+    const axis = axisOf(
+      {
+        report: null,
+        runs: [
+          run('exam', 50),
+          run('interview', 6),
+          run('exam', 60),
+          run('interview', 6),
+          run('interview', 5),
+        ],
+      },
+      'learning',
+    )
+    expect(axis?.ratio).toBeCloseTo(2 / 3)
+    expect(axis?.reading).toBe('近 3 次同类对比 · 2 次提升或持平')
+  })
+
+  it('只有一条记录：无可比对，按无数据（不是 0 分）', () => {
+    const axis = axisOf({ report: null, runs: [run('exam', 90)] }, 'learning')
+    expect(axis?.filled).toBe(false)
+    expect(axis?.reading).toBe('暂无测评数据')
+  })
+
+  it('每次都下降：ratio 为 0 但仍是「有证据」', () => {
+    const axis = axisOf(
+      { report: null, runs: [run('exam', 30), run('exam', 40)] },
+      'learning',
+    )
+    expect(axis?.ratio).toBe(0)
+    expect(axis?.filled).toBe(true)
+  })
+})
+
+describe('深度：挑战难度分组的得分率', () => {
+  it('只聚合 difficulty 含 challenge 的组，每组只计一次', () => {
+    const axis = axisOf(
+      {
+        report: reportWith([
+          weak({ difficulty: ['challenge'], total: 10, wrong: 4 }),
+          weak({ difficulty: ['intermediate', 'challenge'], total: 10, wrong: 2 }),
+          weak({ difficulty: ['basic'], total: 30, wrong: 3 }),
+        ]),
+        runs: [],
+      },
+      'depth',
+    )
+    // (20 - 6) / 20 = 70%
+    expect(axis?.ratio).toBeCloseTo(0.7)
+    expect(axis?.reading).toBe('挑战题得分率 70%（20 题）')
+  })
+
+  it('没有挑战题 / 没有报告 ⇒ 无数据', () => {
+    expect(axisOf({ report: reportWith([weak({ difficulty: ['basic'] })]), runs: [] }, 'depth')?.filled)
+      .toBe(false)
+    expect(axisOf({ report: null, runs: [] }, 'depth')?.filled).toBe(false)
+    expect(axisOf({ report: reportWith(null), runs: [] }, 'depth')?.filled).toBe(false)
+  })
+})
+
+describe('广度：测评覆盖的方向数', () => {
+  it('去重计数、空方向不占一格、分母为全库方向数', () => {
+    const axis = axisOf(
+      {
+        report: reportWith([
+          weak({ direction: 'AI 工程' }),
+          weak({ direction: 'AI 工程' }),
+          weak({ direction: '后端' }),
+          weak({ direction: '' }),
+        ]),
+        runs: [],
+      },
+      'breadth',
+    )
+    expect(axis?.ratio).toBeCloseTo(2 / DIRECTIONS.length)
+    expect(axis?.reading).toBe(`覆盖 2/${DIRECTIONS.length} 个方向`)
+  })
+
+  it('空薄弱地图 / 旧报告 ⇒ 无数据', () => {
+    expect(axisOf({ report: reportWith([]), runs: [] }, 'breadth')?.filled).toBe(false)
+    expect(axisOf({ report: reportWith(null), runs: [] }, 'breadth')?.filled).toBe(false)
+  })
+})
+
+describe('基础扎实度：基础 / 进阶难度分组的得分率', () => {
+  it('与深度互补：只聚合 basic / intermediate，挑战题不计入', () => {
+    const axis = axisOf(
+      {
+        report: reportWith([
+          weak({ difficulty: ['basic'], total: 30, wrong: 3 }),
+          weak({ difficulty: ['intermediate'], total: 20, wrong: 4 }),
+          weak({ difficulty: ['challenge'], total: 10, wrong: 10 }),
+        ]),
+        runs: [],
+      },
+      'fundamentals',
+    )
+    // (50 - 7) / 50 = 86%
+    expect(axis?.ratio).toBeCloseTo(0.86)
+    expect(axis?.reading).toBe('基础 / 进阶题得分率 86%（50 题）')
+    expect(axis?.filled).toBe(true)
+  })
+
+  it('只有挑战题 / 无难度标签 / 没有报告 ⇒ 无数据', () => {
+    const challengeOnly = reportWith([weak({ difficulty: ['challenge'], total: 5 })])
+    expect(axisOf({ report: challengeOnly, runs: [] }, 'fundamentals')?.filled).toBe(false)
+    expect(
+      axisOf({ report: reportWith([weak({ difficulty: [] })]), runs: [] }, 'fundamentals')?.filled,
+    ).toBe(false)
+    expect(axisOf({ report: null, runs: [] }, 'fundamentals')?.filled).toBe(false)
+  })
+})
+
+describe('稳定度：同类测评得分波动', () => {
+  it('1 − 变异系数：笔试 60/70/80 ⇒ 波动 12%', () => {
+    const axis = axisOf(
+      { report: null, runs: [run('exam', 80, 'c'), run('exam', 70, 'b'), run('exam', 60, 'a')] },
+      'stability',
+    )
+    // 均值 70、标准差 ≈ 8.165 ⇒ cv ≈ 0.1166
+    expect(axis?.ratio).toBeCloseTo(0.8834, 3)
+    expect(axis?.reading).toBe('同类 3 次 · 得分波动 12%')
+    expect(axis?.filled).toBe(true)
+  })
+
+  it('多次完全同分 ⇒ 稳定度为满值（只代表发挥稳定，不代表分数高）', () => {
+    const axis = axisOf(
+      { report: null, runs: [run('interview', 5), run('interview', 5)] },
+      'stability',
+    )
+    expect(axis?.ratio).toBe(1)
+    expect(axis?.reading).toBe('同类 2 次 · 得分波动 0%')
+  })
+
+  it('只有一条有分记录 ⇒ 算不出波动，按无数据（不是 0 分）', () => {
+    const axis = axisOf({ report: null, runs: [run('exam', 90), run('exam', null)] }, 'stability')
+    expect(axis?.filled).toBe(false)
+    expect(axis?.reading).toBe('暂无测评数据')
+  })
+})
+
+describe('岗位匹配：目标岗位技能达标率', () => {
+  it('按 user_level / required 均值，required 为 0 的行不计入', () => {
+    const report: Report = {
+      ...reportWith([]),
+      role_fit: roleFit({
+        items: [
+          { name: 'Python', required: 3, user_level: 2, gap: 1, must: true },
+          { name: 'RAG', required: 2, user_level: 2, gap: 0, must: true },
+          { name: '可选项', required: 0, user_level: 0, gap: 0, must: false },
+        ],
+      }),
+    }
+    const axis = axisOf({ report, runs: [] }, 'readiness')
+    // (2/3 + 1) / 2 ≈ 0.8333
+    expect(axis?.ratio).toBeCloseTo(0.8333, 3)
+    expect(axis?.reading).toBe('AI 应用工程师 · 技能达标 1/2')
+    expect(axis?.filled).toBe(true)
+  })
+
+  it('无岗位模型 / 空差距表 ⇒ 无数据', () => {
+    const empty = { ...reportWith([]), role_fit: roleFit({ items: [] }) }
+    expect(axisOf({ report: empty, runs: [] }, 'readiness')?.filled).toBe(false)
+    expect(axisOf({ report: reportWith([]), runs: [] }, 'readiness')?.filled).toBe(false)
+  })
+
+  it('缺 target_role 时用「目标岗位」占位，不编造岗位名', () => {
+    const report: Report = {
+      ...reportWith([]),
+      role_fit: roleFit({
+        target_role: null,
+        items: [{ name: 'Python', required: 2, user_level: 1, gap: 1, must: true }],
+      }),
+    }
+    expect(axisOf({ report, runs: [] }, 'readiness')?.reading).toBe('目标岗位 · 技能达标 0/1')
+  })
+})
+
+describe('参考基线', () => {
+  it('两条参考线是固定刻度（产品设定，非真实市场统计）', () => {
+    expect(CAPABILITY_BASELINE.average).toBe(0.5)
+    expect(CAPABILITY_BASELINE.top).toBe(0.9)
+  })
+})
+
+describe('radarPoints / radarPath / radarPolygon', () => {
+  it('第一条轴在正上方，其余顺时针均分', () => {
+    const points = radarPoints([1, 1, 1, 1], 100, 100, 40)
     expect(points[0].x).toBeCloseTo(100)
     expect(points[0].y).toBeCloseTo(60)
-    expect(points).toHaveLength(5)
+    expect(points[1].x).toBeCloseTo(140)
+    expect(points[1].y).toBeCloseTo(100)
   })
 
-  it('越界与非法值按 0 / 1 夹取（不抛错）', () => {
+  it('越界读数按 0/1 夹取，非有限值按 0', () => {
     const points = radarPoints([1.4, -0.2, Number.NaN], 0, 0, 10)
-    const radii = points.map((point) => Math.hypot(point.x, point.y))
-    expect(radii[0]).toBeCloseTo(10)
-    expect(radii[1]).toBeCloseTo(0)
-    expect(radii[2]).toBeCloseTo(0)
+    expect(points[0].x).toBeCloseTo(0)
+    expect(points[0].y).toBeCloseTo(-10)
+    expect(points[1].x).toBeCloseTo(0)
+    expect(points[2].x).toBeCloseTo(0)
+    expect(points[2].y).toBeCloseTo(0)
   })
 
-  it('不足 3 个顶点不生成闭合路径', () => {
+  it('path 与 polygon 都是闭合形状；不足 3 点不画区域', () => {
+    const points = radarPoints([1, 1, 1], 0, 0, 10)
+    expect(radarPath(points)).toMatch(/^M .* Z$/)
+    expect(radarPolygon(points).split(' ')).toHaveLength(3)
     expect(radarPath(radarPoints([1, 1], 0, 0, 10))).toBe('')
-    expect(radarPath(radarPoints([1, 1, 1], 0, 0, 10))).toMatch(/^M .+ Z$/)
   })
 })

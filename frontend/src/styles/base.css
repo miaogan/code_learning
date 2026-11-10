@@ -7408,8 +7408,21 @@ html {
   stroke: var(--border-hair);
 }
 
+/* 参考层：虚线描边 + 半透明填充当作「阴影」；橙色 / 金色分别用语义色 tint，
+ * 避免与个人区域的强调色撞色。填充透明度全部来自 token，这里不写裸色值。 */
+.sc-radar-series.is-average {
+  fill: var(--danger-tint-12);
+  stroke: var(--danger-line-55);
+}
+
+.sc-radar-series.is-top {
+  fill: var(--warn-tint-12);
+  stroke: var(--warn-line-35);
+}
+
+/* 个人区域：用户要求的「围起来的面积填色」——比 tint 更实，叠在两层阴影之上仍清晰可读。 */
 .sc-radar-area {
-  fill: var(--accent-tint);
+  fill: var(--accent-line-30);
   stroke: var(--accent);
 }
 
@@ -7426,6 +7439,62 @@ html {
 .sc-radar-legend {
   flex: 1 1 calc(var(--sp-8) * 3);
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.sc-radar-series-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2) var(--sp-4);
+}
+
+.sc-radar-series-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  color: var(--text-secondary);
+  font-size: var(--fs-small);
+}
+
+.sc-radar-swatch {
+  flex: 0 0 auto;
+}
+
+.sc-radar-swatch.is-me line {
+  stroke: var(--accent);
+}
+
+.sc-radar-swatch.is-average line {
+  stroke: var(--danger);
+}
+
+.sc-radar-swatch.is-top line {
+  stroke: var(--warn);
+}
+
+/* 勾选框 + 色块 + 文案：整行可点，命中区按行高兜住，键盘 focus 沿用全局 :focus-visible。 */
+.sc-radar-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  cursor: pointer;
+}
+
+.sc-radar-toggle input {
+  flex: 0 0 auto;
+  width: var(--sp-4);
+  height: var(--sp-4);
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.sc-radar-rows {
   margin: 0;
   padding: 0;
   list-style: none;
@@ -7446,9 +7515,21 @@ html {
   font-size: var(--fs-meta);
 }
 
+.sc-radar-axis-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  min-width: 0;
+}
+
 .sc-radar-title {
   color: var(--text-secondary);
   font-size: var(--fs-small);
+}
+
+.sc-radar-basis {
+  color: var(--text-tertiary);
+  font-size: var(--fs-meta);
 }
 
 .sc-radar-reading {

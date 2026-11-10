@@ -47,6 +47,12 @@ type EditTarget = { dimension: ProfileDimensionKey; index: number | null }
  */
 export default function ProfilePage() {
   const profileAsync = useAsync((signal) => api.latestProfile(signal), [])
+  /**
+   * 能力雷达的测评证据：最新报告（深度 / 广度）与成绩历史（技术力 / 学习力）。
+   * 两者都是既有只读接口，失败（含 404 无报告）只让对应轴显示「暂无测评数据」，不阻塞画像本身。
+   */
+  const reportAsync = useAsync((signal) => api.latestReport(signal), [])
+  const runsAsync = useAsync(() => api.history(20), [])
   const location = useLocation()
 
   /**
@@ -306,7 +312,7 @@ export default function ProfilePage() {
             />
           ) : null}
 
-          <ProfileRadar profile={profile} />
+          <ProfileRadar report={reportAsync.data} runs={runsAsync.data ?? []} />
 
           <div className="sc-grid-2">
             <div>
