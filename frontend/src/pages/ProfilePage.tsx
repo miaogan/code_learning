@@ -7,6 +7,7 @@ import { MergeSummaryBar } from '../components/profile/MergeSummaryBar'
 import { ProfileDimension } from '../components/profile/ProfileDimension'
 import type { ProfileDimensionKey } from '../components/profile/ProfileDimension'
 import { ProfileEditor } from '../components/profile/ProfileEditor'
+import { ProfileRadar } from '../components/profile/ProfileRadar'
 import { Chip } from '../components/ui/Chip'
 import { ConfirmModal } from '../components/ui/ConfirmModal'
 import { InlineError } from '../components/ui/InlineError'
@@ -304,6 +305,8 @@ export default function ProfilePage() {
               }
             />
           ) : null}
+
+          <ProfileRadar profile={profile} />
 
           <div className="sc-grid-2">
             <div>

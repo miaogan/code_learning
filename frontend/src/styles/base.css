@@ -7368,3 +7368,204 @@ html {
   }
 }
 
+/* ---------- 图表：画像雷达 / 成绩折线 / 薄弱错误率横条 ----------
+ * 全部是自绘 SVG（与 RingProgress 同一做法），此处只负责配色与布局；
+ * 画布尺寸、描边宽度写在组件常量与 SVG 属性里，避免这里出现裸尺寸。 */
+
+.sc-radar-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.sc-radar-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+
+.sc-radar-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-6);
+}
+
+.sc-radar-svg {
+  flex: 0 0 auto;
+  max-width: 100%;
+  height: auto;
+}
+
+.sc-radar-ring {
+  fill: none;
+  stroke: var(--border-subtle);
+}
+
+.sc-radar-axis {
+  stroke: var(--border-hair);
+}
+
+.sc-radar-area {
+  fill: var(--accent-tint);
+  stroke: var(--accent);
+}
+
+.sc-radar-dot {
+  fill: var(--accent);
+}
+
+.sc-radar-label {
+  fill: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: var(--fs-meta);
+}
+
+.sc-radar-legend {
+  flex: 1 1 calc(var(--sp-8) * 3);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.sc-radar-row {
+  display: grid;
+  grid-template-columns: var(--sp-4) minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: var(--sp-2);
+}
+
+.sc-radar-num {
+  color: var(--text-tertiary);
+  font-size: var(--fs-meta);
+}
+
+.sc-radar-title {
+  color: var(--text-secondary);
+  font-size: var(--fs-small);
+}
+
+.sc-radar-reading {
+  color: var(--text-primary);
+  font-size: var(--fs-small);
+  text-align: right;
+}
+
+.sc-radar-reading.is-empty {
+  color: var(--text-tertiary);
+}
+
+.sc-chart-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.sc-chart-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.sc-chart-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-6);
+}
+
+.sc-chart {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.sc-chart-caption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+
+.sc-chart-title {
+  color: var(--text-secondary);
+  font-size: var(--fs-small);
+}
+
+.sc-chart-latest {
+  color: var(--text-primary);
+  font-size: var(--fs-body);
+}
+
+.sc-chart-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.sc-chart-guide {
+  stroke: var(--border-hair);
+}
+
+.sc-chart-tick {
+  fill: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: var(--fs-meta);
+}
+
+.sc-chart-line {
+  fill: none;
+  stroke: var(--accent);
+}
+
+.sc-chart-dot {
+  fill: var(--accent);
+}
+
+.sc-chart-note {
+  margin: 0;
+  color: var(--text-tertiary);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+}
+
+.sc-weak-ratecell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--sp-1);
+}
+
+.sc-weak-bar {
+  display: block;
+  width: 100%;
+  height: var(--sp-1);
+  background: var(--danger-tint-12);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
+.sc-weak-bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--danger);
+  border-radius: inherit;
+}
+
+@media (max-width: 640px) {
+  .sc-chart-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sc-radar-wrap {
+    gap: var(--sp-4);
+  }
+}
+

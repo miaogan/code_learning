@@ -12,6 +12,7 @@ import {
   roleGapLabel,
   weaknessCountLabel,
   weaknessRateLabel,
+  weaknessRatePercent,
   weaknessSubDirectionLabel,
 } from '../lib/coach'
 
@@ -78,6 +79,13 @@ describe('错误率与计数文案', () => {
   it('错题计数与错误率同屏出现（同一分组的两段文案）', () => {
     expect(weaknessCountLabel(8, 13)).toBe('错 8 / 共 13 题')
     expect(weaknessCountLabel(0, 5)).toBe('错 0 / 共 5 题')
+  })
+
+  it('横条宽度与读数同一夹取口径（图例不能与数字矛盾）', () => {
+    expect(weaknessRatePercent(0.616)).toBe(62)
+    expect(weaknessRatePercent(1.4)).toBe(100)
+    expect(weaknessRatePercent(-0.2)).toBe(0)
+    expect(weaknessRatePercent(Number.NaN)).toBe(0)
   })
 })
 

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client'
 import { TimelineSection } from '../components/history/TimelineSection'
+import { TrendChart } from '../components/history/TrendChart'
 import { TrendTable } from '../components/history/TrendTable'
 import { SegTabs } from '../components/polish/SegTabs'
 import { Button } from '../components/ui/Button'
@@ -103,9 +104,12 @@ export default function HistoryPage() {
           </p>
 
           {visibleRows !== null && visibleRows.length > 0 ? (
-            <Card>
-              <TrendTable rows={visibleRows} />
-            </Card>
+            <>
+              <TrendChart rows={visibleRows} />
+              <Card>
+                <TrendTable rows={visibleRows} />
+              </Card>
+            </>
           ) : (
             <p className="sc-meta-line">该类型还没有已完成记录，做一次后会出现在这里。</p>
           )}

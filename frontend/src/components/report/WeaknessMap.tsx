@@ -10,6 +10,7 @@ import {
   foldWeakness,
   weaknessCountLabel,
   weaknessRateLabel,
+  weaknessRatePercent,
   weaknessSubDirectionLabel,
 } from '../../lib/coach'
 import { Card } from '../ui/Card'
@@ -101,7 +102,16 @@ export function WeaknessMap({ items }: WeaknessMapProps) {
                   </p>
                 </td>
                 <td>
-                  <span className="sc-weak-rate sc-mono">{weaknessRateLabel(item.rate)}</span>
+                  {/* 横条只是错误率的可视化通道：读数（% 与「错 x / 共 y 题」）仍在同一行，不与数字脱钩。 */}
+                  <div className="sc-weak-ratecell">
+                    <span className="sc-weak-rate sc-mono">{weaknessRateLabel(item.rate)}</span>
+                    <span className="sc-weak-bar" aria-hidden="true">
+                      <span
+                        className="sc-weak-bar-fill"
+                        style={{ width: `${weaknessRatePercent(item.rate)}%` }}
+                      />
+                    </span>
+                  </div>
                 </td>
               </tr>
             )

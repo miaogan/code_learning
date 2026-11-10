@@ -104,6 +104,15 @@ export function weaknessRateLabel(rate: number): string {
   return `${Math.round(clamped * 100)}%`
 }
 
+/**
+ * 错误率横条的宽度（0–100）：与 `weaknessRateLabel` **同一夹取口径**，
+ * 保证「读到的百分比」与「画出来的长度」不会一个 100% 一个 120%（图例不可与读数矛盾）。
+ */
+export function weaknessRatePercent(rate: number): number {
+  if (!Number.isFinite(rate)) return 0
+  return Math.round(Math.min(1, Math.max(0, rate)) * 100)
+}
+
 /** 错题计数：与错误率**同屏**出现（错误率单独出现会被误读，AC-2 的反向断言）。 */
 export function weaknessCountLabel(wrong: number, total: number): string {
   return `错 ${wrong} / 共 ${total} 题`

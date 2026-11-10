@@ -86,6 +86,8 @@
 
 - 2026-11-10：开源前置补齐（CI / 许可证 / 仓库信息）：①新增根 `LICENSE`（MIT，`Copyright (c) 2026 miaogan`），README 补「许可证」小节（代码 MIT + fe-interview MIT 素材 NOTICE + 依赖许可结论 + 基础镜像系统包说明）；②`.github/workflows/ci.yml` 双 job 各加一步依赖审计 —— 后端 `pip-audit -r requirements.txt`（实测 No known vulnerabilities）、前端 `npm audit --omit=dev --audit-level=high`（只扫进构建产物的生产依赖，当前 2 条 moderate 属 `react-router` 6.x，修复需升 7.x，留待单独升级验证）；③新增 `.github/dependabot.yml`（pip `/backend`、npm `/frontend`、github-actions `/`，每周）；④`.gitignore` 补 `pytest-of-*/`（仓库根 pytest 临时目录）；⑤README 自检表补两条审计命令，并把易过期的「CI 实跑 33 次 / #33」改成不含次数的表述。**未完成**：仓库元数据（description / topics / LICENSE 识别 / 默认分支）需 GitHub 端权限，当前 `GH_TOKEN`（`ghu_` 用户令牌）调 `gh repo edit` 与 `PATCH /repos` 均返回 403 `Resource not accessible by integration`，须账号本人用 UI 或带 `repo` 权限的 PAT 操作。
 
+- 2026-11-10：可视化图例（r57）：①技术画像页新增五维雷达图 —— 技能 / 技术栈 / 年限 / 项目 / 岗位的**信息填充度**，纯 SVG 自绘（与 `RingProgress` 同一做法，不引第三方图表库），`lib/profileRadar.ts` 负责归一化与投影，图例同时给真实计数，页面与图注两处明示「不代表能力水平与熟练度」；②成绩趋势页新增折线图 —— 面试（/10）与笔试（/100）**分成两张小图、不共轴**，横轴由旧到新（服务端倒序反推，不重排），未计分记录不落点，`lib/trendChart.ts` 负责分组与投影；③报告页薄弱地图错误率列加横条可视化（条长与 `%` 读数同一夹取口径，数字不脱钩）。前端测试 293 全过（新增 `profileRadar` 9 / `trendChart` 8 / `coach` 1），`typecheck` / `lint` / `build` 全绿；样式只用 `tokens.css` 变量，无后端契约、HTTP 接口与表结构变更。
+
 <!-- teamflow:begin -->
 ## TeamFlow 托管区（本块由 TeamFlow 自动维护，团队请勿手改）
 
