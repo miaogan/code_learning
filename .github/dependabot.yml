@@ -8,6 +8,12 @@ updates:
       time: '03:00'
       timezone: Asia/Shanghai
     open-pull-requests-limit: 5
+    # 大版本（含 0.x 的破坏性跨越，如 fastapi 0.110→0.162）一律人工升级：
+    # 这类改动要走契约双侧同步 + 全量测试，不适合让 bot 合并。
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-major
     commit-message:
       prefix: deps(pip)
 
@@ -19,6 +25,11 @@ updates:
       time: '03:00'
       timezone: Asia/Shanghai
     open-pull-requests-limit: 5
+    # react 19 / eslint 10 / globals 17 这类大版本会打断 CI 与类型，留给人工升级。
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-major
     commit-message:
       prefix: deps(npm)
 
