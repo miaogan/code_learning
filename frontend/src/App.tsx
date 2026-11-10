@@ -17,6 +17,7 @@ import ReportPage from './pages/ReportPage'
 import SettingsPage from './pages/SettingsPage'
 import TutorialPage from './pages/TutorialPage'
 import UploadPage from './pages/UploadPage'
+import { PRODUCT_NAME, PRODUCT_TAGLINE } from './lib/brand'
 import { resetResumePrompt } from './lib/resumePrompt'
 import { logout, startAuth, useAuth } from './state/auth'
 import { dismissKeyRequired } from './state/aiGate'
@@ -92,10 +93,13 @@ export default function App() {
   return (
     <>
       <header className="sc-topbar">
-        <div className="sc-brand">
-          <span className="sc-brand-mark" aria-hidden="true" />
-          <span className="sc-brand-name">Skill Coach</span>
-        </div>
+        <Link className="sc-brand" to="/" aria-label={`${PRODUCT_NAME}首页`}>
+          <span className="sc-brand-mark" aria-hidden="true">↗</span>
+          <span className="sc-brand-copy">
+            <span className="sc-brand-name">{PRODUCT_NAME}</span>
+            <span className="sc-brand-tagline">{PRODUCT_TAGLINE}</span>
+          </span>
+        </Link>
         <div className="sc-topbar-right">
           <span className="sc-storage">数据按账号隔离保存</span>
           <Link className="sc-topbar-link" to="/settings" title="账号与 AI 设置">

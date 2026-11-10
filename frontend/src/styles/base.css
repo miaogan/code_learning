@@ -7268,3 +7268,103 @@ html {
   }
 }
 
+/* ---------- r56 · 逃跑计划：品牌、路线与登录页（append-only） ---------- */
+/* 保留旧品牌规则作为基线，这里只覆盖视觉表现；历史 sc-* 标识继续兼容。 */
+.sc-brand {
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.sc-brand-mark {
+  display: grid;
+  place-items: center;
+  color: var(--accent-ink);
+  font-size: var(--fs-section);
+  line-height: var(--lh-section);
+  font-weight: 700;
+}
+
+.sc-brand-mark::before,
+.sc-brand-mark::after {
+  content: none;
+}
+
+.sc-brand-copy {
+  display: flex;
+  flex-direction: column;
+}
+
+.sc-brand-name {
+  font-size: var(--fs-card);
+  letter-spacing: 0.04em;
+}
+
+.sc-brand-tagline {
+  color: var(--text-tertiary);
+  font-size: var(--fs-nano);
+  line-height: var(--lh-nano);
+  letter-spacing: 0.04em;
+}
+
+/* 路线文案复用现有字阶，品牌与登录页不增加新颜色或新尺寸。 */
+.sc-lab-route {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2) var(--sp-3);
+  margin: var(--sp-4) 0 0;
+  color: var(--text-tertiary);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+}
+
+.sc-lab-route strong {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.sc-lab-route span {
+  padding-left: var(--sp-3);
+  border-left: 1px solid var(--border-strong);
+}
+
+.sc-auth-kicker {
+  margin: 0 0 var(--sp-4);
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: var(--fs-kicker);
+  line-height: var(--lh-kicker);
+  letter-spacing: var(--ls-kicker);
+}
+
+.sc-auth-tagline {
+  margin: var(--sp-2) 0 var(--sp-4);
+  color: var(--text-primary);
+  font-size: var(--fs-card);
+  line-height: var(--lh-card);
+}
+
+.sc-auth-route {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin: var(--sp-5) 0 0;
+  padding: var(--sp-4) 0 0;
+  border-top: 1px solid var(--border-subtle);
+  color: var(--text-tertiary);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+}
+
+.sc-auth-route strong {
+  color: var(--text-primary);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+
+@media (max-width: 640px) {
+  .sc-brand-tagline {
+    display: none;
+  }
+}
+

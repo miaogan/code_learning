@@ -93,9 +93,9 @@ def create_app() -> FastAPI:
     settings = get_settings()
     configure_logging(settings.log_level)
     app = FastAPI(
-        title="Skill Coach API",
+        title="逃跑计划 API",
         version=APP_VERSION,
-        description="简历读画像 → 模拟面试/笔试 → 短板报告 → 精选课程",
+        description="外包工程师的 AI 应用 / Agent 后端跃迁工作台：简历证据 → 能力验证 → 项目补强",
         lifespan=lifespan,
     )
     app.add_middleware(

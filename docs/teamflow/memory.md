@@ -1,10 +1,12 @@
-# TeamFlow 产品记忆与待办（dev-skill-coach）
+# TeamFlow 产品记忆与待办（逃跑计划 / Escape Plan）
 
 > 本文件是**产品约定层**：只记录跨需求长期有效的信息（技术栈、团队规矩、已知待办）。
 > 每个需求的迭代细节在各自任务夹 docs/teamflow/<日期-rN-slug>/ 内，不写进本文件。
 > 权威架构文档：`docs/teamflow/architecture/ARCHITECTURE.md`（本文件只做索引与约定摘要）。
 
 ## 团队约定与技术栈
+
+- 品牌与路线（2026-11-10 · r56 落定）：当前产品名「逃跑计划 / Escape Plan」，定位是**外包工程师的跃迁工作台**，主攻 **AI 应用 / Agent 后端**。品牌文案唯一来源 `frontend/src/lib/brand.ts`；叙事遵循「真实经历盘点 → 能力验证 → 项目证据补强」。ACP 只是知识补充，不将刷题、模拟评测或 dry-run 包装成生产经验或录用保证。历史任务夹、存储键、Cookie、路由、Docker 卷名保留旧标识以确保兼容，不做全局机械替换。下阶段方向是「目标岗位差距 + 项目工程证据 + 面试表达」的跃迁档案，**本轮未实现该看板**。
 
 - 技术栈基线：Web 应用 = React + Vite（TypeScript）前端 / Python FastAPI 后端；AI 能力统一由服务端调用模型 API，Key 只经服务端 `.env` 注入，前端源码与构建产物中不得出现 Key。
 - 数据落盘基线：首版用本地 SQLite 单库（`backend/app.db`），不引入外部数据库与云存储；**题库自 r6 起由 SQLite 的 `questions` 表承载（`backend/app/seed/questions.json` 退为唯一导入源，幂等导入不覆盖已有行）**，课程清单仍以服务端 JSON 文件维护。

@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import { ApiError } from '../api/client'
 import { Button } from '../components/ui/Button'
 import { InlineError } from '../components/ui/InlineError'
+import { PRODUCT_DESCRIPTION, PRODUCT_FOCUS, PRODUCT_NAME, PRODUCT_NAME_EN } from '../lib/brand'
 import { login } from '../state/auth'
 
 /**
@@ -32,8 +33,15 @@ export default function LoginPage() {
     <section className="sc-auth">
       <div className="sc-auth-card">
         <header className="sc-page-header">
-          <h1 className="sc-page-title">登录 Skill Coach</h1>
-          <p className="sc-page-sub">AI 读简历建画像 → 模拟面试 / 笔试 → 短板报告 → 精选课程</p>
+          <p className="sc-auth-kicker">{PRODUCT_NAME_EN} · 从交付任务到证明能力</p>
+          <h1 className="sc-page-title">{PRODUCT_NAME}</h1>
+          <p className="sc-auth-tagline">不止完成工作，也为下一次跃迁留下证据。</p>
+          <p className="sc-page-sub">{PRODUCT_DESCRIPTION}</p>
+          <p className="sc-auth-route">
+            <span>当前路线</span>
+            <strong>{PRODUCT_FOCUS}</strong>
+            <span>简历证据 → 能力验证 → 项目补强</span>
+          </p>
         </header>
 
         <form className="sc-form" onSubmit={submit}>

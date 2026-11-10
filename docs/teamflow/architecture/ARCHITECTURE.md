@@ -1,7 +1,8 @@
-# ARCHITECTURE · 开发者能力提升教练（dev-skill-coach）工程方案与脚手架
+# ARCHITECTURE · 逃跑计划（Escape Plan）工程方案与脚手架
 
 > 基线依赖：`docs/teamflow/20261031-r1-dev-skill-coach/DESIGN.md`（视觉 / 信息架构唯一真源，本文件不重复其数值）。
 > 定位：产品级长期文档。任务级契约（PRD / 技术方案 / QA）在任务夹内，不在本文件。
+> r56 品牌为「逃跑计划」：外包工程师的 AI 应用 / Agent 后端跃迁工作台。改名仅影响展示、文案与前端包名；既有路由、存储键、Cookie、Docker 卷名与历史任务夹保持兼容。
 > 本文只描述**已经落盘**的骨架与下游要填的坑；标「待」的条目一律列在 §7，不算已完成。
 
 ---
@@ -99,6 +100,7 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
 | `src/styles/tokens.css` | DESIGN §0.2–0.4 全部变量 | 禁止组件内写裸色值 / 裸 px 尺寸 |
 | `src/components/ui/*` | 通用件（无业务语义） | 只接 props，不 import `api` |
 | `src/pages/*` | 页面装配、状态机（idle/loading/error/empty/success） | 只经 `api/client.ts` 取数 |
+| `src/lib/brand.ts` | 当前品牌、定位、路线与描述单点（r56） | 不反向改写历史任务夹或兼容存储标识 |
 | `src/lib/format.ts` | 数值/时长/字数格式化，保证 mono + tabular | 分数永远 ≤3 字符（DESIGN §0.7 第 2 条） |
 | `src/lib/practice.ts` | 练习页业务文案与纯逻辑唯一出处；方向 chip 由 `DIRECTION_LABEL` 派生 | `satisfies Record<Exclude<PracticeDirectionFilter,'all'>, string>`，新增方向漏项即 typecheck 红 |
 | `src/components/exam/PromptBody.tsx` | 题面围栏（代码块/表格）渲染唯一出口 | 题卡与错题本共用，禁止各自解析 |

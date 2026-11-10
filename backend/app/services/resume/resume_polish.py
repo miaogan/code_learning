@@ -322,7 +322,7 @@ def _header(target_role: str | None, dropped_count: int) -> str:
     role = (target_role or "").strip() or "未指定"
     return (
         f"# 简历（润色版）\n\n"
-        f"> Skill Coach · 目标岗位：{role} · "
+        f"> 逃跑计划 · 目标岗位：{role} · "
         f"{dropped_count} 条建议未通过事实校验已剔除\n\n"
     )
 

@@ -3,6 +3,7 @@ import type { ChangeEvent, DragEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { ApiError, api } from '../api/client'
 import type { ProfileMergeSummary, ResumeMeta } from '../api/types'
+import { PRODUCT_FOCUS } from '../lib/brand'
 import { mergeSummaryText } from '../components/profile/mergeModel'
 import { Button } from '../components/ui/Button'
 import { Chip } from '../components/ui/Chip'
@@ -163,9 +164,15 @@ export default function UploadPage() {
   const [pendingLeave, setPendingLeave] = useState<string | null>(null)
   /** r42：本地会话的账号作用域；登录态就绪后才读本地会话。 */
   const userId = useAuth().me?.id ?? null
-  /** 重接入按「恢复轮次」只跑一次（StrictMode 双跑由 ref 挡住；手动重试 +1 轮）。 */
+  /** 重接入按「恢复轮次」只跑一次；手动重试 +1 轮。 */
   const [recoverTick, setRecoverTick] = useState(0)
   const recoverTickRef = useRef(-1)
+  /**
+   * 本轮恢复是否仍在生效。StrictMode 会「挂载 → 卸载 → 再挂载」：cleanup 把第一轮取消后，
+   * 若只按 tick 去重，第二轮就会直接跳过 —— 开发态下切页回来永远恢复不出进度。
+   * 因此被作废的轮次允许下一轮重新接上（与 ExamPage / ReportPage 的 mountedRef 同类修法）。
+   */
+  const recoverAliveRef = useRef(false)
   /** phase 的镜像：重接入的异步回调里判断「用户是否已经又开始了新动作」。 */
   const phaseRef = useRef<Phase>(phase)
   phaseRef.current = phase
@@ -248,8 +255,9 @@ export default function UploadPage() {
   // 3) 网络异常不能白屏：给中文提示 + 「重试接上」，任务本身仍在服务端跑。
   useEffect(() => {
     if (userId === null) return
-    if (recoverTickRef.current === recoverTick) return
+    if (recoverTickRef.current === recoverTick && recoverAliveRef.current) return
     recoverTickRef.current = recoverTick
+    recoverAliveRef.current = true
     let cancelled = false
 
     const run = async () => {
@@ -394,6 +402,8 @@ export default function UploadPage() {
     void run()
     return () => {
       cancelled = true
+      // 本轮被作废：允许下一轮（StrictMode 再挂载 / 手动重试）重新接上，而不是被 tick 去重跳过。
+      recoverAliveRef.current = false
     }
     // startProfileJob 是「受理 + 写本地会话」的组件内动作，身份随渲染变化；放进依赖会导致
     // 恢复流程反复触发。它只读 ref / setState，行为等价稳定，故刻意排除。
@@ -836,26 +846,26 @@ export default function UploadPage() {
     },
     {
       num: '02',
-      title: '建立画像',
-      desc: '技能 / 项目 / 证据逐条可溯源',
+      title: '盘点证据',
+      desc: '技能 / 项目 / 经历逐条可溯源',
       state: flow.hasProfile ? 'done' : phase === 'profiling' ? 'now' : 'todo',
     },
     {
       num: '03',
-      title: '模拟面试',
-      desc: '按画像出题，作答即时评分',
+      title: '面试验证',
+      desc: '把项目与工程取舍讲出证据',
       state: flow.hasInterview ? 'done' : 'todo',
     },
     {
       num: '04',
-      title: '模拟笔试',
-      desc: '客观题定位知识盲区',
+      title: '知识验证',
+      desc: '用 ACP 与工程题定位知识盲区',
       state: flow.hasExam ? 'done' : 'todo',
     },
     {
       num: '05',
-      title: '诊断报告',
-      desc: '短板按证据排序，直连精选课程',
+      title: '补强路线',
+      desc: '按短板补课程、项目与表达证据',
       state: flow.hasReport ? 'done' : 'todo',
     },
   ] as const
@@ -865,29 +875,32 @@ export default function UploadPage() {
       <header className="sc-lab-hero">
         <div className="sc-lab-hero-copy">
           <p className="sc-lab-kicker sc-lab-rise">
-            <span className="sc-lab-kicker-idx">01</span> COMPILE PROFILE
+            <span className="sc-lab-kicker-idx">01</span> ESCAPE PLAN / 逃跑计划
+          </p>
+          <p className="sc-lab-route sc-lab-rise">
+            当前路线 <strong>{PRODUCT_FOCUS}</strong><span>目标：更高平台</span>
           </p>
           <h1 className="sc-lab-hero-title sc-lab-rise is-d1">
             {saved === null ? (
               <>
-                上传简历，
+                摆脱外包，
                 <br />
-                建立<span className="sc-lab-hl">可溯源</span>
+                靠的不是<span className="sc-lab-hl">一句目标</span>
                 <br />
-                的技术画像
+                是能力证据
               </>
             ) : (
               <>
-                继续你的
+                继续积累
                 <br />
-                <span className="sc-lab-hl">技术画像</span>
+                <span className="sc-lab-hl">跃迁证据</span>
               </>
             )}
           </h1>
           <p className="sc-lab-lead sc-lab-rise is-d2">
             {saved === null
-              ? '从一份简历出发：抽取技能与项目，把每条结论都钉回原文，再用面试与笔试定位真实的短板。'
-              : '你的画像已经就绪。可以直接开始面试或笔试，也可以上传新版简历让它继续长大。'}
+              ? '从一份真实简历开始，盘点项目与技能证据，用面试和笔试找到差距，再把工程补强沉淀成能讲清、能复现、能衡量的竞争力。'
+              : '画像已经就绪。下一步验证你的项目表达与工程知识，把每项短板转成明确的补强动作；新简历可继续合并，不覆盖旧证据。'}
           </p>
           <div className="sc-lab-cta sc-lab-rise is-d3">
             <button
