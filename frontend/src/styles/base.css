@@ -7749,3 +7749,128 @@ html {
   color: var(--text-secondary);
 }
 
+/* ---------- r63 学习档案（只读汇总页 + Markdown 导出） ---------- */
+.sc-archive-actions {
+  align-items: center;
+  margin-bottom: var(--sp-4);
+}
+
+.sc-archive-hint {
+  margin: 0;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+}
+
+.sc-archive-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--sp-4);
+  align-items: start;
+}
+
+.sc-archive-kv {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-1) 0;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+}
+
+.sc-archive-kv-label {
+  flex: 0 0 auto;
+  color: var(--text-tertiary);
+}
+
+.sc-archive-kv-value {
+  min-width: 0;
+  text-align: right;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.sc-archive-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+  margin-top: var(--sp-2);
+}
+
+.sc-archive-muted {
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+}
+
+.sc-archive-bar {
+  height: var(--sp-1);
+  margin: var(--sp-2) 0;
+  border-radius: var(--radius-pill);
+  background: var(--overlay-06);
+  overflow: hidden;
+}
+
+.sc-archive-bar-fill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+}
+
+.sc-archive-weak {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sc-archive-weak-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--sp-1) var(--sp-3);
+}
+
+.sc-archive-weak-name {
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.sc-archive-weak-rate {
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.sc-archive-weak-row .sc-archive-bar {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.sc-archive-link {
+  display: inline-block;
+  margin-top: var(--sp-3);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--accent-soft);
+  text-decoration: none;
+}
+
+.sc-archive-link:hover {
+  color: var(--accent-hover);
+  text-decoration: underline;
+}
+
+.sc-archive-note {
+  margin: var(--sp-4) 0 0;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+}
+
