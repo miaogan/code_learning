@@ -1,0 +1,1082 @@
+[
+  {
+    "n": 1,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "客服助手必须回答刚生效的运费规则，还要给出可核验的出处。首选方案是？",
+    "options": [
+      { "key": "A", "text": "把历年规则全部追加到系统提示中，并每年重新整理" },
+      { "key": "B", "text": "基于版本化规则库做检索增强，返回命中的规则引用" },
+      { "key": "C", "text": "调高采样温度，让模型尝试不同规则" },
+      { "key": "D", "text": "依靠基座模型训练时记住的通用知识回答" }
+    ],
+    "answer": "B",
+    "explanation": "私有且会更新的知识应由检索层提供，并让答案关联到具体文档版本。把规则塞入提示会增加维护成本，也不能解决版本更新与出处核验问题。"
+  },
+  {
+    "n": 2,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "用户问「我昨天的订单到哪了」，订单数据每分钟都会变化。最合理的技术路径是？",
+    "options": [
+      { "key": "A", "text": "在系统提示中写一份订单查询说明，让模型据此推断物流状态" },
+      { "key": "B", "text": "对全量历史订单做参数高效微调，期待模型记住实时数据" },
+      { "key": "C", "text": "经用户鉴权后调用订单查询工具，把当次结果作为回答依据" },
+      { "key": "D", "text": "扩大模型上下文窗口，将问题原样交给模型处理" }
+    ],
+    "answer": "C",
+    "explanation": "实时业务事实应在请求时从权威系统读取，而不是靠提示或微调记忆。工具调用仍需校验用户身份和订单归属，不能把模型推断当作订单状态。"
+  },
+  {
+    "n": 3,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "固定格式发票抽取的字段和枚举基本稳定，但大段提示仍偶尔让模型改变输出风格。已有足量经审核的样例，下一步最值得评估的是？",
+    "options": [
+      { "key": "A", "text": "建设发票知识库，通过向量检索寻找输出格式" },
+      { "key": "B", "text": "用审核样例做小范围微调试验，并与提示方案的离线指标对比" },
+      { "key": "C", "text": "每次请求随机更换字段名称，迫使模型重新理解任务" },
+      { "key": "D", "text": "将所有历史对话拼入提示，不再限制上下文长度" }
+    ],
+    "answer": "B",
+    "explanation": "稳定的任务模式、格式和风格可以考虑用监督微调固化，但仍应以独立测试集比较错误率、成本和延迟。RAG 主要补知识，不是固化输出格式的默认首选。"
+  },
+  {
+    "n": 4,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "一个文案润色功能只需一次模型调用，团队却计划加入规划、检索、执行、评审四个 Agent。最合理的判断是？",
+    "options": [
+      { "key": "A", "text": "直接采用多 Agent，角色越多越能保证质量" },
+      { "key": "B", "text": "先用简单链路建立质量基线，只有确有需要分解的子任务才引入编排" },
+      { "key": "C", "text": "改成离线微调，任何简单任务都不应调用模型" },
+      { "key": "D", "text": "保留四个 Agent，但取消质量评测以减少工程成本" }
+    ],
+    "answer": "B",
+    "explanation": "Agent 适用于需要动态决策、工具协作或多步状态流转的任务，不是所有模型调用的默认包装。额外编排会增加成本、延迟和失败面，必须用可测的收益证明必要性。"
+  },
+  {
+    "n": 5,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "选择 RAG、实时工具、提示工程或微调之前，应先澄清哪些问题？",
+    "options": [
+      { "key": "A", "text": "所需知识是私有或易变，还是已经稳定的通用能力" },
+      { "key": "B", "text": "主要缺陷是缺事实、输出格式不稳，还是需要多步行动" },
+      { "key": "C", "text": "业务可接受的错误率、延迟、成本及合规边界" },
+      { "key": "D", "text": "团队是否有权限把所有业务数据直接交给外部模型训练" }
+    ],
+    "answer": "A,B,C",
+    "explanation": "选型由知识时效、问题性质和非功能约束共同决定，不能把「能实现」等同于「最适合」。是否可将业务数据交给外部训练是合规前提之一，但题目并未给出该前提，不能把无条件交付当作选型依据。"
+  },
+  {
+    "n": 6,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "流式问答界面首 token 已经返回，用户仍抱怨「回答慢」。最该同时观测哪两项耗时？",
+    "options": [
+      { "key": "A", "text": "首 token 延迟（TTFT）与后续 token 的生成速率或间隔" },
+      { "key": "B", "text": "模型参数总量与训练数据文件数量" },
+      { "key": "C", "text": "提示词文件的磁盘占用与 Git 提交耗时" },
+      { "key": "D", "text": "数据库表数量与向量索引的存储目录层级" }
+    ],
+    "answer": "A",
+    "explanation": "首 token 快只说明排队与输入处理较快，后续输出速度还决定整体体验。应把 TTFT、逐 token 延迟及端到端完成时间分开记录，避免用一个数字掩盖瓶颈。"
+  },
+  {
+    "n": 7,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Prompt 工程",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "设计模型 API 的统一调用层时，哪种职责划分更利于后续换模型和排查问题？",
+    "options": [
+      { "key": "A", "text": "每个页面各自拼消息、设置采样参数并处理供应商错误" },
+      { "key": "B", "text": "统一封装消息结构、参数默认值、超时和错误映射，业务层只声明任务需求" },
+      { "key": "C", "text": "让前端持有模型密钥，以便直接比较不同供应商的速度" },
+      { "key": "D", "text": "把供应商原始异常与密钥一起返回给页面，便于用户自行诊断" }
+    ],
+    "answer": "B",
+    "explanation": "统一调用层把协议差异、采样参数、超时与错误处理集中起来，便于版本记录、兼容测试和可观测。密钥与原始供应商错误不应泄露给前端。"
+  },
+  {
+    "n": 8,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Prompt 工程",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "制度问答要求输出固定 JSON，模型偶尔多出字段导致下游反序列化失败。最直接有效的工程兜底是？",
+    "options": [
+      { "key": "A", "text": "在服务端按 Schema 校验，失败时走有界修复或错误出口，不把非法结果交给下游" },
+      { "key": "B", "text": "只在提示中再强调一次字段要求，默认模型此后永远遵守" },
+      { "key": "C", "text": "让下游忽略反序列化异常，把未解析文本当作空结果入库" },
+      { "key": "D", "text": "每次请求随机更换字段名，以增加模型输出的多样性" }
+    ],
+    "answer": "A",
+    "explanation": "提示中的 Schema 能降低格式错误概率，服务端校验才是阻止非法结果扩散的确定性边界。修复或重试必须有上限，并保留可识别的失败状态；提示约束不能替代输入输出验证。"
+  },
+  {
+    "n": 9,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "要比较微调方案与提示方案，哪组实验设计最有说服力？",
+    "options": [
+      { "key": "A", "text": "分别挑选最擅长的样例展示，得分高的一方直接上线" },
+      { "key": "B", "text": "使用相互隔离的训练集与测试集，在相同测试集上比较质量、延迟和单次成本" },
+      { "key": "C", "text": "用训练集的正确率作为唯一结论，忽略实际调用开销" },
+      { "key": "D", "text": "把测试集标准答案同时提供给两个方案，以减少评分困难" }
+    ],
+    "answer": "B",
+    "explanation": "微调需要数据划分、防泄漏和端到端成本收益评估，不能只看训练集效果。相同未见测试集与一致的评分口径，才能把质量提升与推理、训练成本一起比较。"
+  },
+  {
+    "n": 10,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "企业要将扫描发票、文字制度和语音咨询组合成一套助手，哪些设计是合理的？",
+    "options": [
+      { "key": "A", "text": "按模态配置解析或识别步骤，保留原始文件与页码等来源信息" },
+      { "key": "B", "text": "针对 OCR 错字、表格错位和语音转写错误分别准备评测样本" },
+      { "key": "C", "text": "模型不能确定图片中的关键字段时，明确提示补拍或转人工复核" },
+      { "key": "D", "text": "把任一模态的模型输出直接视为已核实事实，不再保留证据" }
+    ],
+    "answer": "A,B,C",
+    "explanation": "多模态应用要管理解析误差、证据溯源和低置信度出口，而不是只做格式转换。按模态建设失败样例，才能判断问题发生在识别、检索还是生成阶段。"
+  },
+  {
+    "n": 11,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "制度问答中，「年度报销上限是多少」经常找不到只出现在小标题中的金额，而正文语义检索正常。优先尝试哪项改进？",
+    "options": [
+      { "key": "A", "text": "结合章节标题、关键词与向量结果做混合召回，并保留标题到正文的关联" },
+      { "key": "B", "text": "将全文压缩成一句摘要，只留下高频出现的词" },
+      { "key": "C", "text": "增大输出 token 上限，让模型补出未检索到的金额" },
+      { "key": "D", "text": "只把生成温度降低，期望它记住小标题中的数值" }
+    ],
+    "answer": "A",
+    "explanation": "精确短语和编号常适合关键词检索，语义改写适合向量检索；两者互补后再重排更有机会覆盖目标。标题层级是理解局部片段的关键上下文，也应在切片时保留。"
+  },
+  {
+    "n": 12,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "召回前二十名的相关片段都在，但送给模型的前五名经常漏掉关键条款。最值得优先调整的是？",
+    "options": [
+      { "key": "A", "text": "重点评估重排质量与前五截断策略，而非先重写全部文档" },
+      { "key": "B", "text": "把候选数从二十降到二，以减少重排工作量" },
+      { "key": "C", "text": "固定答案长度，让模型自行推断缺失条款" },
+      { "key": "D", "text": "删除检索评测，只看生成文本是否流畅" }
+    ],
+    "answer": "A",
+    "explanation": "候选集已覆盖证据而顶部结果缺失，主要矛盾是排序与截断，不是初始召回不足。应比较 rerank 前后的 nDCG、MRR 或 hit@k，并测量端到端收益与增加的延迟。"
+  },
+  {
+    "n": 13,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "同一个检索问题有 3 条人工标注的相关片段，前 10 个候选实际找到其中 2 条。按标准相关片段集合计算，recall@10 是多少？",
+    "options": [
+      { "key": "A", "text": "20%" },
+      { "key": "B", "text": "约 66.7%" },
+      { "key": "C", "text": "150%" },
+      { "key": "D", "text": "无法计算，只能由模型主观打分" }
+    ],
+    "answer": "B",
+    "explanation": "集合口径的召回率 = 已检出的相关片段数 ÷ 全部相关片段数 = 2 ÷ 3 ≈ 66.7%。它不等同于「候选里有多大比例相关」的精度，也不等同于是否至少命中一条的 hit@k。"
+  },
+  {
+    "n": 14,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "固定的 100 个检索问题中，有 80 个问题的前 10 个候选至少包含一条金标相关片段。hit@10 是多少？",
+    "options": [
+      { "key": "A", "text": "80%" },
+      { "key": "B", "text": "20%" },
+      { "key": "C", "text": "10%" },
+      { "key": "D", "text": "必须知道全部相关片段总数才能计算" }
+    ],
+    "answer": "A",
+    "explanation": "查询级 hit@k 统计「至少命中一条相关片段」的问题占比，即 80 ÷ 100 = 80%。recall@k 才需要统计每个问题检出的相关片段数占其金标相关片段总数的比例，二者不能混用。"
+  },
+  {
+    "n": 15,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "「混合检索＋重排」准备全量上线，怎样验证它的净收益更稳妥？",
+    "options": [
+      { "key": "A", "text": "在冻结的查询与金标证据集上，与单词检索基线比较召回和排序指标" },
+      { "key": "B", "text": "测量端到端答案正确性与忠实度，同时记录重排带来的延迟和费用" },
+      { "key": "C", "text": "按查询类型分层报告，并对失败样本进行人工抽查" },
+      { "key": "D", "text": "只查看 rerank 分数的绝对值，分数变大就认为回答更好" }
+    ],
+    "answer": "A,B,C",
+    "explanation": "重排分数只在同一模型与同一口径内有意义，不能直接代表答案质量。应同时量化检索增益、端到端质量、分场景表现与新增开销，再决定是否值得上线。"
+  },
+  {
+    "n": 16,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "面向多部门员工的 RAG 服务要做到检索阶段的权限隔离，哪些措施是必要的？",
+    "options": [
+      { "key": "A", "text": "依据用户和部门权限过滤候选，而不是等答案生成后再遮住敏感文字" },
+      { "key": "B", "text": "把用户身份、租户及知识库版本纳入缓存键或缓存命名空间" },
+      { "key": "C", "text": "文档权限变更后同步更新索引授权元数据，并让相关缓存失效" },
+      { "key": "D", "text": "让模型看到所有部门文档后，自觉选择不透露机密" }
+    ],
+    "answer": "A,B,C",
+    "explanation": "权限必须在数据进入模型上下文之前执行，缓存也不能跨租户复用敏感结果。提示词不能充当访问控制，授权元数据变化和文档删除还要贯穿索引与缓存生命周期。"
+  },
+  {
+    "n": 17,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "库存查询工具返回「SKU 必须为字符串」的参数错误，Agent 已两次原样重试。最合适的处理是？",
+    "options": [
+      { "key": "A", "text": "按工具 Schema 纠正参数类型并限制修正次数，仍失败则报告无法完成" },
+      { "key": "B", "text": "继续原样重试，直到服务端恰好接受请求" },
+      { "key": "C", "text": "编造一个库存充足的结果，避免用户等待" },
+      { "key": "D", "text": "取消工具参数校验，让模型提交任意 JSON" }
+    ],
+    "answer": "A",
+    "explanation": "参数校验失败属于需要修正输入的错误，不是盲目重试能恢复的临时故障。工具边界应有类型与业务校验、有限纠错和明确的失败出口。"
+  },
+  {
+    "n": 18,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "must_know",
+    "stem": "「创建付款单」工具超时，无法确定上游是否已经扣款。以下处理最安全的是？",
+    "options": [
+      { "key": "A", "text": "立即用新请求号重试扣款，确保至少有一单成功" },
+      { "key": "B", "text": "用原幂等键查询执行状态或安全重试，并向用户标注处理中而非成功" },
+      { "key": "C", "text": "直接向用户宣布付款成功，等待对账系统日后修正" },
+      { "key": "D", "text": "让模型自行再发起一次不同金额的付款，观察哪笔成功" }
+    ],
+    "answer": "B",
+    "explanation": "超时代表结果未知，而非确定失败。有副作用的操作需要稳定幂等键、状态查询和对账能力，不能把未知结果包装成成功，也不能用新请求号制造重复扣款。"
+  },
+  {
+    "n": 19,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "旅行规划 Agent 在「查天气→查酒店→再查天气」之间循环，已经重复相同调用八次。最合理的止损方案是？",
+    "options": [
+      { "key": "A", "text": "记录状态与工具签名，检测重复进展，叠加步数、时长和费用上限后降级结束" },
+      { "key": "B", "text": "把每个工具的超时时间翻倍，等待 Agent 自行发现问题" },
+      { "key": "C", "text": "删除全部历史轨迹，让每次循环看起来都是第一次" },
+      { "key": "D", "text": "只提高模型温度，不设置任何编排层终止条件" }
+    ],
+    "answer": "A",
+    "explanation": "循环治理需要检测「状态没有推进」和重复工具调用，并由编排层执行硬预算。终止后可返回已有信息、请求补充约束或转人工，但应保留轨迹供归因。"
+  },
+  {
+    "n": 20,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "只读库存工具返回 HTTP 429，并携带 Retry-After。Agent 怎样处理最合理？",
+    "options": [
+      { "key": "A", "text": "立即密集重试，抢先占用刚释放的服务容量" },
+      { "key": "B", "text": "尊重等待提示并加入退避与抖动，在次数和全链路时间预算内重试，失败则降级" },
+      { "key": "C", "text": "把它当作参数类型错误，随机修改库存编号后重试" },
+      { "key": "D", "text": "忽略工具失败，直接根据训练知识生成当前库存" }
+    ],
+    "answer": "B",
+    "explanation": "429 表示请求节奏或配额受限，指数退避与抖动可避免同步重试风暴，等待提示和全链路截止时间也必须被尊重。错误分类决定后续动作：参数错误应修正输入，权限拒绝应停止或换授权路径，结果未知的副作用操作则要查状态。"
+  },
+  {
+    "n": 21,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "部署与推理",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "主模型持续故障，备用检索和模板仍能回答少数高频问题。最合适的降级策略是？",
+    "options": [
+      { "key": "A", "text": "保持无限重试，把请求全部挂起直到主模型恢复" },
+      { "key": "B", "text": "对已验证的高频问题给出带标识的有限答案，其余请求明确暂不可用" },
+      { "key": "C", "text": "让模型凭通用知识生成完整答案，并隐藏当前处于降级状态" },
+      { "key": "D", "text": "把尚未完成的请求全部标记成功，避免错误率升高" }
+    ],
+    "answer": "B",
+    "explanation": "降级应缩小能力范围而不是伪造完整能力。只服务经过验证的场景、明示结果性质并保留人工或稍后重试出口，比无限等待或无依据生成更可控。"
+  },
+  {
+    "n": 22,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "部署与推理",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "限流策略应优先依据哪种容量指标，才能避免「QPS 不高却仍把模型服务打满」？",
+    "options": [
+      { "key": "A", "text": "只看请求数，因为每个模型调用的计算量完全相同" },
+      { "key": "B", "text": "结合并发、输入输出 token 预算与在途工作量，而不是只设全局 QPS" },
+      { "key": "C", "text": "只看客户端页面数量，忽略实际生成长度" },
+      { "key": "D", "text": "只限制每日成功请求数，所有超时请求都不占资源" }
+    ],
+    "answer": "B",
+    "explanation": "长输入的 prefill、长输出的 decode 和重试消耗差异很大，固定 QPS 无法代表真实负载。应结合并发和 token 工作量进行准入控制，同时保留用户与租户配额。"
+  },
+  {
+    "n": 23,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "部署与推理",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "免费和付费租户共用一个模型密钥，故障期需要保证付费核心链路。哪种限流与配额设计更合理？",
+    "options": [
+      { "key": "A", "text": "所有租户共享一个无差别计数器，先到的请求耗尽全部额度" },
+      { "key": "B", "text": "按租户与业务优先级分配配额和并发舱位，对低优先级请求提前限流或降级" },
+      { "key": "C", "text": "让前端声明自己的优先级，服务端完全信任且不鉴权" },
+      { "key": "D", "text": "只在月底统计账单，不为在途请求设置任何限制" }
+    ],
+    "answer": "B",
+    "explanation": "多维配额和隔离舱位能防止低优先级流量挤占核心资源，限流决策必须由服务端基于可信身份执行。月度账单只能事后解释成本，不能保护正在运行的服务。"
+  },
+  {
+    "n": 24,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "部署与推理",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "私有 RAG 的知识库从 v1 升到 v2 后，相同问题仍频繁返回旧版答案。缓存层最应优先修复什么？",
+    "options": [
+      { "key": "A", "text": "把知识库版本纳入缓存键，并对换版前的旧缓存执行失效；同时检查权限隔离与过期策略" },
+      { "key": "B", "text": "延长所有缓存的 TTL，让旧答案服务更多请求以降低成本" },
+      { "key": "C", "text": "只用问题原文做全局缓存键，把相同问题跨租户合并" },
+      { "key": "D", "text": "保留旧缓存不变，只在提示中提醒模型尽量使用新知识" }
+    ],
+    "answer": "A",
+    "explanation": "缓存键必须覆盖会影响答案的版本和权限上下文，换版还应主动失效旧条目。除知识库版本外，租户权限、提示版本、模型与参数也可能影响结果；命中率必须和正确性、时效、隔离一起评估。"
+  },
+  {
+    "n": 25,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "面向外部用户的 LLM 服务上线内容安全措施，哪些层次需要同时考虑？",
+    "options": [
+      { "key": "A", "text": "输入侧识别攻击、违法有害请求与异常文件，定义可执行的拦截策略" },
+      { "key": "B", "text": "输出侧检查敏感信息和不适当内容，并提供安全的拒答或转人工路径" },
+      { "key": "C", "text": "记录策略版本、命中类型和处置结果，用误判与漏判样本迭代规则" },
+      { "key": "D", "text": "只在系统提示中写一句「不要出错」，不设置任何校验和复核" }
+    ],
+    "answer": "A,B,C",
+    "explanation": "内容安全是输入、生成、输出和运营复核的闭环，不是一条自然语言指令。误判会影响正常用户，漏判会形成合规风险，两者都需要样本与指标持续治理。"
+  },
+  {
+    "n": 26,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "要限制「网页里的恶意指令诱导 Agent 导出客户资料」的风险，哪些控制比单纯提示更有效？",
+    "options": [
+      { "key": "A", "text": "网页内容仅作不可信数据，导出工具按用户权限和参数白名单单独鉴权" },
+      { "key": "B", "text": "敏感导出执行前进行人工确认，并限制目标地址、数据范围和调用频次" },
+      { "key": "C", "text": "记录触发导出的来源、审批与执行结果，对异常行为告警" },
+      { "key": "D", "text": "把所有网页内容直接并入系统消息，让它拥有与开发者相同的指令权限" }
+    ],
+    "answer": "A,B,C",
+    "explanation": "提示注入无法靠一句提示彻底消除，应把数据与指令分离，并在真正产生副作用的工具边界做最小权限、参数约束、审批和审计。系统消息不是不可信网页该进入的位置。"
+  },
+  {
+    "n": 27,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "为一次「客服自动退款」事故编写审计日志，以下哪种记录最有调查价值？",
+    "options": [
+      { "key": "A", "text": "只写「模型调用成功」，不保留任何操作上下文" },
+      { "key": "B", "text": "记录关联标识、操作者、工具参数摘要、审批、结果和策略版本，敏感字段脱敏" },
+      { "key": "C", "text": "完整写入模型密钥、所有客户隐私及原始凭证，便于任何人查看" },
+      { "key": "D", "text": "只记录前端按钮颜色，不记录实际外部副作用" }
+    ],
+    "answer": "B",
+    "explanation": "审计要回答谁在何时基于什么上下文、经过何种授权、执行了什么动作以及结果如何，同时能关联追踪。它不是无边界收集敏感数据，密钥不应入日志，隐私字段需最小化与脱敏。"
+  },
+  {
+    "n": 28,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "一个 Agent 请求要串联检索、模型和三次工具调用，怎样才能定位「慢在哪一段」？",
+    "options": [
+      { "key": "A", "text": "为整条请求分配 trace id，在各阶段建立带父子关系的 span 并记录耗时与状态" },
+      { "key": "B", "text": "只在进程启动时打一条日志，请求结束后不再记录" },
+      { "key": "C", "text": "把每次调用的日志随机改名，避免它们能够串联" },
+      { "key": "D", "text": "只统计接口 200 响应数，把响应体中的失败全部忽略" }
+    ],
+    "answer": "A",
+    "explanation": "统一追踪标识和父子跨度可还原请求经过的检索、模型与工具节点，并把耗时、重试和失败归到具体阶段。HTTP 200 只说明传输或查询成功，不等于业务任务成功。"
+  },
+  {
+    "n": 29,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "部署与推理",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "账单突然翻倍，但业务请求量基本不变。哪组数据最有助于快速定位成本来源？",
+    "options": [
+      { "key": "A", "text": "按模型、租户、功能和结果状态统计输入输出 token、缓存命中与重试次数" },
+      { "key": "B", "text": "只统计前端每天的访问量，不区分是否调用模型" },
+      { "key": "C", "text": "只保留模型供应商名称，等待月底再次对账" },
+      { "key": "D", "text": "把所有请求合并成一个总数，删除输入输出长度信息" }
+    ],
+    "answer": "A",
+    "explanation": "成本需要按可行动的维度分解：输入与输出 token、模型档位、缓存命中、失败重试及 Agent 步数都会改变费用。租户与功能标签可进一步定位异常调用来自哪里。"
+  },
+  {
+    "n": 30,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "部署与推理",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "团队想把简单分类请求路由到小模型、复杂请求留给大模型。上线前最关键的验证是？",
+    "options": [
+      { "key": "A", "text": "小模型单价更低即可全量切换，无需考虑路由错误" },
+      { "key": "B", "text": "按任务难度分层验证质量，并计入路由误判、回退大模型后的总成本与延迟" },
+      { "key": "C", "text": "让路由器始终选最大模型，以证明小模型路由有效" },
+      { "key": "D", "text": "只比较模型参数量，不构造任何业务评测集" }
+    ],
+    "answer": "B",
+    "explanation": "路由的收益来自「简单请求足够便宜，复杂请求仍有质量」，误判会同时损害质量和成本。应把回退率、端到端延迟与两次调用的开销一起算，而不是只看小模型标价。"
+  },
+  {
+    "n": 31,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "部署与推理",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "某模型服务平均延迟正常，但高峰期用户大量超时。哪些指标和措施应优先纳入排查？",
+    "options": [
+      { "key": "A", "text": "观察 TTFT、完成时长与队列等待的分位数，而不是只看平均值" },
+      { "key": "B", "text": "按输入输出长度、模型与优先级拆分，检查长请求是否挤占容量" },
+      { "key": "C", "text": "结合并发限制、排队上限和负载测试结果评估准入与降级策略" },
+      { "key": "D", "text": "继续提高客户端超时，不设置队列或服务端资源上限" }
+    ],
+    "answer": "A,B,C",
+    "explanation": "平均值会掩盖高峰与长尾，p95/p99、队列和请求长度分布才能解释超时。单纯延长等待不会增加容量，还可能把更多在途工作堆进服务。"
+  },
+  {
+    "n": 32,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "部署与推理",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "模型供应商故障率升高，怎样设计熔断与恢复更合适？",
+    "options": [
+      { "key": "A", "text": "按可恢复错误与失败率触发熔断，给上游留出恢复时间" },
+      { "key": "B", "text": "用少量探测请求验证恢复，成功后逐步放回流量" },
+      { "key": "C", "text": "熔断期间走已验证的备用模型或有限降级，并记录降级比例" },
+      { "key": "D", "text": "让所有实例在同一时刻无限重试，以便尽快冲开故障窗口" }
+    ],
+    "answer": "A,B,C",
+    "explanation": "熔断用于阻止故障期间继续放大压力，恢复应经半开探测和渐进放量完成。同步无限重试会形成重试风暴，备用路径也必须预先验证质量与数据合规边界。"
+  },
+  {
+    "n": 33,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "线上样本显示，不少用户问「病假怎么申请」时系统引用了已废止制度并给出错误材料清单。怎样把这个问题纳入持续优化？",
+    "options": [
+      { "key": "A", "text": "脱敏收录失败样本，标注正确证据与失败类型，修复切片或时效过滤后回放回归" },
+      { "key": "B", "text": "只在群聊里提醒模型下次注意，不保存可复现的样本" },
+      { "key": "C", "text": "删除这次失败记录，保证历史成功率不下降" },
+      { "key": "D", "text": "把该用户的全部隐私对话长期公开给所有开发人员" }
+    ],
+    "answer": "A",
+    "explanation": "Bad Case 回流应包含脱敏、失败分类、正确证据或答案标注、修复、回放与指标复核。它把一次性投诉变成可复现的回归资产，同时仍需遵守数据最小化。"
+  },
+  {
+    "n": 34,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "接口成功率一直是 99.9%，但用户投诉「系统总给空答案」。最应补充哪类监控？",
+    "options": [
+      { "key": "A", "text": "增加业务成功率、空答案率、证据覆盖和人工接管率，而不只看 HTTP 状态" },
+      { "key": "B", "text": "继续只看 200 响应占比，认为接口成功就代表答案正确" },
+      { "key": "C", "text": "把空答案请求从统计样本里全部剔除" },
+      { "key": "D", "text": "将投诉工单数设为隐藏字段，不纳入任何看板" }
+    ],
+    "answer": "A",
+    "explanation": "技术可用性与任务完成质量是不同维度。HTTP 成功仍可能返回空内容、格式错误或无依据回答，因此需要业务结果指标、内容抽检及用户反馈形成互补。"
+  },
+  {
+    "n": 35,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "为「错误回答进入生产」设计告警，怎样避免看板有数据却没人能处理？",
+    "options": [
+      { "key": "A", "text": "按业务影响设阈值与持续时间，区分质量异常、流量变化和上游故障" },
+      { "key": "B", "text": "告警附带 trace、版本与代表性失败样本，并提供处置手册和负责人" },
+      { "key": "C", "text": "控制重复告警，记录确认、处置和恢复过程，定期复核误报" },
+      { "key": "D", "text": "所有指标每次轻微波动都向全员群发，不提供任何上下文" }
+    ],
+    "answer": "A,B,C",
+    "explanation": "有效告警必须可行动，包含影响范围、归因线索与处理责任，并控制噪声。只看绝对阈值或频繁群发会造成告警疲劳，最终让真正的事故被忽视。"
+  },
+  {
+    "n": 36,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "项目新增「召回率提升、失败降级、token 成本下降」三项成果，面试时哪种表述最能支撑这些结论？",
+    "options": [
+      { "key": "A", "text": "讲清业务问题、方案取舍、指标口径与优化前后数据，再补一个关键失败案例" },
+      { "key": "B", "text": "只罗列 LangChain、向量数据库和多个模型名称，不解释为什么使用" },
+      { "key": "C", "text": "声称系统已完全消除幻觉，因此无需说明评测样本与限制" },
+      { "key": "D", "text": "只讲最初的功能演示，避开所有线上异常和失败分支" }
+    ],
+    "answer": "A",
+    "explanation": "可验证的项目表达应形成问题、方案、指标、踩坑闭环：为什么这样做、如何度量、优化前后怎样、哪些场景仍不成立。技术名词本身不能证明工程能力。"
+  },
+  {
+    "n": 37,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "把一个 demo 包装成「能上线、能兜底、能优化」的项目证据，还应补齐哪些工作？",
+    "options": [
+      { "key": "A", "text": "给核心链路补失败注入与降级测试，保留可复现的异常轨迹" },
+      { "key": "B", "text": "建立带版本的质量与成本基线，展示优化前后的同口径对比" },
+      { "key": "C", "text": "补充权限、审计、内容安全及数据保留策略，并说明适用边界" },
+      { "key": "D", "text": "只在成功路径上演示，所有未实现的能力都写成已经生产验证" }
+    ],
+    "answer": "A,B,C",
+    "explanation": "工程证据来自可复现的测试、同口径指标和明确的安全边界，而不是更长的技术栈列表。模拟故障应如实标注，不能把尚未上线的能力包装成生产事实。"
+  },
+  {
+    "n": 38,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "一次模型版本升级后离线质量分上升，但线上客诉反而增加。合理的复核方向有哪些？",
+    "options": [
+      { "key": "A", "text": "核对离线与线上的提示、检索索引、工具权限和采样配置是否一致" },
+      { "key": "B", "text": "检查评测集是否覆盖真实流量及近期 Bad Case，是否存在样本泄漏或分布偏差" },
+      { "key": "C", "text": "查看拒答、空答案、工具失败和降级比例，按场景下钻而非只看均分" },
+      { "key": "D", "text": "认定用户不理解新模型，立即停止收集线上失败样本" }
+    ],
+    "answer": "A,B,C",
+    "explanation": "离线提升不保证线上提升，需先排除链路配置不一致和评测代表性问题，再分解真实失败。线上 Bad Case 是发现分布变化的重要证据，不能因与离线结论冲突就丢弃。"
+  },
+  {
+    "n": 39,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "对比「固定字数切片」与「按标题语义切片」，为了公平且能解释结果，应固定或记录哪些变量？",
+    "options": [
+      { "key": "A", "text": "文档与评测集快照、embedding 模型和向量索引参数" },
+      { "key": "B", "text": "召回数量、重排策略、提示模板与生成模型配置" },
+      { "key": "C", "text": "切片的上下文保留方式，以及检索、答案质量和索引成本指标" },
+      { "key": "D", "text": "给语义切片单独换更强的生成模型，同时宣称提升全部来自切片" }
+    ],
+    "answer": "A,B,C",
+    "explanation": "切片实验要控制下游变量并记录完整版本，否则检索与生成差异会混在一起。除质量外还要衡量索引构建、存储和延迟成本，避免为微小收益付出过高代价。"
+  },
+  {
+    "n": 40,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "模型调用日志要用于成本统计和事故排查，又不能让日志本身成为新的泄露源，哪些做法合适？",
+    "options": [
+      { "key": "A", "text": "记录必要的 token 用量、耗时、状态、模型和提示版本等元数据" },
+      { "key": "B", "text": "密钥、凭证和敏感正文默认不落日志，必要字段做脱敏或受控引用" },
+      { "key": "C", "text": "设置访问权限、保留期限和删除策略，审计日志本身的访问也可追踪" },
+      { "key": "D", "text": "为方便全文检索，把所有用户的敏感原文永久写入公共日志桶" }
+    ],
+    "answer": "A,B,C",
+    "explanation": "可观测不等于无限收集。元数据通常足以做成本与稳定性归因，敏感原文应最小化、受控保存，并对访问和生命周期做管理，防止运维系统扩大数据暴露面。"
+  },
+  {
+    "n": 41,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "批量对一百段员工咨询做意图分类，结果需要写入后续程序。相比自由文本，更合适的调用设计是？",
+    "options": [
+      { "key": "A", "text": "固定标签集合与输出 Schema，逐条校验结果并单独处理失败样本" },
+      { "key": "B", "text": "要求模型自由发挥分类名称，由人工事后猜测各名称含义" },
+      { "key": "C", "text": "每段咨询随机更换标签定义，让输出更丰富" },
+      { "key": "D", "text": "只要接口返回 200，就不检查分类是否属于允许范围" }
+    ],
+    "answer": "A",
+    "explanation": "批量算法应用需要明确标签闭集、结构化输出、逐项校验与失败隔离，避免单条坏结果阻断整批或将非法标签流入下游。接口成功不代表分类合法。"
+  },
+  {
+    "n": 42,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Prompt 工程",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "客服应用中，系统消息与当轮用户消息的职责怎样划分更合理？",
+    "options": [
+      { "key": "A", "text": "系统消息承载稳定的角色、政策与输出边界，用户消息承载当轮问题与必要输入" },
+      { "key": "B", "text": "用户消息可自动覆盖平台所有安全策略，无需经过服务端校验" },
+      { "key": "C", "text": "系统消息只用于传递模型密钥，业务规则全部放到前端注释中" },
+      { "key": "D", "text": "两种消息没有任何区别，都应直接信任其中的所有指令" }
+    ],
+    "answer": "A",
+    "explanation": "稳定规则与临时输入应分层管理，但高优先级提示也不是安全边界。真正的身份、权限和敏感工具控制仍应由服务端执行，不能相信用户输入会服从提示。"
+  },
+  {
+    "n": 43,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "产品文档同时有中文 PDF、英文网页和扫描表格，建设知识库时首先应重视哪一步？",
+    "options": [
+      { "key": "A", "text": "按文档类型验证解析质量，保留章节、表格结构、语言和来源等元数据" },
+      { "key": "B", "text": "不检查抽取结果，直接将所有文件按固定字节切割并生成向量" },
+      { "key": "C", "text": "把所有扫描图片当成空白页跳过，但仍宣称知识库已覆盖全部资料" },
+      { "key": "D", "text": "删除来源与版本字段，让相同主题的文档无法区分" }
+    ],
+    "answer": "A",
+    "explanation": "RAG 的质量上限常在文档解析阶段就决定。文字层、扫描 OCR、表格结构和语言信息需要分别验收，并保留来源与版本，后续才能切片、授权、评测和追溯。"
+  },
+  {
+    "n": 44,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "企业已有稳定的票据字段规范与标注样本，希望用较小训练成本适配一个开源模型。哪种路线最值得优先试验？",
+    "options": [
+      { "key": "A", "text": "以 LoRA 等参数高效微调做对照实验，保留独立验证集和测试集" },
+      { "key": "B", "text": "从零预训练整个模型，不计算数据与算力成本" },
+      { "key": "C", "text": "直接把测试集混入训练集，以缩短达到高分的时间" },
+      { "key": "D", "text": "随机修改基座模型权重，不保留任何版本或评估结果" }
+    ],
+    "answer": "A",
+    "explanation": "参数高效微调适合在有限资源和明确任务上验证适配收益，但数据质量、划分、防泄漏与回归仍不可省。它不应被理解为必然优于提示或 RAG。"
+  },
+  {
+    "n": 45,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "「搜集资料并生成图文周报」的多 Agent 流程中，哪种职责边界最清晰？",
+    "options": [
+      { "key": "A", "text": "资料角色只读检索并交付带来源的结构化素材，写作角色按约定消费，编排层核验后才申请发布" },
+      { "key": "B", "text": "所有角色共享一个可任意改写的草稿和发布密钥，谁先完成谁就自动上线" },
+      { "key": "C", "text": "写作角色可凭空补事实，资料角色不再保留来源，图像角色直接覆盖正文" },
+      { "key": "D", "text": "只按角色名划分职责，不约定输入输出、权限、错误状态或审批边界" }
+    ],
+    "answer": "A",
+    "explanation": "多 Agent 应围绕明确的输入产物、最小权限和可校验交付物分工，而不是只换角色名称。来源、版本、失败状态与发布审批需要由编排层管理，图像生成等其他角色也应遵守同一份交付契约。"
+  },
+  {
+    "n": 46,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "业务要求所有「删除云资源」建议都不能直接执行。以下哪项落地最可靠？",
+    "options": [
+      { "key": "A", "text": "将建议与执行分离，删除工具默认不开放；确需执行时独立鉴权、审批并留审计" },
+      { "key": "B", "text": "只在提示里写「不要删除」，同时给 Agent 配置管理员永久密钥" },
+      { "key": "C", "text": "先让 Agent 删除资源，再根据最终回答判断是否合适" },
+      { "key": "D", "text": "把删除工具重命名为只读工具，以绕过权限系统" }
+    ],
+    "answer": "A",
+    "explanation": "不可逆云资源操作必须由确定性权限与审批机制控制，不能依赖模型自觉遵守提示。工具默认不开放是最小权限的直接体现，例外路径需单独授权、审批和追踪。"
+  },
+  {
+    "n": 47,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Prompt 工程",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "客服意图分类的输出标签偶尔漂移，团队准备把 temperature 从 0.7 调到 0。正确的预期是？",
+    "options": [
+      { "key": "A", "text": "可减少采样随机性，但仍需明确标签约束、校验结果并回放测试集" },
+      { "key": "B", "text": "能彻底修复知识缺失、提示注入和所有标签语义错误" },
+      { "key": "C", "text": "会自动扩大模型上下文窗口，使检索变得多余" },
+      { "key": "D", "text": "能保证所有供应商和版本每次都返回逐字节相同结果" }
+    ],
+    "answer": "A",
+    "explanation": "temperature 影响采样分布，不是事实正确性或确定性的万能开关。分类任务还应限定标签集合、结构化输出、校验与评测；即使低温也不能承诺跨环境完全一致。"
+  },
+  {
+    "n": 48,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "希望学生模型继承教师模型的分类能力，同时降低部署成本。哪种方案最贴合？",
+    "options": [
+      { "key": "A", "text": "用教师输出或中间信号指导小模型训练，再独立验证学生模型的质量与资源消耗" },
+      { "key": "B", "text": "把每次学生请求都转发给教师模型，不训练学生模型" },
+      { "key": "C", "text": "增大学生模型的参数量，使其最终与教师模型完全相同" },
+      { "key": "D", "text": "只修改学生模型名称，宣称权重已经自动蒸馏完成" }
+    ],
+    "answer": "A",
+    "explanation": "蒸馏通过教师监督信号训练更小的学生模型，目标是在可接受质量损失下降低推理成本。教师在线代理不是蒸馏，学生仍需独立质量、偏差和性能评测。"
+  },
+  {
+    "n": 49,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "kind": "multiple",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "对比基于 LlamaIndex 搭建的 RAG 原型时，哪些组件边界应在方案中说清楚？",
+    "options": [
+      { "key": "A", "text": "文档加载与解析、节点切片及元数据来源" },
+      { "key": "B", "text": "向量或关键词检索、可选重排及查询时的过滤条件" },
+      { "key": "C", "text": "响应生成的提示、引用返回和失败时的行为" },
+      { "key": "D", "text": "只写使用了某框架，默认它会自动保证事实正确与数据权限" }
+    ],
+    "answer": "A,B,C",
+    "explanation": "框架负责组织索引、检索和响应组件，但文档质量、召回策略、过滤、提示与失败行为仍由应用负责。说明组件边界才能定位问题，框架名不是质量或安全保证。"
+  },
+  {
+    "n": 50,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "在托管大模型平台上线企业知识助手，除了能调用模型，还应核对哪些生产事项？",
+    "options": [
+      { "key": "A", "text": "应用、知识库、提示和模型版本是否可追踪，发布能否灰度与回滚" },
+      { "key": "B", "text": "密钥、数据权限、内容安全和日志保留是否符合企业边界" },
+      { "key": "C", "text": "评测、限流、超时、费用监控与故障降级是否有明确配置和责任人" },
+      { "key": "D", "text": "平台页面显示「发布成功」后，就免除应用自身的权限与质量验收" }
+    ],
+    "answer": "A,B,C",
+    "explanation": "托管平台可以简化开发、评测和部署，但不会替业务方自动完成权限、质量与成本治理。发布成功是流程节点，不是端到端生产验收结论。"
+  },
+  {
+    "n": 51,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "多模态助手识别票据照片时金额模糊，系统应优先采取哪种行为？",
+    "options": [
+      { "key": "A", "text": "标记金额低置信度并请求补拍或人工确认，不将猜测值用于付款" },
+      { "key": "B", "text": "从相近票据中任选一个金额补齐，直接自动付款" },
+      { "key": "C", "text": "删除图片质量信息，只保留模型最自信的文本结论" },
+      { "key": "D", "text": "把 temperature 调高，以多次生成中的多数金额作为真实票据值" }
+    ],
+    "answer": "A",
+    "explanation": "图像模糊属于输入证据不足，应暴露不确定性并进入补拍或人工复核。投票和高温生成不能恢复丢失的视觉信息，高风险字段更不能靠猜测补齐。"
+  },
+  {
+    "n": 52,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "微调后的模型在票据测试集上表现很好，但换到另一家企业的票据就频繁漏字段。最合理的下一步是？",
+    "options": [
+      { "key": "A", "text": "按版式和供应商分层评测，补充代表性训练样本并检查数据标注与分布偏移" },
+      { "key": "B", "text": "继续增加原训练集的重复轮次，不分析不同版式的失败样本" },
+      { "key": "C", "text": "将所有新版票据加入测试集并同时训练，仍沿用原测试分数" },
+      { "key": "D", "text": "把漏字段一律归为可接受行为，避免修改数据或模型" }
+    ],
+    "answer": "A",
+    "explanation": "跨版式失效提示泛化或数据代表性不足，应先分层定位，再补充覆盖真实分布的高质量样本。重复训练已知数据可能加重过拟合，训练测试混用则会破坏评估可信度。"
+  },
+  {
+    "n": 53,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "企业准备把内部制度问答接入托管模型服务，发布前最不应遗漏哪项合规核查？",
+    "options": [
+      { "key": "A", "text": "确认数据发送范围、供应商处理与留存条款、访问权限及必要的脱敏措施" },
+      { "key": "B", "text": "认为模型回答流畅即可，不需要确认企业数据会被如何处理" },
+      { "key": "C", "text": "把所有密钥写入前端代码，便于浏览器直接请求托管服务" },
+      { "key": "D", "text": "将全部员工对话默认用于公开训练，无需任何授权或告知" }
+    ],
+    "answer": "A",
+    "explanation": "数据离开企业边界前，应核查用途、留存、访问和供应商条款，并只发送必要数据。托管服务的易用性不替代数据合规与密钥管理，也不意味着可以任意复用员工内容。"
+  },
+  {
+    "n": 54,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Prompt 工程",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "长对话助手把每次历史消息都完整发送，近期成本和延迟持续上升。哪种优化最有针对性？",
+    "options": [
+      { "key": "A", "text": "按任务保留必要状态与近期消息，对旧历史做可回溯摘要并设置 token 预算" },
+      { "key": "B", "text": "不区分内容重要性，将所有历史原样重复两遍以增强记忆" },
+      { "key": "C", "text": "只提高输出 token 上限，让每次回答更长以占用更多上下文" },
+      { "key": "D", "text": "关闭所有状态管理，期待模型自动记得从未发送的历史" }
+    ],
+    "answer": "A",
+    "explanation": "对话历史需要预算与信息管理：保留当前约束和事实，对旧内容做结构化摘要，并保留必要来源以便追溯。优化后还应评测关键事实遗忘与多轮任务成功率。"
+  },
+  {
+    "n": 55,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "部署与推理",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "平台同时提供多种模型档位，团队希望「成本不超预算且核心任务不降级」。哪种发布方案更完整？",
+    "options": [
+      { "key": "A", "text": "按场景设质量门槛和 token 预算，灰度比较模型档位，超预算走已验证的降级与告警" },
+      { "key": "B", "text": "全部请求永久选择最贵模型，不记录质量或成本，认为价格能替代验收" },
+      { "key": "C", "text": "全部请求立即切到最便宜模型，不保留回退，也不区分任务难度" },
+      { "key": "D", "text": "只按单次调用的标价做决策，忽略重试、输出长度与额外工具成本" }
+    ],
+    "answer": "A",
+    "explanation": "模型选型应以场景质量门槛为约束，再比较端到端成本与延迟，并保留灰度、回退和预算保护。价格高低都不能替代业务评测，额外调用也必须计入总成本。"
+  },
+  {
+    "n": 56,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "发布一个会自动调用外部插件的办公 Agent，怎样验证插件不会放大提示注入风险？",
+    "options": [
+      { "key": "A", "text": "构造含恶意指令的网页、文件和工具返回，测试是否能诱导越权调用" },
+      { "key": "B", "text": "验证插件域名与参数白名单、最小权限、审批和审计在异常路径仍生效" },
+      { "key": "C", "text": "分别记录内容拦截、工具拒绝和人工接管结果，而不只统计最终文本是否温和" },
+      { "key": "D", "text": "只测试正常网页，假定工具返回的内容永远不可能含攻击指令" }
+    ],
+    "answer": "A,B,C",
+    "explanation": "插件把不可信内容转化为现实动作，安全测试必须覆盖完整攻击链和异常路径。最终文本安全不代表没有执行危险工具，应单独断言授权、审批和副作用边界。"
+  },
+  {
+    "n": 57,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "将「回答错误率下降」作为微调上线依据时，哪些信息必须与结论一起呈现？",
+    "options": [
+      { "key": "A", "text": "训练、验证和测试数据的来源、去重与隔离方式" },
+      { "key": "B", "text": "基座与微调版本、评测口径、样本量和主要失败类型" },
+      { "key": "C", "text": "通用能力与重点业务的分层回归，以及推理成本、延迟变化" },
+      { "key": "D", "text": "只展示几条微调后答对的案例，隐藏与基座模型相同的失败样本" }
+    ],
+    "answer": "A,B,C",
+    "explanation": "微调结论要可复现且能解释边界，数据隔离、版本、样本量、失败分类和非功能开销缺一不可。只展示成功案例不能证明整体提升，也无法发现通用能力退化。"
+  },
+  {
+    "n": 58,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "同一制度的新旧版本同时存在于知识库，模型回答引用了旧版。哪些改进形成完整闭环？",
+    "options": [
+      { "key": "A", "text": "为文档维护生效时间、版本与失效状态，在检索时执行确定性过滤" },
+      { "key": "B", "text": "建立冲突版本与时效问题样本，验证答案引用的是当前有效版本" },
+      { "key": "C", "text": "版本切换后核对旧索引和缓存失效，并为异常引用配置告警与回流" },
+      { "key": "D", "text": "保留所有版本并让模型凭文本风格猜测哪个有效，不返回文档日期" }
+    ],
+    "answer": "A,B,C",
+    "explanation": "版本冲突应由元数据和索引生命周期解决，而不是让模型猜。检索过滤、评测样本、缓存失效、异常监控和 Bad Case 回流共同构成可验证的时效治理。"
+  },
+  {
+    "n": 59,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "工具偶发不可用，但 Agent 已拿到部分可信资料。怎样向用户收口更合理？",
+    "options": [
+      { "key": "A", "text": "区分已核实事实与缺失部分，明确哪些结论暂时不能给出" },
+      { "key": "B", "text": "保留失败工具与重试轨迹，提供稍后重试或人工处理入口" },
+      { "key": "C", "text": "当工具结果未知时标记任务未完成，不用 HTTP 200 包装成全部成功" },
+      { "key": "D", "text": "为了语气完整，让模型编造未返回的查询结果并声称已执行" }
+    ],
+    "answer": "A,B,C",
+    "explanation": "部分失败应产出有边界的部分结果，明确未知与可继续处理的路径，同时保存追踪证据。技术请求收到响应不等于任务完成，缺失事实不能由生成模型补齐。"
+  },
+  {
+    "n": 60,
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "为 AI 项目准备「问题—方案—指标—踩坑」面试材料，哪些内容能让证据经得起追问？",
+    "options": [
+      { "key": "A", "text": "解释为何选 RAG、工具或微调，以及放弃了哪些更复杂方案" },
+      { "key": "B", "text": "给出指标定义、样本范围、基线和优化前后结果，说明哪些是实测" },
+      { "key": "C", "text": "选择一个真实失败案例，讲清定位过程、修复动作和仍存的边界" },
+      { "key": "D", "text": "把所有功能都描述为已达到工业级，回避样本量与未验证的能力" }
+    ],
+    "answer": "A,B,C",
+    "explanation": "高质量表达不只是结构整齐，更要有取舍、可核验数字和失败归因。把模拟测试、离线结果与生产实测明确区分，主动说明限制，反而更能体现工程判断力。"
+  }
+]

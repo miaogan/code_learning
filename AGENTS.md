@@ -80,6 +80,8 @@
 
 - 2026-11-09：在线质量评测轨道脚手架（r54）：用户说「继续吧」，按上一轮建议落地唯一能把「管线没回归」升级为「模型/提示词因果证据」的地基。①`backend/app/services/eval/live.py` 纯函数层：`RunConfig` 版本锁定（prompt_version=`profile-r1` / model / rubric / 金标 sha256 / 提示词 sha256）、`TRACE_KEYS` 21 键白名单、`score_case` / `aggregate` / `wilson` / `compare_with_offline`（**明确 comparable=False，两轨差值不可相减**）/ `should_run_live`。②`scripts/eval_live.py`：默认 dry-run 零网络；`--check` 只读门禁进 CI；真跑需 `--live` + `AI_LIVE=1` + 运行时就绪**三条件**，不满足退出码 2、绝不静默出网；真跑日志写 `TemporaryDirectory` 的临时库不污染开发库。③**复用产品真实链路** `PROFILE_SYSTEM` + `ProfileDraft` + `AIClient.complete_model(retry_unavailable=True)`，不另写客户端。④产物 `docs/eval/traces/dry-run.jsonl`（只记元数据 + 输入 sha256 + 合成字段词，**不含简历正文 / Key / 提示词全文 / 模型原始响应**）与 `docs/eval/LIVE-REPORT.md`（版本锁定 / 指标分母 / Wilson / 双轨并列 / 解读限制）。⑤有意偏差逐条记在 `TECHNICAL.md §8.3`：**token 成本未采集**（`AIClient` 不暴露 usage，不编造估算值）、轨迹只回放元数据、不含 `verify_quotes()`、pass@k 与评分 MAE 未实现、**真实模型一次都没跑过**。⑥CI 新增 `Live eval dry-run gate`（仅 dry-run `--check`），在线真跑刻意不进 CI。⑦`backend/tests/test_r54_live_eval.py` 10 条（版本锁定 / 脱敏 / 分母 / 双开关 / CLI 只读与拒绝出网），`ruff check app tests` 全过；dry-run 实测 30 例 schema 96.7%、micro-F1 98.5%、Wilson `[83.3%, 99.4%]`。**注意**：dry-run 的 schema 判定与离线 harness / 真跑 `ProfileDraft` 三者口径不同，报告已写明不可相减。
 
+- 2026-11-10：ACP 应用工程题库扩充（r55）：按「场景判断 / 工程兜底 / 评测意识 / 面试表达」短板新增 60 道原创练习题（单选 40 / 多选 20；基础 11 / 进阶 32 / 挑战 17），覆盖 ACP 六大知识领域，重点补 RAG 指标、Agent 异常与幂等、安全审计、成本性能、可观测与 Bad Case 回流。素材 `docs/question-bank-staging/12-acp-engineering.json`，新来源 `acp-eng` / 前缀 `acpeng-`，题库 1164 → 1224、AI 工程 233 → 293；沿用五个既有 AI 工程二级方向，无前端、HTTP 契约或表结构变更。题目非官方真题，完整范围与验证见本任务夹。
+
 <!-- teamflow:begin -->
 ## TeamFlow 托管区（本块由 TeamFlow 自动维护，团队请勿手改）
 

@@ -271,7 +271,8 @@ def test_generated_bank_has_no_ai_placeholder(bank_rows: list[dict[str, Any]]) -
 #: r12 新增来源闭集（与 `question_merge.SOURCES` 同一口径；门禁是唯一断言点故写字面量）。
 #: r47 追加 `ai-adv`（10 号素材，AI 工程高阶题 40 道）。
 #: r48 追加 `ai-sys`（11 号素材，多 Agent 编排 / RAG 评审 / harness 工程 36 道）。
-R12_SOURCES = ("tiji", "local100", "iq380", "fe-interview", "ai-eng", "mw", "sql", "algo", "devprac", "ai-adv", "ai-sys")
+#: r55 追加 `acp-eng`（12 号素材，ACP 应用工程原创练习题 60 道）。
+R12_SOURCES = ("tiji", "local100", "iq380", "fe-interview", "ai-eng", "mw", "sql", "algo", "devprac", "ai-adv", "ai-sys", "acp-eng")
 #: 每来源条数：`seed` 是存量 260 行（种子不写 `source`，读侧缺省 `'seed'`）。
 R12_SOURCE_COUNTS = {
     "seed": 260,
@@ -286,9 +287,10 @@ R12_SOURCE_COUNTS = {
     "devprac": 50,
     "ai-adv": 40,
     "ai-sys": 36,
+    "acp-eng": 60,
 }
-#: 合并后总量（= 存量 260 + 本批 904，其中 r47 追加 40、r48 追加 36）。
-R12_TOTAL = 1164
+#: 合并后总量（= 存量 260 + 本批 964，其中 r55 追加 60）。
+R12_TOTAL = 1224
 
 
 def test_r12_source_enum_and_per_source_counts(bank_rows: list[dict[str, Any]]) -> None:
@@ -305,7 +307,7 @@ def test_r12_source_enum_and_per_source_counts(bank_rows: list[dict[str, Any]]) 
 
 
 def test_r12_total_after_merge_is_1088(bank_rows: list[dict[str, Any]]) -> None:
-    """r12/r47/r48：合并后总量恰 1164（260 存量 + 904 新增），且 904 道全是客观题。"""
+    """r12/r47/r48/r55：合并后总量恰 1224（260 存量 + 964 新增），且新增全是客观题。"""
     assert len(bank_rows) == R12_TOTAL, f"题库总量 {len(bank_rows)} ≠ {R12_TOTAL}"
     merged = [row for row in bank_rows if str(row.get("source") or "") in R12_SOURCES]
     assert len(merged) == R12_TOTAL - R12_SOURCE_COUNTS["seed"]
@@ -315,6 +317,22 @@ def test_r12_total_after_merge_is_1088(bank_rows: list[dict[str, Any]]) -> None:
     assert len(_new_rows(bank_rows)) == len(NEW_ID_LANGUAGE) * LANGUAGE_QUOTA, (
         "r11 的 180 道语言题不得被合并逻辑吞掉（id 前缀判定口径不变）"
     )
+
+
+def test_r55_acp_batch_preserves_scope_and_distribution(bank_rows: list[dict[str, Any]]) -> None:
+    """r55：60 道 ACP 原创练习题进入既有 AI 工程筛选，不新增空子方向或契约。"""
+    rows = [row for row in bank_rows if str(row.get("source") or "") == "acp-eng"]
+    assert Counter(str(row["kind"]) for row in rows) == {"single": 40, "multiple": 20}
+    assert Counter(str(row["sub_direction"]) for row in rows) == {
+        "通用 AI": 22,
+        "LLM 与 RAG": 12,
+        "Agent": 12,
+        "部署与推理": 9,
+        "Prompt 工程": 5,
+    }
+    assert all(str(row["direction"]) == "AI 工程" for row in rows)
+    assert all(str(row.get("language") or "") == "" for row in rows)
+    assert all(str(row["id"]).startswith("acpeng-") for row in rows)
 
 
 def test_r12_generic_directions_stay_language_free(bank_rows: list[dict[str, Any]]) -> None:

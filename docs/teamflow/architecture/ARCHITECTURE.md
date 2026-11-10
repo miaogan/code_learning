@@ -186,7 +186,7 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
 #### 3.4.2 题库 id 前缀与 `source` 口径（r16 定稿）
 
 外部素材（`docs/question-bank-staging/`）并入 seed 时，id 由 `question_merge.ID_PREFIX` 按「来源 + 源内原序（1 起，`%03d`）」生成；
-**四前缀与来源一一对应、不得改名**（改名会让 `--rollback` 与已部署库的既有行分叉）：
+**已登记前缀与来源一一对应、不得改名**（改名会让 `--rollback` 与已部署库的既有行分叉）：
 
 | `source` | 种子 id 前缀 | 示例 | 素材 | 许可留痕 |
 | --- | --- | --- | --- | --- |
@@ -194,6 +194,14 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
 | `local100` | `l100-` | `l100-001` | `02-本地100题.json`（100 道） | 自建，见 `PROVENANCE.md` |
 | `iq380` | `iq380-` | `iq380-001` | `03-七方向379题.json`（379 道） | 自建，见 `PROVENANCE.md` |
 | `fe-interview` | `fei-` | `fei-001` | `04-fe-interview20.json`（20 道，MIT） | `NOTICE-fe-interview.md` |
+| `ai-eng` | `aieng-` | `aieng-001` | `05-ai-engineering78.json`（103 道） | 自建，见 `PROVENANCE.md` |
+| `mw` | `mw-` | `mw-001` | `06-middleware.json`（76 道） | 自建，见 `PROVENANCE.md` |
+| `sql` | `sql-` | `sql-001` | `07-sql.json`（50 道） | 自建，见 `PROVENANCE.md` |
+| `algo` | `algo-` | `algo-001` | `08-basic-algo.json`（30 道） | 自建，见 `PROVENANCE.md` |
+| `devprac` | `devprac-` | `devprac-001` | `09-dev-practice.json`（50 道） | 自建，见 `PROVENANCE.md` |
+| `ai-adv` | `aiadv-` | `aiadv-001` | `10-ai-engineering-advanced.json`（40 道） | 自建，见 `PROVENANCE.md` |
+| `ai-sys` | `aisys-` | `aisys-001` | `11-ai-engineering-systems.json`（36 道） | 自建，见 `PROVENANCE.md` |
+| `acp-eng` | `acpeng-` | `acpeng-001` | `12-acp-engineering.json`（60 道） | 原创练习，见 `PROVENANCE.md` |
 
 - `iq380-` **刻意不用 `iq-`**：面试发言 id 同为 `iq-{序号}`（`runs.payload.questions[].id`），同名不同域，
   数据不撞但 grep / 日志会混淆，故加宽前缀。
@@ -331,7 +339,7 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
 | 题库组卷与选池 | `services/assessment/exam_selector.py`（`rank_pool` / `build_paper` / L1–L6 阶梯，结构闸门唯一实现） |
 | 诊断报告 + 课程匹配（AC-5/AC-6） | `services/report/diagnosis.py`、`routers/report.py`（含 `GET /markdown`）、`pages/ReportPage.tsx` |
 | 历史与趋势（AC-9/AC-10） | `services/interview/history.py`、`routers/history.py`、`pages/HistoryPage.tsx`；r3 起含长期记忆聚合 |
-| 题库种子 779 道（r12 起） | `backend/app/seed/questions.json`（r6 起退为**唯一导入源**，运行时由 `questions` 表承载；r11 起每次启动幂等导入，r14 起启动同时覆写既有行差异）；素材输入与留痕在 `docs/question-bank-staging/`（`PROVENANCE.md` + `NOTICE-fe-interview.md`），id 前缀口径见 §3.4.2 |
+| 题库种子 1224 道（r55 起） | `backend/app/seed/questions.json`（r6 起退为**唯一导入源**，运行时由 `questions` 表承载；r11 起每次启动幂等导入，r14 起启动同时覆写既有行差异）；素材输入与留痕在 `docs/question-bank-staging/`（`PROVENANCE.md` + `NOTICE-fe-interview.md`），id 前缀口径见 §3.4.2 |
 | pydantic 契约模型（画像 5 维度 / 题目 / 报告 / 课程） | `backend/app/schemas.py` |
 | 后端测试 38 文件（pytest 零网络） | `backend/tests/*.py` |
 | 容器化交付（r10） | `docker-compose.yml`、`backend/Dockerfile`、`frontend/Dockerfile`、`frontend/nginx.conf`、`docker.env.example`、任务夹 `docs/teamflow/20261101-r10-docker-compose-deploy/DEPLOY.md`；`WEB_PORT=8080` 单端口对外、SQLite 落 `skillcoach-data` 卷 |
