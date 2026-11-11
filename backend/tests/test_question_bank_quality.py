@@ -272,7 +272,8 @@ def test_generated_bank_has_no_ai_placeholder(bank_rows: list[dict[str, Any]]) -
 #: r47 追加 `ai-adv`（10 号素材，AI 工程高阶题 40 道）。
 #: r48 追加 `ai-sys`（11 号素材，多 Agent 编排 / RAG 评审 / harness 工程 36 道）。
 #: r55 追加 `acp-eng`（12 号素材，ACP 应用工程原创练习题 60 道）。
-R12_SOURCES = ("tiji", "local100", "iq380", "fe-interview", "ai-eng", "mw", "sql", "algo", "devprac", "ai-adv", "ai-sys", "acp-eng")
+#: 系统架构场景批追加 `sys-arch`（13 号素材，研发工程实践 / 架构设计 60 道）。
+R12_SOURCES = ("tiji", "local100", "iq380", "fe-interview", "ai-eng", "mw", "sql", "algo", "devprac", "ai-adv", "ai-sys", "acp-eng", "sys-arch")
 #: 每来源条数：`seed` 是存量 260 行（种子不写 `source`，读侧缺省 `'seed'`）。
 R12_SOURCE_COUNTS = {
     "seed": 260,
@@ -288,9 +289,10 @@ R12_SOURCE_COUNTS = {
     "ai-adv": 40,
     "ai-sys": 36,
     "acp-eng": 60,
+    "sys-arch": 60,
 }
-#: 合并后总量（= 存量 260 + 本批 964，其中 r55 追加 60）。
-R12_TOTAL = 1224
+#: 合并后总量（= 存量 260 + 已登记素材 1024；系统架构场景批新增 60）。
+R12_TOTAL = 1284
 
 
 def test_r12_source_enum_and_per_source_counts(bank_rows: list[dict[str, Any]]) -> None:
@@ -306,8 +308,8 @@ def test_r12_source_enum_and_per_source_counts(bank_rows: list[dict[str, Any]]) 
             )
 
 
-def test_r12_total_after_merge_is_1088(bank_rows: list[dict[str, Any]]) -> None:
-    """r12/r47/r48/r55：合并后总量恰 1224（260 存量 + 964 新增），且新增全是客观题。"""
+def test_r12_total_after_merge_is_1284(bank_rows: list[dict[str, Any]]) -> None:
+    """合并后总量恰 1284（260 存量 + 1024 素材题），且素材题全是客观题。"""
     assert len(bank_rows) == R12_TOTAL, f"题库总量 {len(bank_rows)} ≠ {R12_TOTAL}"
     merged = [row for row in bank_rows if str(row.get("source") or "") in R12_SOURCES]
     assert len(merged) == R12_TOTAL - R12_SOURCE_COUNTS["seed"]
@@ -333,6 +335,40 @@ def test_r55_acp_batch_preserves_scope_and_distribution(bank_rows: list[dict[str
     assert all(str(row["direction"]) == "AI 工程" for row in rows)
     assert all(str(row.get("language") or "") == "" for row in rows)
     assert all(str(row["id"]).startswith("acpeng-") for row in rows)
+
+
+def test_system_architecture_batch_scope_and_distribution(bank_rows: list[dict[str, Any]]) -> None:
+    """60 道场景题固定进入「研发工程实践 / 架构设计」，防止空筛选入口回归。"""
+    rows = [row for row in bank_rows if str(row.get("source") or "") == "sys-arch"]
+    assert len(rows) == 60
+    assert Counter(str(row["kind"]) for row in rows) == {
+        "single": 40,
+        "multiple": 11,
+        "judge": 9,
+    }
+    assert Counter(str(row["difficulty"]) for row in rows) == {
+        "basic": 12,
+        "intermediate": 33,
+        "challenge": 15,
+    }
+    assert Counter(str(row["essentiality"]) for row in rows) == {
+        "must_know": 29,
+        "advanced": 31,
+    }
+    assert all(str(row["direction"]) == "研发工程实践" for row in rows)
+    assert all(str(row["sub_direction"]) == "架构设计" for row in rows)
+    assert all(str(row.get("language") or "") == "" for row in rows)
+    assert all(str(row["id"]).startswith("sysarch-") for row in rows)
+    judge_answers = Counter(
+        next(
+            str(option["text"])
+            for option in row["options"]
+            if str(option["key"]) in row["answer"]
+        )
+        for row in rows
+        if str(row["kind"]) == "judge"
+    )
+    assert judge_answers == {"正确": 6, "错误": 3}
 
 
 def test_r12_generic_directions_stay_language_free(bank_rows: list[dict[str, Any]]) -> None:

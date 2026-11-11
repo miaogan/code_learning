@@ -496,6 +496,53 @@ def test_sub_direction_auto_locks_parent_when_direction_is_all(tmp_db: Any) -> N
     assert paper["sub_direction_backfill"] == 4
 
 
+# --- 系统架构场景批：真实种子导入、二级方向与判分 ---------------------------
+
+
+def test_system_architecture_seed_import_is_idempotent(tmp_db: Any) -> None:
+    """真实 seed 首次导入 1284 道，重复导入与刷新均不新增或改写；只使用临时库。"""
+    assert question_bank.ensure_seeded() == 1284
+    assert repository.count_questions() == 1284
+    assert question_bank.import_seed() == 0
+    assert question_bank.refresh_from_seed() == 0
+    assert question_bank.ensure_seeded() == 1284
+    batch = [row for row in question_bank.practice_pool() if row["source"] == "sys-arch"]
+    assert len(batch) == 60
+    assert all(
+        row["direction"] == "研发工程实践" and row["sub_direction"] == "架构设计"
+        for row in batch
+    )
+    assert {row["id"] for row in batch} <= {
+        row["id"] for row in question_bank.exam_pool()
+    }, "人工复核的架构场景题应同时进入练习与笔试题池"
+
+
+def test_system_architecture_focus_and_objective_grading(tmp_db: Any) -> None:
+    """架构设计筛选恰出 60 道且无补位，三种客观题沿用统一判分入口。"""
+    question_bank.ensure_seeded()
+    focus = {"direction": "研发工程实践", "sub_direction": "架构设计"}
+    paper = practice.build_paper(**focus, limit=0)
+    ids = _ids(paper)
+    assert len(ids) == paper["hit_count"] == 60
+    assert all(question_id.startswith("sysarch-") for question_id in ids)
+    assert paper["sub_direction"] == "架构设计"
+    assert paper["sub_direction_backfill"] == 0
+    assert paper["filtered_count"] == 0
+    assert all("answer" not in row and "explanation" not in row for row in paper["questions"])
+    assert practice.stats(**focus)["hit"] == 60
+
+    for index, kind in ((1, "single"), (3, "multiple"), (5, "judge")):
+        question_id = f"sysarch-{index:03d}"
+        question = question_bank.find_question(question_id)
+        assert question is not None and question["kind"] == kind
+        session_id = f"ps_arch_{index}"
+        assert practice.submit_answer(session_id, question_id, question["answer"])["correct"] is True
+        wrong = [key for key in ("A", "B", "C", "D") if key not in question["answer"]]
+        if kind == "multiple":
+            wrong = question["answer"][:1]  # 多选少选不给部分分。
+        assert practice.submit_answer(session_id, question_id, wrong)["correct"] is False
+
+
 # --- r52：熟练题默认不进练习 -------------------------------------------------
 
 

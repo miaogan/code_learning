@@ -53,6 +53,7 @@ SOURCES: tuple[str, ...] = (
     "ai-adv",
     "ai-sys",
     "acp-eng",
+    "sys-arch",
 )
 
 #: 来源 → 素材文件名（`docs/question-bank-staging/` 下的可复现输入，必须随仓库提交）。
@@ -69,6 +70,7 @@ STAGING_FILES: dict[str, str] = {
     "ai-adv": "10-ai-engineering-advanced.json",
     "ai-sys": "11-ai-engineering-systems.json",
     "acp-eng": "12-acp-engineering.json",
+    "sys-arch": "13-system-architecture-scenarios.json",
 }
 
 #: 来源 → 种子 id 前缀（避开 legacy `fe-/be-/al-/cs-` 与 r11 九个语言前缀，保证
@@ -79,6 +81,7 @@ STAGING_FILES: dict[str, str] = {
 #: `aiadv-` 是面向高级 AI 应用工程师的补题批次（10 号素材），独立于 `aieng-` 便于按批审计。
 #: `aisys-` 是 11 号素材：多 Agent 编排 / RAG 评审 / 评测流水线工程，按批独立可审计。
 #: `acpeng-` 是 12 号素材：面向阿里云大模型 ACP 知识覆盖的原创应用工程练习题，非官方真题。
+#: `sysarch-` 是 13 号素材：研发工程实践 / 架构设计的常见业务场景题。
 ID_PREFIX: dict[str, str] = {
     "tiji": "tiji-",
     "local100": "l100-",
@@ -92,6 +95,7 @@ ID_PREFIX: dict[str, str] = {
     "ai-adv": "aiadv-",
     "ai-sys": "aisys-",
     "acp-eng": "acpeng-",
+    "sys-arch": "sysarch-",
 }
 
 #: 近重复口径：字符 n-gram 的 Jaccard 下界（常量只在这里，别处不得再写一个阈值）。

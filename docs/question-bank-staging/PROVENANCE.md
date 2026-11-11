@@ -131,3 +131,22 @@
   并新增 hit@10 计算场景，最终严格为 40 单选 / 20 多选；不是统计时篡改题型。
 - 未引用任何第三方题目文本；`--check` 与 `question_shuffle --check` 均逐字节 0 差异。
   回滚按 `question_merge.SOURCES` 全量删本批行（含 `acpeng-`），存量 260 行不受影响。
+
+## 9 追加素材 `13-system-architecture-scenarios.json`（2026-11-11）
+
+| 文件 | `source` | 种子 id 前缀 | 条数 | 来源性质 | 上游 / LICENSE |
+| --- | --- | --- | --- | --- | --- |
+| `13-system-architecture-scenarios.json` | `sys-arch` | `sysarch-` | 60 | 自建：AI 原创生成 + 逐条复核 | 无第三方题目来源，无第三方 LICENSE |
+
+- 全部归入 `研发工程实践 / 架构设计`、`language=""`，填补该二级方向原有 0 道的空筛选入口；
+  不迁移「通用后端」「通用运维」等其他方向中的缓存、幂等、限流或分库分表旧题。
+- 题型：single 40 / multiple 11 / judge 9（正确 6 / 错误 3）；
+  难度：basic 12 / intermediate 33 / challenge 15；必备度：must_know 29 / advanced 31。
+- 内容覆盖高并发读写、缓存一致性、幂等重试、异步任务、消息积压与乱序、分库分表、
+  服务拆分、最终一致、故障降级、多租户、分布式锁和容灾，强调业务约束与失败兜底，而非名词背诵。
+- 与全库逐条执行归一化题干及字符 2-gram Jaccard 查重，阈值 0.62；与原 1224 道题的
+  最高相似度约 0.1452。`--write` 实测读入 60 / 新增 60 / 越界 0 / 字面重复 0 / 近重复 0；
+  题库总量 1224 → 1284，研发工程实践 50 → 110，架构设计 0 → 60。
+- `question_merge --check` 与 `question_shuffle --check` 均逐字节 0 差异。
+  回滚按 `question_merge.SOURCES` 删除全部登记素材（含 `sysarch-`），保留存量 260 行；
+  不手工删 seed 或数据库记录。
