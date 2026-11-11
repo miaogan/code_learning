@@ -19,6 +19,9 @@ export const COACH_DETAIL_MAX = 400
 export const COACH_FOCUS_MAX = 40
 export const COACH_GOAL_MAX = 160
 
+/** 方向名排序固定用中文排序规则：默认 locale 在 CI（en-US）会退化成按码点排，同一份报告顺序会漂移。 */
+const ZH_COLLATOR = new Intl.Collator('zh-Hans-CN')
+
 /** 薄弱方向（已按错误率排序、按方向去重）：排序口径与报告页薄弱地图同源。 */
 export function weakDirectionsOf(report: Report): WeaknessItem[] {
   const map = report.weakness_map
@@ -30,7 +33,7 @@ export function weakDirectionsOf(report: Report): WeaknessItem[] {
       (a, b) =>
         b.rate - a.rate ||
         b.wrong - a.wrong ||
-        a.direction.localeCompare(b.direction)
+        ZH_COLLATOR.compare(a.direction, b.direction)
     )
   const seen = new Set<string>()
   const picked: WeaknessItem[] = []

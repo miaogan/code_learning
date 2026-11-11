@@ -20,6 +20,9 @@ export const ARCHIVE_PREFIX = '学习档案-'
 /** 薄弱方向最多列出 5 条：档案是摘要，不是完整报告。 */
 export const MAX_ARCHIVE_WEAKNESSES = 5
 
+/** 方向名排序固定用中文排序规则：默认 locale 在 CI（en-US）会退化成按码点排，同一份档案顺序会漂移。 */
+const ZH_COLLATOR = new Intl.Collator('zh-Hans-CN')
+
 export interface ArchiveProfile {
   targetRole: string | null
   years: number | null
@@ -134,8 +137,8 @@ function sortWeaknesses(report: Report): ArchiveWeakness[] {
       (a, b) =>
         b.rate - a.rate ||
         b.wrong - a.wrong ||
-        a.direction.localeCompare(b.direction) ||
-        a.subDirection.localeCompare(b.subDirection),
+        ZH_COLLATOR.compare(a.direction, b.direction) ||
+        ZH_COLLATOR.compare(a.subDirection, b.subDirection),
     )
     .slice(0, MAX_ARCHIVE_WEAKNESSES)
 }
