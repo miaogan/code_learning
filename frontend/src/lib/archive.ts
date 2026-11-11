@@ -72,7 +72,7 @@ export interface ArchiveSnapshot {
   scores: ArchiveScores
   versions: ArchiveVersions
   weaknesses: ArchiveWeakness[]
-  /** `null` = 还没有诊断报告；`[]` = 报告存在但本次无已计分题（与 `weakness_map` 同口径）。 */
+  /** `null` = 还没有医案；`[]` = 报告存在但本次无已计分题（与 `weakness_map` 同口径）。 */
   weaknessesAvailable: boolean
   reportAt: string | null
   learn: ArchiveLearn
@@ -200,7 +200,7 @@ export function evidenceCoverage(snapshot: ArchiveSnapshot): ArchiveCoverage {
   const items: ArchiveEvidence[] = [
     {
       key: 'profile',
-      label: '技术画像',
+      label: '立传',
       covered:
         snapshot.profile !== null && (snapshot.profile.skills.length > 0 || snapshot.profile.tech.length > 0),
       hint: '上传简历并生成画像',
@@ -217,14 +217,14 @@ export function evidenceCoverage(snapshot: ArchiveSnapshot): ArchiveCoverage {
       key: 'scores',
       label: '测评成绩',
       covered: snapshot.scores.judgedCount > 0,
-      hint: '完成一场有计分的模拟面试或笔试',
+      hint: '完成一场有计分的召对或科考',
       to: '/interview',
     },
     {
       key: 'report',
-      label: '诊断报告',
+      label: '医案',
       covered: snapshot.weaknessesAvailable,
-      hint: '生成诊断报告后才有薄弱方向',
+      hint: '生成医案后才有薄弱方向',
       to: '/report',
     },
     {
@@ -300,7 +300,7 @@ export function archiveMarkdown(snapshot: ArchiveSnapshot, now: Date = new Date(
 
   lines.push('## 目标与画像', '')
   if (profile === null) {
-    lines.push('还没有技术画像：上传简历并生成画像后，这里会给出证据盘点的摘要。')
+    lines.push('还没有立传：上传简历并生成画像后，这里会给出证据盘点的摘要。')
   } else {
     lines.push(`- 目标岗位：${profile.targetRole ?? '未填写'}`)
     lines.push(`- 工作年限：${profile.years === null ? '未填写' : `${profile.years} 年`}`)
@@ -320,7 +320,7 @@ export function archiveMarkdown(snapshot: ArchiveSnapshot, now: Date = new Date(
 
   lines.push('## 测评成绩', '')
   if (scores.judgedCount === 0) {
-    lines.push('还没有已计分的测评记录：完成一场模拟面试或模拟笔试后会出现在这里。')
+    lines.push('还没有已计分的测评记录：完成一场召对或科考后会出现在这里。')
   } else {
     lines.push(`- 已完成计分测评 ${scores.judgedCount} 场（面试 ${scores.interviewCount} / 笔试 ${scores.examCount}）`)
     lines.push(
@@ -346,7 +346,7 @@ export function archiveMarkdown(snapshot: ArchiveSnapshot, now: Date = new Date(
 
   lines.push(`## 薄弱方向（按错误率取前 ${MAX_ARCHIVE_WEAKNESSES}）`, '')
   if (!snapshot.weaknessesAvailable) {
-    lines.push('还没有诊断报告：完成一次有计分的测评并生成报告后，薄弱方向才会出现在档案里。')
+    lines.push('还没有医案：完成一次有计分的测评并生成报告后，薄弱方向才会出现在档案里。')
   } else if (weaknesses.length === 0) {
     lines.push('本次报告里没有形成薄弱方向（没有可计分的客观题）。')
   } else {
@@ -361,7 +361,7 @@ export function archiveMarkdown(snapshot: ArchiveSnapshot, now: Date = new Date(
 
   lines.push('## 7 天计划', '')
   if (plan === null) {
-    lines.push('还没有可用的 7 天计划：生成诊断报告后，报告页会按短板排出计划。')
+    lines.push('还没有可用的 7 天计划：生成医案后，报告页会按短板排出计划。')
   } else if (plan.total === 0) {
     lines.push('本次报告的短板没有可排入计划的条目。')
   } else {

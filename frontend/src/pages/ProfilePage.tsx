@@ -41,7 +41,7 @@ import { useAsync } from '../lib/useAsync'
 type EditTarget = { dimension: ProfileDimensionKey; index: number | null }
 
 /**
- * 技术画像页（AC-2）：读最新画像 → 5 维卡片 + 溯源源文 → 逐条行内编辑（PATCH 成功才替换）。
+ * 立传页（AC-2）：读最新画像 → 5 维卡片 + 溯源源文 → 逐条行内编辑（PATCH 成功才替换）。
  * 服务端是唯一权威（TECHNICAL §4）：刷新只靠 `GET /api/profiles/latest`，PATCH 以响应体为真值，
  * 不做全局乐观更新；404 是引导态（空态），不是错误态。
  */
@@ -263,7 +263,7 @@ export default function ProfilePage() {
   return (
     <section>
       <header className="sc-page-header">
-        <h1 className="sc-page-title">你的技术画像</h1>
+        <h1 className="sc-page-title">立传</h1>
         <p className="sc-page-sub">
           {profile === null
             ? '读取简历后自动生成 5 个维度，每条结论都带简历原文出处'
@@ -363,7 +363,7 @@ export default function ProfilePage() {
               <p className="sc-meta-line">编辑后以服务端返回为准；保存失败不会改动已保存的画像。</p>
               <div className="sc-btn-row">
                 <Link className="sc-btn sc-btn--primary" to="/interview">
-                  开始模拟面试
+                  开始召对
                 </Link>
                 <Link className="sc-btn sc-btn--secondary" to="/exam">
                   改为笔试

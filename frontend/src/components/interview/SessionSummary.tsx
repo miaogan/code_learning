@@ -69,7 +69,7 @@ export function SessionSummary({ runId, questions, settings, onRestart }: Sessio
       </p>
 
       <p className="sc-iq-summary-note">
-        {answered > 0 ? '短板与课程由诊断报告统一给出。' : '本场一题未答，没有可汇总的成绩。'}
+        {answered > 0 ? '短板与课程由医案统一给出。' : '本场一题未答，没有可汇总的成绩。'}
       </p>
 
       <div className="sc-iq-summary-actions">
@@ -78,7 +78,7 @@ export function SessionSummary({ runId, questions, settings, onRestart }: Sessio
             className="sc-btn sc-btn--primary"
             to={`/report?run_ids=${encodeURIComponent(runId)}`}
           >
-            去看诊断报告
+            去看医案
           </Link>
         ) : null}
         <Button variant={answered > 0 ? 'secondary' : 'primary'} onClick={onRestart}>

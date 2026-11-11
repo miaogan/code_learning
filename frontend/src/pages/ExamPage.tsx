@@ -53,7 +53,7 @@ function isAnswered(value: string[] | string | undefined): boolean {
 }
 
 /**
- * 模拟笔试（AC-4）：出卷 → 计时作答（三种题型）→ 提交判分 → 结果面板 + 逐题复核。
+ * 科考（AC-4）：出卷 → 计时作答（三种题型）→ 提交判分 → 结果面板 + 逐题复核。
  * 判分完全在服务端本地完成（不调 AI），所以展示层不做任何分数推算：
  * 总分 / 用时 / 客观题数 / 逐题对错一律以 `POST /api/exams/{run_id}/submit` 的响应为唯一真值。
  */
@@ -269,7 +269,7 @@ export default function ExamPage() {
   return (
     <section>
       <header className="sc-page-header">
-        <h1 className="sc-page-title">模拟笔试</h1>
+        <h1 className="sc-page-title">科考</h1>
         <p className="sc-page-sub">
           客观题本地判分，提交后 10 秒内出总分、用时与逐题对错；失败不会清空你的选择
         </p>
@@ -281,7 +281,7 @@ export default function ExamPage() {
 
       {view === 'empty' ? (
         <ResumeGate
-          reason="笔试按画像方向组卷（≥10 题，其中客观题 ≥8 道自动判分）。先上传简历并确认画像，再来笔试。"
+          reason="科考按画像方向组卷（≥10 题，其中客观题 ≥8 道自动判分）。先上传简历并确认画像，再来科考。"
           unlockLabel="回来开始笔试"
         />
       ) : null}
@@ -512,7 +512,7 @@ export default function ExamPage() {
               className="sc-btn sc-btn--primary"
               to={`/report?run_ids=${encodeURIComponent(run.run_id)}`}
             >
-              生成诊断报告
+              生成医案
             </Link>
             <Button variant="secondary" onClick={() => setRestartOpen(true)}>
               再出一套笔试

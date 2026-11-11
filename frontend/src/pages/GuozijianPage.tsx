@@ -198,7 +198,7 @@ function JobDetail({
       )}
       {job.status === 'adopted' && (
         <p className="sc-coach-note">
-          已扩充入库：{job.questions.length} 条题已进入练习池（不进入模拟笔试卷）。
+          已扩充入库：{job.questions.length} 条题已进入练习池（不进入科考卷）。
         </p>
       )}
       {job.status === 'discarded' && <p className="sc-coach-note">这份草稿已废弃，题目未入库。</p>}
@@ -319,7 +319,7 @@ export default function GuozijianPage() {
                 onDiscard={() => void act('discard', selected)}
               />
               <p className="sc-coach-note">
-                雷达生成的题只进练习池、不进模拟笔试卷；章节草稿不并入官方教程。
+                雷达生成的题只进练习池、不进科考卷；章节草稿不并入官方教程。
                 扩充入库后可到练习页按方向练习。
               </p>
             </div>

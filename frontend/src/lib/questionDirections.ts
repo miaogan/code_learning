@@ -1,5 +1,5 @@
 /** 题库方向闭集：与后端 `services/report/rules.py` 的 `DIRECTIONS` / `SUBDIRECTIONS`
- * 逐字一致，改动必须同步两处。模拟笔试与模拟面试的筛选控件都从这里派生选项。 */
+ * 逐字一致，改动必须同步两处。科考与召对的筛选控件都从这里派生选项。 */
 
 export const DIRECTIONS: string[] = [
   '前端',

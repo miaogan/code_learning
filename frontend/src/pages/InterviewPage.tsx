@@ -77,7 +77,7 @@ function sessionOf(run: InterviewRun): InterviewSession {
 }
 
 /**
- * 模拟面试（AC-4 / AC-5 / AC-9 / AC-18）：七态编排 —— 配置 → 开局 → 多轮对话 → 结束；
+ * 召对（AC-4 / AC-5 / AC-9 / AC-18）：七态编排 —— 配置 → 开局 → 多轮对话 → 结束；
  * `?run_id=` 恢复整场会话（已完成为只读）。页面只做编排与单一 session state（后端镜像），
  * 气泡/评分/输入区/汇总的渲染与纯函数全部在 components/interview/ 下。
  */
@@ -277,7 +277,7 @@ export default function InterviewPage() {
 
   /**
    * 提前结束本场（放弃）：后端只落状态、不调 AI，未答题目不再计分；
-   * 已答题目保留评分，结束后即可去诊断报告汇总本场（与答满后的结束态共用汇总块）。
+   * 已答题目保留评分，结束后即可去医案汇总本场（与答满后的结束态共用汇总块）。
    */
   const finishSession = async () => {
     if (!session || finishing) return
@@ -428,7 +428,7 @@ export default function InterviewPage() {
   } else if (profileView === 'empty') {
     content = (
       <ResumeGate
-        reason="模拟面试会依据你的画像出题（技术题 ≥5 · 项目深挖 ≥3 · 进阶 ≤20%）。先上传简历并确认画像，再来测评。"
+        reason="召对会依据你的画像出题（技术题 ≥5 · 项目深挖 ≥3 · 进阶 ≤20%）。先上传简历并确认画像，再来测评。"
         unlockLabel="回来开始面试"
       />
     )
@@ -462,7 +462,7 @@ export default function InterviewPage() {
   return (
     <section>
       <header className="sc-page-header">
-        <h1 className="sc-page-title">模拟面试</h1>
+        <h1 className="sc-page-title">召对</h1>
         <p className="sc-page-sub">
           多轮对话式面试：每题 0–10 分与逐字点评长在你的回答里；首问之后每轮只出一道，失败不会清空你的答案
         </p>
@@ -472,7 +472,7 @@ export default function InterviewPage() {
       <ConfirmModal
         open={finishOpen}
         title="结束本场面试"
-        message={`已答 ${session?.answered_count ?? 0} / ${session?.total ?? 0} 题。结束后面试置为已完成：已答题目保留评分，未答题目不再计分，可在诊断报告里汇总本场。`}
+        message={`已答 ${session?.answered_count ?? 0} / ${session?.total ?? 0} 题。结束后面试置为已完成：已答题目保留评分，未答题目不再计分，可在医案里汇总本场。`}
         confirmLabel="结束本场"
         cancelLabel="继续作答"
         onConfirm={() => {

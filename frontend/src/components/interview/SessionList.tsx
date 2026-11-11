@@ -64,7 +64,7 @@ export function SessionList() {
               <Link
                 className="sc-plan-taskgo"
                 to={`/interview?run_id=${encodeURIComponent(row.run_id)}`}
-                aria-label={`${completed ? '回放' : '继续'} ${formatWhen(row.created_at)} 的模拟面试`}
+                aria-label={`${completed ? '回放' : '继续'} ${formatWhen(row.created_at)} 的召对`}
               >
                 {completed ? '回放复盘 →' : '继续作答 →'}
               </Link>

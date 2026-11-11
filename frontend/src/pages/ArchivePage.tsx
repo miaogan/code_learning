@@ -237,7 +237,7 @@ export default function ArchivePage() {
 
       {snapshot !== null && isEmptyArchive(snapshot) && (
         <EmptyState
-          reason="还没有可汇总的记录：先上传简历生成画像，再做一场模拟面试或笔试，这里就会有内容。"
+          reason="还没有可汇总的记录：先上传简历生成画像，再做一场召对或科考，这里就会有内容。"
           actionLabel="去上传简历"
           actionTo="/"
         />
@@ -302,7 +302,7 @@ export default function ArchivePage() {
               <CardTitle index="01" title="目标与画像" />
               {snapshot.profile === null ? (
                 <p className="sc-coach-note">
-                  还没有技术画像：上传简历并生成画像后，这里会给出证据盘点的摘要。
+                  还没有立传：上传简历并生成画像后，这里会给出证据盘点的摘要。
                   <Link className="sc-archive-link" to="/">
                     去上传简历
                   </Link>
@@ -349,9 +349,9 @@ export default function ArchivePage() {
               <CardTitle index="02" title="测评成绩" />
               {snapshot.scores.judgedCount === 0 ? (
                 <p className="sc-coach-note">
-                  还没有已计分的测评记录：完成一场模拟面试或模拟笔试后会出现在这里。
+                  还没有已计分的测评记录：完成一场召对或科考后会出现在这里。
                   <Link className="sc-archive-link" to="/interview">
-                    去面试
+                    去召对
                   </Link>
                 </p>
               ) : (
@@ -410,9 +410,9 @@ export default function ArchivePage() {
               <CardTitle index="04" title="薄弱方向" />
               {!snapshot.weaknessesAvailable ? (
                 <p className="sc-coach-note">
-                  还没有诊断报告：完成一次有计分的测评并生成报告后，薄弱方向才会出现在这里。
+                  还没有医案：完成一次有计分的测评并生成报告后，薄弱方向才会出现在这里。
                   <Link className="sc-archive-link" to="/report">
-                    去看诊断报告
+                    去看医案
                   </Link>
                 </p>
               ) : snapshot.weaknesses.length === 0 ? (
@@ -459,9 +459,9 @@ export default function ArchivePage() {
               <CardTitle index="06" title="7 天计划" />
               {snapshot.plan === null ? (
                 <p className="sc-coach-note">
-                  还没有可用的 7 天计划：生成诊断报告后，报告页会按短板排出计划。
+                  还没有可用的 7 天计划：生成医案后，报告页会按短板排出计划。
                   <Link className="sc-archive-link" to="/report">
-                    去看诊断报告
+                    去看医案
                   </Link>
                 </p>
               ) : snapshot.plan.total === 0 ? (

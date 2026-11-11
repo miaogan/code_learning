@@ -61,7 +61,7 @@ function QuestionHit({ item }: { item: QuestionSearchItem }) {
  * 之前只是没有任何入口 —— 本页只把已有能力接上入口，**不改检索口径与后端契约**。
  *
  * 三条口径边界：
- * 1. 只搜站内教程与题库题面，**不搜简历正文、技术画像、诊断报告原文**（隐私边界）；
+ * 1. 只搜站内教程与题库题面，**不搜简历正文、立传、医案原文**（隐私边界）；
  * 2. 题库响应永不含答案（服务端保证），命中只带你到练习页按方向 / 子方向继续练；
  * 3. 方向是唯一共用筛选，教程与题库都只接受同一份方向闭集。
  */
@@ -135,7 +135,7 @@ export default function SearchPage() {
           <p className="sc-lab-kicker sc-lab-rise">SEARCH / 站内检索</p>
           <h1 className="sc-lab-page-title sc-lab-rise is-d1">检索</h1>
           <p className="sc-lab-lead sc-lab-rise is-d2">
-            教程按小节正文与标题命中并给出摘要，题库按题面命中并带你到对应方向的练习；教程侧即时出结果，题库侧停止输入后自动检索。只读站内教程与题库，不读简历正文、技术画像与报告原文。
+            教程按小节正文与标题命中并给出摘要，题库按题面命中并带你到对应方向的练习；教程侧即时出结果，题库侧停止输入后自动检索。只读站内教程与题库，不读简历正文、立传与医案原文。
           </p>
         </div>
         <div className="sc-lab-stats sc-lab-rise is-d2">

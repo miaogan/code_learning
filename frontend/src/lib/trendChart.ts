@@ -7,8 +7,8 @@ import type { RunKind, RunSummary } from '../api/types'
  * 因此按 `kind` 分成两张独立的小图，序列的 `max` 由类型决定（不是前端二次统计分数）。
  */
 export const TREND_META: Record<RunKind, { title: string; max: number; unit: string }> = {
-  interview: { title: '模拟面试 · 均分', max: 10, unit: '/10' },
-  exam: { title: '模拟笔试 · 总分', max: 100, unit: '/100' },
+  interview: { title: '召对 · 均分', max: 10, unit: '/10' },
+  exam: { title: '科考 · 总分', max: 100, unit: '/100' },
 }
 
 /**

@@ -23,8 +23,8 @@ export interface TimelineEventProps {
 const KIND_LABEL: Record<TimelineType, string> = { interview: '面试', exam: '笔试', resume: '简历' }
 /** 首次态文案（DESIGN §2.1「首次<类型>测评，暂无对比」）；简历事件不是测评，措辞按类型区分。 */
 const FIRST_TEXT: Record<TimelineType, string> = {
-  interview: '首次模拟面试，暂无对比',
-  exam: '首次模拟笔试，暂无对比',
+  interview: '首次召对，暂无对比',
+  exam: '首次科考，暂无对比',
   resume: '首次简历记录，暂无对比',
 }
 /** 分数量纲与 `TrendTable` 同一口径（面试均分 /10、笔试总分 /100），两种量纲永不互比。 */

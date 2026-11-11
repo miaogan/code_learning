@@ -5,7 +5,7 @@
  * 输出是可单测、可重算的固定 7 天任务表。**不调接口、不调 AI、不计入任何成绩**。
  *
  * 三条不能破的口径：
- * 1. 任务只能指回站内真实入口（教程章节 / 小节、练习筛选、模拟笔试面试）；
+ * 1. 任务只能指回站内真实入口（教程章节 / 小节、练习筛选、科考召对）；
  * 2. 短板不足时用通用任务补位，**绝不编造短板名**；
  * 3. 教程章有「方向 / 子方向 / 难度」但没有显式前置字段 —— 「先读基础章」是**难度递进代理**，
  *    UI 文案不得宣称那是真实课程依赖；短板带子方向时优先选同子方向章，挑不到静默回落方向级。
@@ -346,7 +346,7 @@ function genericFillers(minutes: PlanMinutes): Omit<StudyTask, 'id'>[] {
   return [
     {
       kind: 'review',
-      title: '回看诊断报告，挑一个短板写下具体改进动作',
+      title: '回看医案，挑一个短板写下具体改进动作',
       est_min: reviewMinutes(minutes),
       direction: null,
       chapter_id: null,
@@ -379,7 +379,7 @@ function genericFillers(minutes: PlanMinutes): Omit<StudyTask, 'id'>[] {
     },
     {
       kind: 'practice',
-      title: '去模拟笔试，按真实节奏做一套',
+      title: '去科考，按真实节奏做一套',
       est_min: minutes,
       direction: null,
       chapter_id: null,
@@ -390,7 +390,7 @@ function genericFillers(minutes: PlanMinutes): Omit<StudyTask, 'id'>[] {
     },
     {
       kind: 'review',
-      title: '去模拟面试，再对照报告看变化',
+      title: '去召对，再对照报告看变化',
       est_min: minutes,
       direction: null,
       chapter_id: null,

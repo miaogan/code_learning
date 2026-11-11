@@ -112,7 +112,7 @@ export function ProfileRadar({ report, runs }: ProfileRadarProps) {
 
       {filledCount === 0 ? (
         <p className="sc-coach-note">
-          还没有可用的测评数据。先完成一次模拟面试或模拟笔试，雷达就会按真实得分生成；
+          还没有可用的测评数据。先完成一次召对或科考，雷达就会按真实得分生成；
           这里不预填、也不估算任何能力值。
         </p>
       ) : (

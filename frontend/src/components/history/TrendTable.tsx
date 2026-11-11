@@ -13,7 +13,7 @@ export interface TrendTableProps {
   rows: RunSummary[]
 }
 
-const KIND_LABEL: Record<RunKind, string> = { interview: '模拟面试', exam: '模拟笔试' }
+const KIND_LABEL: Record<RunKind, string> = { interview: '召对', exam: '科考' }
 /** 分数量纲：面试 = 均分（/10），笔试 = 总分（/100），因此两者永不互相比较。 */
 const KIND_UNIT: Record<RunKind, string> = { interview: '/10', exam: '/100' }
 
@@ -125,7 +125,7 @@ export function TrendTable({ rows }: TrendTableProps) {
                 <Link
                   className="sc-meta-line"
                   to={`/interview?run_id=${encodeURIComponent(row.id)}`}
-                  aria-label={`回放 ${formatWhen(row.created_at)} 的模拟面试`}
+                  aria-label={`回放 ${formatWhen(row.created_at)} 的召对`}
                 >
                   回放本场 →
                 </Link>
@@ -161,7 +161,7 @@ export function TrendTable({ rows }: TrendTableProps) {
                   {row.kind === 'interview' ? (
                     <Link
                       to={`/interview?run_id=${encodeURIComponent(row.id)}`}
-                      aria-label={`回放 ${formatWhen(row.created_at)} 的模拟面试`}
+                      aria-label={`回放 ${formatWhen(row.created_at)} 的召对`}
                     >
                       回放本场 →
                     </Link>

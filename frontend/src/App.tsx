@@ -29,11 +29,11 @@ import { dismissKeyRequired } from './state/aiGate'
 import { useFlowState } from './state/flow'
 
 const STEP_BASE = [
-  { key: 'upload', label: '上传简历', to: '/' },
-  { key: 'profile', label: '技术画像', to: '/profile' },
-  { key: 'interview', label: '模拟面试', to: '/interview' },
-  { key: 'exam', label: '模拟笔试', to: '/exam' },
-  { key: 'report', label: '诊断报告', to: '/report' },
+  { key: 'upload', label: '投卷', to: '/' },
+  { key: 'profile', label: '立传', to: '/profile' },
+  { key: 'interview', label: '召对', to: '/interview' },
+  { key: 'exam', label: '科考', to: '/exam' },
+  { key: 'report', label: '医案', to: '/report' },
 ] as const
 
 /** 侧栏「工具」组：日常使用的非线性出口，不混进步骤（DESIGN §1.1）。 */

@@ -10,7 +10,7 @@ import { applyMe, useAuth } from '../state/auth'
 import { dismissKeyRequired } from '../state/aiGate'
 
 const CAPABILITY_TEXT: Record<AiCapability, string> = {
-  full: '全部 AI 能力可用（含模拟面试、诊断报告等高消耗场景）',
+  full: '全部 AI 能力可用（含召对、医案等高消耗场景）',
   light: '仅画像生成与润色建议可用；高消耗场景需配置自己的 Key',
   none: 'AI 能力不可用，请配置自己的 Key 或联系管理员开通内置 Key',
 }
@@ -161,7 +161,7 @@ export default function SettingsPage() {
           </dl>
           {me.key_mode === 'shared' ? (
             <p className="sc-settings-hint">
-              内置 Key 仅开放画像生成与润色建议，并有每日次数上限；模拟面试、诊断报告等高消耗场景请配置自己的
+              内置 Key 仅开放画像生成与润色建议，并有每日次数上限；召对、医案等高消耗场景请配置自己的
               Key（保存后自动切到自带 Key）。
             </p>
           ) : null}
@@ -277,7 +277,7 @@ export default function SettingsPage() {
       <ConfirmModal
         open={clearOpen}
         title="清除已保存的 Key"
-        message="清除后 AI 能力会立即关闭：画像生成、模拟面试、诊断报告等都需要重新配置 Key 才能使用。"
+        message="清除后 AI 能力会立即关闭：画像生成、召对、医案等都需要重新配置 Key 才能使用。"
         confirmLabel="清除 Key"
         cancelLabel="保留"
         onConfirm={() => {

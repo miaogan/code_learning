@@ -1178,10 +1178,10 @@ export default function UploadPage() {
               查看画像 →
             </Link>
             <Link className="sc-lab-ghost" to="/interview">
-              模拟面试 →
+              召对 →
             </Link>
             <Link className="sc-lab-ghost" to="/report">
-              诊断报告 →
+              医案 →
             </Link>
           </span>
         </div>

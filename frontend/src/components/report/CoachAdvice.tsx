@@ -76,14 +76,14 @@ export function CoachAdvice({ report }: CoachAdviceProps) {
         </div>
         <p className="sc-coach-note">
           {noMaterials
-            ? '需要一份含薄弱方向的诊断报告，才能检索出可引用的站内材料。'
+            ? '需要一份含薄弱方向的医案，才能检索出可引用的站内材料。'
             : `本次上传 ${materials.length} 条站内材料；建议里的链接必须逐字来自这些材料，服务端会逐条校验。`}
         </p>
       </div>
 
       {noMaterials ? (
         <p className="sc-coach-hint">
-          先去模拟笔试或面试拿到计分结果，报告里有了薄弱方向后再回来。
+          先去科考或召对拿到计分结果，报告里有了薄弱方向后再回来。
         </p>
       ) : (
         <>

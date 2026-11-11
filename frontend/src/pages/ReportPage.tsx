@@ -48,7 +48,7 @@ function formatGeneratedAt(iso: string): string {
 function markdownFileName(report: Report): string {
   const day = report.generated_at.slice(0, 10)
   const safe = /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : report.id.slice(0, 8)
-  return `诊断报告-${safe}.md`
+  return `医案-${safe}.md`
 }
 
 function errorMessage(error: unknown, fallback: string): string {
@@ -108,7 +108,7 @@ function clipboardErrorMessage(error: unknown): string {
 }
 
 /**
- * 诊断报告页（AC-5 / AC-6 / AC-9）。
+ * 医案页（AC-5 / AC-6 / AC-9）。
  *
  * 三条语义分开：`latest` 只读旧报告（刷新页面不重跑 AI），`generate` 是显式动作，
  * 导出走 `GET /api/reports/{id}/markdown` 的文本落到 Blob 回下载 —— 页面不二次拼串，
@@ -120,7 +120,7 @@ export default function ReportPage() {
   const profileAsync = useAsync((signal) => api.latestProfile(signal), [])
   /**
    * 空态前置条件（权威判定）：history 只返回**已完成**的面试/笔试。
-   * 依据它把「生成诊断报告」换成「去完成一次测评」，避免按钮点了才收到 400
+   * 依据它把「生成医案」换成「去完成一次测评」，避免按钮点了才收到 400
    * （不用本地 flow 标记：换设备/清缓存时不失真）。
    * 取 10 条且要求「有分数」：提前结束但一题未答的会话也是 completed，它不可诊断。
    */
@@ -297,7 +297,7 @@ export default function ReportPage() {
           <p className="sc-lab-kicker sc-lab-rise">
             <span className="sc-lab-kicker-idx">03</span> DIAGNOSTIC
           </p>
-          <h1 className="sc-lab-page-title sc-lab-rise is-d1">诊断报告</h1>
+          <h1 className="sc-lab-page-title sc-lab-rise is-d1">医案</h1>
           <p className="sc-lab-lead sc-lab-rise is-d2">
             短板按严重度从高到低排序，每条都带题目证据、建议动作与推荐课程
           </p>
@@ -325,7 +325,7 @@ export default function ReportPage() {
       <div className="sc-profile-dim">
         {generating ? (
           <PhaseLoader
-            title={requested ? '正在生成本场诊断报告' : '正在生成诊断报告'}
+            title={requested ? '正在生成本场医案' : '正在生成医案'}
             phases={GENERATE_PHASES}
             active={generatePhase}
             elapsedSec={elapsed}
@@ -334,11 +334,11 @@ export default function ReportPage() {
 
         {/* 首帧先于 effect：带 ?run_ids= 时也显示「生成本场报告」，绝不闪出旧的最近报告。 */}
         {!generating && requestPending ? (
-          <PhaseLoader title="正在生成本场诊断报告" phases={GENERATE_PHASES} active={0} />
+          <PhaseLoader title="正在生成本场医案" phases={GENERATE_PHASES} active={0} />
         ) : null}
 
         {!generating && !requested && firstLoad ? (
-          <PhaseLoader title="正在读取最近一份诊断报告" phases={['读取已有报告']} active={0} />
+          <PhaseLoader title="正在读取最近一份医案" phases={['读取已有报告']} active={0} />
         ) : null}
 
         {!generating && requestFailed ? (
@@ -497,8 +497,8 @@ export default function ReportPage() {
 
         {!generating && !firstLoad && !requested && report === null && profileMissing ? (
           <ResumeGate
-            reason="诊断报告要先有一份画像：上传简历后会自动解析技能与项目，再去做模拟面试或笔试，这里才会产出带证据的短板清单。"
-            unlockLabel="回来查看诊断报告"
+            reason="医案要先有一份画像：上传简历后会自动解析技能与项目，再去做召对或科考，这里才会产出带证据的短板清单。"
+            unlockLabel="回来查看医案"
           />
         ) : null}
 
@@ -524,24 +524,24 @@ export default function ReportPage() {
             ) : null}
             {noCompletedRun ? (
               <EmptyState
-                reason="还没有可汇总的测评：先完成一轮模拟面试或笔试，再回来生成带题目证据的短板清单。"
+                reason="还没有可汇总的测评：先完成一轮召对或科考，再回来生成带题目证据的短板清单。"
                 actionLabel="去完成一次测评"
                 actionTo="/interview"
               />
             ) : (
               <EmptyState
-                reason="还没有诊断报告：完成一轮面试或笔试后，这里会给出 3–5 条带题目证据的短板，按严重度排序并直连基础课程。"
-                actionLabel="生成诊断报告"
+                reason="还没有医案：完成一轮召对或科考后，这里会给出 3–5 条带题目证据的短板，按严重度排序并直连基础课程。"
+                actionLabel="生成医案"
                 onAction={regenerate}
               />
             )}
             <div className="sc-btn-row">
               <p className="sc-meta-line">还没有作答记录？先完成一次测评</p>
               <Link className="sc-btn sc-btn--secondary" to="/interview">
-                模拟面试
+                召对
               </Link>
               <Link className="sc-btn sc-btn--secondary" to="/exam">
-                模拟笔试
+                科考
               </Link>
             </div>
           </div>

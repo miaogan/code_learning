@@ -276,10 +276,10 @@ describe('archiveMarkdown', () => {
       }),
     )
     const text = archiveMarkdown(snapshot, NOW)
-    expect(text).toContain('还没有技术画像')
+    expect(text).toContain('还没有立传')
     expect(text).toContain('还没有已计分的测评记录')
     expect(text).toContain('还没有简历版本')
-    expect(text).toContain('还没有诊断报告')
+    expect(text).toContain('还没有医案')
     expect(text).toContain('还没有可用的 7 天计划')
     expect(text).not.toContain('null')
     expect(text).not.toContain('undefined')
@@ -313,13 +313,13 @@ describe('archiveMarkdown', () => {
       NOW,
     )
     expect(empty).toContain('- 已齐备 0 / 6 项（0%）')
-    expect(empty).toContain('还缺：技术画像（上传简历并生成画像）')
+    expect(empty).toContain('还缺：立传（上传简历并生成画像）')
     expect(empty).toContain('计划打卡（在报告页勾掉一个计划任务）')
   })
 
   it('坐标不足 1 条薄弱方向时不带序号以外的假数据', () => {
     const text = archiveMarkdown(buildArchiveSnapshot(input({ report: report(null) })), NOW)
-    expect(text).toContain('还没有诊断报告')
+    expect(text).toContain('还没有医案')
   })
 })
 
@@ -377,7 +377,7 @@ describe('evidenceCoverage', () => {
     expect(coverage.items[0].covered).toBe(false)
   })
 
-  it('只有诊断报告时只算一项（1 / 6 = 17%）', () => {
+  it('只有医案时只算一项（1 / 6 = 17%）', () => {
     const coverage = evidenceCoverage(
       buildArchiveSnapshot(
         input({ profile: null, versions: [], runs: [], progress: EMPTY_LEARN_PROGRESS, plan: null }),
