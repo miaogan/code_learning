@@ -52,7 +52,7 @@ export default function ProfilePage() {
    * 两者都是既有只读接口，失败（含 404 无报告）只让对应轴显示「暂无测评数据」，不阻塞画像本身。
    */
   const reportAsync = useAsync((signal) => api.latestReport(signal), [])
-  const runsAsync = useAsync(() => api.history(20), [])
+  const runsAsync = useAsync(() => api.history({ limit: 20 }), [])
   const location = useLocation()
 
   /**
@@ -312,7 +312,7 @@ export default function ProfilePage() {
             />
           ) : null}
 
-          <ProfileRadar report={reportAsync.data} runs={runsAsync.data ?? []} />
+          <ProfileRadar report={reportAsync.data} runs={runsAsync.data?.items ?? []} />
 
           <div className="sc-grid-2">
             <div>

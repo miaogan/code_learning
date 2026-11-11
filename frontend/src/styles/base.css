@@ -8807,6 +8807,31 @@ html {
   margin-bottom: var(--sp-3);
 }
 
+/* 清单筛选条：结论 tab 靠左、方向下拉靠右，窄屏折行；筛到 0 条时空态文案与它同处一张卡。 */
+.sc-radar-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-3);
+  padding-bottom: var(--sp-3);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.sc-radar-filterdir {
+  flex: 0 1 200px;
+  min-width: 160px;
+}
+
+.sc-radar-filtered-empty {
+  padding: var(--sp-5) 0;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--text-secondary);
+  text-align: center;
+}
+
 .sc-radar-count {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
@@ -9186,6 +9211,26 @@ html {
     justify-content: flex-end;
   }
 }
+
+/* 列表分页器（所有列表页共用）：上一页 / 页码 · 总数 / 下一页。
+   状态行用等宽数字，翻页时位数变化不推动按钮位置。 */
+.sc-pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sp-3);
+  margin-top: var(--sp-4);
+}
+
+.sc-pager__status {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+}
+
 
 
 

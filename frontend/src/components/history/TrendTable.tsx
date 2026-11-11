@@ -48,15 +48,14 @@ interface DeltaView {
 
 /**
  * 变化列：只与**同类型**的上一次比（面试对面试、笔试对笔试）。
- * 列表已是时间倒序，所以「上一次」= 本行之后第一条同类型记录；找不到即「暂无对比」。
+ * 「上一次」由服务端 `list_history` 算好（`has_prev` / `prev_score`）——分页后对比对象
+ * 可能落在上一页，前端只看本页数组会误判成「暂无对比」，因此这里不扫行。
  */
-function deltaOf(rows: RunSummary[], index: number): DeltaView {
-  const current = rows[index]
-  const previous = rows.slice(index + 1).find((row) => row.kind === current.kind)
-  if (previous === undefined) return { text: NO_COMPARE, tone: 'none' }
-  if (current.score === null || previous.score === null) return { text: DASH, tone: 'none' }
+function deltaOf(row: RunSummary): DeltaView {
+  if (!row.has_prev) return { text: NO_COMPARE, tone: 'none' }
+  if (row.score === null || row.prev_score === null) return { text: DASH, tone: 'none' }
 
-  const diff = Math.round((current.score - previous.score) * 10) / 10
+  const diff = Math.round((row.score - row.prev_score) * 10) / 10
   if (diff === 0) return { text: FLAT, tone: 'flat' }
   const magnitude = trimmed(Math.abs(diff))
   return diff > 0
@@ -99,8 +98,8 @@ export function TrendTable({ rows }: TrendTableProps) {
   if (narrow) {
     return (
       <div className="sc-grid-2">
-        {rows.map((row, index) => {
-          const delta = deltaOf(rows, index)
+        {rows.map((row) => {
+          const delta = deltaOf(row)
           const shortfalls =
             row.shortfall_count === null ? DASH : `${row.shortfall_count} 条`
           const settings = settingsTextOf(row)
@@ -149,8 +148,8 @@ export function TrendTable({ rows }: TrendTableProps) {
         </tr>
       </thead>
       <tbody>
-        {rows.map((row, index) => {
-          const delta = deltaOf(rows, index)
+        {rows.map((row) => {
+          const delta = deltaOf(row)
           const settings = settingsTextOf(row)
           return (
             <tr key={row.id}>

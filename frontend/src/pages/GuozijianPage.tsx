@@ -7,6 +7,7 @@ import { Card } from '../components/ui/Card'
 import { EmptyState } from '../components/ui/EmptyState'
 import { InlineError } from '../components/ui/InlineError'
 import { PhaseLoader } from '../components/ui/PhaseLoader'
+import { Pagination } from '../components/ui/Pagination'
 import { Toast } from '../components/ui/Toast'
 import { formatWhen } from '../lib/format'
 import {
@@ -21,6 +22,9 @@ import { useAsync } from '../lib/useAsync'
 
 /** 轮询间隔：一次生成约几十秒，2s 足够跟手又不打爆接口。 */
 const POLL_MS = 2000
+
+/** 每页条数：与后端 `/api/radar/jobs` 的 `limit` 同一口径。 */
+const PAGE_SIZE = 10
 
 const STATUS_CLASS: Record<string, string> = {
   queued: 'is-queued',
@@ -209,7 +213,8 @@ function JobDetail({
 export default function GuozijianPage() {
   const [params] = useSearchParams()
   const jobParam = params.get('job') ?? ''
-  const jobsAsync = useAsync((signal) => api.radarJobs(20, signal), [])
+  const [page, setPage] = useState(1)
+  const jobsAsync = useAsync((signal) => api.radarJobs(PAGE_SIZE, page, signal), [page])
 
   const [selectedId, setSelectedId] = useState(jobParam)
   const [acting, setActing] = useState('')
@@ -217,12 +222,16 @@ export default function GuozijianPage() {
   const [toast, setToast] = useState<{ message: string; seq: number } | null>(null)
 
   useEffect(() => {
-    if (jobParam !== '') setSelectedId(jobParam)
+    if (jobParam !== '') {
+      setSelectedId(jobParam)
+      setPage(1) // 深链进来的是刚生成的任务：总在最新一页，回到第 1 页即可找到
+    }
   }, [jobParam])
 
   // 用 `data` 而不是 `status` 取列表：轮询期间 status 会短暂变回 loading，data 仍是上一次成功值。
   // 若按 status 判定，每次轮询都会把工作区卸载、闪一帧 PhaseLoader（页面抖动）。
   const jobs = jobsAsync.data !== null ? jobsAsync.data.items : []
+  const jobTotal = jobsAsync.data !== null ? jobsAsync.data.total : 0
   const hasActive = jobs.some((job) => isActiveJob(job.status))
   const reload = jobsAsync.reload
 
@@ -296,7 +305,7 @@ export default function GuozijianPage() {
           <Card>
             <div className="sc-radar-listhead">
               <h3 className="sc-coach-blocktitle">样例任务</h3>
-              <span className="sc-radar-count">{jobs.length} 条</span>
+              <span className="sc-radar-count">共 {jobTotal} 条</span>
             </div>
             <ul className="sc-radar-joblist">
               {jobs.map((job) => (
@@ -308,6 +317,13 @@ export default function GuozijianPage() {
                 />
               ))}
             </ul>
+            <Pagination
+              page={page}
+              pageSize={PAGE_SIZE}
+              total={jobTotal}
+              onChange={setPage}
+              label="样例任务分页"
+            />
             {hasActive && <p className="sc-coach-note">有任务正在生成，列表每 2 秒自动刷新。</p>}
           </Card>
 

@@ -35,13 +35,28 @@ def _notice() -> str:
 
 
 @router.get("/techs", response_model=RadarTechList, summary="技术清单（最新评估 + 快照）")
-async def list_techs(limit: int = Query(default=50, ge=1, le=100)) -> RadarTechList:
-    items = store.list_techs(limit)
+async def list_techs(
+    limit: int = Query(default=50, ge=1, le=100, description="每页条数"),
+    page: int = Query(default=1, ge=1, description="页码，从 1 起"),
+    direction: str = Query(default="", description="按方向筛选（站内闭集，空串 = 全部）"),
+    verdict: str = Query(
+        default="", description="按结论筛选 must_learn|worth_knowing|watch|skip，空串 = 全部"
+    ),
+) -> RadarTechList:
+    direction = direction.strip()
+    verdict = verdict.strip()
+    if direction and direction not in rules.DIRECTIONS:
+        raise AppError(VALIDATION_ERROR, "方向不在站内闭集，请从下拉框选择", status=400)
+    if verdict and verdict not in rules.VERDICTS:
+        raise AppError(VALIDATION_ERROR, "结论不在闭集内，请从筛选器选择", status=400)
+    items = store.list_techs(
+        limit, direction=direction, verdict=verdict, offset=(page - 1) * limit
+    )
     return RadarTechList(
         items=[
             RadarTechItem(**row, verdict_label=rules.label_of(row["verdict"])) for row in items
         ],
-        total=len(items),
+        total=store.count_techs(direction=direction, verdict=verdict),
         notice=_notice(),
     )
 
@@ -97,10 +112,13 @@ async def generate(payload: RadarGenerateRequest, user: CurrentUser) -> RadarJob
 
 
 @router.get("/jobs", response_model=RadarJobList, summary="本账号的样例任务列表")
-async def list_jobs(limit: int = Query(default=20, ge=1, le=50)) -> RadarJobList:
+async def list_jobs(
+    limit: int = Query(default=20, ge=1, le=50, description="每页条数"),
+    page: int = Query(default=1, ge=1, description="页码，从 1 起"),
+) -> RadarJobList:
     store.sweep_stale_jobs(get_settings().radar_job_stale_minutes)
-    rows = store.list_jobs(limit)
-    return RadarJobList(items=[RadarJobItem(**row) for row in rows], total=len(rows))
+    rows = store.list_jobs(limit, offset=(page - 1) * limit)
+    return RadarJobList(items=[RadarJobItem(**row) for row in rows], total=store.count_jobs())
 
 
 @router.get("/jobs/{job_id}", response_model=RadarJobItem, summary="单个样例任务的进度与草稿")

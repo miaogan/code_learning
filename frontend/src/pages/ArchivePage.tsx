@@ -116,7 +116,7 @@ export default function ArchivePage() {
     const [profile, versions, runs, report] = await Promise.all([
       optional(api.latestProfile(signal)),
       api.listResumeVersions(20, signal),
-      api.history(20),
+      api.history({ limit: 20 }).then((list) => list.items),
       optional(api.latestReport(signal)),
     ])
     const planState = report === null ? null : await optional(api.planState(report.id, signal))

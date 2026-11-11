@@ -14,7 +14,8 @@
 最新报告参与了本次测评（`run_ids` 含该 run）时取该报告的短板条数，否则记 `None` ——
 不硬凑 0。报告不按 run 拆条（一条短板可由多次测评合并归因），故同报告内的多个 run 显示同一数值。
 
-排序：`repository.list_runs()` 已按 `created_at DESC` 返回，本层**不再二次排序**（口径单一来源）。
+分页：`limit` 是每页条数（沿用旧字段名），`page` 从 1 起；`total` 是命中总数。
+排序：`repository.history_rows()` 已按 `created_at DESC` 返回，本层**不再二次排序**（口径单一来源）。
 """
 
 from typing import Any
@@ -29,9 +30,9 @@ EXAM_KIND = "exam"
 MIN_LIMIT = 1
 MAX_LIMIT = 50
 DEFAULT_LIMIT = 10
-# `repository.list_runs` 只支持 LIMIT、不支持按 status 过滤，而运行中的卷子与未知 kind 会占位。
-# 若直接 `LIMIT=limit` 再过滤，「最近 1 条已完成」（limit=1）就可能取到空 —— 因此多取几倍窗口。
-FETCH_MULTIPLIER = 4
+#: 分页多取的行数：页尾两行若类型不同，各需要再往下 1 条才能找到「上一同类」，
+#: 因此多取 2 行即可保证本页每一行的对比对象都算得出来（只用于计算，不返回）。
+LOOKAHEAD = 2
 
 
 def _round1(value: float) -> float:
@@ -111,34 +112,52 @@ def _shortfall_count(run_id: str, report: Report | None = None) -> int | None:
     return len(report.shortfalls)
 
 
-def list_history(limit: int = DEFAULT_LIMIT) -> list[RunSummary]:
-    """最近 `limit` 条**已完成**测评（`created_at` 倒序由 repository 决定）。
+def kind_counts() -> dict[str, int]:
+    """面试 / 笔试各自的历史总数：页面筛选标签的统计口径（不受当前筛选影响）。"""
+    return {
+        kind: repository.count_history_rows(kind) for kind in (INTERVIEW_KIND, EXAM_KIND)
+    }
 
-    `limit` 越界由路由层的 `Query(ge=1, le=50)` 拦下（422 → 统一 envelope）；这里只做防御性截断。
+
+def list_history(
+    limit: int = DEFAULT_LIMIT, page: int = 1, kind: str | None = None
+) -> tuple[list[RunSummary], int]:
+    """已完成测评的**分页**投影，返回 `(本页条目, 命中总数)`。
+
+    `kind` 只接受 `interview` / `exam`（其它值按「不筛选」处理，路由层已用闭集拦一次）；
+    `total` 与列表同一过滤口径，前端据此算总页数。`limit` 越界由路由层
+    `Query(ge=1, le=50)` 拦下（422 → 统一 envelope）；这里只做防御性截断。
     """
     limit = min(max(limit, MIN_LIMIT), MAX_LIMIT)
+    page = max(page, 1)
+    if kind not in {INTERVIEW_KIND, EXAM_KIND}:
+        kind = None
+    offset = (page - 1) * limit
     report = repository.latest_report()  # 短板数共用同一份最新报告：一次读库，不逐行反查
+    total = repository.count_history_rows(kind)
+    # 多取 LOOKAHEAD 行只为页尾行找「上一同类」；这 2 行不返回给调用方。
+    rows = repository.history_rows(kind, limit=limit + LOOKAHEAD, offset=offset)
+    scored = [(row, score_of(row["kind"], row["payload"] or {})) for row in rows]
     summaries: list[RunSummary] = []
-    for row in repository.list_runs(limit=limit * FETCH_MULTIPLIER):
-        if row["status"] != repository.RUN_COMPLETED:
-            continue
-        kind = row["kind"]
-        if kind not in {INTERVIEW_KIND, EXAM_KIND}:
-            continue
+    for index, (row, score) in enumerate(scored[:limit]):
+        previous = next(
+            (pair for pair in scored[index + 1 :] if pair[0]["kind"] == row["kind"]), None
+        )
+        run_kind = row["kind"]
         summaries.append(
             RunSummary(
                 id=row["id"],
-                kind=kind,
-                score=score_of(kind, row["payload"] or {}),
+                kind=run_kind,
+                score=score,
                 shortfall_count=_shortfall_count(row["id"], report),
                 created_at=row["created_at"],
                 interview_settings=(
                     _interviews_settings_of(row["payload"] or {})
-                    if kind == INTERVIEW_KIND
+                    if run_kind == INTERVIEW_KIND
                     else None
                 ),
+                prev_score=None if previous is None else previous[1],
+                has_prev=previous is not None,
             )
         )
-        if len(summaries) == limit:
-            break
-    return summaries
+    return summaries, total

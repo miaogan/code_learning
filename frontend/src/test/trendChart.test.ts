@@ -16,7 +16,16 @@ function run(
   score: number | null,
   createdAt: string,
 ): RunSummary {
-  return { id, kind, score, shortfall_count: null, created_at: createdAt, interview_settings: null }
+  return {
+    id,
+    kind,
+    score,
+    shortfall_count: null,
+    created_at: createdAt,
+    interview_settings: null,
+    prev_score: null,
+    has_prev: false,
+  }
 }
 
 describe('buildSeries 分组与时间方向', () => {

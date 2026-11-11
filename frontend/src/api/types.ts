@@ -354,7 +354,10 @@ export interface QuestionSearchRequest {
   query: string
   direction?: string
   sub_direction?: string
+  /** 每页条数 */
   limit?: number
+  /** 页码，从 1 起（`total` 是命中总数） */
+  page?: number
 }
 
 export interface QuestionSearchItem {
@@ -533,6 +536,19 @@ export interface RunSummary {
   shortfall_count: number | null
   created_at: string
   interview_settings: InterviewSettings | null
+  /** 上一条同类型记录的分数；分页后可能落在上一页，故由服务端算好 */
+  prev_score: number | null
+  /** 是否存在上一条同类型记录（区分「暂无对比」与「未计分」） */
+  has_prev: boolean
+}
+
+/** 历史分页结果：`items` 是本页条目，`total` 是命中总数（与列表同一过滤口径）。 */
+export interface HistoryList {
+  items: RunSummary[]
+  total: number
+  /** 面试 / 笔试各自的历史总数（筛选标签的统计口径） */
+  interview_total: number
+  exam_total: number
 }
 
 export interface ApiErrorBody {

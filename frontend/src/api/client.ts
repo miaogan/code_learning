@@ -13,6 +13,7 @@ import type {
   ExamResult,
   ExamRun,
   Health,
+  HistoryList,
   InterviewCreateRequest,
   InterviewRun,
   InterviewSession,
@@ -58,7 +59,7 @@ import type {
   ResumeMeta,
   ResumeVersionDetail,
   ResumeVersionSummary,
-  RunSummary,
+  RunKind,
   TimelineEvent,
 } from './types'
 import { reportKeyRequired } from '../state/aiGate'
@@ -183,9 +184,25 @@ export const api = {
 
   /* ---------- r67 技术雷达（先锋 = 清单 / 国子监 = 生成任务） ---------- */
 
-  /** 技术清单：最新评估 + 最新快照 + 当前账号在该技术上的任务 id。 */
-  radarTechs: (limit = 50, signal?: AbortSignal): Promise<RadarTechList> =>
-    request<RadarTechList>(`/api/radar/techs?${queryString({ limit })}`, { signal }),
+  /** 技术清单：最新评估 + 最新快照 + 当前账号在该技术上的任务 id；方向/结论为服务端筛选。 */
+  radarTechs: (
+    params: {
+      limit?: number
+      page?: number
+      direction?: string
+      verdict?: string
+      signal?: AbortSignal
+    } = {},
+  ): Promise<RadarTechList> =>
+    request<RadarTechList>(
+      `/api/radar/techs?${queryString({
+        limit: params.limit ?? 50,
+        page: params.page ?? 1,
+        direction: params.direction || undefined,
+        verdict: params.verdict || undefined,
+      })}`,
+      { signal: params.signal },
+    ),
 
   /** 立即跑一轮采集与评估；可指定方向或单个仓库（都不填即全源默认轮次）。 */
   radarRun: (payload?: RadarRunRequest): Promise<RadarRunSummary> =>
@@ -207,8 +224,8 @@ export const api = {
     request<RadarJobAccepted>('/api/radar/generate', jsonInit('POST', payload)),
 
   /** 本账号的样例任务（含进度、章节草稿、题目样例），在途任务靠页面轮询刷新。 */
-  radarJobs: (limit = 20, signal?: AbortSignal): Promise<RadarJobList> =>
-    request<RadarJobList>(`/api/radar/jobs?${queryString({ limit })}`, { signal }),
+  radarJobs: (limit = 20, page = 1, signal?: AbortSignal): Promise<RadarJobList> =>
+    request<RadarJobList>(`/api/radar/jobs?${queryString({ limit, page })}`, { signal }),
 
   /** 扩充入库：通过自检的题写进练习池，章节草稿留档（不并入官方教程）。 */
   radarAdopt: (jobId: string): Promise<RadarJobItem> =>
@@ -393,8 +410,15 @@ export const api = {
   reportMarkdown: (reportId: string): Promise<string> =>
     requestText(`/api/reports/${encodeURIComponent(reportId)}/markdown`),
 
-  history: (limit = 10): Promise<RunSummary[]> =>
-    request<RunSummary[]>(`/api/history?limit=${encodeURIComponent(String(limit))}`),
+  /** 历史分页投影：`limit` 是每页条数、`page` 从 1 起、`kind` 是服务端筛选。 */
+  history: (params: { limit?: number; page?: number; kind?: RunKind } = {}): Promise<HistoryList> =>
+    request<HistoryList>(
+      `/api/history?${queryString({
+        limit: params.limit ?? 10,
+        page: params.page ?? 1,
+        kind: params.kind,
+      })}`,
+    ),
 
   listCourses: (): Promise<Course[]> => request<Course[]>('/api/courses'),
 
@@ -415,7 +439,14 @@ export const api = {
   /** 错题本：服务端已按最近答错时间倒序，前端不二次排序。 */
   practiceWrongBook: (
     language: PracticeLanguageFilter,
-    signal?: AbortSignal,
+    options: { page?: number; limit?: number; signal?: AbortSignal } = {},
   ): Promise<PracticeWrongBook> =>
-    request<PracticeWrongBook>(`/api/practice/wrong-book?${queryString({ language })}`, { signal }),
+    request<PracticeWrongBook>(
+      `/api/practice/wrong-book?${queryString({
+        language,
+        page: options.page ?? 1,
+        limit: options.limit ?? 20,
+      })}`,
+      { signal: options.signal },
+    ),
 }

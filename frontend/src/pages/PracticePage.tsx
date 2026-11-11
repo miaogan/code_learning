@@ -44,6 +44,8 @@ type Tab = 'practice' | 'wrong'
 
 const STATS_PHASES = ['读取题库统计', '统计已练与错题']
 const PAPER_PHASES = ['按筛选挑题', '准备题单']
+/** 错题本每页条数：与后端 `/api/practice/wrong-book` 的 `limit` 同一口径。 */
+const WRONG_PAGE_SIZE = 20
 
 /** 非 ApiError 的异常也归一成一句中文（错误 envelope 的 message 由 client.ts 保证是中文）。 */
 function messageOf(error: unknown, fallback: string): string {
@@ -91,6 +93,7 @@ export default function PracticePage() {
 
   const [wrongBook, setWrongBook] = useState<PracticeWrongBook | null>(null)
   const [wrongLanguage, setWrongLanguage] = useState<PracticeLanguageFilter>('all')
+  const [wrongPage, setWrongPage] = useState(1)
   const [wrongLoading, setWrongLoading] = useState(false)
   const [wrongError, setWrongError] = useState<string | null>(null)
   const [wrongPulse, setWrongPulse] = useState(0)
@@ -155,7 +158,11 @@ export default function PracticePage() {
     setWrongLoading(true)
     setWrongError(null)
     api
-      .practiceWrongBook(wrongLanguage, controller.signal)
+      .practiceWrongBook(wrongLanguage, {
+        page: wrongPage,
+        limit: WRONG_PAGE_SIZE,
+        signal: controller.signal,
+      })
       .then((next) => {
         if (controller.signal.aborted) return
         setWrongBook(next)
@@ -167,7 +174,7 @@ export default function PracticePage() {
         setWrongLoading(false)
       })
     return () => controller.abort()
-  }, [tab, wrongLanguage, wrongPulse])
+  }, [tab, wrongLanguage, wrongPage, wrongPulse])
 
   // 换题 / 进入作答态：焦点落到题卡（读屏先读「第 i / N 题」，DESIGN §3-5）。
   useEffect(() => {
@@ -516,12 +523,19 @@ export default function PracticePage() {
         items={wrongBook ? wrongBook.items : []}
         total={wrongBook ? wrongBook.total : 0}
         language={wrongLanguage}
+        page={wrongPage}
+        pageSize={WRONG_PAGE_SIZE}
+        onPageChange={(next) => {
+          setWrongPage(next)
+          setExpandedId(null) // 换页收起展开行：展开态跟着题走，不跨页残留
+        }}
         expandedId={expandedId}
         onToggle={(questionId) =>
           setExpandedId((previous) => (previous === questionId ? null : questionId))
         }
         onFilterLanguage={(value) => {
           setWrongLanguage(value)
+          setWrongPage(1)
           setExpandedId(null)
         }}
         onRetrain={retrainWrong}

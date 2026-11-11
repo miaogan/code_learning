@@ -48,12 +48,30 @@ def insert_assessment(tech_slug: str, run_id: int, result: dict[str, Any], *, in
     )
 
 
-def list_techs(limit: int = 50, *, tech_slug: str = "") -> list[dict[str, Any]]:
-    """技术清单：最新评估 + 最新快照 + 当前在途任务，按评估时间倒序取前 N 条。
+def list_techs(
+    limit: int = 50,
+    *,
+    tech_slug: str = "",
+    direction: str = "",
+    verdict: str = "",
+    offset: int = 0,
+) -> list[dict[str, Any]]:
+    """技术清单：最新评估 + 最新快照 + 当前在途任务，按评估时间倒序取一页。
 
-    `tech_slug` 非空时只取该条（手工录入后回读用，不让调用方自己拼一份投影）。
+    `limit` 是每页条数，`offset` 由调用方按 `(page - 1) * limit` 计算；
+    `tech_slug` 非空时只取该条（手工录入后回读用，不让调用方自己拼一份投影）；
+    `direction` / `verdict` 是清单页的筛选口径（空串 = 不过滤）。
     """
-    return repository.radar_list_techs(limit, tech_slug=tech_slug)
+    return repository.radar_list_techs(
+        limit, tech_slug=tech_slug, direction=direction, verdict=verdict, offset=offset
+    )
+
+
+def count_techs(*, tech_slug: str = "", direction: str = "", verdict: str = "") -> int:
+    """技术清单命中总数（与 `list_techs` 同一过滤口径），供分页器算总页数。"""
+    return repository.radar_count_techs(
+        tech_slug=tech_slug, direction=direction, verdict=verdict
+    )
 
 
 def cross_source_count() -> dict[str, int]:
@@ -95,8 +113,14 @@ def get_job(job_id: str) -> dict[str, Any] | None:
     return None if row is None else _job_row(row)
 
 
-def list_jobs(limit: int = 20) -> list[dict[str, Any]]:
-    return [_job_row(row) for row in repository.radar_job_rows(limit)]
+def list_jobs(limit: int = 20, offset: int = 0) -> list[dict[str, Any]]:
+    """本账号的样例任务：`limit` 是每页条数，`offset` 由调用方按 `(page - 1) * limit` 计算。"""
+    return [_job_row(row) for row in repository.radar_job_rows(limit, offset=offset)]
+
+
+def count_jobs() -> int:
+    """本账号样例任务总数（与 `list_jobs` 同一过滤口径），供分页器算总页数。"""
+    return repository.radar_count_jobs()
 
 
 _JOB_FIELDS = frozenset(

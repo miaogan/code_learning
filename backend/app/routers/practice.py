@@ -9,7 +9,7 @@
 - 响应模型 `Practice*` 保证题单/统计/错题本永不含 `answer`，答案只在 `/answer` 回显。
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 
 from app.deps import current_user
 from app.schemas import (
@@ -70,5 +70,9 @@ def get_stats(
 
 
 @router.get("/wrong-book", response_model=PracticeWrongBook, summary="错题本（最近一次答错的题）")
-def get_wrong_book(language: PracticeLanguageFilter = "all") -> PracticeWrongBook:
-    return PracticeWrongBook(**practice_service.wrong_book(language))
+def get_wrong_book(
+    language: PracticeLanguageFilter = "all",
+    limit: int = Query(default=20, ge=1, le=100, description="每页条数"),
+    page: int = Query(default=1, ge=1, description="页码，从 1 起"),
+) -> PracticeWrongBook:
+    return PracticeWrongBook(**practice_service.wrong_book(language, limit, page))

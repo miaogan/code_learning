@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import type { RadarRunRequest, RadarTechItem } from '../api/types'
@@ -6,7 +6,9 @@ import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { EmptyState } from '../components/ui/EmptyState'
 import { InlineError } from '../components/ui/InlineError'
+import { Pagination } from '../components/ui/Pagination'
 import { PhaseLoader } from '../components/ui/PhaseLoader'
+import { SegTabs } from '../components/polish/SegTabs'
 import { Toast } from '../components/ui/Toast'
 import { DIRECTIONS } from '../lib/questionDirections'
 import { dimensionText, techMetaText } from '../lib/radar'
@@ -25,6 +27,22 @@ const VERDICT_CLASS: Record<string, string> = {
   watch: 'is-watch',
   skip: 'is-skip',
 }
+
+/** 每页条数：与后端 `/api/radar/techs` 的 `limit` 同一口径。 */
+const PAGE_SIZE = 20
+
+type VerdictFilter = 'all' | 'must_learn' | 'worth_knowing' | 'watch' | 'skip'
+
+const VERDICT_KEYS: VerdictFilter[] = ['all', 'must_learn', 'worth_knowing', 'watch', 'skip']
+
+/** 结论筛选标签：与后端 `rules.VERDICT_LABELS` 同一套措辞（间隔只在「全部」与四个结论之间）。 */
+const VERDICT_TABS = [
+  { key: 'all', label: '全部' },
+  { key: 'must_learn', label: '必学' },
+  { key: 'worth_knowing', label: '值得了解' },
+  { key: 'watch', label: '观望' },
+  { key: 'skip', label: '跳过' },
+]
 
 function TechRow({
   item,
@@ -61,7 +79,21 @@ function TechRow({
 
 export default function PioneerPage() {
   const navigate = useNavigate()
-  const listAsync = useAsync((signal) => api.radarTechs(50, signal), [])
+  const [page, setPage] = useState(1)
+  // 清单筛选（服务端过滤）：结论走 tab、方向走下拉；筛选值变化一律回到第 1 页。
+  const [verdictFilter, setVerdictFilter] = useState<VerdictFilter>('all')
+  const [directionFilter, setDirectionFilter] = useState('')
+  const listAsync = useAsync(
+    (signal) =>
+      api.radarTechs({
+        limit: PAGE_SIZE,
+        page,
+        direction: directionFilter,
+        verdict: verdictFilter === 'all' ? undefined : verdictFilter,
+        signal,
+      }),
+    [page, directionFilter, verdictFilter],
+  )
   const runAsync = useAsync((signal) => api.radarLatestRun(signal), [])
 
   const [name, setName] = useState('')
@@ -75,10 +107,38 @@ export default function PioneerPage() {
   const [generating, setGenerating] = useState('')
   const [direction, setDirection] = useState('')
   const [repo, setRepo] = useState('')
+  // 采集期间的清单轮询句柄：离开页面时要清掉，避免在别的页面继续打接口。
+  const pollRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (pollRef.current !== null) {
+        window.clearInterval(pollRef.current)
+        pollRef.current = null
+      }
+    }
+  }, [])
 
   // 直接读 `data`（重载期间保留上一次成功值）：按 status 派生会在采集后刷新时清空清单、闪一帧 loader。
   const techs = listAsync.data
   const lastRun = runAsync.data
+  const filtering = verdictFilter !== 'all' || directionFilter !== ''
+
+  const changeVerdict = (key: string): void => {
+    setVerdictFilter(VERDICT_KEYS.includes(key as VerdictFilter) ? (key as VerdictFilter) : 'all')
+    setPage(1)
+  }
+
+  const changeDirection = (value: string): void => {
+    setDirectionFilter(value)
+    setPage(1)
+  }
+
+  const resetFilters = (): void => {
+    setVerdictFilter('all')
+    setDirectionFilter('')
+    setPage(1)
+  }
 
   const refresh = (): void => {
     listAsync.reload()
@@ -88,6 +148,9 @@ export default function PioneerPage() {
   const collect = async (): Promise<void> => {
     setCollecting(true)
     setCollectError('')
+    // 规则评估先落库、模型细化还要接着跑（单轮可能几十秒）：采集在飞时轮询清单，
+    // 让新条目随写随现，不必等整轮结束或手动刷新。
+    pollRef.current = window.setInterval(() => listAsync.reload(), 2000)
     try {
       const payload: RadarRunRequest = {}
       if (direction !== '') {
@@ -97,6 +160,7 @@ export default function PioneerPage() {
         payload.repo = repo.trim()
       }
       const result = await api.radarRun(payload)
+      setPage(1)
       refresh()
       setToast({
         message: result.notice !== '' ? result.notice : `采集完成：本轮看到 ${result.techs_seen} 项技术`,
@@ -105,6 +169,10 @@ export default function PioneerPage() {
     } catch (error) {
       setCollectError(error instanceof Error ? error.message : '采集失败，请稍后重试')
     } finally {
+      if (pollRef.current !== null) {
+        window.clearInterval(pollRef.current)
+        pollRef.current = null
+      }
       setCollecting(false)
     }
   }
@@ -125,6 +193,7 @@ export default function PioneerPage() {
       setName('')
       setUrl('')
       setSummary('')
+      setPage(1)
       refresh()
       setToast({ message: `已加入清单：${item.name}（${item.verdict_label}）`, seq: Date.now() })
     } catch (error) {
@@ -271,7 +340,7 @@ export default function PioneerPage() {
         <InlineError message={listAsync.error.message} onRetry={listAsync.reload} />
       )}
 
-      {techs !== null && techs.items.length === 0 && (
+      {techs !== null && techs.items.length === 0 && !filtering && (
         <EmptyState
           reason="清单还是空的：点「立即采集一轮」拉一轮公开信号，或在上方手工录入一条线索。"
           actionLabel="立即采集一轮"
@@ -279,23 +348,65 @@ export default function PioneerPage() {
         />
       )}
 
-      {techs !== null && techs.items.length > 0 && (
+      {techs !== null && (techs.items.length > 0 || filtering) && (
         <Card>
           <div className="sc-radar-listhead">
             <h3 className="sc-coach-blocktitle">技术清单</h3>
-            <span className="sc-radar-count">共 {techs.items.length} 项</span>
+            <span className="sc-radar-count">共 {techs.total} 项</span>
+          </div>
+          {/* 筛选放在清单卡内：筛到 0 条时卡片仍在，筛选器不会跟着消失。 */}
+          <div className="sc-radar-filters">
+            <SegTabs
+              tabs={VERDICT_TABS}
+              active={verdictFilter}
+              onChange={changeVerdict}
+              ariaLabel="技术结论筛选"
+            />
+            <label className="sc-field sc-radar-filterdir">
+              <span className="sc-field-label">按方向筛选</span>
+              <select
+                className="sc-filter-select"
+                value={directionFilter}
+                onChange={(event) => changeDirection(event.target.value)}
+              >
+                <option value="">全部方向</option>
+                {DIRECTIONS.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {filtering && (
+              <Button variant="ghost" size="sm" onClick={resetFilters}>
+                清除筛选
+              </Button>
+            )}
           </div>
           {techs.notice !== '' && <p className="sc-coach-note">{techs.notice}</p>}
-          <ul className="sc-radar-list">
-            {techs.items.map((item) => (
-              <TechRow
-                key={item.tech_slug}
-                item={item}
-                busy={generating === item.tech_slug}
-                onGenerate={(row) => void generate(row)}
-              />
-            ))}
-          </ul>
+          {techs.items.length === 0 ? (
+            <p className="sc-radar-filtered-empty">
+              当前筛选下没有条目：换个方向或结论，或点「清除筛选」看全量清单。
+            </p>
+          ) : (
+            <ul className="sc-radar-list">
+              {techs.items.map((item) => (
+                <TechRow
+                  key={item.tech_slug}
+                  item={item}
+                  busy={generating === item.tech_slug}
+                  onGenerate={(row) => void generate(row)}
+                />
+              ))}
+            </ul>
+          )}
+          <Pagination
+            page={page}
+            pageSize={PAGE_SIZE}
+            total={techs.total}
+            onChange={setPage}
+            label="技术清单分页"
+          />
           <p className="sc-coach-note">
             清单是全局知识库，不按账号隔离；生成的任务按账号隔离，别人在途的任务不会占用你的额度。
           </p>

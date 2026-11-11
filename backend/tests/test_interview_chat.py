@@ -726,8 +726,9 @@ def test_history_row_carries_interview_settings(
     run = _create(fake_ai, profile.id, InterviewSettingsPatch(**SETTINGS_VALUES))
     _drive(run.run_id, fake_ai)
 
-    rows = history.list_history()
+    rows, total = history.list_history()
 
+    assert total == 1
     assert len(rows) == 1
     assert rows[0].kind == history.INTERVIEW_KIND
     assert rows[0].interview_settings is not None

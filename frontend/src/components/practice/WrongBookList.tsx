@@ -12,6 +12,7 @@ import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
 import { Chip } from '../ui/Chip'
 import { EmptyState } from '../ui/EmptyState'
+import { Pagination } from '../ui/Pagination'
 
 export interface WrongBookListProps {
   items: PracticeWrongItem[]
@@ -19,6 +20,10 @@ export interface WrongBookListProps {
   total: number
   /** 当前语言过滤（页面持有，重练题单与列表必须用同一个值） */
   language: PracticeLanguageFilter
+  /** 当前页码（从 1 起）与每页条数：列表按页展示，`total` 是全库错题数 */
+  page: number
+  pageSize: number
+  onPageChange: (page: number) => void
   /** 已展开的行 id；`null` = 全部收起（同一时刻最多展开一行） */
   expandedId: string | null
   onToggle: (questionId: string) => void
@@ -41,6 +46,9 @@ export function WrongBookList({
   items,
   total,
   language,
+  page,
+  pageSize,
+  onPageChange,
   expandedId,
   onToggle,
   onFilterLanguage,
@@ -120,9 +128,18 @@ export function WrongBookList({
       )}
 
       {items.length > 0 ? (
-        <div className="sc-qa-footer-row">
-          <Button onClick={onRetrain}>{`错题重练 · ${total} 题`}</Button>
-        </div>
+        <>
+          <Pagination
+            page={page}
+            pageSize={pageSize}
+            total={total}
+            onChange={onPageChange}
+            label="错题本分页"
+          />
+          <div className="sc-qa-footer-row">
+            <Button onClick={onRetrain}>{`错题重练 · ${total} 题`}</Button>
+          </div>
+        </>
       ) : null}
     </Card>
   )

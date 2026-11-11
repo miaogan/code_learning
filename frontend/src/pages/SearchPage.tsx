@@ -6,6 +6,7 @@ import { LevelChip } from '../components/learn/LevelChip'
 import { Chip } from '../components/ui/Chip'
 import { ChipRow, type ChipOption } from '../components/ui/ChipRow'
 import { InlineError } from '../components/ui/InlineError'
+import { Pagination } from '../components/ui/Pagination'
 import {
   QUESTION_DEBOUNCE_MS,
   QUESTION_HIT_LIMIT,
@@ -89,10 +90,19 @@ export default function SearchPage() {
 
   // 题库侧是网络请求：先防抖定稿查询词，再由 useAsync 管竞态、取消与重试。
   const [settled, setSettled] = useState('')
+  const [page, setPage] = useState(1)
   useEffect(() => {
-    const timer = window.setTimeout(() => setSettled(query), QUESTION_DEBOUNCE_MS)
+    const timer = window.setTimeout(() => {
+      setSettled(query)
+      setPage(1) // 新关键词重新从第 1 页看
+    }, QUESTION_DEBOUNCE_MS)
     return () => window.clearTimeout(timer)
   }, [query])
+
+  // 换方向同样是新的一组结果：回到第 1 页，避免停在上一组命中的第 N 页。
+  useEffect(() => {
+    setPage(1)
+  }, [direction])
 
   const questions = useAsync(async () => {
     if (!isSearchable(settled)) return null
@@ -100,8 +110,9 @@ export default function SearchPage() {
       query: settled,
       direction: direction === 'all' ? undefined : direction,
       limit: QUESTION_HIT_LIMIT,
+      page,
     })
-  }, [settled, direction])
+  }, [settled, direction, page])
 
   // settled 与当前输入不一致时（还在防抖窗口里）一律按「检索中」渲染，不展示上一轮结果。
   const questionsCurrent = searchable && settled === query
@@ -279,10 +290,17 @@ export default function SearchPage() {
                   ))}
                 </div>
                 <p className="sc-search-foot">
-                  {`共 ${questionData.total} 题命中，显示前 ${questionData.items.length} 题 · 检索方式 ${
+                  {`共 ${questionData.total} 题命中，第 ${page} 页 · 本页显示 ${questionData.items.length} 题 · 检索方式 ${
                     questionData.mode === 'fts5' ? '全文索引（FTS5）' : '关键词降级匹配'
                   } · 命中不带答案，点开进入对应方向的练习`}
                 </p>
+                <Pagination
+                  page={page}
+                  pageSize={QUESTION_HIT_LIMIT}
+                  total={questionData.total}
+                  onChange={setPage}
+                  label="题库检索结果分页"
+                />
                 {questionData.notice === '' ? null : (
                   <p className="sc-search-foot">{questionData.notice}</p>
                 )}

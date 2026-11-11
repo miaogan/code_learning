@@ -191,7 +191,7 @@ def test_interview_event_matches_history_and_diagnosis(
     drive_session(run, fake_ai, answer="补充说明")
 
     event = timeline.list_timeline()[0]
-    rows = client.get("/api/history?limit=10").json()
+    rows = client.get("/api/history?limit=10").json()["items"]
     row = next(item for item in rows if item["id"] == run.run_id)
     assert row["score"] is not None
     assert abs(float(event.key_metrics.interview_avg) - float(row["score"])) <= 0.05

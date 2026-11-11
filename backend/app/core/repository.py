@@ -532,6 +532,40 @@ def list_runs(kind: str | None = None, limit: int = 20) -> list[dict[str, Any]]:
     return [_run_dict(row) for row in rows]
 
 
+def history_rows(
+    kind: str | None = None, limit: int = 10, offset: int = 0
+) -> list[dict[str, Any]]:
+    """历史页分页：已完成且 `kind ∈ {interview, exam}` 的 run，倒序（与报告页口径一致）。"""
+    sql = (
+        "SELECT id, kind, profile_id, payload, status, created_at FROM runs"
+        " WHERE user_id = ? AND status = ? AND kind IN (?, ?)"
+    )
+    params: list[Any] = [_uid(), RUN_COMPLETED, "interview", "exam"]
+    if kind is not None:
+        sql += " AND kind = ?"
+        params.append(kind)
+    sql += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
+    params.extend([limit, offset])
+    with connection() as conn:
+        rows = conn.execute(sql, params).fetchall()
+    return [_run_dict(row) for row in rows]
+
+
+def count_history_rows(kind: str | None = None) -> int:
+    """历史页总数：与 `history_rows` 同一过滤口径，供分页器算总页数。"""
+    sql = (
+        "SELECT count(*) AS n FROM runs"
+        " WHERE user_id = ? AND status = ? AND kind IN (?, ?)"
+    )
+    params: list[Any] = [_uid(), RUN_COMPLETED, "interview", "exam"]
+    if kind is not None:
+        sql += " AND kind = ?"
+        params.append(kind)
+    with connection() as conn:
+        row = conn.execute(sql, params).fetchone()
+    return int(row["n"])
+
+
 def list_runs_for_document(document_id: str, limit: int = 100) -> list[dict[str, Any]]:
     """某份简历关联的**已完成** run（经 `profiles.document_id` 关联，倒序）。
 
@@ -1415,11 +1449,15 @@ def rebuild_question_search() -> tuple[str, int]:
 
 
 def search_questions(
-    query: str, direction: str = "", sub_direction: str = "", limit: int = 5
+    query: str, direction: str = "", sub_direction: str = "", limit: int = 5, page: int = 1
 ) -> dict[str, Any]:
-    """题目检索：FTS5 trigram 优先，短查询 / 无虚表时降级 LIKE；答案列永不入响应。"""
+    """题目检索：FTS5 trigram 优先，短查询 / 无虚表时降级 LIKE；答案列永不入响应。
+
+    `limit` 是每页条数，`page` 从 1 起；`total` 为**命中总数**（不是本页条数），供前端翻页。
+    """
     needle = str(query or "").strip()
     size = max(1, min(int(limit), 20))
+    offset = (max(1, int(page)) - 1) * size
     if not needle:
         return {"items": [], "total": 0, "mode": "fts5", "notice": "请输入检索关键词"}
     filters: list[str] = []
@@ -1434,19 +1472,29 @@ def search_questions(
     with connection() as conn:
         if _question_search_table_exists(conn) and len(needle) >= 3:
             match = '"' + needle.replace('"', '""') + '"'
+            total = conn.execute(
+                "SELECT count(*) AS n FROM question_search WHERE question_search MATCH ?" + where,
+                [match, *params],
+            ).fetchone()["n"]
             rows = conn.execute(
                 "SELECT question_id, prompt, direction, sub_direction, "
                 "bm25(question_search) AS rank FROM question_search "
-                "WHERE question_search MATCH ?" + where + " ORDER BY rank ASC LIMIT ?",
-                [match, *params, size],
+                "WHERE question_search MATCH ?" + where + " ORDER BY rank ASC LIMIT ? OFFSET ?",
+                [match, *params, size, offset],
             ).fetchall()
             mode = "fts5"
         else:
             like = "%" + needle + "%"
+            total = conn.execute(
+                "SELECT count(*) AS n FROM questions"
+                " WHERE (prompt LIKE ? OR explanation LIKE ?)" + where,
+                [like, like, *params],
+            ).fetchone()["n"]
             rows = conn.execute(
                 "SELECT id AS question_id, prompt, direction, sub_direction FROM questions "
-                "WHERE (prompt LIKE ? OR explanation LIKE ?)" + where + " ORDER BY id LIMIT ?",
-                [like, like, *params, size],
+                "WHERE (prompt LIKE ? OR explanation LIKE ?)" + where
+                + " ORDER BY id LIMIT ? OFFSET ?",
+                [like, like, *params, size, offset],
             ).fetchall()
             mode = "like"
     items = [
@@ -1460,7 +1508,7 @@ def search_questions(
         for row in rows
     ]
     notice = "" if mode == "fts5" else "当前环境未启用全文索引，已按关键词包含匹配"
-    return {"items": items, "total": len(items), "mode": mode, "notice": notice}
+    return {"items": items, "total": int(total), "mode": mode, "notice": notice}
 
 
 def _json_map(value: Any) -> dict[str, bool]:
@@ -1635,13 +1683,47 @@ def radar_insert_assessment(
         return cursor.rowcount > 0
 
 
-def radar_list_techs(limit: int = 50, *, tech_slug: str = "") -> list[dict[str, Any]]:
-    """技术清单：最新评估 + 最新快照 + 当前账号最近一条生成任务，按评估时间倒序取前 N 条。"""
-    where = " WHERE t.tech_slug = ?" if tech_slug else ""
-    params: list[Any] = [_uid()]
+_RADAR_TECH_JOIN = (
+    " LEFT JOIN radar_assessments a ON a.id = ("
+    "   SELECT MAX(a2.id) FROM radar_assessments a2 WHERE a2.tech_slug = t.tech_slug)"
+)
+
+
+def _radar_tech_where(
+    *, tech_slug: str = "", direction: str = "", verdict: str = ""
+) -> tuple[str, list[Any]]:
+    """技术清单的过滤条件（列表与计数共用，避免两处口径漂移）。
+
+    `verdict` 走 `COALESCE(a.verdict, 'skip')`：还没有评估行的技术按 `skip` 投射，
+    筛「跳过」时要一并命中，与列表里的默认结论保持一致。
+    """
+    clauses: list[str] = []
+    params: list[Any] = []
     if tech_slug:
+        clauses.append("t.tech_slug = ?")
         params.append(tech_slug)
-    params.append(limit)
+    if direction:
+        clauses.append("t.direction = ?")
+        params.append(direction)
+    if verdict:
+        clauses.append("COALESCE(a.verdict, 'skip') = ?")
+        params.append(verdict)
+    return (" WHERE " + " AND ".join(clauses)) if clauses else "", params
+
+
+def radar_list_techs(
+    limit: int = 50,
+    *,
+    tech_slug: str = "",
+    direction: str = "",
+    verdict: str = "",
+    offset: int = 0,
+) -> list[dict[str, Any]]:
+    """技术清单：最新评估 + 最新快照 + 当前账号最近一条生成任务，按评估时间倒序分页。"""
+    where, filter_params = _radar_tech_where(
+        tech_slug=tech_slug, direction=direction, verdict=verdict
+    )
+    params: list[Any] = [_uid(), *filter_params, limit, offset]
     with connection() as conn:
         rows = conn.execute(
             "SELECT t.tech_slug, t.name, t.direction, t.sub_direction, t.source_key, t.url,"
@@ -1655,10 +1737,10 @@ def radar_list_techs(limit: int = 50, *, tech_slug: str = "") -> list[dict[str, 
             "  ORDER BY s.id DESC LIMIT 1) AS suspect,"
             " (SELECT j.job_id FROM radar_jobs j WHERE j.tech_slug = t.tech_slug"
             "  AND j.user_id = ? ORDER BY j.created_at DESC LIMIT 1) AS job_id"
-            " FROM radar_techs t LEFT JOIN radar_assessments a ON a.id = ("
-            "   SELECT MAX(a2.id) FROM radar_assessments a2 WHERE a2.tech_slug = t.tech_slug)"
+            " FROM radar_techs t"
+            f"{_RADAR_TECH_JOIN}"
             f"{where}"
-            " ORDER BY a.created_at DESC, t.last_seen_at DESC LIMIT ?",
+            " ORDER BY a.created_at DESC, t.last_seen_at DESC LIMIT ? OFFSET ?",
             params,
         ).fetchall()
     items: list[dict[str, Any]] = []
@@ -1690,6 +1772,18 @@ def radar_list_techs(limit: int = 50, *, tech_slug: str = "") -> list[dict[str, 
             }
         )
     return items
+
+
+def radar_count_techs(
+    *, tech_slug: str = "", direction: str = "", verdict: str = ""
+) -> int:
+    """技术清单总数：与 `radar_list_techs` 同一过滤口径，供分页器算总页数。"""
+    where, params = _radar_tech_where(tech_slug=tech_slug, direction=direction, verdict=verdict)
+    with connection() as conn:
+        row = conn.execute(
+            f"SELECT count(*) AS n FROM radar_techs t{_RADAR_TECH_JOIN}{where}", params
+        ).fetchone()
+    return int(row["n"])
 
 
 def radar_cross_source_count() -> dict[str, int]:
@@ -1775,12 +1869,22 @@ def radar_get_job_row(job_id: str) -> sqlite3.Row | None:
         ).fetchone()
 
 
-def radar_job_rows(limit: int = 20) -> list[sqlite3.Row]:
+def radar_job_rows(limit: int = 20, offset: int = 0) -> list[sqlite3.Row]:
     with connection() as conn:
         return conn.execute(
-            "SELECT * FROM radar_jobs WHERE user_id = ? ORDER BY created_at DESC LIMIT ?",
-            (_uid(), limit),
+            "SELECT * FROM radar_jobs WHERE user_id = ? ORDER BY created_at DESC"
+            " LIMIT ? OFFSET ?",
+            (_uid(), limit, offset),
         ).fetchall()
+
+
+def radar_count_jobs() -> int:
+    """本账号样例任务总数，供分页器算总页数。"""
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT count(*) AS n FROM radar_jobs WHERE user_id = ?", (_uid(),)
+        ).fetchone()
+    return int(row["n"])
 
 
 def radar_update_job(job_id: str, payload: dict[str, Any]) -> None:

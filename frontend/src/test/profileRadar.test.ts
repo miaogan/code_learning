@@ -52,6 +52,8 @@ function run(kind: RunSummary['kind'], score: number | null, id = 'x'): RunSumma
     shortfall_count: null,
     created_at: '2026-11-10T00:00:00Z',
     interview_settings: null,
+    prev_score: null,
+    has_prev: false,
   }
 }
 

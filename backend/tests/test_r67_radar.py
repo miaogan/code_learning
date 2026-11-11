@@ -118,6 +118,39 @@ def test_offline_round_lands_techs(radar_env: None) -> None:
     assert any(row["star_delta_7d"] == 0 for row in rows)  # 首轮无上一份快照
 
 
+def test_techs_api_filters_and_paginates(client: TestClient, radar_env: None) -> None:
+    """清单接口：结论/方向筛选与列表同口径，`total` 是命中数而不是本页条数。"""
+    asyncio.run(radar.run_round(trigger="manual", user=None))
+    full = client.get("/api/radar/techs", params={"limit": 100}).json()
+    assert full["total"] >= len(full["items"]) >= 10
+
+    verdict = full["items"][0]["verdict"]
+    by_verdict = client.get(
+        "/api/radar/techs", params={"limit": 100, "verdict": verdict}
+    ).json()
+    assert by_verdict["total"] == len(by_verdict["items"])
+    assert by_verdict["total"] >= 1
+    assert all(row["verdict"] == verdict for row in by_verdict["items"])
+
+    direction = next(row["direction"] for row in full["items"] if row["direction"])
+    by_direction = client.get(
+        "/api/radar/techs", params={"limit": 100, "direction": direction}
+    ).json()
+    assert by_direction["total"] >= 1
+    assert all(row["direction"] == direction for row in by_direction["items"])
+
+    second = client.get("/api/radar/techs", params={"limit": 1, "page": 2}).json()
+    assert [row["tech_slug"] for row in second["items"]] == [full["items"][1]["tech_slug"]]
+
+    out_of_range = client.get("/api/radar/techs", params={"limit": 100, "page": 99}).json()
+    assert out_of_range["items"] == []
+
+    bad_verdict = client.get("/api/radar/techs", params={"verdict": "not-a-verdict"})
+    assert bad_verdict.status_code == 400
+    bad_direction = client.get("/api/radar/techs", params={"direction": "不存在的方向"})
+    assert bad_direction.status_code == 400
+
+
 def test_exam_pool_excludes_radar_questions(radar_env: None) -> None:
     radar_question = {
         "id": "radar-test-q1",

@@ -524,11 +524,15 @@ def stats(
     }
 
 
-def wrong_book(language: str = rules.FILTER_ANY) -> dict[str, Any]:
+def wrong_book(
+    language: str = rules.FILTER_ANY, limit: int = 20, page: int = 1
+) -> dict[str, Any]:
     """错题本：**最近一次作答为错误**的可用客观题，`last_wrong_at` 倒序、同刻按 id 升序。
 
     成员判定跨 exam / practice（同一张 `question_attempts`）：笔试答错也算错题，练习答对即移出。
     题目被下线（不可用）或非客观题时静默跳过——错题本只列还能练的题。
+
+    `limit` 是每页条数、`page` 从 1 起；`total` 是排序后的**全部**错题数（不受分页裁剪）。
     """
     index = attempt_index()
     items: list[dict[str, Any]] = []
@@ -554,4 +558,7 @@ def wrong_book(language: str = rules.FILTER_ANY) -> dict[str, Any]:
     # 两段稳定排序：先按 id 升序（同刻的确定性次序），再按时间倒序（主序）。
     items.sort(key=lambda item: str(item["question_id"]))
     items.sort(key=lambda item: str(item["last_wrong_at"]), reverse=True)
-    return {"items": items, "total": len(items)}
+    total = len(items)
+    size = max(1, limit)
+    offset = (max(1, page) - 1) * size
+    return {"items": items[offset : offset + size], "total": total}

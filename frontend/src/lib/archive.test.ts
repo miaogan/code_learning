@@ -59,6 +59,8 @@ function run(id: string, kind: 'interview' | 'exam', score: number | null): RunS
     shortfall_count: null,
     created_at: '2026-11-09T04:00:00Z',
     interview_settings: null,
+    prev_score: null,
+    has_prev: false,
   }
 }
 

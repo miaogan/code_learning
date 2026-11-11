@@ -554,7 +554,10 @@ class QuestionSearchRequest(BaseModel):
     query: str = ""
     direction: str = ""
     sub_direction: str = ""
+    #: 每页条数（沿用旧字段名，默认 5）。
     limit: int = 5
+    #: 页码，从 1 起；`total` 是命中总数，前端据此算总页数。
+    page: int = 1
 
 
 class QuestionSearchItem(BaseModel):
@@ -747,6 +750,19 @@ class RunSummary(BaseModel):
     interview_settings: InterviewSettings | None = Field(
         default=None, description="面试 run 的设定；笔试与旧 run 为 None"
     )
+    #: 分页后「上一同类」可能落在上一页，故对比上下文由**服务端**给出（前端零扫描）。
+    prev_score: float | None = Field(default=None, description="上一条同类型记录的分数；无则 None")
+    has_prev: bool = Field(default=False, description="是否存在上一条同类型记录（区分「暂无对比」与「未计分」）")
+
+
+class HistoryList(BaseModel):
+    """历史分页结果：`items` 是本页条目，`total` 是命中总数（与列表同一过滤口径）。"""
+
+    items: list[RunSummary] = Field(default_factory=list)
+    total: int = 0
+    #: 面试 / 笔试各自的历史总数（页面筛选标签的统计口径，不受当前页与当前筛选影响）。
+    interview_total: int = 0
+    exam_total: int = 0
 
 
 # --- 成长时间线（r3 AC-1 / AC-2 / AC-5）---------------------------------------

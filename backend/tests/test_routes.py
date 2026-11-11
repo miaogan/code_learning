@@ -410,16 +410,25 @@ def test_history_sorted_desc_and_limited(
     run_ids = _completed_runs(profile_factory, seed_questions)
     assert len(run_ids) >= 2
 
-    rows = client.get("/api/history", params={"limit": 10}).json()
+    body = client.get("/api/history", params={"limit": 10}).json()
+    rows = body["items"]
     assert len(rows) >= 2
+    assert body["total"] >= len(rows), "total 是命中总数，不是本页条数"
     stamps = [row["created_at"] for row in rows]
     assert stamps == sorted(stamps, reverse=True), "history 必须按 created_at 倒序"
     for row in rows:
         assert row["kind"] in {"interview", "exam"}
         assert set(row) >= {"id", "kind", "score", "shortfall_count", "created_at"}
 
-    only_one = client.get("/api/history", params={"limit": 1}).json()
-    assert len(only_one) == 1
+    only_one = client.get("/api/history", params={"limit": 1, "page": 1}).json()
+    assert len(only_one["items"]) == 1
+    assert only_one["items"][0]["id"] == rows[0]["id"]
+
+    second_page = client.get("/api/history", params={"limit": 1, "page": 2}).json()
+    assert second_page["items"][0]["id"] == rows[1]["id"], "第 2 页从第 limit+1 条开始"
+
+    out_of_page = client.get("/api/history", params={"limit": 10, "page": 99}).json()
+    assert out_of_page["items"] == [], "越界页返回空列表而不是报错"
 
     out_of_range = client.get("/api/history", params={"limit": 0})
     assert out_of_range.status_code == 422
@@ -553,5 +562,5 @@ def test_full_flow_reaches_terminal_report(
 
     history = client.get("/api/history", params={"limit": 10})
     assert history.status_code == 200
-    kinds = {row["kind"] for row in history.json()}
+    kinds = {row["kind"] for row in history.json()["items"]}
     assert kinds == {"interview", "exam"}

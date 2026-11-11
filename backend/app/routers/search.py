@@ -25,6 +25,6 @@ def search_questions(payload: QuestionSearchRequest) -> QuestionSearchResponse:
     )
     return QuestionSearchResponse(
         **repository.search_questions(
-            payload.query, direction, sub_direction, payload.limit
+            payload.query, direction, sub_direction, payload.limit, payload.page
         )
     )

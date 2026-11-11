@@ -124,7 +124,7 @@ export default function ReportPage() {
    * （不用本地 flow 标记：换设备/清缓存时不失真）。
    * 取 10 条且要求「有分数」：提前结束但一题未答的会话也是 completed，它不可诊断。
    */
-  const historyAsync = useAsync(() => api.history(10), [])
+  const historyAsync = useAsync(() => api.history({ limit: 10 }), [])
 
   const [generated, setGenerated] = useState<Report | null>(null)
   const [generating, setGenerating] = useState(false)
@@ -177,7 +177,7 @@ export default function ReportPage() {
   /** history 已确认「没有一条带成绩的已完成测评」：此时生成必然 400/404，不给可点按钮。 */
   const noCompletedRun =
     historyAsync.status === 'success' &&
-    !(historyAsync.data ?? []).some((run) => run.score !== null)
+    !(historyAsync.data?.items ?? []).some((run) => run.score !== null)
   const firstLoad =
     (reportAsync.status === 'loading' && report === null) || (reportMissing && profilePending)
   /** 带 ?run_ids= 进来：本场报告还没出来（生成中/尚未开始）。 */

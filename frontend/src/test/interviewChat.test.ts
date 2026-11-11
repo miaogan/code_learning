@@ -42,7 +42,7 @@ const SETTINGS: InterviewSettings = {
   company_size: '初创',
 }
 
-function runSummary(patch: Partial<RunSummary>): RunSummary {
+function runSummary(patch: Partial<Omit<RunSummary, 'prev_score' | 'has_prev'>>): RunSummary {
   return {
     id: 'run-1',
     kind: 'interview',
@@ -50,6 +50,8 @@ function runSummary(patch: Partial<RunSummary>): RunSummary {
     shortfall_count: null,
     created_at: '2026-11-01T02:00:00+00:00',
     interview_settings: SETTINGS,
+    prev_score: null,
+    has_prev: false,
     ...patch,
   }
 }
