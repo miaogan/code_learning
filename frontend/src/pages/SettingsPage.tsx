@@ -6,6 +6,7 @@ import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { ConfirmModal } from '../components/ui/ConfirmModal'
 import { InlineError } from '../components/ui/InlineError'
+import { Select } from '../components/ui/Select'
 import { applyMe, useAuth } from '../state/auth'
 import { dismissKeyRequired } from '../state/aiGate'
 
@@ -206,15 +207,16 @@ export default function SettingsPage() {
             </label>
             <label className="sc-field">
               <span className="sc-field-label">JSON 模式</span>
-              <select
-                className="sc-filter-select"
+              <Select
+                ariaLabel="JSON 模式"
                 value={jsonMode}
                 disabled={aiBusy !== null}
-                onChange={(event) => setJsonMode(event.target.value as JsonMode)}
-              >
-                <option value="json_object">json_object（要求模型支持 JSON 输出）</option>
-                <option value="none">none（纯文本模型，解析更宽松）</option>
-              </select>
+                options={[
+                  { value: 'json_object', label: 'json_object（要求模型支持 JSON 输出）' },
+                  { value: 'none', label: 'none（纯文本模型，解析更宽松）' },
+                ]}
+                onChange={(value) => setJsonMode(value as JsonMode)}
+              />
             </label>
             {aiError !== null ? <InlineError message={aiError} /> : null}
             {aiNotice !== null ? <p className="sc-settings-ok">{aiNotice}</p> : null}

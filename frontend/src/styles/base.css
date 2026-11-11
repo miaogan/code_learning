@@ -9726,3 +9726,95 @@ html {
     width: 100%;
   }
 }
+
+/* ============================================================
+   r72 · 自绘下拉弹层（append-only）
+   Windows Chromium 的原生 select 弹层跟随系统浅色主题：页面级
+   color-scheme: dark 与 option 上色均管不到（2026-11 实测），
+   深色页面里是一块白底。ui/Select 自绘弹层，触发器沿用既有
+   下拉外观类；窄屏/触屏仍回退原生 select 用系统选择器。
+   ============================================================ */
+.sc-select {
+  position: relative;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.sc-select .sc-select-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  text-align: left;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+
+.sc-select-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sc-select-popup {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 80;
+  min-width: 100%;
+  max-width: min(420px, calc(100vw - 32px));
+  max-height: 288px;
+  overflow-y: auto;
+  margin: 0;
+  padding: var(--sp-1);
+  list-style: none;
+  background-color: var(--bg-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-8);
+  box-shadow: var(--elev-2);
+  color-scheme: dark;
+}
+
+.sc-select-popup.is-up {
+  top: auto;
+  bottom: calc(100% + 4px);
+}
+
+.sc-select-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  min-height: 32px;
+  padding: 0 var(--sp-2);
+  border-radius: var(--radius-4);
+  color: var(--text-secondary);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  cursor: pointer;
+}
+
+.sc-select-option.is-active {
+  background-color: var(--overlay-04);
+  color: var(--text-primary);
+}
+
+.sc-select-option.is-selected {
+  color: var(--accent);
+}
+
+.sc-select-option-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sc-select-option-check {
+  flex: none;
+}
+
+/* 紧凑触发器（清单工具行）的弹层选项随行高降密。 */
+.sc-select .sc-radar-select ~ .sc-select-popup .sc-select-option {
+  min-height: 28px;
+}

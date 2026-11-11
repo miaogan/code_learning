@@ -9,6 +9,7 @@ import { EmptyState } from '../components/ui/EmptyState'
 import { InlineError } from '../components/ui/InlineError'
 import { Pagination } from '../components/ui/Pagination'
 import { PhaseLoader } from '../components/ui/PhaseLoader'
+import { Select } from '../components/ui/Select'
 import { Toast } from '../components/ui/Toast'
 import { DIRECTIONS } from '../lib/questionDirections'
 import { dimensionText, techMetaText } from '../lib/radar'
@@ -278,18 +279,14 @@ export default function PioneerPage() {
         <div className="sc-radar-target">
           <label className="sc-field sc-radar-targetdir">
             <span className="sc-field-label">采集方向</span>
-            <select
-              className="sc-filter-select"
+            <Select
               value={direction}
-              onChange={(event) => setDirection(event.target.value)}
-            >
-              <option value="">全部方向</option>
-              {DIRECTIONS.map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
-            </select>
+              options={[
+                { value: '', label: '全部方向' },
+                ...DIRECTIONS.map((item) => ({ value: item, label: item })),
+              ]}
+              onChange={setDirection}
+            />
           </label>
           <label className="sc-field sc-radar-targetrepo">
             <span className="sc-field-label">指定仓库（选填）</span>
@@ -400,18 +397,16 @@ export default function PioneerPage() {
               </div>
             </div>
             <div className="sc-radar-filterright">
-              <select
-                className="sc-radar-select"
-                aria-label="每页条数"
-                value={pageSize}
-                onChange={(event) => changePageSize(event.target.value)}
-              >
-                {PAGE_SIZE_OPTIONS.map((size) => (
-                  <option key={size} value={size}>
-                    每页 {size} 条
-                  </option>
-                ))}
-              </select>
+              <Select
+                variant="compact"
+                ariaLabel="每页条数"
+                value={String(pageSize)}
+                options={PAGE_SIZE_OPTIONS.map((size) => ({
+                  value: String(size),
+                  label: `每页 ${size} 条`,
+                }))}
+                onChange={changePageSize}
+              />
               {filtering && (
                 <Button variant="ghost" size="sm" onClick={resetFilters}>
                   清除筛选

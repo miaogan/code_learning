@@ -6,6 +6,7 @@ import { Card } from '../components/ui/Card'
 import { EmptyState } from '../components/ui/EmptyState'
 import { InlineError } from '../components/ui/InlineError'
 import { PhaseLoader } from '../components/ui/PhaseLoader'
+import { Select } from '../components/ui/Select'
 import { useAsync } from '../lib/useAsync'
 import { canCompare, compareVersions, formatDelta } from '../lib/versionDiff'
 
@@ -149,31 +150,25 @@ export default function VersionsPage() {
           <div className="sc-versions-picker">
             <label className="sc-field">
               <span className="sc-field-label">旧版（基线）</span>
-              <select
-                className="sc-filter-select"
+              <Select
                 value={selection.older ?? ''}
-                onChange={(event) => setPicked((prev) => ({ ...prev, older: event.target.value }))}
-              >
-                {versions.map((version) => (
-                  <option key={version.resume_id} value={version.resume_id}>
-                    {versionLabel(version)}
-                  </option>
-                ))}
-              </select>
+                options={versions.map((version) => ({
+                  value: version.resume_id,
+                  label: versionLabel(version),
+                }))}
+                onChange={(value) => setPicked((prev) => ({ ...prev, older: value }))}
+              />
             </label>
             <label className="sc-field">
               <span className="sc-field-label">新版（当前）</span>
-              <select
-                className="sc-filter-select"
+              <Select
                 value={selection.newer ?? ''}
-                onChange={(event) => setPicked((prev) => ({ ...prev, newer: event.target.value }))}
-              >
-                {versions.map((version) => (
-                  <option key={version.resume_id} value={version.resume_id}>
-                    {versionLabel(version)}
-                  </option>
-                ))}
-              </select>
+                options={versions.map((version) => ({
+                  value: version.resume_id,
+                  label: versionLabel(version),
+                }))}
+                onChange={(value) => setPicked((prev) => ({ ...prev, newer: value }))}
+              />
             </label>
           </div>
 

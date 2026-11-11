@@ -13,6 +13,7 @@ import { InlineError } from '../components/ui/InlineError'
 import { PhaseLoader } from '../components/ui/PhaseLoader'
 import { ResumeGate } from '../components/ui/ResumeGate'
 import { RingProgress } from '../components/ui/RingProgress'
+import { Select } from '../components/ui/Select'
 import { backfillNotice, filteredNotice, proficiencyRuleHint, subDirectionNotice } from '../lib/examNotice'
 import { formatElapsed } from '../lib/format'
 import { DIRECTIONS, SUBDIRECTIONS } from '../lib/questionDirections'
@@ -380,18 +381,15 @@ export default function ExamPage() {
                 <span className="sc-lab-filter-label">题量</span>
                 <div className="sc-lab-filter-body">
                   <label className="sc-filter sc-exam-filtercount">
-                    <select
-                      className="sc-filter-select"
-                      value={filterCount ?? ''}
-                      aria-label="题量"
-                      onChange={(e) => setFilterCount(e.target.value ? Number(e.target.value) : null)}
-                    >
-                      {QUESTION_COUNT_OPTIONS.map((opt) => (
-                        <option key={opt.label} value={opt.value ?? ''}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
+                    <Select
+                      ariaLabel="题量"
+                      value={filterCount === null ? '' : String(filterCount)}
+                      options={QUESTION_COUNT_OPTIONS.map((opt) => ({
+                        value: opt.value === null ? '' : String(opt.value),
+                        label: opt.label,
+                      }))}
+                      onChange={(next) => setFilterCount(next === '' ? null : Number(next))}
+                    />
                   </label>
                 </div>
               </div>
