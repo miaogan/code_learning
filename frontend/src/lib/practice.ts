@@ -19,27 +19,44 @@ import type {
   QuestionLanguage,
 } from '../api/types'
 
-/** 六个筛选维度 + 题量：页面持有这一整块状态（无全局 store，刷新即重置）。 */
+/**
+ * 六个筛选维度 + 题量：页面持有这一整块状态（无全局 store，刷新即重置）。
+ *
+ * 筛选维度均为**多选**（「全部」哨兵不与其他具体项并存，由 `MultiChipRow` 折叠）：
+ * 空数组 = 全部（仅二级方向会出现，语义同「不聚焦」）。
+ */
 export interface PracticeFiltersState {
-  language: PracticeLanguageFilter
-  direction: PracticeDirectionFilter
-  /** r50：空串 = 不聚焦；取值闭集由 `allowedSubDirections(direction)` 派生。 */
-  sub_direction: string
-  difficulty: PracticeDifficultyFilter
-  essentiality: PracticeEssentialityFilter
-  scope: PracticeScope
+  language: PracticeLanguageFilter[]
+  direction: PracticeDirectionFilter[]
+  /** r50：空数组 = 不聚焦；取值闭集由 `allowedSubDirections(direction)` 派生。 */
+  sub_direction: string[]
+  difficulty: PracticeDifficultyFilter[]
+  essentiality: PracticeEssentialityFilter[]
+  scope: PracticeScope[]
+  /** 题量是数量档位，不是可并集的筛选集合，仍单选。 */
   limit: PracticeLimit
 }
 
 /** 默认筛选：全部 + 10 题（与服务端默认值逐字一致，避免首屏多发一次无效请求）。 */
 export const DEFAULT_PRACTICE_FILTERS: PracticeFiltersState = {
-  language: 'all',
-  direction: 'all',
-  sub_direction: '',
-  difficulty: 'all',
-  essentiality: 'all',
-  scope: 'all',
+  language: ['all'],
+  direction: ['all'],
+  sub_direction: [],
+  difficulty: ['all'],
+  essentiality: ['all'],
+  scope: ['all'],
   limit: 10,
+}
+
+/**
+ * 「全部」判定：`MultiChipRow` 已保证「勾满具体项」折叠成 `[allValue]`，
+ * 因此这里只需看空数组与哨兵（展示层与放宽建议共用，不另算一份）。
+ */
+export function isAllSelection<T extends string | number>(
+  values: readonly T[],
+  allValue: T,
+): boolean {
+  return values.length === 0 || values.includes(allValue)
 }
 
 /** 语言闭集的展示顺序（后端 `rules.LANGUAGES` 的镜像顺序：通用题排首位）。 */
@@ -146,22 +163,25 @@ export function directionChips(): { value: PracticeDirectionFilter; label: strin
 }
 
 /**
- * r50：某个方向下**可选**的二级方向全集。`direction='all'` 时返回全库子方向
+ * r50：所选方向下**可选**的二级方向并集。「全部」时返回全库子方向
  * （服务端会把合法子方向自动归一到其父方向，见 `_resolve_focus`）。
  */
-export function allowedSubDirections(direction: PracticeDirectionFilter): string[] {
-  return direction === 'all' ? DIRECTIONS.flatMap(subDirectionsOf) : subDirectionsOf(direction)
+export function allowedSubDirections(direction: PracticeDirectionFilter[]): string[] {
+  if (isAllSelection(direction, 'all')) {
+    return DIRECTIONS.flatMap(subDirectionsOf)
+  }
+  const merged = new Set<string>()
+  direction.forEach((name) => subDirectionsOf(name).forEach((sub) => merged.add(sub)))
+  return Array.from(merged)
 }
 
 /** r50：二级方向 chip 组；未选方向时为空数组（由筛选卡显示「先选方向」提示）。 */
 export function subDirectionChips(
-  direction: PracticeDirectionFilter,
+  direction: PracticeDirectionFilter[],
 ): { value: string; label: string }[] {
-  if (direction === 'all') return []
-  return [
-    { value: '', label: '全部' },
-    ...subDirectionsOf(direction).map((sub) => ({ value: sub, label: sub })),
-  ]
+  const subs = allowedSubDirections(direction)
+  if (isAllSelection(direction, 'all') || subs.length === 0) return []
+  return [{ value: '', label: '全部' }, ...subs.map((sub) => ({ value: sub, label: sub }))]
 }
 
 export function difficultyChips(): { value: PracticeDifficultyFilter; label: string }[] {
@@ -236,12 +256,12 @@ export function promptPreview(prompt: string, max = 88): string {
 
 /** 0 命中时可点的「放宽」建议（文案即按钮文字，点击后把对应维度设为「全部」）。 */
 export const RELAX_OPTIONS: { label: string; patch: Partial<PracticeFiltersState> }[] = [
-  { label: '难度=全部', patch: { difficulty: 'all' } },
-  { label: '必备度=全部', patch: { essentiality: 'all' } },
-  { label: '方向=全部', patch: { direction: 'all', sub_direction: '' } },
-  { label: '二级方向=全部', patch: { sub_direction: '' } },
-  { label: '语言=全部', patch: { language: 'all' } },
-  { label: '范围=全部', patch: { scope: 'all' } },
+  { label: '难度=全部', patch: { difficulty: ['all'] } },
+  { label: '必备度=全部', patch: { essentiality: ['all'] } },
+  { label: '方向=全部', patch: { direction: ['all'], sub_direction: [] } },
+  { label: '二级方向=全部', patch: { sub_direction: [] } },
+  { label: '语言=全部', patch: { language: ['all'] } },
+  { label: '范围=全部', patch: { scope: ['all'] } },
 ]
 
 /**
@@ -250,27 +270,57 @@ export const RELAX_OPTIONS: { label: string; patch: Partial<PracticeFiltersState
  */
 export function relaxSuggestions(filters: PracticeFiltersState): string[] {
   const active: string[] = []
-  if (filters.difficulty !== 'all') active.push('难度=全部')
-  if (filters.essentiality !== 'all') active.push('必备度=全部')
-  if (filters.direction !== 'all') active.push('方向=全部')
-  if (filters.sub_direction !== '') active.push('二级方向=全部')
-  if (filters.language !== 'all') active.push('语言=全部')
-  if (filters.scope !== 'all') active.push('范围=全部')
+  if (!isAllSelection(filters.difficulty, 'all')) active.push('难度=全部')
+  if (!isAllSelection(filters.essentiality, 'all')) active.push('必备度=全部')
+  if (!isAllSelection(filters.direction, 'all')) active.push('方向=全部')
+  if (!isAllSelection(filters.sub_direction, '')) active.push('二级方向=全部')
+  if (!isAllSelection(filters.language, 'all')) active.push('语言=全部')
+  if (!isAllSelection(filters.scope, 'all')) active.push('范围=全部')
   return active.slice(0, 3)
+}
+
+/** 多选维度的一行文案：全选取「全部 X」，否则用「、」并列具体项（中文标签，不写枚举值）。 */
+function choiceText<T extends string>(
+  values: readonly T[],
+  allValue: T,
+  allLabel: string,
+  labelOf: (value: T) => string,
+): string {
+  return isAllSelection(values, allValue) ? allLabel : values.map(labelOf).join('、')
 }
 
 /** 完成态「本次筛选：…」：四个维度并列，避免只写「全部」让用户看不出本轮条件。 */
 export function filtersLabel(filters: PracticeFiltersState): string {
   const parts = [
-    languageLabel(filters.language),
-    directionLabel(filters.direction),
-    filters.difficulty === 'all' ? '全部难度' : DIFFICULTY_LABEL[filters.difficulty],
-    filters.essentiality === 'all' ? '全部必备度' : ESSENTIALITY_LABEL[filters.essentiality],
+    choiceText(
+      filters.language,
+      'all',
+      '全部语言',
+      // 走到 labelOf 时一定不是「全部」哨兵，收窄后才是 QUESTION_LANGUAGE 闭集
+      (value) => LANGUAGE_LABEL[value as Exclude<PracticeLanguageFilter, 'all'>],
+    ),
+    choiceText(filters.direction, 'all', '全部方向', (value) => value),
+    choiceText(
+      filters.difficulty,
+      'all',
+      '全部难度',
+      (value) => DIFFICULTY_LABEL[value as Exclude<PracticeDifficultyFilter, 'all'>],
+    ),
+    choiceText(
+      filters.essentiality,
+      'all',
+      '全部必备度',
+      (value) => ESSENTIALITY_LABEL[value as Exclude<PracticeEssentialityFilter, 'all'>],
+    ),
   ]
   // r50：聚焦的二级方向必须出现在完成态描述里，否则用户看不出本轮练的是哪一块
-  if (filters.sub_direction !== '') parts.push(filters.sub_direction)
+  if (!isAllSelection(filters.sub_direction, '')) {
+    parts.push(filters.sub_direction.join('、'))
+  }
   // 「错题重练」一轮的 scope 必须是可见条件，否则用户看不出这轮为什么只有错题
-  if (filters.scope !== 'all') parts.push(SCOPE_LABEL[filters.scope])
+  if (!isAllSelection(filters.scope, 'all')) {
+    parts.push(filters.scope.map((value) => SCOPE_LABEL[value]).join('、'))
+  }
   return parts.join(' · ')
 }
 
@@ -299,57 +349,99 @@ export const STATS_ERROR_MESSAGE = '题库统计读取失败，可稍后重试'
 /**
  * 从 `/practice` 的 URL query 解析初始筛选（报告页「7 天计划」的专项练习链接用）。
  * 只接受闭集内取值：未知 / 非法 / 缺省一律回落默认值，不抛错、不让页面白屏。
+ *
+ * 多选写法两种都吃：重复键（`language=python&language=go`）与逗号并列（`language=python,go`）；
+ * 勾满全部具体项（或带 `all`）折叠成 `["all"]`，与 chip 交互后的状态同形。
  */
 export function parsePracticeSearch(search: string): PracticeFiltersState {
   const params = new URLSearchParams(search)
-  const languages = new Set<string>(languageChips().map((chip) => chip.value))
-  const directions = new Set<string>(directionChips().map((chip) => chip.value))
-  const difficulties = new Set<string>(difficultyChips().map((chip) => chip.value))
-  const essentialities = new Set<string>(essentialityChips().map((chip) => chip.value))
-  const scopes = new Set<string>(scopeChips().map((chip) => chip.value))
+  const languageOptions = languageChips()
+  const directionOptions = directionChips()
+  const difficultyOptions = difficultyChips()
+  const essentialityOptions = essentialityChips()
+  const scopeOptions = scopeChips()
+  const concrete = <T extends string>(options: { value: T }[], allValue: T): T[] =>
+    options.filter((chip) => chip.value !== allValue).map((chip) => chip.value)
 
-  const language = params.get('language')
-  const direction = params.get('direction')
-  const sub = params.get('sub')
-  const difficulty = params.get('difficulty')
-  const essentiality = params.get('essentiality')
-  const scope = params.get('scope')
+  const language = readChoices(
+    params,
+    'language',
+    new Set<string>(languageOptions.map((chip) => chip.value)),
+    'all',
+    concrete(languageOptions, 'all'),
+  )
+  const direction = readChoices(
+    params,
+    'direction',
+    new Set<string>(directionOptions.map((chip) => chip.value)),
+    'all',
+    concrete(directionOptions, 'all'),
+  )
+  // r50：子方向必须落在所选方向的闭集里（direction=all 时允许全库子方向，服务端会锁父方向）；
+  // 越界值与 direction 一起回落默认，不让脏 query 选出空题单。
+  const allowedSubs = allowedSubDirections(direction)
+  // 二级方向的「全部」哨兵是空串；状态里统一用空数组表示「不聚焦」，故过滤掉哨兵。
+  const sub_direction = readChoices(
+    params,
+    'sub',
+    new Set<string>(allowedSubs),
+    '',
+    allowedSubs,
+  ).filter((sub) => sub !== '')
+  const difficulty = readChoices(
+    params,
+    'difficulty',
+    new Set<string>(difficultyOptions.map((chip) => chip.value)),
+    'all',
+    concrete(difficultyOptions, 'all'),
+  )
+  const essentiality = readChoices(
+    params,
+    'essentiality',
+    new Set<string>(essentialityOptions.map((chip) => chip.value)),
+    'all',
+    concrete(essentialityOptions, 'all'),
+  )
+  const scope = readChoices(
+    params,
+    'scope',
+    new Set<string>(scopeOptions.map((chip) => chip.value)),
+    'all',
+    concrete(scopeOptions, 'all'),
+  )
+
   const limitRaw = params.get('limit')
   const limit = limitRaw === null ? null : Number(limitRaw)
 
   return {
-    language:
-      language !== null && languages.has(language)
-        ? (language as PracticeLanguageFilter)
-        : DEFAULT_PRACTICE_FILTERS.language,
-    direction:
-      direction !== null && directions.has(direction)
-        ? (direction as PracticeDirectionFilter)
-        : DEFAULT_PRACTICE_FILTERS.direction,
-    // r50：子方向必须落在所选方向的闭集里（direction=all 时允许全库子方向，服务端会锁父方向）；
-    // 越界值与 direction 一起回落默认，不让脏 query 选出空题单。
-    sub_direction:
-      sub !== null &&
-      allowedSubDirections(
-        direction !== null && directions.has(direction)
-          ? (direction as PracticeDirectionFilter)
-          : 'all',
-      ).includes(sub)
-        ? sub
-        : DEFAULT_PRACTICE_FILTERS.sub_direction,
-    difficulty:
-      difficulty !== null && difficulties.has(difficulty)
-        ? (difficulty as PracticeDifficultyFilter)
-        : DEFAULT_PRACTICE_FILTERS.difficulty,
-    essentiality:
-      essentiality !== null && essentialities.has(essentiality)
-        ? (essentiality as PracticeEssentialityFilter)
-        : DEFAULT_PRACTICE_FILTERS.essentiality,
-    scope:
-      scope !== null && scopes.has(scope) ? (scope as PracticeScope) : DEFAULT_PRACTICE_FILTERS.scope,
+    language,
+    direction,
+    sub_direction,
+    difficulty,
+    essentiality,
+    scope,
     limit:
       limit !== null && limitChips().some((chip) => chip.value === limit)
         ? (limit as PracticeLimit)
         : DEFAULT_PRACTICE_FILTERS.limit,
   }
+}
+
+/** 读一个多选维度：只留闭集内取值；无有效值回落「全部」，勾满具体项折叠回「全部」。 */
+function readChoices<T extends string>(
+  params: URLSearchParams,
+  key: string,
+  allowed: ReadonlySet<string>,
+  allValue: T,
+  concreteValues: readonly T[],
+): T[] {
+  const picked = params
+    .getAll(key)
+    .flatMap((raw) => raw.split(','))
+    .filter((value) => allowed.has(value)) as T[]
+  if (picked.length === 0) return [allValue]
+  if (picked.includes(allValue) || concreteValues.every((value) => picked.includes(value))) {
+    return [allValue]
+  }
+  return concreteValues.filter((value) => picked.includes(value))
 }

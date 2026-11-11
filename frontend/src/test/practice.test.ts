@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { isAllChoice, nextChoice } from '../lib/choice'
 import {
   ANSWER_ERROR_MESSAGE,
   DEFAULT_PRACTICE_FILTERS,
@@ -14,6 +15,7 @@ import {
   accuracyText,
   allowedSubDirections,
   answerText,
+  directionChips,
   filtersLabel,
   formatWrongTime,
   languageChips,
@@ -101,29 +103,34 @@ describe('practice 文案与纯逻辑', () => {
 
   it('0 命中放宽建议：只建议非「全部」的维度，最多三条', () => {
     expect(relaxSuggestions(ALL_FILTERS)).toEqual([])
-    expect(relaxSuggestions({ ...ALL_FILTERS, language: 'python' })).toEqual(['语言=全部'])
+    expect(relaxSuggestions({ ...ALL_FILTERS, language: ['python'] })).toEqual(['语言=全部'])
     expect(
-      relaxSuggestions({ ...ALL_FILTERS, difficulty: 'basic', essentiality: 'must_know' }),
+      relaxSuggestions({ ...ALL_FILTERS, difficulty: ['basic'], essentiality: ['must_know'] }),
     ).toEqual(['难度=全部', '必备度=全部'])
     expect(
       relaxSuggestions({
         ...ALL_FILTERS,
-        difficulty: 'basic',
-        essentiality: 'must_know',
-        direction: '前端',
-        language: 'go',
-        scope: 'wrong',
+        difficulty: ['basic'],
+        essentiality: ['must_know'],
+        direction: ['前端'],
+        language: ['go'],
+        scope: ['wrong'],
       }),
     ).toEqual(['难度=全部', '必备度=全部', '方向=全部'])
   })
 
-  it('完成态筛选描述把四个维度并列（含中文标签，不写枚举值）', () => {
+  it('完成态筛选描述把四个维度并列（多选用「、」连接，不写枚举值）', () => {
     expect(filtersLabel(ALL_FILTERS)).toBe('全部语言 · 全部方向 · 全部难度 · 全部必备度')
     expect(
-      filtersLabel({ ...ALL_FILTERS, language: 'python', direction: '后端', difficulty: 'basic' }),
-    ).toBe('Python · 后端 · 基础 · 全部必备度')
+      filtersLabel({
+        ...ALL_FILTERS,
+        language: ['python', 'go'],
+        direction: ['后端'],
+        difficulty: ['basic'],
+      }),
+    ).toBe('Python、Go · 后端 · 基础 · 全部必备度')
     // 错题重练一轮：scope 不是「全部」时必须显式出现，否则看不出这轮为什么只有错题
-    expect(filtersLabel({ ...ALL_FILTERS, scope: 'wrong' })).toBe(
+    expect(filtersLabel({ ...ALL_FILTERS, scope: ['wrong'] })).toBe(
       '全部语言 · 全部方向 · 全部难度 · 全部必备度 · 只看错题',
     )
   })
@@ -148,48 +155,83 @@ describe('practice 文案与纯逻辑', () => {
     expect(WRONG_BOOK_EMPTY_REASON).toBe('练习里答错的题会自动进来，答对一次就移出')
   })
 
-  it('默认筛选与服务端默认值一致（全部 + 10 题）', () => {
+  it('默认筛选与服务端默认值一致（全部 + 10 题，筛选维度为多选数组）', () => {
     expect(DEFAULT_PRACTICE_FILTERS).toEqual({
-      language: 'all',
-      direction: 'all',
-      sub_direction: '',
-      difficulty: 'all',
-      essentiality: 'all',
-      scope: 'all',
+      language: ['all'],
+      direction: ['all'],
+      sub_direction: [],
+      difficulty: ['all'],
+      essentiality: ['all'],
+      scope: ['all'],
       limit: 10,
     })
   })
 
   it('r50 二级方向闭集：从属于方向，未选方向时可取全库子方向', () => {
-    expect(subDirectionChips('all')).toEqual([])
-    expect(subDirectionChips('AI 工程')[0]).toEqual({ value: '', label: '全部' })
-    expect(subDirectionChips('AI 工程').map((chip) => chip.value)).toContain('部署与推理')
-    expect(allowedSubDirections('AI 工程')).toContain('Agent')
-    expect(allowedSubDirections('all')).toContain('部署与推理')
-    expect(allowedSubDirections('all')).toContain('python')
+    expect(subDirectionChips(['all'])).toEqual([])
+    expect(subDirectionChips(['AI 工程'])[0]).toEqual({ value: '', label: '全部' })
+    expect(subDirectionChips(['AI 工程']).map((chip) => chip.value)).toContain('部署与推理')
+    expect(allowedSubDirections(['AI 工程'])).toContain('Agent')
+    expect(allowedSubDirections(['all'])).toContain('部署与推理')
+    expect(allowedSubDirections(['all'])).toContain('python')
+    // 多方向取并集：两个方向的子方向都要出现
+    expect(allowedSubDirections(['前端', 'AI 工程'])).toContain('react')
+    expect(allowedSubDirections(['前端', 'AI 工程'])).toContain('Agent')
   })
 
   it('r50 0 命中建议含「二级方向=全部」，且不影响既有前三条次序', () => {
-    expect(relaxSuggestions({ ...ALL_FILTERS, sub_direction: 'react' })).toEqual([
+    expect(relaxSuggestions({ ...ALL_FILTERS, sub_direction: ['react'] })).toEqual([
       '二级方向=全部',
     ])
     expect(
       relaxSuggestions({
         ...ALL_FILTERS,
-        difficulty: 'basic',
-        essentiality: 'must_know',
-        direction: '前端',
-        sub_direction: 'react',
-        language: 'go',
-        scope: 'wrong',
+        difficulty: ['basic'],
+        essentiality: ['must_know'],
+        direction: ['前端'],
+        sub_direction: ['react'],
+        language: ['go'],
+        scope: ['wrong'],
       }),
     ).toEqual(['难度=全部', '必备度=全部', '方向=全部'])
   })
 
-  it('r50 完成态描述显式带上聚焦的二级方向', () => {
-    expect(filtersLabel({ ...ALL_FILTERS, sub_direction: '部署与推理' })).toBe(
+  it('r50 完成态描述显式带上聚焦的二级方向（多个用「、」并列）', () => {
+    expect(filtersLabel({ ...ALL_FILTERS, sub_direction: ['部署与推理'] })).toBe(
       '全部语言 · 全部方向 · 全部难度 · 全部必备度 · 部署与推理',
     )
+    expect(filtersLabel({ ...ALL_FILTERS, sub_direction: ['部署与推理', 'Agent'] })).toBe(
+      '全部语言 · 全部方向 · 全部难度 · 全部必备度 · 部署与推理、Agent',
+    )
+  })
+})
+
+describe('MultiChipRow 多选折叠（勾满全部具体项 → 自动回到「全部」）', () => {
+  const concrete = ['python', 'go', 'java']
+  const allValue = 'all'
+
+  it('「全部」判定：空数组 / 含哨兵 / 已勾满全部具体项', () => {
+    expect(isAllChoice([], allValue, concrete)).toBe(true)
+    expect(isAllChoice([allValue], allValue, concrete)).toBe(true)
+    expect(isAllChoice(['python', 'go', 'java'], allValue, concrete)).toBe(true)
+    expect(isAllChoice(['python'], allValue, concrete)).toBe(false)
+  })
+
+  it('从「全部」点具体项 → 只选该项；再点第二项 → 两项并存', () => {
+    expect(nextChoice([allValue], 'python', allValue, concrete)).toEqual(['python'])
+    expect(nextChoice(['python'], 'go', allValue, concrete)).toEqual(['python', 'go'])
+  })
+
+  it('手动勾满全部具体项 → 自动折叠成「全部」；取消最后一个具体项也回到「全部」', () => {
+    expect(nextChoice(['python', 'go'], 'java', allValue, concrete)).toEqual([allValue])
+    expect(nextChoice(['python'], 'python', allValue, concrete)).toEqual([allValue])
+  })
+
+  it('二级方向用空串作「全部」哨兵，行为与 all 一致', () => {
+    const subs = ['react', 'vue3']
+    expect(nextChoice([''], 'react', '', subs)).toEqual(['react'])
+    expect(nextChoice(['react'], 'vue3', '', subs)).toEqual([''])
+    expect(nextChoice(['react', 'vue3'], 'react', '', subs)).toEqual(['react'])
   })
 })
 
@@ -199,37 +241,59 @@ describe('parsePracticeSearch（7 天计划的筛选链接 → 首渲染筛选�
     expect(parsePracticeSearch('?foo=bar')).toEqual(DEFAULT_PRACTICE_FILTERS)
   })
 
-  it('闭集内的方向 / 难度 / 必备度 / 范围 / 题量原样生效', () => {
+  it('闭集内的方向 / 难度 / 必备度 / 范围 / 题量原样生效（单值归一成单元素数组）', () => {
     expect(
       parsePracticeSearch(
         '?direction=前端&difficulty=basic&essentiality=must_know&scope=wrong&limit=0',
       ),
     ).toEqual({
-      language: 'all',
-      direction: '前端',
-      sub_direction: '',
-      difficulty: 'basic',
-      essentiality: 'must_know',
-      scope: 'wrong',
+      language: ['all'],
+      direction: ['前端'],
+      sub_direction: [],
+      difficulty: ['basic'],
+      essentiality: ['must_know'],
+      scope: ['wrong'],
       limit: 0,
     })
   })
 
-  it('r50 `?sub=` 落在方向闭集内时生效；方向缺省时按全库子方向接受', () => {
-    expect(parsePracticeSearch('?direction=AI 工程&sub=部署与推理').sub_direction).toBe(
+  it('多选：重复键与逗号并列都吃，勾满具体项折叠成「全部」', () => {
+    expect(parsePracticeSearch('?language=python&language=go').language).toEqual(['python', 'go'])
+    expect(parsePracticeSearch('?language=python,go&difficulty=basic,challenge')).toMatchObject({
+      language: ['python', 'go'],
+      difficulty: ['basic', 'challenge'],
+    })
+    // 全部具体方向都勾上 → 折叠回「全部」
+    const languages = parsePracticeSearch('?language=').language
+    expect(languages).toEqual([''])
+    const allDirections = parsePracticeSearch(
+      `?direction=${directionChips()
+        .filter((chip) => chip.value !== 'all')
+        .map((chip) => chip.value)
+        .join(',')}`,
+    ).direction
+    expect(allDirections).toEqual(['all'])
+  })
+
+  it('r50 `?sub=` 落在方向闭集内时生效；方向缺省时按全库子方向接受（支持多选）', () => {
+    expect(parsePracticeSearch('?direction=AI 工程&sub=部署与推理').sub_direction).toEqual([
       '部署与推理',
-    )
-    expect(parsePracticeSearch('?sub=python').sub_direction).toBe('python')
+    ])
+    expect(parsePracticeSearch('?sub=python').sub_direction).toEqual(['python'])
+    expect(parsePracticeSearch('?direction=前端&sub=react&sub=vue3').sub_direction).toEqual([
+      'react',
+      'vue3',
+    ])
   })
 
   it('r50 `?sub=` 越界 / 与方向冲突时静默回落，不抛错', () => {
-    expect(parsePracticeSearch('?direction=前端&sub=python').sub_direction).toBe('')
-    expect(parsePracticeSearch('?sub=不存在').sub_direction).toBe('')
-    expect(parsePracticeSearch('?sub=').sub_direction).toBe('')
+    expect(parsePracticeSearch('?direction=前端&sub=python').sub_direction).toEqual([])
+    expect(parsePracticeSearch('?sub=不存在').sub_direction).toEqual([])
+    expect(parsePracticeSearch('?sub=').sub_direction).toEqual([])
   })
 
   it('空串语言是闭集成员（通用），不能被当成「全部」', () => {
-    expect(parsePracticeSearch('?language=').language).toBe('')
+    expect(parsePracticeSearch('?language=').language).toEqual([''])
   })
 
   it('越界值全部回落默认，且不抛错', () => {

@@ -3,6 +3,7 @@ import {
   DIFFICULTY_LABEL,
   LANGUAGE_LABEL,
   WRONG_BOOK_EMPTY_REASON,
+  answerText,
   formatWrongTime,
   languageChips,
   promptPreview,
@@ -11,15 +12,23 @@ import { PromptBody } from '../exam/PromptBody'
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
 import { Chip } from '../ui/Chip'
+import { MultiChipRow } from '../ui/ChipRow'
 import { EmptyState } from '../ui/EmptyState'
 import { Pagination } from '../ui/Pagination'
+import { Explanation } from './Explanation'
+
+/** 正确选项键归一化：服务端可能给 `["A"]` 或旧数据的字符串 `"A"`。 */
+function correctKeys(answer: PracticeWrongItem['correct_answer']): string[] {
+  if (Array.isArray(answer)) return answer.map(String)
+  return answer ? [String(answer)] : []
+}
 
 export interface WrongBookListProps {
   items: PracticeWrongItem[]
   /** 全库错题数（服务端给的 total，不是 `items.length`，语言过滤后两者会不同） */
   total: number
-  /** 当前语言过滤（页面持有，重练题单与列表必须用同一个值） */
-  language: PracticeLanguageFilter
+  /** 当前语言过滤（多选，页面持有，重练题单与列表必须用同一组值） */
+  language: PracticeLanguageFilter[]
   /** 当前页码（从 1 起）与每页条数：列表按页展示，`total` 是全库错题数 */
   page: number
   pageSize: number
@@ -27,7 +36,7 @@ export interface WrongBookListProps {
   /** 已展开的行 id；`null` = 全部收起（同一时刻最多展开一行） */
   expandedId: string | null
   onToggle: (questionId: string) => void
-  onFilterLanguage: (language: PracticeLanguageFilter) => void
+  onFilterLanguage: (language: PracticeLanguageFilter[]) => void
   onRetrain: () => void
   /** 空态出口「开始练习」→ 切回练习 tab */
   onStartPractice: () => void
@@ -62,22 +71,13 @@ export function WrongBookList({
   return (
     <Card className="sc-qa-wrongbook">
       <div className="sc-qa-wrong-head">
-        <div className="sc-qa-chips" role="group" aria-label="错题本语言筛选">
-          {languageChips().map((option) => {
-            const selected = option.value === language
-            return (
-              <button
-                key={String(option.value)}
-                type="button"
-                className="sc-chip sc-iq-chip sc-qa-chip"
-                aria-pressed={selected}
-                onClick={() => onFilterLanguage(option.value)}
-              >
-                {selected ? `✓ ${option.label}` : option.label}
-              </button>
-            )
-          })}
-        </div>
+        <MultiChipRow
+          groupLabel="错题本语言筛选"
+          options={languageChips()}
+          values={language}
+          allValue="all"
+          onChange={onFilterLanguage}
+        />
         <p className="sc-qa-hint">
           {`答错一次就会进来，答对一次即移出（最近一次作答口径） · 通用题在「全部」中`}
         </p>
@@ -110,6 +110,30 @@ export function WrongBookList({
                 {expanded ? (
                   <div className="sc-qa-wrong-full">
                     <PromptBody prompt={item.prompt} textClassName="sc-qa-wrong-full-text" />
+                    {item.options.length > 0 ? (
+                      <div className="sc-upload-summary">
+                        {item.options.map((option) => {
+                          const isCorrect = correctKeys(item.correct_answer).includes(option.key)
+                          return (
+                            <div
+                              key={option.key}
+                              className={isCorrect ? 'sc-opt is-correct' : 'sc-opt'}
+                              aria-disabled="true"
+                            >
+                              <span className="sc-opt-key">{option.key}</span>
+                              <span className="sc-opt-text">{option.text}</span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    ) : null}
+                    <div className="sc-qa-feedback">
+                      <div className="sc-qa-feedback-head">
+                        <span className="sc-qa-answer-label">正确答案：</span>
+                        <span className="sc-mono sc-qa-answer">{answerText(item.correct_answer)}</span>
+                      </div>
+                      <Explanation text={item.explanation} />
+                    </div>
                   </div>
                 ) : null}
                 <div className="sc-qa-wrong-meta">

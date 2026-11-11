@@ -107,63 +107,98 @@ def _difficulty_rank(difficulty: str) -> int:
     )
 
 
-def _matches_scope(question_id: str, scope: str, index: dict[str, dict[str, Any]]) -> bool:
-    """范围三口径（`all` / `unseen` / `wrong`）：互斥、可与其他筛选叠加。"""
-    if scope == rules.FILTER_ANY:
+def _choices(value: str | list[str] | tuple[str, ...] | None) -> list[str]:
+    """把单选旧值 / 多选数组归一成集合；空集合等价「全部」。"""
+    if value is None:
+        return [rules.FILTER_ANY]
+    if isinstance(value, str):
+        return [value]
+    return list(value) or [rules.FILTER_ANY]
+
+
+def _subs(value: str | list[str] | tuple[str, ...] | None) -> list[str]:
+    """二级方向归一成集合：空白 / 空集合 = 不聚焦。"""
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [value.strip()] if value.strip() else []
+    return [str(item).strip() for item in value if str(item).strip()]
+
+
+def _is_any(selected: list[str]) -> bool:
+    return not selected or rules.FILTER_ANY in selected
+
+
+def _matches_choice(value: str, selected: list[str]) -> bool:
+    return _is_any(selected) or value in selected
+
+
+def _matches_scope(
+    question_id: str, scopes: list[str], index: dict[str, dict[str, Any]]
+) -> bool:
+    """范围三口径（`all` / `unseen` / `wrong`）：多选时取并集。"""
+    if _is_any(scopes):
         return True
     entry = index.get(question_id)
-    if scope == "unseen":
-        return entry is None
-    if scope == "wrong":
-        return entry is not None and entry["last_correct"] is False
-    return False
+    unseen = "unseen" in scopes and entry is None
+    wrong = "wrong" in scopes and entry is not None and entry["last_correct"] is False
+    return unseen or wrong
 
 
-def _resolve_focus(direction: str, sub_direction: str) -> tuple[str, str]:
-    """r50：归一成 `(实际生效方向, 实际生效二级方向)`，与笔试 r46 逐字同口径。
+def _resolve_focus(
+    direction: list[str], sub_direction: list[str]
+) -> tuple[list[str], list[str]]:
+    """r50：归一成 `(实际生效方向集合, 实际生效二级方向集合)`，与笔试 r46 逐字同口径。
 
-    - 空串 / 空白 → 不聚焦，方向原样返回；
+    - 无合法子方向 → 不聚焦，方向原样返回；
     - 闭集外脏值 → 静默忽略（**不**新增 422 / 400，与 r46 一致）；
     - `direction` 为「全部」而子方向合法 → 自动锁定其父方向，补位才不会跨方向取题；
-    - 子方向与显式 `direction` 冲突 → 忽略子方向（子方向从属于方向，不猜归属）。
+    - 子方向与显式 `direction` 冲突 → 忽略该子方向（子方向从属于方向，不猜归属）。
     """
-    sub = str(sub_direction or "").strip()
-    if not sub:
-        return direction, ""
-    owner = next(
-        (name for name, subs in rules.SUBDIRECTIONS.items() if sub in subs),
-        None,
-    )
-    if owner is None:
-        return direction, ""
-    if direction == rules.FILTER_ANY:
-        return owner, sub
-    if direction != owner:
-        return direction, ""
-    return direction, sub
+    subs = [
+        sub
+        for sub in _subs(sub_direction)
+        if any(sub in group for group in rules.SUBDIRECTIONS.values())
+    ]
+    if not subs:
+        return direction, []
+    owners = {
+        name
+        for name, group in rules.SUBDIRECTIONS.items()
+        if any(sub in group for sub in subs)
+    }
+    if _is_any(direction):
+        return sorted(owners, key=rules.DIRECTIONS.index), subs
+    kept = [
+        sub
+        for sub in subs
+        if next((name for name, group in rules.SUBDIRECTIONS.items() if sub in group), None)
+        in direction
+    ]
+    return direction, kept
 
 
 def _matches(
     question: dict[str, Any],
     *,
-    language: str,
-    direction: str,
-    difficulty: str,
-    essentiality: str,
-    scope: str,
+    language: list[str],
+    direction: list[str],
+    difficulty: list[str],
+    essentiality: list[str],
+    scope: list[str],
     index: dict[str, dict[str, Any]],
-    sub_direction: str = "",
+    sub_direction: list[str],
 ) -> bool:
     """逐字段核对全部筛选（B-4：命中必须 100% 合规，判据只此一处）。"""
-    if language != rules.FILTER_ANY and str(question.get("language") or "") != language:
+    if not _matches_choice(str(question.get("language") or ""), language):
         return False
-    if direction != rules.FILTER_ANY and str(question.get("direction") or "") != direction:
+    if not _matches_choice(str(question.get("direction") or ""), direction):
         return False
-    if difficulty != rules.FILTER_ANY and str(question.get("difficulty") or "") != difficulty:
+    if not _matches_choice(str(question.get("difficulty") or ""), difficulty):
         return False
-    if essentiality != rules.FILTER_ANY and str(question.get("essentiality") or "") != essentiality:
+    if not _matches_choice(str(question.get("essentiality") or ""), essentiality):
         return False
-    if sub_direction and str(question.get("sub_direction") or "").strip() != sub_direction:
+    if sub_direction and str(question.get("sub_direction") or "").strip() not in sub_direction:
         return False
     return _matches_scope(str(question.get("id") or ""), scope, index)
 
@@ -171,13 +206,13 @@ def _matches(
 def _filtered(
     pool: list[dict[str, Any]],
     *,
-    language: str,
-    direction: str,
-    difficulty: str,
-    essentiality: str,
-    scope: str,
+    language: list[str],
+    direction: list[str],
+    difficulty: list[str],
+    essentiality: list[str],
+    scope: list[str],
     index: dict[str, dict[str, Any]],
-    sub_direction: str = "",
+    sub_direction: list[str],
 ) -> list[dict[str, Any]]:
     """按全部筛选过一遍题池（组卷与统计共用，`hit` 与 `hit_count` 因此同源同值）。"""
     return [
@@ -230,13 +265,13 @@ def _ordered(candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def _compose_paper(
-    language: str = rules.FILTER_ANY,
-    direction: str = rules.FILTER_ANY,
-    difficulty: str = rules.FILTER_ANY,
-    essentiality: str = rules.FILTER_ANY,
-    scope: str = rules.FILTER_ANY,
+    language: str | list[str] = rules.FILTER_ANY,
+    direction: str | list[str] = rules.FILTER_ANY,
+    difficulty: str | list[str] = rules.FILTER_ANY,
+    essentiality: str | list[str] = rules.FILTER_ANY,
+    scope: str | list[str] = rules.FILTER_ANY,
     limit: int = rules.DEFAULT_PRACTICE_LIMIT,
-    sub_direction: str = "",
+    sub_direction: str | list[str] = "",
 ) -> dict[str, Any]:
     """组一份练习题单（纯本地、零 AI）：返回 `session_id` / `questions` / `hit_count` / `notice`。
 
@@ -249,6 +284,14 @@ def _compose_paper(
     - r52：熟练题（`proficiency.proficient_ids()`，与笔试同一份判定）默认不进题单，
       `filtered_count` 是本次真正被跳过的熟练题数（0 时前端不解释，与前端口径一致）。
     """
+    language = _choices(language)
+    direction = _choices(direction)
+    difficulty = _choices(difficulty)
+    essentiality = _choices(essentiality)
+    scope = _choices(scope)
+    sub_direction = _subs(sub_direction)
+    limit = int(limit)
+
     session_id = SESSION_PREFIX + uuid4().hex[:8]
     pool = question_bank.practice_pool()
     if not pool:
@@ -274,6 +317,7 @@ def _compose_paper(
         essentiality=essentiality,
         scope=scope,
         index=index,
+        sub_direction=[],
     )
     wide_available = [
         question for question in wide if str(question.get("id") or "") not in proficient
@@ -357,7 +401,7 @@ def _compose_paper(
             "hit_count": hit_count,
             "notice": _NOTICE_PROFICIENT_EMPTY if filtered_count else NOTICE_EMPTY,
             "filtered_count": filtered_count,
-            "sub_direction": focus_sub,
+            "sub_direction": "、".join(focus_sub),
             "sub_direction_backfill": 0,
         }
 
@@ -376,7 +420,7 @@ def _compose_paper(
         "hit_count": hit_count,
         "notice": notice,
         "filtered_count": filtered_count,
-        "sub_direction": focus_sub,
+        "sub_direction": "、".join(focus_sub),
         "sub_direction_backfill": backfill,
     }
 
@@ -480,12 +524,12 @@ def submit_answer(
 
 
 def stats(
-    language: str = rules.FILTER_ANY,
-    direction: str = rules.FILTER_ANY,
-    difficulty: str = rules.FILTER_ANY,
-    essentiality: str = rules.FILTER_ANY,
-    scope: str = rules.FILTER_ANY,
-    sub_direction: str = "",
+    language: str | list[str] = rules.FILTER_ANY,
+    direction: str | list[str] = rules.FILTER_ANY,
+    difficulty: str | list[str] = rules.FILTER_ANY,
+    essentiality: str | list[str] = rules.FILTER_ANY,
+    scope: str | list[str] = rules.FILTER_ANY,
+    sub_direction: str | list[str] = "",
 ) -> dict[str, Any]:
     """练习统计：`total` / `practiced` / `wrong_total` 不带筛选，`hit` 带筛选。
 
@@ -496,6 +540,13 @@ def stats(
     - r52：`hit` 与题单同口径排除熟练题（同一份 `proficiency.proficient_ids()`）；`total` /
       `practiced` / `wrong_total` 仍是全库事实，不因熟练过滤缩水。
     """
+    language = _choices(language)
+    direction = _choices(direction)
+    difficulty = _choices(difficulty)
+    essentiality = _choices(essentiality)
+    scope = _choices(scope)
+    sub_direction = _subs(sub_direction)
+
     pool = question_bank.practice_pool()
     index = attempt_index()
     proficient = proficiency.proficient_ids()
@@ -525,7 +576,7 @@ def stats(
 
 
 def wrong_book(
-    language: str = rules.FILTER_ANY, limit: int = 20, page: int = 1
+    language: str | list[str] = rules.FILTER_ANY, limit: int = 20, page: int = 1
 ) -> dict[str, Any]:
     """错题本：**最近一次作答为错误**的可用客观题，`last_wrong_at` 倒序、同刻按 id 升序。
 
@@ -534,6 +585,7 @@ def wrong_book(
 
     `limit` 是每页条数、`page` 从 1 起；`total` 是排序后的**全部**错题数（不受分页裁剪）。
     """
+    language = _choices(language)
     index = attempt_index()
     items: list[dict[str, Any]] = []
     for question in question_bank.practice_pool():
@@ -542,12 +594,20 @@ def wrong_book(
         if entry is None or entry["last_correct"] is not False:
             continue
         current = str(question.get("language") or "")
-        if language != rules.FILTER_ANY and current != language:
+        if not _matches_choice(current, language):
             continue
         items.append(
             {
                 "question_id": question_id,
                 "prompt": str(question.get("prompt") or ""),
+                "kind": str(question.get("kind") or ""),
+                "options": [
+                    {"key": str(option.get("key") or ""), "text": str(option.get("text") or "")}
+                    for option in question.get("options") or []
+                    if isinstance(option, dict)
+                ],
+                "correct_answer": question.get("answer") or [],
+                "explanation": str(question.get("explanation") or ""),
                 "language": current,
                 "direction": str(question.get("direction") or ""),
                 "difficulty": str(question.get("difficulty") or ""),

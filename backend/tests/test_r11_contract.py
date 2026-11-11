@@ -189,21 +189,24 @@ def test_r11_practice_closed_sets() -> None:
     assert rules.DEFAULT_PRACTICE_LIMIT in rules.PRACTICE_LIMITS
 
     # 方向筛选刻意不写第二份字面量：闭集只在 `rules.DIRECTIONS`（见下一条用例）。
-    assert schemas.PracticePaperRequest.model_fields["direction"].default == rules.FILTER_ANY
+    assert schemas.PracticePaperRequest().direction == [rules.FILTER_ANY]
     assert _literal_values(PracticeDifficultyFilter) == {rules.FILTER_ANY} | set(rules.DIFFICULTIES)
     assert _literal_values(PracticeEssentialityFilter) == {rules.FILTER_ANY} | set(rules.ESSENTIALITIES)
 
     # 请求模型的默认值 = 「全部」+ 默认题量（七项都可省略）。
-    # r50 追加 `sub_direction`；缺省 "" = 不聚焦，老客户端请求体逐字可用。
-    request_defaults = {name: field.default for name, field in PracticePaperRequest.model_fields.items()}
+    # 筛选维度默认是单元素「全部」数组；`sub_direction` 缺省 [] = 不聚焦。
+    request_defaults = {
+        name: field.get_default(call_default_factory=True)
+        for name, field in PracticePaperRequest.model_fields.items()
+    }
     assert request_defaults == {
-        "language": rules.FILTER_ANY,
-        "direction": rules.FILTER_ANY,
-        "difficulty": rules.FILTER_ANY,
-        "essentiality": rules.FILTER_ANY,
-        "scope": "all",
+        "language": [rules.FILTER_ANY],
+        "direction": [rules.FILTER_ANY],
+        "difficulty": [rules.FILTER_ANY],
+        "essentiality": [rules.FILTER_ANY],
+        "scope": ["all"],
         "limit": rules.DEFAULT_PRACTICE_LIMIT,
-        "sub_direction": "",
+        "sub_direction": [],
     }, f"PracticePaperRequest 默认值漂移：{request_defaults}"
 
     ts = _ts_source()
@@ -227,7 +230,7 @@ def test_r11_direction_filter_rejects_out_of_closed_set() -> None:
     assert not offenders, f"schemas.py 复写了方向字面量（第二份闭集）：{offenders}"
 
     for direction in (*rules.DIRECTIONS, rules.FILTER_ANY):
-        assert PracticePaperRequest(direction=direction).direction == direction
+        assert PracticePaperRequest(direction=direction).direction == [direction]
     with pytest.raises(ValidationError):
         PracticePaperRequest(direction="前端语言")
 

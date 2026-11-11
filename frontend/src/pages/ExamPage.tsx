@@ -293,94 +293,107 @@ export default function ExamPage() {
 
       {view === 'idle' ? (
         <div className="sc-fade-in">
-          <Card className="sc-card-hover">
-            <div className="sc-qcard-head">
-              <Chip label="本卷规则" />
+          <Card className="sc-exam-setup">
+            <div className="sc-exam-setup-head">
+              <div>
+                <span className="sc-form-kicker">EXAM / SETUP</span>
+                <h2 className="sc-form-section-title">按你的目标，组一场笔试</h2>
+              </div>
+              <span className="sc-exam-setup-mark" aria-hidden="true">↗</span>
+            </div>
+            <p className="sc-exam-profile">
+              <span>当前画像</span>
+              <strong>{profile?.target_role ?? '未填写目标岗位'}</strong>
+              <span className="sc-exam-profile-meta">
+                {profile?.skills.length ?? 0} 项技能 · {profile?.projects.length ?? 0} 个项目
+              </span>
+            </p>
+            <div className="sc-qcard-head" aria-label="本卷规则">
               <Chip label="总题 ≥10" tone="direction" />
               <Chip label="客观 ≥8" tone="direction" />
-              <span className="sc-badge sc-badge--low">提交 10s 内出分</span>
+              <span className="sc-exam-rule-note">提交后本地判分，不消耗 AI 配额</span>
             </div>
-          <p className="sc-qcard-prompt">
-            依据画像：目标岗位 {profile?.target_role ?? '未填写'} · 技能 {profile?.skills.length ?? 0} 项 · 项目{' '}
-            {profile?.projects.length ?? 0} 个
-          </p>
-          <p className="sc-qcard-hint">
-            单选 / 多选 / 简答三型混排，客观题多选题必须完全匹配才得分；简答不计入客观题数。计时从出卷后开始，仅记录用时。
-          </p>
 
-          <div className="sc-exam-filters">
-            <label className="sc-filter">
-              <span className="sc-filter-label">方向</span>
-              <select
-                className="sc-filter-select"
-                value={filterDirection ?? ''}
-                onChange={(e) => {
-                  const dir = e.target.value || null
-                  setFilterDirection(dir)
-                  setFilterSubDirection(null) // direction 变了，子方向必须重选
-                }}
-              >
-                {DIRECTION_OPTIONS.map((opt) => (
-                  <option key={opt.label} value={opt.value ?? ''}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="sc-filter">
-              <span className="sc-filter-label">子方向</span>
-              <select
-                className="sc-filter-select"
-                value={filterSubDirection ?? ''}
-                onChange={(e) => setFilterSubDirection(e.target.value || null)}
-                disabled={!filterDirection}
-                title={filterDirection ? '按所选一级方向选子方向' : '请先选一级方向'}
-              >
-                <option value="">不限（该方向全部）</option>
-                {filterDirection && SUBDIRECTIONS[filterDirection]?.map((sub) => (
-                  <option key={sub} value={sub}>{sub}</option>
-                ))}
-              </select>
-            </label>
-            <label className="sc-filter">
-              <span className="sc-filter-label">难度</span>
-              <select
-                className="sc-filter-select"
-                value={filterDifficulty ?? ''}
-                onChange={(e) => setFilterDifficulty(e.target.value || null)}
-              >
-                {DIFFICULTY_OPTIONS.map((opt) => (
-                  <option key={opt.label} value={opt.value ?? ''}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="sc-filter">
-              <span className="sc-filter-label">题量</span>
-              <select
-                className="sc-filter-select"
-                value={filterCount ?? ''}
-                onChange={(e) => setFilterCount(e.target.value ? Number(e.target.value) : null)}
-              >
-                {QUESTION_COUNT_OPTIONS.map((opt) => (
-                  <option key={opt.label} value={opt.value ?? ''}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
+            <div className="sc-exam-filter-heading">
+              <h3>组卷偏好</h3>
+              <span>不选择时按画像智能组卷</span>
+            </div>
+            <div className="sc-exam-filters">
+              <label className="sc-filter">
+                <span className="sc-filter-label">方向</span>
+                <select
+                  className="sc-filter-select"
+                  value={filterDirection ?? ''}
+                  onChange={(e) => {
+                    const dir = e.target.value || null
+                    setFilterDirection(dir)
+                    setFilterSubDirection(null) // direction 变了，子方向必须重选
+                  }}
+                >
+                  {DIRECTION_OPTIONS.map((opt) => (
+                    <option key={opt.label} value={opt.value ?? ''}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="sc-filter">
+                <span className="sc-filter-label">子方向</span>
+                <select
+                  className="sc-filter-select"
+                  value={filterSubDirection ?? ''}
+                  onChange={(e) => setFilterSubDirection(e.target.value || null)}
+                  disabled={!filterDirection}
+                  title={filterDirection ? '按所选一级方向选子方向' : '请先选一级方向'}
+                >
+                  <option value="">不限（该方向全部）</option>
+                  {filterDirection && SUBDIRECTIONS[filterDirection]?.map((sub) => (
+                    <option key={sub} value={sub}>{sub}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="sc-filter">
+                <span className="sc-filter-label">难度</span>
+                <select
+                  className="sc-filter-select"
+                  value={filterDifficulty ?? ''}
+                  onChange={(e) => setFilterDifficulty(e.target.value || null)}
+                >
+                  {DIFFICULTY_OPTIONS.map((opt) => (
+                    <option key={opt.label} value={opt.value ?? ''}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="sc-filter">
+                <span className="sc-filter-label">题量</span>
+                <select
+                  className="sc-filter-select"
+                  value={filterCount ?? ''}
+                  onChange={(e) => setFilterCount(e.target.value ? Number(e.target.value) : null)}
+                >
+                  {QUESTION_COUNT_OPTIONS.map((opt) => (
+                    <option key={opt.label} value={opt.value ?? ''}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <p className="sc-exam-filter-note">
+              方向变化后需重新选择子方向；单选、多选与简答混排，计时从出卷后开始。
+            </p>
 
-          {createError ? (
-            <InlineError message={createError} onRetry={() => void startExam()} retryLabel="重新出卷" />
-          ) : null}
-          <div className="sc-btn-row">
-            <Button onClick={() => void startExam()}>开始笔试</Button>
-            <Link className="sc-btn sc-btn--secondary" to="/profile">
-              先看看画像
-            </Link>
-          </div>
+            {createError ? (
+              <InlineError message={createError} onRetry={() => void startExam()} retryLabel="重新出卷" />
+            ) : null}
+            <div className="sc-btn-row sc-exam-setup-actions">
+              <Button onClick={() => void startExam()}>开始笔试 ↗</Button>
+              <Link className="sc-btn sc-btn--ghost" to="/profile">
+                先看看画像
+              </Link>
+            </div>
           </Card>
         </div>
       ) : null}

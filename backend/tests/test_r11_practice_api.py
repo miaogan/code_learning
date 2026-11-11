@@ -279,6 +279,10 @@ def test_wrong_book_lists_last_wrong_and_filters_language(client: Any) -> None:
     assert set(item) == {
         "question_id",
         "prompt",
+        "kind",
+        "options",
+        "correct_answer",
+        "explanation",
         "language",
         "direction",
         "difficulty",
@@ -287,6 +291,12 @@ def test_wrong_book_lists_last_wrong_and_filters_language(client: Any) -> None:
     }
     assert item["question_id"] == question["id"]
     assert item["wrong_count"] == 1
+    # 展开必须能看到选项、正确项与解析（否则错题本只剩题干）。
+    stored_row = next(row for row in repository.list_questions() if row["id"] == question["id"])
+    assert item["options"] == stored_row["options"]
+    assert item["correct_answer"] == stored_row["answer"]
+    assert item["explanation"] == stored_row["explanation"]
+    assert item["kind"] == stored_row["kind"]
 
     other = client.get("/api/practice/wrong-book", params={"language": "java"}).json()
     assert other == {"items": [], "total": 0}

@@ -207,6 +207,7 @@ export default function SettingsPage() {
             <label className="sc-field">
               <span className="sc-field-label">JSON 模式</span>
               <select
+                className="sc-filter-select"
                 value={jsonMode}
                 disabled={aiBusy !== null}
                 onChange={(event) => setJsonMode(event.target.value as JsonMode)}

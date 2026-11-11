@@ -92,7 +92,7 @@ export default function PracticePage() {
   const [statsPulse, setStatsPulse] = useState(0)
 
   const [wrongBook, setWrongBook] = useState<PracticeWrongBook | null>(null)
-  const [wrongLanguage, setWrongLanguage] = useState<PracticeLanguageFilter>('all')
+  const [wrongLanguage, setWrongLanguage] = useState<PracticeLanguageFilter[]>(['all'])
   const [wrongPage, setWrongPage] = useState(1)
   const [wrongLoading, setWrongLoading] = useState(false)
   const [wrongError, setWrongError] = useState<string | null>(null)
@@ -337,12 +337,12 @@ export default function PracticePage() {
   const retrainWrong = () => {
     void startPaper(
       {
-        language: wrongLanguage,
-        direction: 'all',
-        sub_direction: '',
-        difficulty: 'all',
-        essentiality: 'all',
-        scope: 'wrong',
+        language: [...wrongLanguage],
+        direction: ['all'],
+        sub_direction: [],
+        difficulty: ['all'],
+        essentiality: ['all'],
+        scope: ['wrong'],
         limit: 0,
       },
       true,
@@ -496,8 +496,8 @@ export default function PracticePage() {
           setFilters((previous) => {
             const next = { ...previous, ...patch }
             // r50：二级方向从属于方向，换方向必须清空子方向（与学习目录页同口径）。
-            if (patch.direction !== undefined && patch.direction !== previous.direction) {
-              next.sub_direction = ''
+            if (patch.direction !== undefined) {
+              next.sub_direction = []
             }
             return next
           })
@@ -533,8 +533,8 @@ export default function PracticePage() {
         onToggle={(questionId) =>
           setExpandedId((previous) => (previous === questionId ? null : questionId))
         }
-        onFilterLanguage={(value) => {
-          setWrongLanguage(value)
+        onFilterLanguage={(values) => {
+          setWrongLanguage(values)
           setWrongPage(1)
           setExpandedId(null)
         }}

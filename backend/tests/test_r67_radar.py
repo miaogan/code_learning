@@ -192,6 +192,7 @@ def test_manual_then_generate_then_adopt_only_practice(
     assert job["status"] == "succeeded", job
     assert job["chapter"]["id"].startswith(f"radar-{job['job_id']}-chapter")
     assert job["discarded_count"] == 1  # 答案键不在选项里的那条被自检丢弃
+    assert job["discarded_reasons"] == {"answer": 1}
     assert len(job["questions"]) == 2
 
     adopted = client.post(f"/api/radar/jobs/{job['job_id']}/adopt")
@@ -420,6 +421,69 @@ def test_generate_failure_is_visible(
     job = _wait_job(client, job_id)
     assert job["status"] == "failed"
     assert "样例生成失败" in job["error_message"]
+
+
+def test_generate_accepts_model_alias_shape(
+    client: TestClient, radar_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """模型常见的同义写法（sections / type / question / 字符串选项）不再被读成空草稿。"""
+
+    def _responder_alias() -> dict[str, Any]:
+        return {
+            "title": "别名形状草稿",
+            "sections": [
+                {"title": "这是什么", "content": CHAPTER_BODY},
+                {"title": "什么时候用", "content": CHAPTER_BODY},
+            ],
+            "questions": [
+                {
+                    "type": "single",
+                    "question": "以下关于这项技术的描述，哪一项最符合快照给出的信息？",
+                    "options": [
+                        "A. 它解决的是模型推理吞吐问题",
+                        "B. 它只用于前端渲染",
+                        "C. 它要求替换掉操作系统",
+                    ],
+                    "answer": ["A"],
+                    "explanation": EXPLANATION,
+                }
+            ],
+        }
+
+    class _Fake:
+        async def complete_model(self, _system: str, _user: str, model_cls: type[Any],
+                                 **_kwargs: Any) -> Any:
+            return model_cls.model_validate(_responder_alias())
+
+    monkeypatch.setattr(user_ai, "client_for", lambda _user, _tier: _Fake())
+    manual = client.post("/api/radar/manual", json={"name": "别名形状技术"})
+    slug = manual.json()["tech_slug"]
+    job_id = client.post("/api/radar/generate", json={"tech_slug": slug}).json()["job_id"]
+    job = _wait_job(client, job_id)
+    assert job["status"] == "succeeded", job
+    assert job["chapter"] is not None
+    assert len(job["chapter"]["sections"]) == 2
+    assert len(job["questions"]) == 1
+    assert job["questions"][0]["options"][0] == {"key": "A", "text": "它解决的是模型推理吞吐问题"}
+
+
+def test_empty_model_questions_marks_failed(
+    client: TestClient, radar_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """模型没给题不能伪装成「已完成 + 0 题」，如实判失败让用户重试。"""
+
+    class _Empty:
+        async def complete_model(self, _system: str, _user: str, model_cls: type[Any],
+                                 **_kwargs: Any) -> Any:
+            return model_cls.model_validate({"chapter": {}, "questions": []})
+
+    monkeypatch.setattr(user_ai, "client_for", lambda _user, _tier: _Empty())
+    manual = client.post("/api/radar/manual", json={"name": "空题技术"})
+    slug = manual.json()["tech_slug"]
+    job_id = client.post("/api/radar/generate", json={"tech_slug": slug}).json()["job_id"]
+    job = _wait_job(client, job_id)
+    assert job["status"] == "failed"
+    assert "没有返回任何练习题" in job["error_message"]
 
 
 def test_stale_running_job_is_swept_to_failed(client: TestClient, radar_env: None) -> None:

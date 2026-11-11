@@ -125,7 +125,7 @@ def count_jobs() -> int:
 
 _JOB_FIELDS = frozenset(
     {"status", "stage", "progress", "chapter_json", "questions_json",
-     "discarded_count", "error_message"}
+     "discarded_count", "discarded_reasons_json", "error_message"}
 )
 
 
@@ -157,6 +157,17 @@ def _json_list(text: str | None) -> list[Any]:
     return payload if isinstance(payload, list) else []
 
 
+def _json_counts(text: str | None) -> dict[str, int]:
+    """丢弃原因计数：坏值一律当空字典，界面只展示可读的键值对。"""
+    try:
+        payload = json.loads(text or "{}")
+    except ValueError:
+        return {}
+    if not isinstance(payload, dict):
+        return {}
+    return {str(key): int(value) for key, value in payload.items() if isinstance(value, int)}
+
+
 def _job_row(row: Any) -> dict[str, Any]:
     chapter = None
     if row["chapter_json"]:
@@ -174,6 +185,7 @@ def _job_row(row: Any) -> dict[str, Any]:
         "chapter": chapter,
         "questions": _json_list(row["questions_json"]),
         "discarded_count": int(row["discarded_count"]),
+        "discarded_reasons": _json_counts(row["discarded_reasons_json"]),
         "error_message": row["error_message"],
         "trigger": row["trigger"],
         "created_at": row["created_at"],

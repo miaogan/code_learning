@@ -65,10 +65,35 @@ export function canDiscard(job: RadarJobItem): boolean {
   return !isActiveJob(job.status) && job.status !== 'discarded'
 }
 
+/** 自检丢弃原因 → 中文：与服务端 `generate.clean_question` 的 reason 码一一对应。 */
+const DISCARD_REASON_LABELS: Record<string, string> = {
+  options: '选项数量不合规（单选 / 多选 3–4 项，判断题恰好 2 项）',
+  answer: '答案键不在选项里，或答案数量与题型不符',
+  prompt: '题干少于 10 字',
+  explanation: '解析少于 10 字',
+  duplicate: '题干与前面的题重复',
+}
+
+const DISCARD_REASON_ORDER = ['options', 'answer', 'prompt', 'explanation', 'duplicate']
+
+/** 丢弃明细：按固定顺序展开，未知原因原样回显（不猜中文）。 */
+export function discardReasonLines(job: RadarJobItem): { reason: string; text: string; count: number }[] {
+  const reasons = job.discarded_reasons ?? {}
+  const known = DISCARD_REASON_ORDER.filter((reason) => (reasons[reason] ?? 0) > 0).map((reason) => ({
+    reason,
+    text: DISCARD_REASON_LABELS[reason],
+    count: reasons[reason],
+  }))
+  const unknown = Object.keys(reasons)
+    .filter((reason) => !DISCARD_REASON_ORDER.includes(reason) && reasons[reason] > 0)
+    .map((reason) => ({ reason, text: reason, count: reasons[reason] }))
+  return [...known, ...unknown]
+}
+
 /** 自检丢弃提示：没有丢弃就不打扰，有丢弃必须明示（透明度口径与 r46 / r52 一致）。 */
 export function discardedNotice(job: RadarJobItem): string {
   if (job.discarded_count <= 0) return ''
-  return `另有 ${job.discarded_count} 条题未通过自检（答案与选项不匹配或选项数不合规），已丢弃，未入库。`
+  return `另有 ${job.discarded_count} 条题未通过自检，已丢弃且不入库（具体原因见下）。`
 }
 
 /** star 量级：1000 以上压成 1.2k，避免清单列过宽。 */

@@ -429,16 +429,34 @@ class ExamResult(BaseModel):
 
 
 class PracticePaperRequest(BaseModel):
-    """练习组卷请求体（`POST /api/practice/paper`，闭集越界由 FastAPI 统一映射 422）。"""
+    """练习组卷请求体（`POST /api/practice/paper`，闭集越界由 FastAPI 统一映射 422）。
 
-    language: PracticeLanguageFilter = "all"
-    direction: PracticeDirectionFilter = "all"
-    difficulty: PracticeDifficultyFilter = "all"
-    essentiality: PracticeEssentialityFilter = "all"
-    scope: PracticeScope = "all"
+    筛选维度均为**多选**：数组里出现 `"all"`（或空数组）即「全部」；
+    单选旧值（如 `"python"`）由服务层归一成单元素集合，行为与原来一致。
+    """
+
+    language: list[PracticeLanguageFilter] = Field(default_factory=lambda: ["all"])
+    direction: list[PracticeDirectionFilter] = Field(default_factory=lambda: ["all"])
+    difficulty: list[PracticeDifficultyFilter] = Field(default_factory=lambda: ["all"])
+    essentiality: list[PracticeEssentialityFilter] = Field(default_factory=lambda: ["all"])
+    scope: list[PracticeScope] = Field(default_factory=lambda: ["all"])
     limit: PracticeLimit = 10
-    #: r50：二级方向聚焦，空串 = 不限；与 `direction` 冲突时按笔试 r46 口径归一。
-    sub_direction: PracticeSubDirectionFilter = ""
+    #: r50：二级方向聚焦（多选）；与 `direction` 冲突的子方向按笔试 r46 口径归一。
+    sub_direction: list[PracticeSubDirectionFilter] = Field(default_factory=list)
+
+    @field_validator(
+        "language",
+        "direction",
+        "difficulty",
+        "essentiality",
+        "scope",
+        "sub_direction",
+        mode="before",
+    )
+    @classmethod
+    def _single_to_list(cls, value: Any) -> Any:
+        """兼容单选载荷：`"python"` 归一成 `["python"]`（多选是本轮唯一新形态）。"""
+        return [value] if isinstance(value, str) else value
 
 
 class PracticeQuestion(BaseModel):
@@ -503,6 +521,14 @@ class PracticeWrongItem(BaseModel):
 
     question_id: str
     prompt: str
+    #: 题型（`single` / `multiple` / `judge`）：前端据此决定是否按多选展示。
+    kind: str = ""
+    #: 选项原文（只读回显）。
+    options: list[ExamOption] = Field(default_factory=list)
+    #: 正确选项键（`["A"]` / `["A","C"]`）：展开时高亮。
+    correct_answer: list[str] | str | None = None
+    #: 逐题解析；题库保证非空 ≥10 字，模型生成的题已过自检。
+    explanation: str = ""
     language: str
     direction: str
     difficulty: str
@@ -1198,6 +1224,8 @@ class RadarJobItem(BaseModel):
     chapter: RadarChapterDraft | None = None
     questions: list[RadarQuestionSample] = Field(default_factory=list)
     discarded_count: int = 0
+    #: 丢弃原因计数（`options` / `answer` / `prompt` / `explanation` / `duplicate`）。
+    discarded_reasons: dict[str, int] = Field(default_factory=dict)
     error_message: str = ""
     trigger: str = "manual"
     created_at: str = ""

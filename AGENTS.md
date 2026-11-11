@@ -114,6 +114,8 @@
 
 - 2026-11-11：系统架构常见场景题库扩充：用户要求继续补「系统架构常见场景」题，盘点定位到「研发工程实践 / 架构设计」二级方向已有入口但 0 道。新增 60 道原创客观场景题（单选 40 / 多选 11 / 判断 9；基础 12 / 进阶 33 / 挑战 15），聚焦业务约束下的方案选型、超时／重复／乱序／依赖故障兜底和一致性／可用性／容量取舍，覆盖缓存、幂等、异步、消息、分库分表、服务拆分、降级与容灾等。素材 `docs/question-bank-staging/13-system-architecture-scenarios.json`，新来源 `sys-arch` / 前缀 `sysarch-`，题库 1224 → 1284，研发工程实践 50 → 110，架构设计 0 → 60。沿用离线合并、seed、启动幂等导入、练习／笔试与统一判分，无前端、HTTP 契约或表结构变更（产物见 `docs/teamflow/20261111-r68-system-architecture-scenarios/`）。
 
+- 2026-11-11：页面表单视觉统一（r69）：用户反馈页面偏丑、下拉框与主题格格不入。保留原生 `select` 的键盘、读屏和移动系统选择器，用公共表面 / 描边 / 箭头 / 焦点 / 禁用规则统一 `.sc-filter-select` / `.sc-radar-select` / `.sc-form select`；设置页 JSON 模式接入公共类，版本选择与先锋筛选复用同一套视觉。笔试开局卡增加画像摘要、规则说明、组卷偏好分区与按钮层级，宽屏四列、≤960px 两列，≤640px 下拉最小 44px / 16px。页头标题与说明文本层级同步调整。新增 `--select-icon-size` / `--select-chevron`，补齐既有 `--lab-rule` 引用；无依赖、接口或筛选逻辑变更。隔离演示数据实测设置 / 笔试 / 版本 / 先锋，长文件名无横滚，原生键盘方向联动与 2px 焦点环通过；r69 产品文件完成时前端 31 files / 415 tests、lint、typecheck、build 全过。最后复核时另一并发需求修改练习筛选类型但页面未同步，最新工作区 typecheck / build 的外部阻塞与复跑结果见 `docs/teamflow/20261111-r69-form-polish/ACCEPTANCE.md`。
+
 <!-- teamflow:begin -->
 ## TeamFlow 托管区（本块由 TeamFlow 自动维护，团队请勿手改）
 

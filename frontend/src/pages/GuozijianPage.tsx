@@ -14,6 +14,7 @@ import {
   canAdopt,
   canDiscard,
   discardedNotice,
+  discardReasonLines,
   isActiveJob,
   progressText,
   statusLabel,
@@ -47,6 +48,13 @@ const DIFFICULTY_LABELS: Record<string, string> = {
   challenge: '高级',
 }
 
+/** 章节档位闭集与题目难度不同（`advanced` vs `challenge`），不共用一张词表。 */
+const LEVEL_LABELS: Record<string, string> = {
+  basic: '基础',
+  intermediate: '进阶',
+  advanced: '高级',
+}
+
 function JobRow({
   job,
   active,
@@ -57,24 +65,59 @@ function JobRow({
   onClick: () => void
 }) {
   return (
-    <li>
-      <button
-        type="button"
-        className={active ? 'sc-radar-jobrow is-active' : 'sc-radar-jobrow'}
-        onClick={onClick}
-        aria-pressed={active}
-      >
-        <span className="sc-radar-jobrowtitle">
-          <span className={`sc-radar-jobstatus ${STATUS_CLASS[job.status] ?? 'is-failed'}`}>
-            {statusLabel(job.status)}
-          </span>
-          <span className="sc-radar-name">{job.tech_name || job.tech_slug}</span>
+    <button
+      type="button"
+      className={active ? 'sc-radar-jobrow is-active' : 'sc-radar-jobrow'}
+      onClick={onClick}
+      aria-pressed={active}
+    >
+      <span className="sc-radar-jobrowtitle">
+        <span className={`sc-radar-jobstatus ${STATUS_CLASS[job.status] ?? 'is-failed'}`}>
+          {statusLabel(job.status)}
         </span>
-        <span className="sc-radar-jobmeta">
-          {progressText(job)} · {formatWhen(job.created_at)}
-        </span>
-      </button>
-    </li>
+        <span className="sc-radar-name">{job.tech_name || job.tech_slug}</span>
+      </span>
+      <span className="sc-radar-jobmeta">
+        {progressText(job)} · {formatWhen(job.created_at)}
+      </span>
+    </button>
+  )
+}
+
+function SelfCheckRules() {
+  return (
+    <div className="sc-radar-checks">
+      <h4 className="sc-coach-blocktitle">自检规则（哪些题会被丢弃）</h4>
+      <ul className="sc-radar-checklist">
+        <li>判断题恰好 2 个选项；单选 / 多选 3–4 个选项，选项键只认 A–F 单字母</li>
+        <li>答案键必须落在选项里；单选与判断题只能有 1 个答案</li>
+        <li>题干至少 10 字，解析至少 10 字</li>
+        <li>题干重复的题只保留第一条</li>
+      </ul>
+      <p className="sc-radar-meta">
+        不合格的条目直接丢弃（不静默改写模型输出）；章节小节少于 2 节则整章不留。
+      </p>
+    </div>
+  )
+}
+
+function DiscardReasons({ job }: { job: RadarJobItem }) {
+  if (job.discarded_count <= 0) return null
+  const lines = discardReasonLines(job)
+  return (
+    <div className="sc-radar-discard">
+      <h4 className="sc-coach-blocktitle">被丢弃的题</h4>
+      <p className="sc-coach-note">{discardedNotice(job)}</p>
+      {lines.length > 0 && (
+        <ul className="sc-radar-discardlist">
+          {lines.map((line) => (
+            <li key={line.reason}>
+              {line.text}：{line.count} 条
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   )
 }
 
@@ -90,8 +133,9 @@ function JobDetail({
   onDiscard: () => void
 }) {
   const percent = Math.max(0, Math.min(100, Math.floor(job.progress)))
+  const terminal = !isActiveJob(job.status)
   return (
-    <Card>
+    <div className="sc-radar-detailbody">
       <div className="sc-radar-detailhead">
         <h3 className="sc-coach-blocktitle">{job.tech_name || job.tech_slug}</h3>
         <span className={`sc-radar-jobstatus ${STATUS_CLASS[job.status] ?? 'is-failed'}`}>
@@ -117,7 +161,7 @@ function JobDetail({
       {job.chapter !== null && (
         <div className="sc-radar-chapter">
           <h4 className="sc-coach-blocktitle">
-            学习章节草稿（{DIFFICULTY_LABELS[job.chapter.level] ?? job.chapter.level}）
+            学习章节草稿（{LEVEL_LABELS[job.chapter.level] ?? job.chapter.level}）
           </h4>
           <p className="sc-radar-meta">
             {job.chapter.direction}
@@ -143,6 +187,11 @@ function JobDetail({
             章节草稿留档在任务里，不会并入站内教程；扩充入库只把题目写进练习池。
           </p>
         </div>
+      )}
+      {terminal && job.status !== 'failed' && job.chapter === null && (
+        <p className="sc-coach-note">
+          模型没有产出章节草稿：小节少于 2 节，整章按规则丢弃（不影响题目入库）。
+        </p>
       )}
 
       {job.questions.length > 0 && (
@@ -179,9 +228,11 @@ function JobDetail({
               </li>
             ))}
           </ul>
-          {discardedNotice(job) !== '' && <p className="sc-coach-note">{discardedNotice(job)}</p>}
         </div>
       )}
+
+      <DiscardReasons job={job} />
+      {terminal && <SelfCheckRules />}
 
       <div className="sc-btn-row sc-radar-actions">
         <Button
@@ -198,7 +249,11 @@ function JobDetail({
         </Button>
       </div>
       {job.status === 'succeeded' && job.questions.length === 0 && (
-        <p className="sc-coach-note">这份草稿没有题目通过自检，只能废弃。</p>
+        <p className="sc-coach-note">
+          {job.discarded_count > 0
+            ? `模型返回的 ${job.discarded_count} 条题全部未通过自检，已丢弃；没有可扩充的题目，这份草稿只能废弃。`
+            : '模型这次没有按约定格式返回练习题（不是被自检淘汰的）；没有可扩充的题目，这份草稿只能废弃，重新生成即可。'}
+        </p>
       )}
       {job.status === 'adopted' && (
         <p className="sc-coach-note">
@@ -206,7 +261,7 @@ function JobDetail({
         </p>
       )}
       {job.status === 'discarded' && <p className="sc-coach-note">这份草稿已废弃，题目未入库。</p>}
-    </Card>
+    </div>
   )
 }
 
@@ -243,7 +298,8 @@ export default function GuozijianPage() {
     return () => clearTimeout(timer)
   }, [hasActive, jobsAsync.data, reload])
 
-  const selected = jobs.find((job) => job.job_id === selectedId) ?? (jobs.length > 0 ? jobs[0] : null)
+  // 只有用户点开（或从先锋深链带入 `?job=`）的那一行才展开详情；再点同一行收起。
+  const selected = jobs.find((job) => job.job_id === selectedId) ?? null
 
   const act = async (kind: 'adopt' | 'discard', job: RadarJobItem): Promise<void> => {
     setActing(job.job_id)
@@ -301,48 +357,52 @@ export default function GuozijianPage() {
       )}
 
       {jobs.length > 0 && (
-        <div className="sc-radar-workspace">
-          <Card>
-            <div className="sc-radar-listhead">
-              <h3 className="sc-coach-blocktitle">样例任务</h3>
-              <span className="sc-radar-count">共 {jobTotal} 条</span>
-            </div>
-            <ul className="sc-radar-joblist">
-              {jobs.map((job) => (
-                <JobRow
+        <Card>
+          <div className="sc-radar-listhead">
+            <h3 className="sc-coach-blocktitle">样例任务</h3>
+            <span className="sc-radar-count">共 {jobTotal} 条</span>
+          </div>
+          <ul className="sc-radar-joblist">
+            {jobs.map((job) => {
+              const isSelected = selected !== null && selected.job_id === job.job_id
+              return (
+                <li
                   key={job.job_id}
-                  job={job}
-                  active={selected !== null && selected.job_id === job.job_id}
-                  onClick={() => setSelectedId(job.job_id)}
-                />
-              ))}
-            </ul>
-            <Pagination
-              page={page}
-              pageSize={PAGE_SIZE}
-              total={jobTotal}
-              onChange={setPage}
-              label="样例任务分页"
-            />
-            {hasActive && <p className="sc-coach-note">有任务正在生成，列表每 2 秒自动刷新。</p>}
-          </Card>
-
-          {selected !== null && (
-            <div className="sc-radar-detail">
-              {actionError !== '' && <InlineError message={actionError} />}
-              <JobDetail
-                job={selected}
-                acting={acting === selected.job_id}
-                onAdopt={() => void act('adopt', selected)}
-                onDiscard={() => void act('discard', selected)}
-              />
-              <p className="sc-coach-note">
-                雷达生成的题只进练习池、不进科考卷；章节草稿不并入官方教程。
-                扩充入库后可到练习页按方向练习。
-              </p>
-            </div>
-          )}
-        </div>
+                  className={isSelected ? 'sc-radar-jobitem is-open' : 'sc-radar-jobitem'}
+                >
+                  <JobRow
+                    job={job}
+                    active={isSelected}
+                    onClick={() => setSelectedId((prev) => (prev === job.job_id ? '' : job.job_id))}
+                  />
+                  {isSelected && (
+                    <div className="sc-radar-detail">
+                      {actionError !== '' && <InlineError message={actionError} />}
+                      <JobDetail
+                        job={job}
+                        acting={acting === job.job_id}
+                        onAdopt={() => void act('adopt', job)}
+                        onDiscard={() => void act('discard', job)}
+                      />
+                      <p className="sc-coach-note">
+                        雷达生成的题只进练习池、不进科考卷；章节草稿不并入官方教程。
+                        扩充入库后可到练习页按方向练习。
+                      </p>
+                    </div>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+          <Pagination
+            page={page}
+            pageSize={PAGE_SIZE}
+            total={jobTotal}
+            onChange={setPage}
+            label="样例任务分页"
+          />
+          {hasActive && <p className="sc-coach-note">有任务正在生成，列表每 2 秒自动刷新。</p>}
+        </Card>
       )}
     </div>
   )

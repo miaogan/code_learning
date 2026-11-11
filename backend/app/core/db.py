@@ -340,6 +340,7 @@ CREATE TABLE IF NOT EXISTS radar_jobs (
     chapter_json    TEXT NOT NULL DEFAULT '',
     questions_json  TEXT NOT NULL DEFAULT '[]',
     discarded_count INTEGER NOT NULL DEFAULT 0,
+    discarded_reasons_json TEXT NOT NULL DEFAULT '{}',
     error_message   TEXT NOT NULL DEFAULT '',
     trigger         TEXT NOT NULL DEFAULT 'manual',
     parent_job_id   TEXT NOT NULL DEFAULT '',
@@ -405,6 +406,12 @@ _ADDED_COLUMNS: tuple[tuple[str, str, str], ...] = (
     ("question_attempts", "source", "TEXT NOT NULL DEFAULT 'exam'"),
 )
 
+#: r67 存量库补列：`radar_jobs` 由 `R67_SCHEMA` 建表，补列必须在建表之后执行，
+#: 不能并入 `_ADDED_COLUMNS`（第 2 步时该表还不存在，会对空库直接报 no such table）。
+_R67_ADDED_COLUMNS: tuple[tuple[str, str, str], ...] = (
+    ("radar_jobs", "discarded_reasons_json", "TEXT NOT NULL DEFAULT '{}'"),
+)
+
 
 
 #: r53 并发写锁：8 线程 × 50 次短事务基准里，无 busy_timeout 成功率仅 28.2%（287 次
@@ -447,6 +454,14 @@ def _ensure_r23_columns(conn: sqlite3.Connection) -> None:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
 
 
+def _ensure_r67_columns(conn: sqlite3.Connection) -> None:
+    """r67 存量库补列（幂等）：须在 `R67_SCHEMA` 建表之后调用。"""
+    for table, column, ddl in _R67_ADDED_COLUMNS:
+        existing = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
+        if column not in existing:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
+
+
 def init_db() -> None:
     with connection() as conn:
         conn.executescript(SCHEMA)          # 1. 建表（新库即含新列）
@@ -466,8 +481,9 @@ def init_db() -> None:
                 logger.warning("db.fts5_unavailable error=%s", type(exc).__name__)
         conn.executescript(R61_SCHEMA)      # 12. r61 学习进度 / 计划打卡表
         conn.executescript(R67_SCHEMA)      # 13. r67 技术雷达五表
-        _sweep_stale_radar_jobs(conn)       # 14. 建部分唯一索引前收敛重启遗留的未终态任务
-        conn.executescript(R67_INDEXES)     # 15. r67 索引（含 jobs 的 active 唯一索引）
+        _ensure_r67_columns(conn)           # 14. 存量库补 r67 列（须在建表之后）
+        _sweep_stale_radar_jobs(conn)       # 15. 建部分唯一索引前收敛重启遗留的未终态任务
+        conn.executescript(R67_INDEXES)     # 16. r67 索引（含 jobs 的 active 唯一索引）
 
 
 def _sweep_stale_radar_jobs(conn: sqlite3.Connection) -> None:

@@ -49,7 +49,7 @@ async def _run(job_id: str, tech_slug: str, user: dict[str, Any]) -> None:
             return
         client = user_ai.client_for(user, "light")
         store.update_job(job_id, status="running", stage="chapter", progress=PROGRESS_CHAPTER)
-        chapter, questions, discarded = await asyncio.wait_for(
+        chapter, questions, discarded, discarded_reasons = await asyncio.wait_for(
             generate.generate(card, str(card.get("verdict") or "watch"), job_id, client),
             timeout=hard_limit,
         )
@@ -62,6 +62,7 @@ async def _run(job_id: str, tech_slug: str, user: dict[str, Any]) -> None:
             chapter_json=json.dumps(chapter, ensure_ascii=False) if chapter else "",
             questions_json=json.dumps(questions, ensure_ascii=False),
             discarded_count=discarded,
+            discarded_reasons_json=json.dumps(discarded_reasons, ensure_ascii=False),
             error_message="",
         )
     except asyncio.CancelledError:

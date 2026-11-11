@@ -753,15 +753,15 @@ export type PracticeLimit = 10 | 20 | 0
 /** 二级方向筛选（r50）：空串 = 不聚焦；闭集由 `subDirectionsOf(direction)` 派生。 */
 export type PracticeSubDirectionFilter = string
 
-/** 组卷请求体。七项都有服务端默认值，故前端可只传改动项。 */
+/** 组卷请求体。七项都有服务端默认值；筛选维度是多选数组，题量仍是单选。 */
 export interface PracticePaperRequest {
-  language?: PracticeLanguageFilter
-  direction?: PracticeDirectionFilter
-  difficulty?: PracticeDifficultyFilter
-  essentiality?: PracticeEssentialityFilter
-  scope?: PracticeScope
+  language?: PracticeLanguageFilter[]
+  direction?: PracticeDirectionFilter[]
+  difficulty?: PracticeDifficultyFilter[]
+  essentiality?: PracticeEssentialityFilter[]
+  scope?: PracticeScope[]
   limit?: PracticeLimit
-  sub_direction?: PracticeSubDirectionFilter
+  sub_direction?: PracticeSubDirectionFilter[]
 }
 
 /** 题单里的一道题：**不含** `answer`（答案只在判分响应里回显）。 */
@@ -816,6 +816,14 @@ export interface PracticeStats {
 export interface PracticeWrongItem {
   question_id: string
   prompt: string
+  /** 题型：`single` / `multiple` / `judge`（展开时只读回显）。 */
+  kind: ExamKind
+  /** 选项原文（只读回显，正确项按 `correct_answer` 高亮）。 */
+  options: ExamOption[]
+  /** 正确选项键：`["A"]` / `["A","C"]`；服务端可能给字符串（判断题旧数据）。 */
+  correct_answer: string[] | string | null
+  /** 逐题解析（题库保证非空 ≥10 字）。 */
+  explanation: string
   language: QuestionLanguage
   direction: string
   difficulty: ExamDifficulty
@@ -1065,6 +1073,8 @@ export interface RadarJobItem {
   questions: RadarQuestionSample[]
   /** 自检丢弃的题数（答案键不在选项、选项数不合法等）。 */
   discarded_count: number
+  /** 丢弃原因计数：`options` / `answer` / `prompt` / `explanation` / `duplicate`。 */
+  discarded_reasons: Record<string, number>
   error_message: string
   trigger: string
   created_at: string

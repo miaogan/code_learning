@@ -158,11 +158,18 @@ function jsonInit(method: string, body: unknown, signal?: AbortSignal): RequestI
   }
 }
 
-/** 查询串：只拼有值的键（中文筛选值如「后端」由 URLSearchParams 负责编码，页面不手拼）。 */
-function queryString(params: Record<string, string | number | undefined>): string {
+/**
+ * 查询串：只拼有值的键（中文筛选值如「后端」由 URLSearchParams 负责编码，页面不手拼）。
+ * 数组按重复键展开（`language=python&language=java`），与服务端 `list[...]` 参数对齐。
+ */
+function queryString(params: Record<string, string | number | string[] | undefined>): string {
   const search = new URLSearchParams()
   Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined) search.set(key, String(value))
+    if (Array.isArray(value)) {
+      value.forEach((item) => search.append(key, item))
+    } else if (value !== undefined) {
+      search.set(key, String(value))
+    }
   })
   return search.toString()
 }
@@ -438,7 +445,7 @@ export const api = {
 
   /** 错题本：服务端已按最近答错时间倒序，前端不二次排序。 */
   practiceWrongBook: (
-    language: PracticeLanguageFilter,
+    language: PracticeLanguageFilter[],
     options: { page?: number; limit?: number; signal?: AbortSignal } = {},
   ): Promise<PracticeWrongBook> =>
     request<PracticeWrongBook>(

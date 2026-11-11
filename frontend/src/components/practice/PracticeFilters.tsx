@@ -5,6 +5,7 @@ import {
   difficultyChips,
   directionChips,
   essentialityChips,
+  isAllSelection,
   languageChips,
   limitChips,
   limitLabel,
@@ -15,7 +16,7 @@ import {
 } from '../../lib/practice'
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
-import { ChipRow } from '../ui/ChipRow'
+import { ChipRow, MultiChipRow } from '../ui/ChipRow'
 
 export interface PracticeFiltersProps {
   filters: PracticeFiltersState
@@ -57,11 +58,12 @@ export function PracticeFilters({
       <div className="sc-qa-filter-row">
         <span className="sc-qa-filter-label">语言</span>
         <div className="sc-qa-filter-body">
-          <ChipRow
+          <MultiChipRow
             groupLabel="语言筛选"
             options={languageChips()}
-            value={filters.language}
-            onSelect={(value) => onChange({ language: value })}
+            values={filters.language}
+            allValue="all"
+            onChange={(values) => onChange({ language: values })}
           />
           <p className="sc-qa-hint">
             通用 = 与具体语言无关的题（算法与数据结构 / 计算机基础 / AI 工程 / 中间件与运维 /
@@ -73,11 +75,12 @@ export function PracticeFilters({
       <div className="sc-qa-filter-row">
         <span className="sc-qa-filter-label">方向</span>
         <div className="sc-qa-filter-body">
-          <ChipRow
+          <MultiChipRow
             groupLabel="方向筛选"
             options={directionChips()}
-            value={filters.direction}
-            onSelect={(value) => onChange({ direction: value })}
+            values={filters.direction}
+            allValue="all"
+            onChange={(values) => onChange({ direction: values })}
           />
         </div>
       </div>
@@ -85,16 +88,17 @@ export function PracticeFilters({
       <div className="sc-qa-filter-row">
         <span className="sc-qa-filter-label">二级方向</span>
         <div className="sc-qa-filter-body">
-          {filters.direction === 'all' ? (
+          {isAllSelection(filters.direction, 'all') ? (
             <p className="sc-qa-hint">
               先选一个方向，再按二级方向聚焦；该方向题目不足时会自动补充同方向的其他题
             </p>
           ) : (
-            <ChipRow
+            <MultiChipRow
               groupLabel="二级方向筛选"
               options={subDirectionChips(filters.direction)}
-              value={filters.sub_direction}
-              onSelect={(value) => onChange({ sub_direction: value })}
+              values={filters.sub_direction}
+              allValue=""
+              onChange={(values) => onChange({ sub_direction: values })}
             />
           )}
         </div>
@@ -103,11 +107,12 @@ export function PracticeFilters({
       <div className="sc-qa-filter-row">
         <span className="sc-qa-filter-label">难度</span>
         <div className="sc-qa-filter-body">
-          <ChipRow
+          <MultiChipRow
             groupLabel="难度筛选"
             options={difficultyChips()}
-            value={filters.difficulty}
-            onSelect={(value) => onChange({ difficulty: value })}
+            values={filters.difficulty}
+            allValue="all"
+            onChange={(values) => onChange({ difficulty: values })}
           />
         </div>
       </div>
@@ -115,11 +120,12 @@ export function PracticeFilters({
       <div className="sc-qa-filter-row">
         <span className="sc-qa-filter-label">必备度</span>
         <div className="sc-qa-filter-body">
-          <ChipRow
+          <MultiChipRow
             groupLabel="必备度筛选"
             options={essentialityChips()}
-            value={filters.essentiality}
-            onSelect={(value) => onChange({ essentiality: value })}
+            values={filters.essentiality}
+            allValue="all"
+            onChange={(values) => onChange({ essentiality: values })}
           />
         </div>
       </div>
@@ -127,11 +133,12 @@ export function PracticeFilters({
       <div className="sc-qa-filter-row">
         <span className="sc-qa-filter-label">范围</span>
         <div className="sc-qa-filter-body">
-          <ChipRow
+          <MultiChipRow
             groupLabel="范围筛选"
             options={scopeChips()}
-            value={filters.scope}
-            onSelect={(value) => onChange({ scope: value })}
+            values={filters.scope}
+            allValue="all"
+            onChange={(values) => onChange({ scope: values })}
           />
           {/* r52：范围旁边说清默认行为，免得「全部」被误读成「一道不少」。 */}
           <p className="sc-meta-line">

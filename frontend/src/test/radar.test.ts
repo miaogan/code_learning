@@ -48,6 +48,7 @@ function job(overrides: Partial<RadarJobItem> = {}): RadarJobItem {
     chapter: null,
     questions: [],
     discarded_count: 0,
+    discarded_reasons: {},
     error_message: '',
     trigger: 'manual',
     created_at: '2026-11-10T09:00:00Z',
@@ -150,7 +151,7 @@ describe('r67 radar 进度与出口判定', () => {
   it('丢弃提示只在有丢弃时出现，并给出条数', () => {
     expect(discardedNotice(job())).toBe('')
     expect(discardedNotice(job({ discarded_count: 2 }))).toContain('另有 2 条题未通过自检')
-    expect(discardedNotice(job({ discarded_count: 2 }))).toContain('未入库')
+    expect(discardedNotice(job({ discarded_count: 2 }))).toContain('不入库')
   })
 })
 

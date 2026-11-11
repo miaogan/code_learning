@@ -9,6 +9,8 @@
 - 响应模型 `Practice*` 保证题单/统计/错题本永不含 `answer`，答案只在 `/answer` 回显。
 """
 
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, Query
 
 from app.deps import current_user
@@ -29,6 +31,11 @@ from app.schemas import (
 from app.services.assessment import practice as practice_service
 
 router = APIRouter(prefix="/api/practice", tags=["practice"], dependencies=[Depends(current_user)])
+
+#: GET 端点的筛选默认值：模块级只读常量（避免把可变字面量写进函数默认值，B008/B006）。
+#: 类型注解仍是 `list[...]`，FastAPI/pydantic 会在校验阶段把元组默认值归一成列表。
+_ALL_CHOICES: tuple[str, ...] = ("all",)
+_NO_SUB_DIRECTIONS: tuple[str, ...] = ()
 
 
 @router.post("/paper", response_model=PracticePaper, summary="按筛选出一份练习题单（不含答案）")
@@ -57,12 +64,12 @@ def submit_answer(payload: PracticeAnswerRequest) -> PracticeAnswerResult:
 
 @router.get("/stats", response_model=PracticeStats, summary="练习统计（命中/已练/错题）")
 def get_stats(
-    language: PracticeLanguageFilter = "all",
-    direction: PracticeDirectionFilter = "all",
-    difficulty: PracticeDifficultyFilter = "all",
-    essentiality: PracticeEssentialityFilter = "all",
-    scope: PracticeScope = "all",
-    sub_direction: PracticeSubDirectionFilter = "",
+    language: Annotated[list[PracticeLanguageFilter], Query()] = _ALL_CHOICES,
+    direction: Annotated[list[PracticeDirectionFilter], Query()] = _ALL_CHOICES,
+    difficulty: Annotated[list[PracticeDifficultyFilter], Query()] = _ALL_CHOICES,
+    essentiality: Annotated[list[PracticeEssentialityFilter], Query()] = _ALL_CHOICES,
+    scope: Annotated[list[PracticeScope], Query()] = _ALL_CHOICES,
+    sub_direction: Annotated[list[PracticeSubDirectionFilter], Query()] = _NO_SUB_DIRECTIONS,
 ) -> PracticeStats:
     return PracticeStats(
         **practice_service.stats(language, direction, difficulty, essentiality, scope, sub_direction)
@@ -71,7 +78,7 @@ def get_stats(
 
 @router.get("/wrong-book", response_model=PracticeWrongBook, summary="错题本（最近一次答错的题）")
 def get_wrong_book(
-    language: PracticeLanguageFilter = "all",
+    language: Annotated[list[PracticeLanguageFilter], Query()] = _ALL_CHOICES,
     limit: int = Query(default=20, ge=1, le=100, description="每页条数"),
     page: int = Query(default=1, ge=1, description="页码，从 1 起"),
 ) -> PracticeWrongBook:
