@@ -935,35 +935,31 @@ a {
 }
 .sc-filter-select {
   width: 100%;
-  min-height: 34px;
+  height: var(--btn-h);
   padding: 0 var(--sp-6) 0 var(--sp-3);
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-6);
-  background-color: var(--bg-inset);
+  border-radius: var(--radius-8);
+  background-color: var(--bg-surface);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23737d89' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 10px center;
   background-size: 10px;
   color: var(--text-primary);
   font-family: inherit;
-  font-size: var(--fs-small);
-  line-height: var(--lh-small);
-  font-weight: 400;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  font-weight: 500;
   text-overflow: ellipsis;
   cursor: pointer;
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
   transition: border-color var(--fast) var(--ease),
-              background-color var(--fast) var(--ease),
-              box-shadow var(--fast) var(--ease);
+              background-color var(--fast) var(--ease);
 }
 .sc-filter-select:hover:not(:disabled) {
   border-color: var(--border-strong);
-  background-color: var(--bg-raised);
 }
-/* 焦点只在键盘操作时出现：鼠标选完一项后不再留一圈强调色描边，
-   键盘 Tab 时仍给一条 30% 透明度的细线 + 极淡外环，可读但不抢眼。 */
 .sc-filter-select:focus {
   outline: none;
 }
@@ -976,7 +972,6 @@ a {
   opacity: 0.5;
   cursor: not-allowed;
   background-image: none;
-  background-color: var(--bg-inset);
   color: var(--text-tertiary);
 }
 
@@ -8828,30 +8823,32 @@ html {
   gap: var(--sp-2);
 }
 
-/* 清单内下拉：透明底 + 细边框，高 32 与 sm 按钮齐平；不放字段标签，靠首选项自解释。
-   hover 只提亮边框，焦点高亮仅键盘可达时出现（沿用科考页的柔和高亮口径）。 */
+/* 清单筛选条下拉：比标准按钮矮一档（sm 高），但底色/圆角/边框和 .sc-filter-select 统一。
+   不放字段标签，靠首选项自解释（「全部方向」「每页 20 条」）。 */
 .sc-radar-select {
   height: var(--btn-h-sm);
   padding: 0 var(--sp-6) 0 var(--sp-3);
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-6);
-  background-color: transparent;
+  border-radius: var(--radius-8);
+  background-color: var(--bg-surface);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23737d89' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 10px center;
   background-size: 10px;
-  color: var(--text-secondary);
+  color: var(--text-primary);
   font-family: inherit;
   font-size: var(--fs-small);
   line-height: var(--lh-small);
+  font-weight: 500;
   cursor: pointer;
   appearance: none;
-  transition: border-color var(--fast) var(--ease), color var(--fast) var(--ease);
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  transition: border-color var(--fast) var(--ease);
 }
 
 .sc-radar-select:hover:not(:disabled) {
   border-color: var(--border-strong);
-  color: var(--text-primary);
 }
 
 .sc-radar-select:focus {
