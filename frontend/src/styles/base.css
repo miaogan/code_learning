@@ -962,10 +962,14 @@ a {
   border-color: var(--border-strong);
   background-color: var(--bg-raised);
 }
+/* 焦点只在键盘操作时出现：鼠标选完一项后不再留一圈强调色描边，
+   键盘 Tab 时仍给一条 30% 透明度的细线 + 极淡外环，可读但不抢眼。 */
 .sc-filter-select:focus {
   outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-tint);
+}
+.sc-filter-select:focus-visible {
+  border-color: var(--accent-line-30);
+  box-shadow: 0 0 0 2px var(--accent-wash-06);
 }
 .sc-filter-select:disabled {
   opacity: 0.5;
