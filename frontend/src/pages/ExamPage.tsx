@@ -94,8 +94,9 @@ export default function ExamPage() {
   const profile = profileAsync.data
 
   // 门禁：画像请求三态直接决定空态 / 错误态（与面试页同一套约定）。
+  // 画像已取到就保持 idle：按 status 判定会在重载瞬间退回 gate，把开考卡整块换成 loader。
   const gateView: 'gate' | 'empty' | 'error' | 'idle' =
-    profileAsync.status === 'success'
+    profile !== null
       ? 'idle'
       : profileAsync.status === 'error'
         ? profileAsync.error?.status === 404

@@ -373,7 +373,8 @@ export default function PolishPage() {
   }
 
   const profileMissing = profileAsync.error?.status === 404
-  const profilePending = profileAsync.status !== 'success' && profileAsync.status !== 'error'
+  // 画像已取到就不再 pending：按 status 判定会在重载时把整个润色工作区换成一帧 loader。
+  const profilePending = profile === null && profileAsync.status !== 'error'
   const defaultRole = profile?.target_role ?? null
   const roleIsTemporary = session?.targetRole != null && session.targetRole !== defaultRole
 

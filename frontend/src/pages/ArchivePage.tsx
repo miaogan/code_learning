@@ -123,7 +123,8 @@ export default function ArchivePage() {
     return { profile, versions, runs, report, planState }
   }, [])
 
-  const data = dataAsync.status === 'success' ? dataAsync.data : null
+  // 用 `data` 而不是 `status`：重载期间保留上一次成功值，内容不会闪空。
+  const data = dataAsync.data
 
   const dailyMinutes = useMemo(() => {
     const remote = data?.planState?.daily_minutes

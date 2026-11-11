@@ -318,8 +318,9 @@ export default function InterviewPage() {
   }
 
   // 门禁：画像请求三态直接决定加载 / 空态 / 错误态（ready 才进配置卡）。
+  // 画像已取到就保持 ready：按 status 判定会在重载瞬间退回 loading，把配置卡整块换成 loader。
   const profileView: 'loading' | 'empty' | 'error' | 'ready' =
-    profileAsync.status === 'success'
+    profile !== null
       ? 'ready'
       : profileAsync.status === 'error'
         ? profileAsync.error?.status === 404

@@ -48,10 +48,11 @@ export function TimelineSection({ runRows, limit = DEFAULT_LIMIT }: TimelineSect
   const timelineAsync = useAsync((signal) => api.timeline(limit, signal), [limit])
   const events = timelineAsync.data
 
-  const succeeded = timelineAsync.status === 'success' && events !== null
+  // 以 `data` 为准：重载期间 status 会短暂回到 loading，但 data 仍保留上一次成功值。
+  const succeeded = events !== null
   const loading = timelineAsync.status === 'loading' && events === null
   const failed = timelineAsync.status === 'error' && timelineAsync.error !== null
-  const isEmpty = succeeded && events.length === 0
+  const isEmpty = events !== null && events.length === 0
 
   const runEventCount =
     events === null ? null : events.filter((event) => isRunEvent(event)).length

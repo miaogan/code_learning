@@ -73,8 +73,9 @@ export default function PioneerPage() {
   const [collectError, setCollectError] = useState('')
   const [generating, setGenerating] = useState('')
 
-  const techs = listAsync.status === 'success' ? listAsync.data : null
-  const lastRun = runAsync.status === 'success' ? runAsync.data : null
+  // 直接读 `data`（重载期间保留上一次成功值）：按 status 派生会在采集后刷新时清空清单、闪一帧 loader。
+  const techs = listAsync.data
+  const lastRun = runAsync.data
 
   const refresh = (): void => {
     listAsync.reload()

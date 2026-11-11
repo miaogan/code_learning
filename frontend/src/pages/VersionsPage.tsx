@@ -81,7 +81,8 @@ function ChipRow({ title, items }: { title: string; items: string[] }) {
 export default function VersionsPage() {
   const [picked, setPicked] = useState<Picked>({ older: null, newer: null })
   const listAsync = useAsync(() => api.listResumeVersions(20), [])
-  const versions = listAsync.status === 'success' ? listAsync.data : null
+  // `data` 在重载期间保留上一次成功值；按 status 派生会让版本选择器闪空并级联重拉详情。
+  const versions = listAsync.data
 
   const selection = useMemo(
     () => (versions === null ? { older: null, newer: null } : resolveSelection(versions, picked)),

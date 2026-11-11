@@ -220,7 +220,9 @@ export default function GuozijianPage() {
     if (jobParam !== '') setSelectedId(jobParam)
   }, [jobParam])
 
-  const jobs = jobsAsync.status === 'success' && jobsAsync.data !== null ? jobsAsync.data.items : []
+  // 用 `data` 而不是 `status` 取列表：轮询期间 status 会短暂变回 loading，data 仍是上一次成功值。
+  // 若按 status 判定，每次轮询都会把工作区卸载、闪一帧 PhaseLoader（页面抖动）。
+  const jobs = jobsAsync.data !== null ? jobsAsync.data.items : []
   const hasActive = jobs.some((job) => isActiveJob(job.status))
   const reload = jobsAsync.reload
 
