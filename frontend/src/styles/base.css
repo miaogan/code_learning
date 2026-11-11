@@ -8824,6 +8824,19 @@ html {
   min-width: 160px;
 }
 
+/* 右侧控件组：方向 / 每页条数 / 清除筛选，窄屏整体折到下一行。 */
+.sc-radar-filterright {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--sp-3);
+}
+
+.sc-radar-pagesize {
+  flex: 0 0 120px;
+  min-width: 104px;
+}
+
 .sc-radar-filtered-empty {
   padding: var(--sp-5) 0;
   font-size: var(--fs-body);
@@ -8908,7 +8921,7 @@ html {
   color: var(--text-tertiary);
 }
 
-/* 判定标签：必须学 / 值得了解 / 观望 / 可跳过 */
+/* 判定标签：必学 / 选学 / 观望 / 跳过 */
 .sc-radar-verdict {
   display: inline-flex;
   align-items: center;

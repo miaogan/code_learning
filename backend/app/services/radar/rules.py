@@ -25,7 +25,7 @@ from app.services.report.rules import (
 VERDICTS: tuple[str, ...] = ("must_learn", "worth_knowing", "watch", "skip")
 VERDICT_LABELS: dict[str, str] = {
     "must_learn": "必学",
-    "worth_knowing": "值得了解",
+    "worth_knowing": "选学",
     "watch": "观望",
     "skip": "跳过",
 }

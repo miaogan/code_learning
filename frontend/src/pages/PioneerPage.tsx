@@ -28,8 +28,9 @@ const VERDICT_CLASS: Record<string, string> = {
   skip: 'is-skip',
 }
 
-/** 每页条数：与后端 `/api/radar/techs` 的 `limit` 同一口径。 */
-const PAGE_SIZE = 20
+/** 每页条数：与后端 `/api/radar/techs` 的 `limit` 同一口径（上限 100）。 */
+const PAGE_SIZE_OPTIONS = [10, 20, 50, 100] as const
+const DEFAULT_PAGE_SIZE = 20
 
 type VerdictFilter = 'all' | 'must_learn' | 'worth_knowing' | 'watch' | 'skip'
 
@@ -39,7 +40,7 @@ const VERDICT_KEYS: VerdictFilter[] = ['all', 'must_learn', 'worth_knowing', 'wa
 const VERDICT_TABS = [
   { key: 'all', label: '全部' },
   { key: 'must_learn', label: '必学' },
-  { key: 'worth_knowing', label: '值得了解' },
+  { key: 'worth_knowing', label: '选学' },
   { key: 'watch', label: '观望' },
   { key: 'skip', label: '跳过' },
 ]
@@ -80,19 +81,21 @@ function TechRow({
 export default function PioneerPage() {
   const navigate = useNavigate()
   const [page, setPage] = useState(1)
+  // 每页条数由用户选（后端 `limit` 上限 100），改动同样回到第 1 页。
+  const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE)
   // 清单筛选（服务端过滤）：结论走 tab、方向走下拉；筛选值变化一律回到第 1 页。
   const [verdictFilter, setVerdictFilter] = useState<VerdictFilter>('all')
   const [directionFilter, setDirectionFilter] = useState('')
   const listAsync = useAsync(
     (signal) =>
       api.radarTechs({
-        limit: PAGE_SIZE,
+        limit: pageSize,
         page,
         direction: directionFilter,
         verdict: verdictFilter === 'all' ? undefined : verdictFilter,
         signal,
       }),
-    [page, directionFilter, verdictFilter],
+    [page, pageSize, directionFilter, verdictFilter],
   )
   const runAsync = useAsync((signal) => api.radarLatestRun(signal), [])
 
@@ -131,6 +134,16 @@ export default function PioneerPage() {
 
   const changeDirection = (value: string): void => {
     setDirectionFilter(value)
+    setPage(1)
+  }
+
+  const changePageSize = (value: string): void => {
+    const size = Number(value)
+    setPageSize(
+      PAGE_SIZE_OPTIONS.includes(size as (typeof PAGE_SIZE_OPTIONS)[number])
+        ? size
+        : DEFAULT_PAGE_SIZE,
+    )
     setPage(1)
   }
 
@@ -362,26 +375,42 @@ export default function PioneerPage() {
               onChange={changeVerdict}
               ariaLabel="技术结论筛选"
             />
-            <label className="sc-field sc-radar-filterdir">
-              <span className="sc-field-label">按方向筛选</span>
-              <select
-                className="sc-filter-select"
-                value={directionFilter}
-                onChange={(event) => changeDirection(event.target.value)}
-              >
-                <option value="">全部方向</option>
-                {DIRECTIONS.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {filtering && (
-              <Button variant="ghost" size="sm" onClick={resetFilters}>
-                清除筛选
-              </Button>
-            )}
+            <div className="sc-radar-filterright">
+              <label className="sc-field sc-radar-filterdir">
+                <span className="sc-field-label">按方向筛选</span>
+                <select
+                  className="sc-filter-select"
+                  value={directionFilter}
+                  onChange={(event) => changeDirection(event.target.value)}
+                >
+                  <option value="">全部方向</option>
+                  {DIRECTIONS.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="sc-field sc-radar-pagesize">
+                <span className="sc-field-label">每页条数</span>
+                <select
+                  className="sc-filter-select"
+                  value={pageSize}
+                  onChange={(event) => changePageSize(event.target.value)}
+                >
+                  {PAGE_SIZE_OPTIONS.map((size) => (
+                    <option key={size} value={size}>
+                      {size} 条
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {filtering && (
+                <Button variant="ghost" size="sm" onClick={resetFilters}>
+                  清除筛选
+                </Button>
+              )}
+            </div>
           </div>
           {techs.notice !== '' && <p className="sc-coach-note">{techs.notice}</p>}
           {techs.items.length === 0 ? (
@@ -402,7 +431,7 @@ export default function PioneerPage() {
           )}
           <Pagination
             page={page}
-            pageSize={PAGE_SIZE}
+            pageSize={pageSize}
             total={techs.total}
             onChange={setPage}
             label="技术清单分页"
