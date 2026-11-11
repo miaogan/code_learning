@@ -40,4 +40,6 @@
 
 r69 产品文件完成后，`npm run lint`、`npm run typecheck`、`npm test -- --run`（31 files / 415 tests）、`npm run build`（含 typecheck，166 modules）与 `git diff --check` 通过。构建保留 Vite 对单 JS chunk >500kB 的既有警告，不影响成功退出；未借本视觉需求改路由分包。
 
-最后 JSX 缩进整理后 lint 仍通过；此时另一个并发需求正把 `types.ts` 的练习筛选改为数组，而 `PracticePage.tsx` 尚未同步，最新全工作区 typecheck 因此出现 13 个单值 → 数组错误，build 也在该前置检查停止。这些文件不属于 r69，未回退或擅自修补；415 项测试再次全过。待并发改动补齐后须重跑全量类型检查与构建，详见 `ACCEPTANCE.md`。
+最后 JSX 缩进整理后 lint 仍通过；此时另一个并发需求正把 `types.ts` 的练习筛选改为数组，而 `PracticePage.tsx` 尚未同步，最新全工作区 typecheck 因此出现 13 个单值 → 数组错误，build 也在该前置检查停止。这些文件不属于 r69，未回退或擅自修补；415 项测试再次全过。
+
+**2026-11-11 16:23 后续复核**：并发改动已同步，最新 `lint`、`typecheck`、31 files / 420 tests、`build`（167 modules）与 `git diff --check` 全部通过，外部阻塞解除。r69 产品文件和本任务夹已随 `9e4d596` 提交并推送，当前无本轮产品代码漏提交。工作区后续未提交的笔试多选筛选与 r70 样式不属于本需求；历史阻塞描述以 `ACCEPTANCE.md` 的提交后复核为最终状态。
