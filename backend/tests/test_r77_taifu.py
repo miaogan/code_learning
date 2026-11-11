@@ -319,42 +319,42 @@ def test_message_roundtrip_keeps_citations(tmp_db: Any, role: str) -> None:
     assert repository.delete_taifu_messages() == 1
 
 
-# === r80 线程记忆（长线程压缩） =================================================
+# === r80 线程摘要（长线程压缩） =================================================
 
 
-def test_sanitize_memory_flattens_caps_and_rejects_placeholders() -> None:
-    # 单行是硬要求：记忆会作为提示词里的一个【段】出现，多行会把后面的段头挤散。
-    assert policy.sanitize_memory("第一句\n第二句") == "第一句 第二句"
-    assert policy.sanitize_memory("   ") == ""
-    # 「无」「（无）」这类占位不算记忆，否则会拿它覆盖掉真记忆。
+def test_sanitize_summary_flattens_caps_and_rejects_placeholders() -> None:
+    # 单行是硬要求：摘要会作为提示词里的一个【段】出现，多行会把后面的段头挤散。
+    assert policy.sanitize_summary("第一句\n第二句") == "第一句 第二句"
+    assert policy.sanitize_summary("   ") == ""
+    # 「无」「（无）」这类占位不算摘要，否则会拿它覆盖掉真摘要。
     for placeholder in ["无", "（无）", "N/A", "没有"]:
-        assert policy.sanitize_memory(placeholder) == ""
+        assert policy.sanitize_summary(placeholder) == ""
 
-    clamped = policy.sanitize_memory("记" * (policy.MEMORY_MAX + 50))
+    clamped = policy.sanitize_summary("记" * (policy.SUMMARY_MAX + 50))
     assert clamped.endswith("…")
-    assert len(clamped) == policy.MEMORY_MAX + 1
+    assert len(clamped) == policy.SUMMARY_MAX + 1
 
 
-def test_prompt_carries_memory_and_only_asks_for_it_when_overflowing() -> None:
+def test_prompt_carries_summary_and_only_asks_for_it_when_overflowing() -> None:
     sections = [{"key": "report", "label": "最近诊断", "href": "/report", "lines": ["x"]}]
 
     without = policy.build_user_prompt(sections, [], "我先补什么")
-    assert f"【早期对话摘要】{policy.MEMORY_NONE}" in without
-    assert policy.MEMORY_TASK[False] in without
-    assert policy.MEMORY_TASK[True] not in without
+    assert f"【早期对话摘要】{policy.SUMMARY_NONE}" in without
+    assert policy.SUMMARY_TASK[False] in without
+    assert policy.SUMMARY_TASK[True] not in without
 
-    with_memory = policy.build_user_prompt(
-        sections, [], "那缓存呢", memory="用户目标是 AI 应用工程师，已建议先补部署。", compact=True
+    with_summary = policy.build_user_prompt(
+        sections, [], "那缓存呢", summary="用户目标是 AI 应用工程师，已建议先补部署。", compact=True
     )
-    assert "【早期对话摘要】用户目标是 AI 应用工程师，已建议先补部署。" in with_memory
-    assert policy.MEMORY_TASK[True] in with_memory
+    assert "【早期对话摘要】用户目标是 AI 应用工程师，已建议先补部署。" in with_summary
+    assert policy.SUMMARY_TASK[True] in with_summary
 
 
-def test_memory_is_never_a_citation_source() -> None:
+def test_summary_is_never_a_citation_source() -> None:
     """记忆里出现的 href 不能当引用：白名单只由档案段构成，记忆是模型自己写的话。"""
     sections = [{"key": "report", "label": "最近诊断", "href": "/report", "lines": ["x"]}]
     draft = policy.TaifuDraftReply.model_validate(
-        {"reply": "好。", "citations": ["/history"], "memory": "上次提到 /history 里的均分"}
+        {"reply": "好。", "citations": ["/history"], "summary": "上次提到 /history 里的均分"}
     )
 
     payload = policy.sanitize_reply(draft, sections)
@@ -363,7 +363,7 @@ def test_memory_is_never_a_citation_source() -> None:
     assert payload["dropped_citations"] == 1
 
 
-def test_short_thread_does_not_store_memory(
+def test_short_thread_does_not_store_summary(
     client: TestClient, patch_ai: Any, profile_factory: Any
 ) -> None:
     repository.insert_profile(profile_factory())
@@ -371,16 +371,16 @@ def test_short_thread_does_not_store_memory(
         lambda _model_cls, _user: {
             "reply": "好。",
             "citations": [],
-            "memory": "用户在问先补什么，已建议先补部署与推理。",
+            "summary": "用户在问先补什么，已建议先补部署与推理。",
         }
     )
 
     client.post("/api/taifu/chat", json={"question": "我先补什么"})
 
-    assert repository.get_taifu_memory() == ""
+    assert repository.get_taifu_summary() == ""
 
 
-def test_overflowing_thread_stores_and_feeds_back_memory(
+def test_overflowing_thread_stores_and_feeds_back_summary(
     client: TestClient, patch_ai: Any, profile_factory: Any
 ) -> None:
     repository.insert_profile(profile_factory())
@@ -396,25 +396,25 @@ def test_overflowing_thread_stores_and_feeds_back_memory(
         return {
             "reply": "接着上次讲缓存。",
             "citations": [],
-            "memory": "用户目标是 AI 应用工程师，先后问过先补什么与缓存一致性。",
+            "summary": "用户目标是 AI 应用工程师，先后问过先补什么与缓存一致性。",
         }
 
     patch_ai(_responder)
     first = client.post("/api/taifu/chat", json={"question": "缓存呢"})
 
     assert first.status_code == 200
-    assert first.json()["memory_used"] is False  # 这一轮还只有旧对话，没有记忆
-    assert policy.MEMORY_TASK[True] in seen["prompt"]
-    stored = repository.get_taifu_memory()
+    assert first.json()["summary_used"] is False  # 这一轮还只有旧对话，没有记忆
+    assert policy.SUMMARY_TASK[True] in seen["prompt"]
+    stored = repository.get_taifu_summary()
     assert stored.startswith("用户目标是 AI 应用工程师")
 
     # 下一轮：上一轮存下的记忆进提示词，且继续滚动更新（摘要每轮由模型重写）。
     second = client.post("/api/taifu/chat", json={"question": "那 Redis 呢"})
-    assert second.json()["memory_used"] is True
+    assert second.json()["summary_used"] is True
     assert f"【早期对话摘要】{stored}" in seen["prompt"]
 
 
-def test_empty_answer_neither_stores_memory_nor_messages(
+def test_empty_answer_neither_stores_summary_nor_messages(
     client: TestClient, patch_ai: Any, profile_factory: Any
 ) -> None:
     repository.insert_profile(profile_factory())
@@ -425,7 +425,7 @@ def test_empty_answer_neither_stores_memory_nor_messages(
         lambda _model_cls, _user: {
             "reply": "   ",
             "citations": [],
-            "memory": "这段记忆不该被写进去，因为本轮根本没有回答。",
+            "summary": "这段记忆不该被写进去，因为本轮根本没有回答。",
         }
     )
 
@@ -433,17 +433,195 @@ def test_empty_answer_neither_stores_memory_nor_messages(
     response = client.post("/api/taifu/chat", json={"question": "缓存呢"})
 
     assert response.json()["reply"] == ""
-    assert repository.get_taifu_memory() == ""
+    assert repository.get_taifu_summary() == ""
     assert len(repository.list_taifu_messages(limit=50)) == before
 
 
-def test_clearing_thread_also_clears_memory(
+def test_clearing_thread_also_clears_summary(
     client: TestClient, patch_ai: Any, profile_factory: Any
 ) -> None:
     repository.insert_profile(profile_factory())
-    repository.save_taifu_memory("用户目标是 AI 应用工程师。")
+    repository.save_taifu_summary("用户目标是 AI 应用工程师。")
 
     client.delete("/api/taifu/thread")
 
     # 不清记忆的话，清空后第一问的提示词里还挂着上一段对话的要点。
-    assert repository.get_taifu_memory() == ""
+    assert repository.get_taifu_summary() == ""
+
+
+# === r81 长期记忆（跨对话，可查看可忘掉） =======================================
+
+
+def test_sanitize_memories_clamps_dedupes_and_caps_per_turn() -> None:
+    existing = ["只能周末学习"]
+    kept = policy.sanitize_memories(
+        [
+            "只能周末学习",                       # 与已有完全相同
+            "用户只能周末学习，工作日要上班",        # 与已有互相包含 → 同一件事
+            "已排除算法岗",                        # 保留
+            "已排除算法岗方向",                     # 与同批互相包含 → 丢掉
+            "更想留在杭州",                        # 保留
+            "第三条不该进来",                       # 超过每轮上限
+        ],
+        existing,
+    )
+
+    assert kept == ["已排除算法岗", "更想留在杭州"]
+
+
+def test_sanitize_memories_rejects_too_short_and_clamps_long() -> None:
+    assert policy.sanitize_memories(["好的", "是的"], []) == []
+
+    long_item = "记" * (policy.MEMORY_ITEM_MAX + 30)
+    kept = policy.sanitize_memories([long_item], [])
+    assert len(kept) == 1
+    assert kept[0].endswith("…")
+    assert len(kept[0]) == policy.MEMORY_ITEM_MAX + 1
+
+
+def test_prompt_carries_long_term_memories_as_a_numbered_list() -> None:
+    sections = [{"key": "report", "label": "最近诊断", "href": "/report", "lines": ["x"]}]
+
+    prompt = policy.build_user_prompt(sections, [], "我先补什么", memories=["只能周末学习", "已排除算法岗"])
+
+    assert "【长期记忆】（用户口头说过、档案里没有的背景与偏好；不是依据，不能当引用出处）" in prompt
+    assert "1. 只能周末学习" in prompt
+    assert "2. 已排除算法岗" in prompt
+    assert policy.MEMORY_TASK in prompt
+    # 没有记忆时给固定占位，不留空段头（否则模型会以为「有记忆但没读到」）。
+    assert f"\n{policy.MEMORIES_NONE}\n" in policy.build_user_prompt(sections, [], "我先补什么")
+
+
+def test_memories_are_never_a_citation_source() -> None:
+    """长期记忆里的 href 同样不能当引用：白名单只由档案段构成。"""
+    sections = [{"key": "report", "label": "最近诊断", "href": "/report", "lines": ["x"]}]
+    draft = policy.TaifuDraftReply.model_validate(
+        {
+            "reply": "好。",
+            "citations": ["/history"],
+            "summary": "上次提到 /history 里的均分",
+            "memories": ["用户看过 /history"],
+        }
+    )
+
+    payload = policy.sanitize_reply(draft, sections)
+
+    assert payload["citations"] == []
+    assert payload["dropped_citations"] == 1
+
+
+def test_chat_stores_long_term_memory_even_on_a_short_thread(
+    client: TestClient, patch_ai: Any, profile_factory: Any
+) -> None:
+    """长期记忆与线程长度无关：第一轮说了「只能周末学习」就该记住。"""
+    repository.insert_profile(profile_factory())
+    patch_ai(
+        lambda _model_cls, _user: {
+            "reply": "那就按周末排。",
+            "citations": [],
+            "memories": ["只能周末学习，工作日要上班"],
+        }
+    )
+
+    body = client.post("/api/taifu/chat", json={"question": "我只有周末有空"}).json()
+
+    assert body["memories_added"] == 1
+    stored = client.get("/api/taifu/memories").json()["items"]
+    assert [item["content"] for item in stored] == ["只能周末学习，工作日要上班"]
+
+
+def test_next_turn_carries_memories_into_the_prompt(
+    client: TestClient, patch_ai: Any, profile_factory: Any
+) -> None:
+    repository.insert_profile(profile_factory())
+    repository.insert_taifu_memory("只能周末学习，工作日要上班")
+    seen: dict[str, str] = {}
+
+    def _responder(_model_cls: type[Any], user_prompt: str) -> dict[str, Any]:
+        seen["prompt"] = user_prompt
+        return {"reply": "按周末排。", "citations": []}
+
+    patch_ai(_responder)
+    body = client.post("/api/taifu/chat", json={"question": "那我这周怎么排"}).json()
+
+    assert body["memories_used"] == 1
+    assert "1. 只能周末学习，工作日要上班" in seen["prompt"]
+
+
+def test_duplicate_memory_is_not_stored_twice(
+    client: TestClient, patch_ai: Any, profile_factory: Any
+) -> None:
+    repository.insert_profile(profile_factory())
+    repository.insert_taifu_memory("只能周末学习")
+    patch_ai(
+        lambda _model_cls, _user: {
+            "reply": "好。",
+            "citations": [],
+            "memories": ["只能周末学习"],
+        }
+    )
+
+    body = client.post("/api/taifu/chat", json={"question": "再说一次：我只能周末"}).json()
+
+    assert body["memories_added"] == 0
+    assert len(client.get("/api/taifu/memories").json()["items"]) == 1
+
+
+def test_memory_list_is_capped_and_drops_the_oldest(
+    client: TestClient, patch_ai: Any, profile_factory: Any
+) -> None:
+    for index in range(repository.TAIFU_MEMORY_LIMIT + 3):
+        repository.insert_taifu_memory(f"第 {index} 条记忆")
+
+    items = client.get("/api/taifu/memories").json()["items"]
+    assert len(items) == repository.TAIFU_MEMORY_LIMIT
+    assert items[0]["content"] == "第 3 条记忆"  # 最旧的三条被淘汰
+
+
+def test_forget_one_memory_keeps_the_rest(
+    client: TestClient, patch_ai: Any, profile_factory: Any
+) -> None:
+    first = repository.insert_taifu_memory("只能周末学习")
+    repository.insert_taifu_memory("已排除算法岗")
+
+    assert client.delete(f"/api/taifu/memories/{first['id']}").json()["deleted"] == 1
+    assert [item["content"] for item in client.get("/api/taifu/memories").json()["items"]] == [
+        "已排除算法岗"
+    ]
+    # 重复删同一条：0，不报错（幂等，界面点两次也不会炸）。
+    assert client.delete(f"/api/taifu/memories/{first['id']}").json()["deleted"] == 0
+
+
+def test_forget_all_memories_keeps_thread(
+    client: TestClient, patch_ai: Any, profile_factory: Any
+) -> None:
+    repository.insert_profile(profile_factory())
+    patch_ai(lambda _model_cls, _user: {"reply": "好。", "citations": []})
+    client.post("/api/taifu/chat", json={"question": "在吗"})
+    repository.insert_taifu_memory("只能周末学习")
+
+    assert client.delete("/api/taifu/memories").json()["deleted"] == 1
+    assert client.get("/api/taifu/memories").json()["items"] == []
+    assert len(client.get("/api/taifu/thread").json()["messages"]) == 2
+
+
+def test_memory_is_isolated_per_account(client: TestClient, tmp_db: Any) -> None:
+    mine = repository.insert_taifu_memory("只能周末学习")
+
+    context.set_current_user_id("someone-else")
+    try:
+        assert repository.list_taifu_memories() == []
+        # 拿到本账号的 id 也删不掉：删除条件是 id + user_id 双条件。
+        assert repository.delete_taifu_memory(mine["id"]) == 0
+    finally:
+        context.reset_current_user_id()
+
+    assert len(repository.list_taifu_memories()) == 1
+
+
+def test_memories_require_login(tmp_db: Any) -> None:
+    from app.main import app
+
+    with TestClient(app) as anonymous:
+        assert anonymous.get("/api/taifu/memories").status_code == 401
+        assert anonymous.delete("/api/taifu/memories").status_code == 401

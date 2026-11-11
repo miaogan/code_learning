@@ -24,11 +24,18 @@ CITATION_LIMIT = 4
 #: 进提示词的最近消息条数（3 轮问答）。
 HISTORY_LIMIT = 6
 HISTORY_ITEM_MAX = 300
-#: 线程记忆上限：只写结论与已确认背景，长过这个数就不是「摘要」而是又一段对话。
-MEMORY_MAX = 240
-#: 记忆有效下限：模型常回「无」「（无）」「N/A」这类占位，短于 4 字一律当作没给（不清空旧记忆）。
+#: 线程摘要上限：只写结论与已确认背景，长过这个数就不是「摘要」而是又一段对话。
+#: （r81 起统一叫 summary：r80 的 `memory` 与长期记忆的 `memories` 只差一个字母，模型极易搞混形状。）
+SUMMARY_MAX = 240
+#: 摘要有效下限：模型常回「无」「（无）」「N/A」这类占位，短于 4 字一律当作没给（不清空旧摘要）。
 #: 别再调高：中文摘要一行十几个字就够用，阈值定高了会把合法短摘要一起丢掉。
-MEMORY_MIN = 4
+SUMMARY_MIN = 4
+#: 单条长期记忆上限：一句话说得清的事实，不是一段自述。
+MEMORY_ITEM_MAX = 80
+#: 单条长期记忆下限：太短的（「好的」「是的」）没有信息量，不记。
+MEMORY_ITEM_MIN = 6
+#: 每轮最多新增长期记忆条数：一次说十件事是自述，不是对话。
+MEMORY_ITEMS_PER_TURN = 2
 
 EMPTY_QUESTION_NOTICE = "先写下你想问的问题，比如「我最近一次测评为什么掉分」。"
 EMPTY_BRIEF_NOTICE = (
@@ -68,22 +75,32 @@ TAIFU_SYSTEM = """你是「太傅」，逃跑计划的跃迁参谋，服务对�
 3. 信息不足时直接说明「你的记录里还没有 X」，并指出补哪一步能让这个问题变得可答。
 4. 不承诺求职结果，不把模拟测评说成工作经历，不编造项目指标。
 5. 【当前页面】只用于理解「这里 / 这条」这类指代；不要因为用户在这一页就编造该页没有的数据。
-6. 【早期对话摘要】是你自己在前几轮写下的记忆：只用来理解「上次说的那个」，**不是依据**，也不能从里面挑引用。有冲突时以【档案】为准。
-7. 只输出一个 JSON 对象：{"reply": "回答正文", "citations": ["/report"], "memory": "早期对话摘要"}，不要代码围栏，不要额外解释。"""
+6. 【早期对话摘要】是你自己在前几轮写下的记忆：只用来理解「上次说的那个」，**不是依据**，也不能从里面挑引用。
+7. 【长期记忆】是用户此前明确说过的背景与偏好：用来知道「他是谁」，同样**不是依据**；与【档案】冲突时以【档案】为准。
+8. 只输出一个 JSON 对象：{"reply": "回答正文", "citations": ["/report"], "summary": "早期对话摘要", "memories": ["值得长期记住的新事实"]}，不要代码围栏，不要额外解释。"""
 
-MEMORY_NONE = "（无：这是本次线程的开头，或对话还短到不需要压缩）"
-MEMORY_TASK = {
+SUMMARY_NONE = "（无：这是本次线程的开头，或对话还短到不需要压缩）"
+SUMMARY_TASK = {
     True: (
-        "另外：把【早期对话摘要】与【最近对话】里这一轮的内容合并，用 memory 字段输出更新后的摘要"
-        f"（不超过 {MEMORY_MAX} 字，只保留用户已确认的背景与已经给过的结论，不写链接、不写客套话）。"
+        "另外：把【早期对话摘要】与【最近对话】里这一轮的内容合并，用 summary 字段输出更新后的摘要"
+        f"（不超过 {SUMMARY_MAX} 字，只保留用户已确认的背景与已经给过的结论，不写链接、不写客套话）。"
     ),
-    False: "本轮不需要压缩摘要：memory 字段给空字符串。",
+    False: "本轮不需要压缩摘要：summary 字段给空字符串。",
 }
+
+MEMORIES_NONE = "（无）"
+MEMORY_TASK = (
+    "长期记忆：只有当用户这一轮**明确说出一条跨对话仍然成立、且【档案】与【长期记忆】里都没有的**事实或偏好时"
+    f"（例如「只能周末学习」「已排除算法岗」「更想留在杭州」），才用 memories 字段输出，每条不超过 {MEMORY_ITEM_MAX} 字，"
+    f"最多 {MEMORY_ITEMS_PER_TURN} 条；这一轮问了什么、你的建议都不算长期记忆。没有就给空数组。"
+)
 
 USER_PROMPT_TEMPLATE = """【档案】
 {materials}
 
-【早期对话摘要】{memory}
+【长期记忆】（用户口头说过、档案里没有的背景与偏好；不是依据，不能当引用出处）
+{memories}
+【早期对话摘要】{summary}
 【当前页面】{page}
 
 【最近对话】
@@ -92,7 +109,8 @@ USER_PROMPT_TEMPLATE = """【档案】
 【问题】{question}
 
 {memory_task}
-请输出 JSON：{{"reply": "中文回答，允许换行分段", "citations": ["档案里出现过的 href"], "memory": ""}}。
+{summary_task}
+请输出 JSON：{{"reply": "中文回答，允许换行分段", "citations": ["档案里出现过的 href"], "summary": "", "memories": []}}。
 约束：citations 最多 4 条且必须逐字来自【档案】；没有可引用的内容时给空数组。"""
 
 NO_HISTORY = "（这是本轮对话的第一句）"
@@ -101,13 +119,15 @@ NO_HISTORY = "（这是本轮对话的第一句）"
 class TaifuDraftReply(BaseModel):
     """模型输出（**未校验**）：`citations` 必须再过白名单才允许进响应。
 
-    `memory` 是 r80 的线程记忆（模型顺带输出的早期对话压缩）；
-    同样要过 `sanitize_memory` 才可能落库，且**永不进引用白名单**。
+    - `summary`：r80 的线程摘要（早期对话压缩，滚动重写）；
+    - `memories`：r81 的长期记忆候选（跨对话的事实与偏好，去重后才可能落库）。
+    两者都**永不进引用白名单** —— 它们都是模型自己写的话，不是站内记录。
     """
 
     reply: str = ""
     citations: list[Any] = Field(default_factory=list)
-    memory: str = ""
+    summary: str = ""
+    memories: list[Any] = Field(default_factory=list)
 
 
 def flatten(text: Any) -> str:
@@ -156,18 +176,61 @@ def _history_line(message: dict[str, Any]) -> str:
     return f"{speaker}：{flatten(message.get('content'))[:HISTORY_ITEM_MAX]}"
 
 
-def sanitize_memory(raw: Any) -> str:
-    """线程记忆净化：压成**单行**、截到 `MEMORY_MAX`；短于 `MEMORY_MIN` 视为没给。
+def sanitize_summary(raw: Any) -> str:
+    """线程摘要净化：压成**单行**、截到 `SUMMARY_MAX`；短于 `SUMMARY_MIN` 视为没给。
 
     单行是硬要求：摘要会作为提示词里的一个 `【段】` 出现，多行会把后面的段头挤散。
-    返回空串表示「本轮不更新记忆」，调用方据此**保留旧记忆**（不能拿空串覆盖）。
+    返回空串表示「本轮不更新摘要」，调用方据此**保留旧摘要**（不能拿空串覆盖）。
     """
     flat = flatten(raw)
-    if len(flat) < MEMORY_MIN:
+    if len(flat) < SUMMARY_MIN:
         return ""
-    if len(flat) <= MEMORY_MAX:
+    if len(flat) <= SUMMARY_MAX:
         return flat
-    return flat[:MEMORY_MAX].rstrip() + "…"
+    return flat[:SUMMARY_MAX].rstrip() + "…"
+
+
+def _memory_key(text: str) -> str:
+    """长期记忆的比较键：只留中文与字母数字，去空格与标点，ASCII 不区分大小写。
+
+    只用来判「是不是同一件事」，不追求语义相似（没有 embedding，也不想为此引依赖）。
+    """
+    return re.sub(r"[^0-9a-zA-Z\u4e00-\u9fff]", "", text).lower()
+
+
+def sanitize_memories(raw: list[Any], existing: list[str]) -> list[str]:
+    """长期记忆候选净化：压单行 → 长度夹取 → 与已有/同批去重 → 每轮最多 `MEMORY_ITEMS_PER_TURN` 条。
+
+    去重口径是「**互相包含即同一件事**」：「只能周末学习」与「用户只能周末学习，工作日要上班」
+    记一条就够，再记一条只会让后面的条目挤掉别的。宁可少记，不要记重。
+    """
+    keys = [key for key in (_memory_key(item) for item in existing) if key]
+    kept: list[str] = []
+    kept_keys: list[str] = []
+    for value in raw:
+        text = flatten(value)
+        if len(text) < MEMORY_ITEM_MIN:
+            continue
+        if len(text) > MEMORY_ITEM_MAX:
+            text = text[:MEMORY_ITEM_MAX].rstrip() + "…"
+        key = _memory_key(text)
+        if not key:
+            continue
+        if any(key == old or key in old or old in key for old in keys):
+            continue
+        if any(key == new or key in new or new in key for new in kept_keys):
+            continue
+        kept.append(text)
+        kept_keys.append(key)
+        if len(kept) >= MEMORY_ITEMS_PER_TURN:
+            break
+    return kept
+
+
+def render_memories(contents: list[str]) -> str:
+    """把长期记忆渲染成提示词里的编号清单；空列表给固定占位（不留空段头）。"""
+    lines = [f"{index}. {flatten(text)}" for index, text in enumerate(contents, start=1)]
+    return "\n".join(lines) or MEMORIES_NONE
 
 
 def build_user_prompt(
@@ -176,14 +239,14 @@ def build_user_prompt(
     question: str,
     page: dict[str, str] | None = None,
     *,
-    memory: str = "",
+    summary: str = "",
+    memories: list[str] | None = None,
     compact: bool = False,
 ) -> str:
-    """拼用户消息：档案逐段编号 + 段 href + 行，后接线程记忆、当前页面、最近对话与本次问题。
+    """拼用户消息：档案逐段编号 + 段 href + 行，后接长期记忆、线程摘要、当前页面与本次问题。
 
-    `page` 只用于消解「这里 / 这条」这类指代，**不是**依据：它不进引用白名单。
-    `memory` 同理 —— 它是模型自己写的对话记忆，不是站内记录，永远不进白名单。
-    `compact=True` 时才要求模型回写记忆：窗口还没溢出时压摘要既无信息量、又白占篇幅。
+    `page` / `summary` / `memories` 都只用于**理解**，**不是**依据：三者都不进引用白名单。
+    `compact=True` 时才要求模型回写摘要：窗口还没溢出时压摘要既无信息量、又白占篇幅。
     """
     blocks: list[str] = []
     for index, section in enumerate(sections, start=1):
@@ -199,11 +262,13 @@ def build_user_prompt(
     )
     return USER_PROMPT_TEMPLATE.format(
         materials=rendered_materials,
-        memory=flatten(memory) or MEMORY_NONE,
+        memories=render_memories(list(memories or [])),
+        summary=flatten(summary) or SUMMARY_NONE,
         page=page_line,
         history=rendered_history,
         question=flatten(question),
-        memory_task=MEMORY_TASK[compact],
+        memory_task=MEMORY_TASK,
+        summary_task=SUMMARY_TASK[compact],
     )
 
 

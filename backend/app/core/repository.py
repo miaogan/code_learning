@@ -1695,10 +1695,11 @@ def list_taifu_messages(limit: int = 20) -> list[dict[str, Any]]:
 
 
 def delete_taifu_messages() -> int:
-    """清空本账号对话（含 r80 线程记忆），返回删除条数（业务数据一律不动）。
+    """清空本账号对话（含 r80 线程摘要），返回删除条数（业务数据一律不动）。
 
-    记忆必须一起清：否则清空后再问，提示词里还挂着上一段对话的摘要 ——
+    摘要必须一起清：否则清空后再问，提示词里还挂着上一段对话的要点 ——
     用户看到的是「空对话」，模型看到的不是。
+    **r81 长期记忆不清**：那是「你是谁」，不是「这次聊了什么」（见 `delete_taifu_memories`）。
     """
     with connection() as conn:
         cursor = conn.execute("DELETE FROM taifu_messages WHERE user_id = ?", (_uid(),))
@@ -1706,8 +1707,8 @@ def delete_taifu_messages() -> int:
         return max(cursor.rowcount, 0)
 
 
-def get_taifu_memory() -> str:
-    """本账号的线程记忆（被窗口挤出后压缩过的早期对话要点）；没有则空串。"""
+def get_taifu_summary() -> str:
+    """本账号的线程摘要（被窗口挤出后压缩过的早期对话要点）；没有则空串。"""
     with connection() as conn:
         row = conn.execute(
             "SELECT memory FROM taifu_threads WHERE user_id = ?", (_uid(),)
@@ -1715,15 +1716,81 @@ def get_taifu_memory() -> str:
     return str(row["memory"]) if row is not None else ""
 
 
-def save_taifu_memory(memory: str) -> None:
-    """写入/覆盖线程记忆（单行 upsert）。空串由调用方拦截，不在这里猜。"""
+def save_taifu_summary(summary: str) -> None:
+    """写入/覆盖线程摘要（单行 upsert）。空串由调用方拦截，不在这里猜。"""
     with connection() as conn:
         conn.execute(
             "INSERT INTO taifu_threads (user_id, memory, updated_at) VALUES (?, ?, ?) "
             "ON CONFLICT(user_id) DO UPDATE SET memory = excluded.memory, "
             "updated_at = excluded.updated_at",
-            (_uid(), memory, _now()),
+            (_uid(), summary, _now()),
         )
+
+
+# --- 太傅长期记忆（r81）-------------------------------------------------------
+#
+# 多条、跨对话：记录「用户口头说过、档案里没有」的稳定事实与偏好。
+# 去重与条数上限的判定在 `services/taifu/policy.py`（纯函数、可单测），
+# 这里只负责读写；`TAIFU_MEMORY_LIMIT` 是**存储层**硬护栏，防止调用方忘了裁剪。
+
+
+#: 单账号长期记忆上限：再多就不是「记住要点」而是又一份档案，提示词也会被它撑满。
+TAIFU_MEMORY_LIMIT = 20
+
+
+def _taifu_memory_of(row: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "id": row["id"],
+        "content": str(row["content"]),
+        "created_at": str(row["created_at"]),
+    }
+
+
+def list_taifu_memories(limit: int = TAIFU_MEMORY_LIMIT) -> list[dict[str, Any]]:
+    """本账号的长期记忆，按写入时间**升序**（先记的在前，读起来像一条时间线）。"""
+    with connection() as conn:
+        rows = conn.execute(
+            "SELECT id, content, created_at FROM taifu_memories "
+            "WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT ?",
+            (_uid(), max(0, int(limit))),
+        ).fetchall()
+    return [_taifu_memory_of(row) for row in reversed(rows)]
+
+
+def insert_taifu_memory(content: str) -> dict[str, Any]:
+    """追加一条长期记忆并裁剪到 `TAIFU_MEMORY_LIMIT`（淘汰最旧），返回写入行。"""
+    memory_id = str(uuid.uuid4())
+    stamp = _now()
+    with connection() as conn:
+        conn.execute(
+            "INSERT INTO taifu_memories (id, user_id, content, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (memory_id, _uid(), content, stamp, stamp),
+        )
+        conn.execute(
+            "DELETE FROM taifu_memories WHERE user_id = ? AND id NOT IN ("
+            "  SELECT id FROM taifu_memories WHERE user_id = ?"
+            "  ORDER BY created_at DESC, id DESC LIMIT ?"
+            ")",
+            (_uid(), _uid(), TAIFU_MEMORY_LIMIT),
+        )
+    return {"id": memory_id, "content": content, "created_at": stamp}
+
+
+def delete_taifu_memory(memory_id: str) -> int:
+    """删掉一条长期记忆（按 id + 账号双条件，不能删别人的）。"""
+    with connection() as conn:
+        cursor = conn.execute(
+            "DELETE FROM taifu_memories WHERE id = ? AND user_id = ?", (memory_id, _uid())
+        )
+        return max(cursor.rowcount, 0)
+
+
+def delete_taifu_memories() -> int:
+    """忘掉全部长期记忆，返回删除条数（对话与业务数据都不动）。"""
+    with connection() as conn:
+        cursor = conn.execute("DELETE FROM taifu_memories WHERE user_id = ?", (_uid(),))
+        return max(cursor.rowcount, 0)
 
 
 # --- radar（r67 技术雷达：清单 / 快照 / 评估 / 采集轮次 / 生成任务）----------

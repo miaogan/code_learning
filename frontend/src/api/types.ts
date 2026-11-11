@@ -1129,9 +1129,31 @@ export interface TaifuReply {
   materials_used: number
   /** 模型给出但不在白名单、被服务端丢弃的引用条数。 */
   dropped_citations: number
+  /** 本轮提示词是否带了线程摘要（r80）：可观测标记，界面不展示。 */
+  summary_used: boolean
+  /** 本轮提示词带了几条长期记忆（r81）。 */
+  memories_used: number
+  /** 本轮新记住几条（r81）：界面只据此提示，具体内容在记忆列表里看。 */
+  memories_added: number
   /** 空档案 / 空回答 / 空问句时的中文说明；正常回答为空串。 */
   notice: string
   created_at: string
+}
+
+/** 一条长期记忆：用户口头说过、档案里没有的稳定事实或偏好（跨对话有效，可单独忘掉）。 */
+export interface TaifuMemoryItem {
+  id: string
+  content: string
+  created_at: string
+}
+
+export interface TaifuMemories {
+  items: TaifuMemoryItem[]
+}
+
+export interface TaifuMemoryResult {
+  /** 0 表示 id 不存在或不属于本账号（幂等：重复删不报错）。 */
+  deleted: number
 }
 
 export interface TaifuClearResult {

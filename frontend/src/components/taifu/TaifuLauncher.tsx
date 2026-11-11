@@ -8,7 +8,7 @@ import type {
 import { Link, useLocation } from 'react-router-dom'
 
 import { ApiError, api } from '../../api/client'
-import type { TaifuMessage } from '../../api/types'
+import type { TaifuMemoryItem, TaifuMessage } from '../../api/types'
 import {
   TAIFU_QUESTION_MAX,
   TAIFU_SAMPLES,
@@ -67,6 +67,13 @@ function errorText(error: unknown): string {
   return error instanceof ApiError ? error.message : '请求失败，请稍后重试'
 }
 
+/** 记忆入口的按钮文案：没读过时不报数字（不猜条数），读过才给准确值。 */
+function memoriesLabel(memories: TaifuMemoryItem[] | null): string {
+  if (memories === null) return '记忆'
+  if (memories.length === 0) return '记忆 · 空'
+  return `记忆 · ${memories.length} 条`
+}
+
 export interface TaifuLauncherProps {
   /** 当前登录账号：位置记忆与对话都按账号隔离，换账号不会复用上一个人的记录。 */
   userId: string
@@ -114,9 +121,20 @@ export function TaifuLauncher({ userId }: TaifuLauncherProps) {
   const [pending, setPending] = useState(false)
   const [sendError, setSendError] = useState('')
   const [notice, setNotice] = useState('')
-  const [meta, setMeta] = useState<{ materials: number; dropped: number } | null>(null)
+  const [meta, setMeta] = useState<{ materials: number; dropped: number; added: number } | null>(
+    null,
+  )
   const [clearArmed, setClearArmed] = useState(false)
   const [clearing, setClearing] = useState(false)
+  // r81 长期记忆：默认收起，展开时才读（与线程同一口径：收起态零请求）。
+  const [memories, setMemories] = useState<TaifuMemoryItem[] | null>(null)
+  const [memoriesStatus, setMemoriesStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>(
+    'idle',
+  )
+  const [memoriesError, setMemoriesError] = useState('')
+  const [memoriesOpen, setMemoriesOpen] = useState(false)
+  const [forgetArmed, setForgetArmed] = useState(false)
+  const [forgetting, setForgetting] = useState(false)
 
   const moveTo = useCallback(
     (next: TaifuPosition, persist: boolean) => {
@@ -208,13 +226,13 @@ export function TaifuLauncher({ userId }: TaifuLauncherProps) {
     return () => document.removeEventListener('pointerdown', closeOnOutside, true)
   }, [open])
 
-  // 新消息 / 等待态都把视图带到最底部：用户不该手动滚才能看到刚来的回答。
+  // 新消息 / 等待态 / 展开记忆都把视图带到最底部：用户不该手动滚才能看到刚来的内容。
   useEffect(() => {
     if (!open) return
     const body = bodyRef.current
     if (body === null) return
     body.scrollTop = body.scrollHeight
-  }, [open, thread.length, pending, notice, sendError])
+  }, [open, thread.length, pending, notice, sendError, memoriesOpen, memories?.length])
 
   const panelStyle = useMemo<CSSProperties | undefined>(() => {
     const layout = taifuPanelLayout(position, viewport.width, viewport.height)
@@ -245,8 +263,18 @@ export function TaifuLauncher({ userId }: TaifuLauncherProps) {
     setThread((current) => [...current, localMessage])
     try {
       const reply = await api.taifuChat(text, location.pathname)
-      setMeta({ materials: reply.materials_used, dropped: reply.dropped_citations })
+      setMeta({
+        materials: reply.materials_used,
+        dropped: reply.dropped_citations,
+        added: reply.memories_added,
+      })
       setNotice(reply.notice)
+      if (reply.memories_added > 0) {
+        // 记忆变了：丢掉缓存让计数重新读（展开态会立刻重拉，收起态等下次展开）。
+        // 不能让旧数组留在界面上充当「最新条数」。
+        setMemories(null)
+        setMemoriesStatus('idle')
+      }
       if (!reply.reply) {
         // 服务端没有可回答的内容（如空档案）时它不会落库，这里也必须收回问句，
         // 否则界面上会留下一条刷新即消失的「有问无答」。
@@ -273,6 +301,59 @@ export function TaifuLauncher({ userId }: TaifuLauncherProps) {
       setPending(false)
     }
   }, [location.pathname, pending, question])
+
+  const loadMemories = useCallback(async () => {
+    setMemoriesStatus('loading')
+    setMemoriesError('')
+    try {
+      const data = await api.taifuMemories()
+      setMemories(data.items)
+      setMemoriesStatus('ready')
+    } catch (error) {
+      setMemoriesError(errorText(error))
+      setMemoriesStatus('error')
+    }
+  }, [])
+
+  const forgetOne = useCallback(async (id: string) => {
+    setForgetting(true)
+    setMemoriesError('')
+    try {
+      await api.taifuForgetMemory(id)
+      setMemories((current) => (current === null ? current : current.filter((item) => item.id !== id)))
+    } catch (error) {
+      setMemoriesError(errorText(error))
+    } finally {
+      setForgetting(false)
+    }
+  }, [])
+
+  const forgetAll = useCallback(async () => {
+    if (!forgetArmed) {
+      setForgetArmed(true)
+      return
+    }
+    setForgetting(true)
+    setMemoriesError('')
+    try {
+      await api.taifuForgetAllMemories()
+      setMemories([])
+    } catch (error) {
+      setMemoriesError(errorText(error))
+    } finally {
+      setForgetting(false)
+      setForgetArmed(false)
+    }
+  }, [forgetArmed])
+
+  // 记忆展开时才读：收起态与「从没打开过记忆」都不发请求。
+  useEffect(() => {
+    if (!memoriesOpen) {
+      setForgetArmed(false)
+      return
+    }
+    if (memoriesStatus === 'idle') void loadMemories()
+  }, [memoriesOpen, memoriesStatus, loadMemories])
 
   const clearThread = useCallback(async () => {
     if (!clearArmed) {
@@ -522,6 +603,7 @@ export function TaifuLauncher({ userId }: TaifuLauncherProps) {
               <p className="sc-taifu-hint">
                 本次读取 {meta.materials} 段站内记录
                 {meta.dropped > 0 ? `，已丢弃 ${meta.dropped} 条无依据引用` : ''}
+                {meta.added > 0 ? `，记住 ${meta.added} 条新事实` : ''}
               </p>
             ) : null}
             {meta !== null && meta.materials === 0 ? (
@@ -531,6 +613,70 @@ export function TaifuLauncher({ userId }: TaifuLauncherProps) {
                 <Link to="/report">去看诊断报告</Link>
               </p>
             ) : null}
+
+            {/* r81：长期记忆必须可查看、可删除 —— 否则用户不知道太傅「记住了自己什么」。 */}
+            <div className="sc-taifu-memo">
+              <button
+                type="button"
+                className="sc-taifu-linkbtn"
+                aria-expanded={memoriesOpen}
+                onClick={() => setMemoriesOpen((value) => !value)}
+              >
+                {memoriesOpen ? '收起记忆' : memoriesLabel(memories)}
+              </button>
+              {memoriesOpen ? (
+                memoriesStatus === 'loading' ? (
+                  <p className="sc-taifu-hint">正在读取记忆…</p>
+                ) : memoriesStatus === 'error' ? (
+                  <div className="sc-taifu-error" role="alert">
+                    <p>{memoriesError}</p>
+                    <button
+                      type="button"
+                      className="sc-taifu-textbtn"
+                      onClick={() => void loadMemories()}
+                    >
+                      重试
+                    </button>
+                  </div>
+                ) : memories !== null && memories.length === 0 ? (
+                  <p className="sc-taifu-hint">
+                    还没记住任何事。你明确说过的限制与偏好（例如「只有周末有空」）会被记住，
+                    跨对话有效，随时可以忘掉。
+                  </p>
+                ) : (
+                  <>
+                    <ul className="sc-taifu-memolist">
+                      {(memories ?? []).map((item) => (
+                        <li key={item.id}>
+                          <span className="sc-taifu-memotext">{item.content}</span>
+                          <button
+                            type="button"
+                            className="sc-taifu-linkbtn"
+                            onClick={() => void forgetOne(item.id)}
+                            disabled={forgetting}
+                          >
+                            忘掉
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                    <button
+                      type="button"
+                      className="sc-taifu-linkbtn"
+                      onClick={() => void forgetAll()}
+                      disabled={forgetting}
+                    >
+                      {forgetArmed ? '再点一次全部忘掉' : '全部忘掉'}
+                    </button>
+                  </>
+                )
+              ) : null}
+              {memoriesError && memoriesStatus === 'ready' ? (
+                <p className="sc-taifu-hint is-error" role="alert">
+                  {memoriesError}
+                </p>
+              ) : null}
+            </div>
           </div>
 
           <form className="sc-taifu-composer" onSubmit={submit}>

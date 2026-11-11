@@ -63,6 +63,8 @@ import type {
   ResumeVersionSummary,
   RunKind,
   TaifuClearResult,
+  TaifuMemories,
+  TaifuMemoryResult,
   TaifuReply,
   TaifuThread,
   TimelineEvent,
@@ -478,7 +480,23 @@ export const api = {
   taifuChat: (question: string, page = ''): Promise<TaifuReply> =>
     request<TaifuReply>('/api/taifu/chat', jsonInit('POST', { question, page })),
 
-  /** 清空对话（只删对话记录，不动画像 / 报告 / 测评 / 练习数据）。 */
+  /** 清空对话（只删对话记录，不动画像 / 报告 / 测评 / 练习数据与长期记忆）。 */
   taifuClear: (): Promise<TaifuClearResult> =>
     request<TaifuClearResult>('/api/taifu/thread', { method: 'DELETE' }),
+
+  /* ---------- r81 长期记忆（跨对话；用户可查看、可逐条忘掉） ---------- */
+
+  /** 查看太傅记住了什么：记忆必须可审计，用户才能决定要不要忘掉。 */
+  taifuMemories: (signal?: AbortSignal): Promise<TaifuMemories> =>
+    request<TaifuMemories>('/api/taifu/memories', { signal }),
+
+  /** 忘掉一条（幂等：删不存在的 id 返回 0，不报错）。 */
+  taifuForgetMemory: (id: string): Promise<TaifuMemoryResult> =>
+    request<TaifuMemoryResult>(`/api/taifu/memories/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    }),
+
+  /** 忘掉全部长期记忆（对话与业务数据都不动）。 */
+  taifuForgetAllMemories: (): Promise<TaifuMemoryResult> =>
+    request<TaifuMemoryResult>('/api/taifu/memories', { method: 'DELETE' }),
 }

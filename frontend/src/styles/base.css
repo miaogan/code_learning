@@ -10469,3 +10469,36 @@ a.sc-radar-name--link:hover .sc-radar-ext {
 .sc-weak-table tr.is-anchored .sc-weak-name {
   color: var(--text-primary);
 }
+
+/* ---------- r81 · 太傅长期记忆 ---------- */
+/* 记忆放在消息流末尾（随内容滚动），不挤输入框：面板高度固定，
+   在 footer 里展开一个列表会把输入框顶出可视区。
+   列表本身**不设**自己的滚动区：面板主体已经会滚，再套一层内滚动会让
+   「第 3 条被自己的滚动条藏住、『全部忘掉』被挤出面板」——两个滚动条比一个难用。 */
+.sc-taifu-memo {
+  margin: var(--sp-2) 0 0;
+  padding-top: var(--sp-2);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.sc-taifu-memolist {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  margin: var(--sp-2) 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sc-taifu-memolist li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+}
+
+.sc-taifu-memotext {
+  flex: 1;
+  color: var(--text-secondary);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-small);
+}

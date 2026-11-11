@@ -47,13 +47,20 @@ async def answer(
     client: AIClient,
 ) -> TaifuReply:
     """`sections` 必须是 `gather_sections()` 的产物（href 即白名单）；`page` 来自闭集白名单。"""
-    # 多取一条只为判断「有没有被窗口挤掉的消息」：溢出才需要压缩记忆。
+    # 多取一条只为判断「有没有被窗口挤掉的消息」：溢出才需要压缩摘要。
     recent = repository.list_taifu_messages(limit=policy.HISTORY_LIMIT + 1)
     overflow = len(recent) > policy.HISTORY_LIMIT
     history = recent[-policy.HISTORY_LIMIT:]
-    memory = repository.get_taifu_memory()
+    summary = repository.get_taifu_summary()
+    memories = repository.list_taifu_memories()
     prompt = policy.build_user_prompt(
-        sections, history, question, page, memory=memory, compact=overflow
+        sections,
+        history,
+        question,
+        page,
+        summary=summary,
+        memories=[item["content"] for item in memories],
+        compact=overflow,
     )
     draft = await client.complete_model(
         policy.TAIFU_SYSTEM,
@@ -62,7 +69,8 @@ async def answer(
         timeout_s=TAIFU_TIMEOUT_S,
     )
     payload = policy.sanitize_reply(draft, sections)
-    payload["memory_used"] = bool(memory)
+    payload["summary_used"] = bool(summary)
+    payload["memories_used"] = len(memories)
     if not payload["reply"]:
         # 没有回答就不写历史：避免下次打开时看到一串「有问无答」的对话。
         return TaifuReply(**payload)
@@ -74,10 +82,18 @@ async def answer(
         citations=payload["citations"],
     )
     payload["created_at"] = assistant_row["created_at"]
-    # 记忆与对话同批落库，且只在「窗口溢出」时更新：短线程不需要摘要，
-    # 模型给了也不存（否则提示词里会出现一条其实什么也没压缩的「记忆」）。
+    # 摘要与对话同批落库，且只在「窗口溢出」时更新：短线程不需要压缩，
+    # 模型给了也不存（否则提示词里会出现一条其实什么也没压缩的「摘要」）。
     if overflow:
-        next_memory = policy.sanitize_memory(draft.memory)
-        if next_memory:
-            repository.save_taifu_memory(next_memory)
+        next_summary = policy.sanitize_summary(draft.summary)
+        if next_summary:
+            repository.save_taifu_summary(next_summary)
+    # 长期记忆与摘要独立：不要求溢出、也不随清空对话消失。
+    # 去重在 policy 里做（与已有条目互相包含即视为同一件事），这里只写留下来的那几条。
+    new_memories = policy.sanitize_memories(
+        draft.memories, [item["content"] for item in memories]
+    )
+    for content in new_memories:
+        repository.insert_taifu_memory(content)
+    payload["memories_added"] = len(new_memories)
     return TaifuReply(**payload)

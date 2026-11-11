@@ -1307,11 +1307,33 @@ class TaifuReply(BaseModel):
     materials_used: int = 0
     #: 模型给出但不在白名单、被丢弃的引用条数（幻觉计数器）。
     dropped_citations: int = 0
-    #: 本轮提示词是否带了线程记忆（r80）：只作可观测标记，界面上不展示。
-    memory_used: bool = False
+    #: 本轮提示词是否带了线程摘要（r80）：可观测标记，界面不展示。
+    summary_used: bool = False
+    #: 本轮提示词带了几条长期记忆（r81）。
+    memories_used: int = 0
+    #: 本轮新记住几条（r81）：界面据此提示「已记住 N 条，可在记忆里查看或删除」。
+    memories_added: int = 0
     #: 空档案 / 空回答 / 空问句时的中文说明；正常回答时为空串。
     notice: str = ""
     created_at: str = ""
+
+
+class TaifuMemoryItem(BaseModel):
+    """一条长期记忆：用户口头说过、档案里没有的稳定事实或偏好（≤80 字）。"""
+
+    id: str
+    content: str
+    created_at: str
+
+
+class TaifuMemories(BaseModel):
+    items: list[TaifuMemoryItem] = Field(default_factory=list)
+
+
+class TaifuMemoryResult(BaseModel):
+    """删除长期记忆的结果：`deleted` 为 0 表示 id 不存在或不属于本账号。"""
+
+    deleted: int = 0
 
 
 class TaifuClearResult(BaseModel):

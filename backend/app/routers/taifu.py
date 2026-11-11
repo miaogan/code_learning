@@ -1,11 +1,11 @@
-"""r77 太傅端点：`POST /api/taifu/chat` / `GET /api/taifu/thread` / `DELETE /api/taifu/thread`。
+"""r77 太傅端点：`POST /api/taifu/chat` / `GET|DELETE /api/taifu/thread` / `GET|DELETE /api/taifu/memories`。
 
 分工：
 - 路由只做「空问句 / 空档案的零成本短路」与依赖装配；
 - 档案摘要、提示词、引用白名单、会话读写全在 `services/taifu/` 与 `core/repository.py`。
 
-**只读承诺**：本路由唯一的写操作是对话本身（`taifu_messages`），不碰画像 / 报告 /
-测评 / 练习 / 学习进度任何一张业务表。
+**只读承诺**：本路由唯一的写操作是太傅自己的三张表（`taifu_messages` / `taifu_threads` /
+`taifu_memories`），不碰画像 / 报告 / 测评 / 练习 / 学习进度任何一张业务表。
 """
 
 from typing import Annotated
@@ -14,7 +14,14 @@ from fastapi import APIRouter, Depends, Query
 
 from app.core import repository
 from app.deps import CurrentUser, current_user
-from app.schemas import TaifuChatRequest, TaifuClearResult, TaifuReply, TaifuThread
+from app.schemas import (
+    TaifuChatRequest,
+    TaifuClearResult,
+    TaifuMemories,
+    TaifuMemoryResult,
+    TaifuReply,
+    TaifuThread,
+)
 from app.services.ai import user_ai
 from app.services.taifu import policy, taifu
 
@@ -49,6 +56,24 @@ def read_thread(
     return TaifuThread(messages=repository.list_taifu_messages(limit=limit))
 
 
-@router.delete("/thread", response_model=TaifuClearResult, summary="清空太傅对话（不动业务数据）")
+@router.delete("/thread", response_model=TaifuClearResult, summary="清空太傅对话（不动业务数据与长期记忆）")
 def clear_thread() -> TaifuClearResult:
     return TaifuClearResult(deleted=repository.delete_taifu_messages())
+
+
+@router.get("/memories", response_model=TaifuMemories, summary="查看太傅记住的长期事实（可审计）")
+def list_memories() -> TaifuMemories:
+    # 记忆必须可查看：用户有权知道自己被「记住」了什么，才能决定要不要忘掉。
+    return TaifuMemories(items=repository.list_taifu_memories())
+
+
+@router.delete(
+    "/memories/{memory_id}", response_model=TaifuMemoryResult, summary="忘掉一条长期记忆"
+)
+def forget_memory(memory_id: str) -> TaifuMemoryResult:
+    return TaifuMemoryResult(deleted=repository.delete_taifu_memory(memory_id))
+
+
+@router.delete("/memories", response_model=TaifuMemoryResult, summary="忘掉全部长期记忆")
+def forget_all_memories() -> TaifuMemoryResult:
+    return TaifuMemoryResult(deleted=repository.delete_taifu_memories())

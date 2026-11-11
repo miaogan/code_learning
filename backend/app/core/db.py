@@ -389,15 +389,33 @@ R77_INDEXES = """
 CREATE INDEX IF NOT EXISTS idx_taifu_user_created ON taifu_messages (user_id, created_at);
 """
 
-#: r80 太傅线程记忆：一账号一行，存「被窗口挤出后压缩过的早期对话要点」。
-#: 与 `taifu_messages` 分开建表而不是加一列：记忆是**线程级**的，
+#: r80 太傅线程摘要：一账号一行，存「被窗口挤出后压缩过的早期对话要点」。
+#: 与 `taifu_messages` 分开建表而不是加一列：摘要**线程级**，
 #: 塞进某条消息会被线程渲染当对话读出来，也会随消息裁剪一起被删。
+#: （列名 `memory` 是 r80 的历史命名，r81 起代码里统一叫 summary —— 见 policy 注释。）
 R80_SCHEMA = """
 CREATE TABLE IF NOT EXISTS taifu_threads (
     user_id     TEXT PRIMARY KEY,
     memory      TEXT NOT NULL DEFAULT '',
     updated_at  TEXT NOT NULL
 );
+"""
+
+#: r81 太傅长期记忆：**多条**、跨对话，记录「用户口头说过、档案里没有」的稳定事实与偏好。
+#: 与 r80 的线程摘要分开：摘要是「这次聊了什么」，清空对话就该清；长期记忆是「你是谁」，
+#: 清空对话不碰它，只能由用户在记忆列表里逐条「忘掉」。
+R81_SCHEMA = """
+CREATE TABLE IF NOT EXISTS taifu_memories (
+    id          TEXT PRIMARY KEY,
+    user_id     TEXT NOT NULL DEFAULT 'default',
+    content     TEXT NOT NULL,
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL
+);
+"""
+
+R81_INDEXES = """
+CREATE INDEX IF NOT EXISTS idx_taifu_memories_user ON taifu_memories (user_id, created_at);
 """
 
 
@@ -518,7 +536,9 @@ def init_db() -> None:
         conn.executescript(R67_INDEXES)     # 16. r67 索引（含 jobs 的 active 唯一索引）
         conn.executescript(R77_SCHEMA)      # 17. r77 太傅对话表
         conn.executescript(R77_INDEXES)     # 18. r77 对话索引
-        conn.executescript(R80_SCHEMA)      # 19. r80 太傅线程记忆（单行）
+        conn.executescript(R80_SCHEMA)      # 19. r80 太傅线程摘要（单行）
+        conn.executescript(R81_SCHEMA)      # 20. r81 太傅长期记忆（多条）
+        conn.executescript(R81_INDEXES)     # 21. r81 长期记忆索引
 
 
 def _sweep_stale_radar_jobs(conn: sqlite3.Connection) -> None:
