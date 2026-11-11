@@ -4,6 +4,7 @@ import { AiKeyModal } from './components/ui/AiKeyModal'
 import { Button } from './components/ui/Button'
 import { Stepper, type StepItem, type StepState } from './components/ui/Stepper'
 import { ToolNav } from './components/ui/ToolNav'
+import { TaifuLauncher } from './components/taifu/TaifuLauncher'
 import EvalPage from './pages/EvalPage'
 import ExamPage from './pages/ExamPage'
 import GuozijianPage from './pages/GuozijianPage'
@@ -11,6 +12,7 @@ import HistoryPage from './pages/HistoryPage'
 import InterviewPage from './pages/InterviewPage'
 import LearnPage from './pages/LearnPage'
 import LoginPage from './pages/LoginPage'
+import NotFoundPage from './pages/NotFoundPage'
 import PioneerPage from './pages/PioneerPage'
 import PolishPage from './pages/PolishPage'
 import PracticePage from './pages/PracticePage'
@@ -180,10 +182,12 @@ export default function App() {
               <Route path="/learn" element={<LearnPage />} />
               <Route path="/learn/:chapterId" element={<TutorialPage />} />
               <Route path="/settings" element={<SettingsPage />} />
+              <Route path="*" element={<NotFoundPage />} />
             </Routes>
           </div>
         </main>
       </div>
+      <TaifuLauncher userId={me.id} />
     </>
   )
 }

@@ -10,6 +10,7 @@ import {
   foldWeakness,
   polishHref,
   roleGapLabel,
+  weaknessAnchorIndex,
   weaknessCountLabel,
   weaknessRateLabel,
   weaknessRatePercent,
@@ -62,6 +63,20 @@ describe('foldWeakness', () => {
     const items = makeItems(10)
     foldWeakness(items, false)
     expect(items).toHaveLength(10)
+  })
+})
+
+describe('weaknessAnchorIndex（太傅引用锚点）', () => {
+  it('认 `#weakness-<n>`，n 从 1 起', () => {
+    expect(weaknessAnchorIndex('#weakness-1')).toBe(1)
+    expect(weaknessAnchorIndex('#weakness-9')).toBe(9)
+    expect(weaknessAnchorIndex('#weakness-120')).toBe(120)
+  })
+
+  it('别的 hash 一律 null：不猜、不跳到第一行', () => {
+    for (const hash of ['', '#', '#practice', '#weakness', '#weakness-', '#weakness-x', '#weakness-0', '#weakness--1', '#weakness-1.5']) {
+      expect(weaknessAnchorIndex(hash), hash).toBeNull()
+    }
   })
 })
 

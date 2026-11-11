@@ -98,26 +98,36 @@ export default function HistoryPage() {
         </>
       ) : null}
 
-      {data !== null && total > 0 ? (
-        <>
-          <div className="sc-lab-filters">
-            <div className="sc-lab-filter-row">
-              <span className="sc-lab-filter-label">类型</span>
-              <div className="sc-lab-filter-body">
-                <MultiChipRow
-                  groupLabel="成绩类型筛选"
-                  options={KIND_OPTIONS}
-                  values={kindFilters}
-                  allValue="all"
-                  onChange={changeKinds}
-                />
-                <p className="sc-lab-filter-hint">
-                  可同时看面试与笔试；勾满两项会自动回到「全部」
-                </p>
-              </div>
+      {data !== null && (total > 0 || pickedKinds.length > 0) ? (
+        <div className="sc-lab-filters">
+          <div className="sc-lab-filter-row">
+            <span className="sc-lab-filter-label">类型</span>
+            <div className="sc-lab-filter-body">
+              <MultiChipRow
+                groupLabel="成绩类型筛选"
+                options={KIND_OPTIONS}
+                values={kindFilters}
+                allValue="all"
+                onChange={changeKinds}
+              />
+              <p className="sc-lab-filter-hint">
+                可同时看面试与笔试；勾满两项会自动回到「全部」
+              </p>
             </div>
           </div>
+        </div>
+      ) : null}
 
+      {data !== null && total === 0 && pickedKinds.length > 0 ? (
+        <EmptyState
+          reason={`「${pickedKinds.map((kind) => (kind === 'interview' ? '面试' : '笔试')).join('、')}」还没有已完成的记录`}
+          actionLabel="看全部记录"
+          onAction={() => changeKinds(['all'])}
+        />
+      ) : null}
+
+      {data !== null && total > 0 ? (
+        <>
           <p className="sc-meta-line">
             <span>{`共 ${total} 次`}</span>
             <span>{`面试 ${interviewCount} 次`}</span>

@@ -9931,3 +9931,541 @@ a.sc-radar-name--link:hover .sc-radar-ext {
   color: var(--text-tertiary);
   word-break: break-word;
 }
+
+/* ============================================================
+   r76 · 太傅悬浮入口（append-only）
+   印章 56 方印；位置由 TaifuLauncher 计算后写入 left/top。
+   层级 15 高于 topbar(10)，低于 Toast(20) 与 Modal(40)。
+   ============================================================ */
+.sc-taifu-fab {
+  position: fixed;
+  z-index: 15;
+  width: var(--sp-9);
+  height: var(--sp-9);
+  padding: 0;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-12);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-family: var(--font-serif);
+  font-size: var(--fs-page);
+  font-weight: 500;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  box-shadow: var(--elev-1);
+  transition: border-color var(--fast) var(--ease), color var(--fast) var(--ease);
+}
+
+.sc-taifu-fab::after {
+  content: '';
+  position: absolute;
+  inset: var(--sp-1);
+  border: 1px solid var(--accent-line-30);
+  border-radius: var(--radius-8);
+  pointer-events: none;
+}
+
+.sc-taifu-fab:hover {
+  border-color: var(--accent-hover);
+  color: var(--accent-soft);
+}
+
+.sc-taifu-fab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.sc-taifu-fab.is-dragging {
+  cursor: grabbing;
+  border-color: var(--accent-hover);
+}
+
+.sc-taifu-panel {
+  position: fixed;
+  z-index: 15;
+  width: var(--taifu-panel-w);
+  height: var(--taifu-panel-h);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-12);
+  background: var(--bg-surface);
+  box-shadow: var(--elev-2);
+  animation: sc-taifu-in var(--base) var(--ease);
+}
+
+.sc-taifu-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--bg-raised);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.sc-taifu-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.sc-taifu-seal {
+  position: relative;
+  width: var(--sp-7);
+  height: var(--sp-7);
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-8);
+  color: var(--text-primary);
+  font-family: var(--font-serif);
+  font-size: var(--fs-card);
+  line-height: 1;
+}
+
+.sc-taifu-seal::after {
+  content: '';
+  position: absolute;
+  inset: var(--sp-1);
+  border: 1px solid var(--accent-line-30);
+  border-radius: var(--radius-4);
+  pointer-events: none;
+}
+
+.sc-taifu-title {
+  margin: 0;
+  font-size: var(--fs-body);
+  line-height: var(--lh-small);
+  font-weight: 500;
+}
+
+.sc-taifu-sub {
+  margin: 0;
+  color: var(--text-tertiary);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+}
+
+.sc-taifu-badge {
+  margin-left: var(--sp-1);
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  color: var(--text-tertiary);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-small);
+  white-space: nowrap;
+}
+
+.sc-taifu-headactions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+}
+
+.sc-taifu-textbtn,
+.sc-taifu-close {
+  border: 0;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  border-radius: var(--radius-4);
+}
+
+.sc-taifu-textbtn {
+  padding: var(--sp-1) var(--sp-2);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+}
+
+.sc-taifu-close {
+  width: var(--sp-7);
+  height: var(--sp-7);
+  font-size: var(--fs-section);
+  line-height: 1;
+}
+
+.sc-taifu-textbtn:hover,
+.sc-taifu-close:hover {
+  color: var(--text-primary);
+  background: var(--overlay-06);
+}
+
+.sc-taifu-textbtn:focus-visible,
+.sc-taifu-close:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.sc-taifu-context {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-4);
+  border-bottom: 1px solid var(--border-hair);
+  color: var(--text-tertiary);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+}
+
+.sc-taifu-contextdot {
+  width: var(--sp-1);
+  height: var(--sp-1);
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.sc-taifu-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--sp-4);
+}
+
+.sc-taifu-bubble {
+  margin: 0;
+  padding: var(--sp-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-8);
+  background: var(--bg-inset);
+  color: var(--text-secondary);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+}
+
+.sc-taifu-label {
+  margin: var(--sp-5) 0 var(--sp-1);
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+}
+
+.sc-taifu-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sc-taifu-list li {
+  display: flex;
+  gap: var(--sp-3);
+  padding: var(--sp-3) 0;
+  border-bottom: 1px solid var(--border-hair);
+  color: var(--text-secondary);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+}
+
+.sc-taifu-list li span {
+  flex: none;
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: var(--fs-meta);
+}
+
+.sc-taifu-composer {
+  display: flex;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4) var(--sp-2);
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+}
+
+.sc-taifu-composer input {
+  flex: 1;
+  min-width: 0;
+  height: var(--btn-h-sm);
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-8);
+  background: var(--bg-inset);
+  color: var(--text-tertiary);
+  font-family: var(--font-sans);
+  font-size: var(--fs-meta);
+}
+
+.sc-taifu-composer button {
+  height: var(--btn-h-sm);
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-8);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-family: var(--font-sans);
+  font-size: var(--fs-meta);
+  font-weight: 600;
+}
+
+.sc-taifu-composer button:disabled,
+.sc-taifu-composer input:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.sc-taifu-foot {
+  margin: 0;
+  padding: 0 var(--sp-4) var(--sp-3);
+  color: var(--text-tertiary);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+}
+
+@keyframes sc-taifu-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--sp-2));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 640px) {
+  .sc-taifu-panel {
+    left: var(--sp-3);
+    right: var(--sp-3);
+    top: auto;
+    bottom: calc(var(--sp-3) + env(safe-area-inset-bottom));
+    width: auto;
+    height: min(72dvh, var(--taifu-panel-h));
+    max-height: calc(100dvh - var(--topbar-h) - var(--sp-6));
+  }
+
+  .sc-taifu-badge {
+    display: none;
+  }
+
+  /* 底部面板几乎盖满宽度，印章只会在右缘露出几像素；打开态直接收起。 */
+  .sc-taifu-fab.is-open {
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sc-taifu-panel {
+    animation: none;
+  }
+}
+
+/* ---------- r77 · 太傅对话 ---------- */
+/* 输入框从「入口预览」的禁用态转为可用态：正文要是主文本色，否则像仍被禁用。 */
+.sc-taifu-composer input {
+  color: var(--text-primary);
+}
+
+.sc-taifu-composer input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.sc-taifu-hint {
+  margin: var(--sp-2) 0 0;
+  color: var(--text-tertiary);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+}
+
+.sc-taifu-hint.is-error {
+  color: var(--danger);
+}
+
+.sc-taifu-error {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border-left: 2px solid var(--danger);
+  border-radius: var(--radius-4);
+  background: var(--danger-tint-08);
+}
+
+.sc-taifu-error p {
+  flex: 1;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+}
+
+.sc-taifu-samples {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sc-taifu-sample {
+  width: 100%;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-8);
+  background: var(--bg-inset);
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  text-align: left;
+  cursor: pointer;
+}
+
+.sc-taifu-sample:hover {
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+
+.sc-taifu-sample:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.sc-taifu-msg {
+  width: fit-content;
+  max-width: 88%;
+  margin-top: var(--sp-3);
+  padding: var(--sp-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-8);
+  background: var(--bg-inset);
+}
+
+/* 用户消息靠右、用强调膜区分；太傅消息靠左贴边，读长文更顺。 */
+.sc-taifu-msg.is-user {
+  margin-left: auto;
+  border-color: var(--accent-line-30);
+  background: var(--accent-wash-06);
+}
+
+.sc-taifu-msgtext p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+}
+
+.sc-taifu-msgtext p + p {
+  margin-top: var(--sp-2);
+}
+
+.sc-taifu-msg.is-user .sc-taifu-msgtext p {
+  color: var(--text-primary);
+}
+
+.sc-taifu-cites {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-1);
+  margin: var(--sp-2) 0 0;
+}
+
+.sc-taifu-citeslabel {
+  color: var(--text-tertiary);
+  font-size: var(--fs-meta);
+}
+
+.sc-taifu-cite {
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  color: var(--text-secondary);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-small);
+  text-decoration: none;
+}
+
+.sc-taifu-cite:hover {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.sc-taifu-notice {
+  margin: var(--sp-2) 0 0;
+  padding: var(--sp-2) var(--sp-3);
+  border-left: 2px solid var(--warn);
+  border-radius: var(--radius-4);
+  background: var(--warn-tint-12);
+  color: var(--text-secondary);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+}
+
+.sc-taifu-linkbtn {
+  margin-left: var(--sp-2);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-family: var(--font-sans);
+  font-size: var(--fs-meta);
+  cursor: pointer;
+}
+
+.sc-taifu-linkbtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sc-taifu-linkbtn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+@media (max-width: 640px) {
+  .sc-taifu-msg {
+    max-width: 100%;
+  }
+}
+
+/* ---------- r78 · 太傅：空档案出口 ---------- */
+/* 没有任何记录时，光说「先去补」不够：给三个可直接点的入口。 */
+.sc-taifu-shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin: var(--sp-2) 0 0;
+}
+
+.sc-taifu-shortcuts a {
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  color: var(--accent);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-small);
+  text-decoration: none;
+}
+
+.sc-taifu-shortcuts a:hover {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+/* ---------- r79 · 太傅引用锚点 ---------- */
+/* 被引用到的那一行薄弱分组：淡底 + 左侧竖条，用户点进来能立刻认出「就是这条」。
+   `:target` 覆盖「直接粘贴带锚点的 URL」；`.is-anchored` 覆盖站内路由跳转 ——
+   React Router 走 pushState，Chrome 不会因此重算 `:target`，只靠伪类会静默失效。 */
+.sc-weak-table tr:target,
+.sc-weak-table tr.is-anchored {
+  background: var(--accent-wash-06);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.sc-weak-table tr:target .sc-weak-name,
+.sc-weak-table tr.is-anchored .sc-weak-name {
+  color: var(--text-primary);
+}

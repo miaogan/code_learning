@@ -95,6 +95,19 @@ export function foldWeakness<T>(items: T[], expanded: boolean): Folded<T> {
   return { visible: items.slice(0, WEAKNESS_FOLD_LIMIT), hiddenCount: items.length - WEAKNESS_FOLD_LIMIT }
 }
 
+/**
+ * `#weakness-<n>` → n（1 起）：太傅回答里的引用用它指到报告中的某一条分组。
+ *
+ * 只认这一种形状 —— 别的 hash（`#practice`、`#weakness-0`、`#weakness-x`）一律 `null`，
+ * 让调用方「不定位」而不是猜一行（猜错比不跳更糟：用户会以为那条就是他问的）。
+ */
+export function weaknessAnchorIndex(hash: string): number | null {
+  const match = /^#weakness-(\d+)$/.exec(hash)
+  if (match === null) return null
+  const index = Number(match[1])
+  return Number.isInteger(index) && index >= 1 ? index : null
+}
+
 // === 展示文案 ==================================================================
 
 /** 错误率：服务端算好 0–1，这里只做整数百分比（不出现小数错误率）。 */

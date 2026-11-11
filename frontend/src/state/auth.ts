@@ -4,6 +4,7 @@ import { api, setUnauthorizedHandler } from '../api/client'
 import type { Me } from '../api/types'
 import { bindFlowToUser } from './flow'
 import { bindLearnProgressToUser } from './learnProgress'
+import { markSessionExpired } from './authNotice'
 
 export type AuthStatus = 'loading' | 'authed' | 'anonymous'
 
@@ -44,7 +45,11 @@ export function getAuthState(): AuthState {
 
 /** 会话失效（401）时回登录页；只对已登录态生效，登录页自身的 401 不重复触发。 */
 setUnauthorizedHandler(() => {
-  if (current.status === 'authed') emit({ status: 'anonymous', me: null })
+  if (current.status === 'authed') {
+    markSessionExpired()
+    // 等当前请求的错误处理完成再切登录页，避免面试/笔试把已保存草稿误当提交成功清掉。
+    window.setTimeout(() => emit({ status: 'anonymous', me: null }), 0)
+  }
 })
 
 /**

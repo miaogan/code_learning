@@ -1623,6 +1623,109 @@ def save_plan_state(report_id: str, daily_minutes: int, done: dict[str, bool]) -
         )
 
 
+# --- taifu（r77 太傅对话：单账号单线程）-------------------------------------
+#
+# 只存对话本身：`citations` 是可核对的站内路由，不存画像 / 报告的副本。
+# 读路径恒为「本账号最近 N 条」，因此 `list_taifu_messages()` 先倒序取再翻转，
+# 保证调用方拿到的时间序与界面展示一致（不在服务层二次排序）。
+
+#: 每账号保留的消息条数上限：超出按时间淘汰最旧，避免常驻件把库撑大。
+TAIFU_MESSAGE_LIMIT = 200
+
+
+def _taifu_message_of(row: sqlite3.Row) -> dict[str, Any]:
+    """行 → 通用字典；`citations` 坏值一律退化为空列表（不让脏 JSON 把整个线程读崩）。"""
+    raw = row["citations"]
+    try:
+        decoded = json.loads(raw) if isinstance(raw, str) else []
+    except json.JSONDecodeError:
+        decoded = []
+    citations = [
+        {"label": str(item.get("label") or ""), "href": str(item.get("href") or "")}
+        for item in (decoded if isinstance(decoded, list) else [])
+        if isinstance(item, dict)
+    ]
+    return {
+        "id": row["id"],
+        "role": str(row["role"]),
+        "content": str(row["content"]),
+        "citations": citations,
+        "created_at": str(row["created_at"]),
+    }
+
+
+def insert_taifu_message(
+    *, role: str, content: str, citations: list[dict[str, str]] | None = None
+) -> dict[str, Any]:
+    """追加一条对话并裁剪到 `TAIFU_MESSAGE_LIMIT` 条，返回写入行。"""
+    message_id = str(uuid.uuid4())
+    stamp = _now()
+    payload = json.dumps(citations or [], ensure_ascii=False)
+    with connection() as conn:
+        conn.execute(
+            "INSERT INTO taifu_messages (id, user_id, role, content, citations, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (message_id, _uid(), role, content, payload, stamp),
+        )
+        conn.execute(
+            "DELETE FROM taifu_messages WHERE user_id = ? AND id NOT IN ("
+            "  SELECT id FROM taifu_messages WHERE user_id = ?"
+            "  ORDER BY created_at DESC, id DESC LIMIT ?"
+            ")",
+            (_uid(), _uid(), TAIFU_MESSAGE_LIMIT),
+        )
+    return {
+        "id": message_id,
+        "role": role,
+        "content": content,
+        "citations": citations or [],
+        "created_at": stamp,
+    }
+
+
+def list_taifu_messages(limit: int = 20) -> list[dict[str, Any]]:
+    """本账号最近 `limit` 条消息，按时间**升序**返回（先倒序取，再翻转）。"""
+    with connection() as conn:
+        rows = conn.execute(
+            "SELECT id, role, content, citations, created_at FROM taifu_messages "
+            "WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT ?",
+            (_uid(), max(0, int(limit))),
+        ).fetchall()
+    return [_taifu_message_of(row) for row in reversed(rows)]
+
+
+def delete_taifu_messages() -> int:
+    """清空本账号对话（含 r80 线程记忆），返回删除条数（业务数据一律不动）。
+
+    记忆必须一起清：否则清空后再问，提示词里还挂着上一段对话的摘要 ——
+    用户看到的是「空对话」，模型看到的不是。
+    """
+    with connection() as conn:
+        cursor = conn.execute("DELETE FROM taifu_messages WHERE user_id = ?", (_uid(),))
+        conn.execute("DELETE FROM taifu_threads WHERE user_id = ?", (_uid(),))
+        return max(cursor.rowcount, 0)
+
+
+def get_taifu_memory() -> str:
+    """本账号的线程记忆（被窗口挤出后压缩过的早期对话要点）；没有则空串。"""
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT memory FROM taifu_threads WHERE user_id = ?", (_uid(),)
+        ).fetchone()
+    return str(row["memory"]) if row is not None else ""
+
+
+def save_taifu_memory(memory: str) -> None:
+    """写入/覆盖线程记忆（单行 upsert）。空串由调用方拦截，不在这里猜。"""
+    with connection() as conn:
+        conn.execute(
+            "INSERT INTO taifu_threads (user_id, memory, updated_at) VALUES (?, ?, ?) "
+            "ON CONFLICT(user_id) DO UPDATE SET memory = excluded.memory, "
+            "updated_at = excluded.updated_at",
+            (_uid(), memory, _now()),
+        )
+
+
 # --- radar（r67 技术雷达：清单 / 快照 / 评估 / 采集轮次 / 生成任务）----------
 #
 # 技术清单、快照与评估是**全局知识**（不按账号切）；生成任务 `radar_jobs` 带 `user_id`，

@@ -62,6 +62,9 @@ import type {
   ResumeVersionDetail,
   ResumeVersionSummary,
   RunKind,
+  TaifuClearResult,
+  TaifuReply,
+  TaifuThread,
   TimelineEvent,
 } from './types'
 import { reportKeyRequired } from '../state/aiGate'
@@ -464,4 +467,18 @@ export const api = {
       })}`,
       { signal: options.signal },
     ),
+
+  /* ---------- r77 太傅（只读站内档案；收起面板时不发起任何请求） ---------- */
+
+  /** 打开面板时读回历史：服务端按账号隔离，时间升序。 */
+  taifuThread: (limit = 20, signal?: AbortSignal): Promise<TaifuThread> =>
+    request<TaifuThread>(`/api/taifu/thread?limit=${limit}`, { signal }),
+
+  /** 问一句：服务端自己读档案再生成回答；`page` 只用于消解「这里 / 这条」的指代。 */
+  taifuChat: (question: string, page = ''): Promise<TaifuReply> =>
+    request<TaifuReply>('/api/taifu/chat', jsonInit('POST', { question, page })),
+
+  /** 清空对话（只删对话记录，不动画像 / 报告 / 测评 / 练习数据）。 */
+  taifuClear: (): Promise<TaifuClearResult> =>
+    request<TaifuClearResult>('/api/taifu/thread', { method: 'DELETE' }),
 }

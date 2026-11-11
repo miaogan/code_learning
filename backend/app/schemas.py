@@ -1264,3 +1264,55 @@ class RadarJobItem(BaseModel):
 class RadarJobList(BaseModel):
     items: list[RadarJobItem] = Field(default_factory=list)
     total: int = 0
+
+
+# --- r77 太傅对话（只读站内档案的问答） ---------------------------------------
+#
+# 会话是**单线程**：一个账号一条对话流，不建 session 表（PRD 明确不做多线程）。
+# `citations` 只会是服务端白名单校验后的站内路由，前端可直接渲染为链接。
+
+
+class TaifuCitation(BaseModel):
+    """一条可核对的站内出处：`href` 必然来自档案摘要里真实存在的段。"""
+
+    label: str = ""
+    href: str
+
+
+class TaifuMessage(BaseModel):
+    id: str
+    role: Literal["user", "assistant"]
+    content: str
+    citations: list[TaifuCitation] = Field(default_factory=list)
+    created_at: str
+
+
+class TaifuThread(BaseModel):
+    messages: list[TaifuMessage] = Field(default_factory=list)
+
+
+class TaifuChatRequest(BaseModel):
+    #: 不设 `max_length`：超长问句按 PRD AC-4 **截断后回答**（`policy.sanitize_question` 取前 200 字），
+    #: 而不是 422 把用户挡在门外 —— 粘贴一大段背景再提问是真实用法。
+    question: str = Field(default="", description="用户这一轮的问题")
+    #: 当前页面的 pathname（前端原样传）：服务端按闭集白名单归一，只用于消解指代，
+    #: 不进引用白名单，也不会被当作「依据」。
+    page: str = Field(default="", description="当前页面路径，如 /report")
+
+
+class TaifuReply(BaseModel):
+    reply: str = ""
+    citations: list[TaifuCitation] = Field(default_factory=list)
+    #: 本次真正读到的档案段数（0 表示没有可用记录、未调用模型）。
+    materials_used: int = 0
+    #: 模型给出但不在白名单、被丢弃的引用条数（幻觉计数器）。
+    dropped_citations: int = 0
+    #: 本轮提示词是否带了线程记忆（r80）：只作可观测标记，界面上不展示。
+    memory_used: bool = False
+    #: 空档案 / 空回答 / 空问句时的中文说明；正常回答时为空串。
+    notice: str = ""
+    created_at: str = ""
+
+
+class TaifuClearResult(BaseModel):
+    deleted: int = 0

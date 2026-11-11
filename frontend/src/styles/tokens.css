@@ -346,3 +346,12 @@
   --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23737d89' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
 }
 
+/* ---------- r76 · 太傅悬浮入口（append-only；推导见 docs/teamflow/20261111-r76-taifu-launcher/TECHNICAL.md） ---------- */
+:root {
+  /* 方印 56 = 7×8，与 --sp-9 同值；浮窗 400×600 = 印章 56 × 7 留出 8 的呼吸位。 */
+  --taifu-panel-w: 400px;
+  --taifu-panel-h: 600px;
+  /* 印章内的「傅」用宋体，和站内黑体正文拉开身份；不打包字体，按系统衬线降级。 */
+  --font-serif: "Songti SC", "STSong", "SimSun", serif;
+}
+

@@ -371,6 +371,35 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_radar_jobs_active
 CREATE INDEX IF NOT EXISTS idx_radar_jobs_user ON radar_jobs (user_id, created_at);
 """
 
+#: r77 太傅对话：**单线程**（一账号一条对话流），只存对话本身，不存任何业务数据的副本。
+#: `citations` 是 JSON 数组 `[{label, href}]`，且只会是白名单校验后的站内路由。
+R77_SCHEMA = """
+CREATE TABLE IF NOT EXISTS taifu_messages (
+    id          TEXT PRIMARY KEY,
+    user_id     TEXT NOT NULL DEFAULT 'default',
+    role        TEXT NOT NULL,
+    content     TEXT NOT NULL,
+    citations   TEXT NOT NULL DEFAULT '[]',
+    created_at  TEXT NOT NULL
+);
+"""
+
+#: r77 索引：读取路径恒为「本账号最近 N 条」，故按 (user_id, created_at) 建索引。
+R77_INDEXES = """
+CREATE INDEX IF NOT EXISTS idx_taifu_user_created ON taifu_messages (user_id, created_at);
+"""
+
+#: r80 太傅线程记忆：一账号一行，存「被窗口挤出后压缩过的早期对话要点」。
+#: 与 `taifu_messages` 分开建表而不是加一列：记忆是**线程级**的，
+#: 塞进某条消息会被线程渲染当对话读出来，也会随消息裁剪一起被删。
+R80_SCHEMA = """
+CREATE TABLE IF NOT EXISTS taifu_threads (
+    user_id     TEXT PRIMARY KEY,
+    memory      TEXT NOT NULL DEFAULT '',
+    updated_at  TEXT NOT NULL
+);
+"""
+
 
 def fts5_available(conn: sqlite3.Connection) -> bool:
     """探测当前 SQLite 是否编译了 FTS5；不抛异常，缺能力即返回 False。"""
@@ -487,6 +516,9 @@ def init_db() -> None:
         _ensure_r67_columns(conn)           # 14. 存量库补 r67 列（须在建表之后）
         _sweep_stale_radar_jobs(conn)       # 15. 建部分唯一索引前收敛重启遗留的未终态任务
         conn.executescript(R67_INDEXES)     # 16. r67 索引（含 jobs 的 active 唯一索引）
+        conn.executescript(R77_SCHEMA)      # 17. r77 太傅对话表
+        conn.executescript(R77_INDEXES)     # 18. r77 对话索引
+        conn.executescript(R80_SCHEMA)      # 19. r80 太傅线程记忆（单行）
 
 
 def _sweep_stale_radar_jobs(conn: sqlite3.Connection) -> None:

@@ -53,6 +53,7 @@ from app.routers import (
     report,
     resume,
     search,
+    taifu,
     timeline,
 )
 from app.schemas import HealthResponse
@@ -324,6 +325,7 @@ def create_app() -> FastAPI:
     app.include_router(coach.router)
     # r67：技术雷达（先锋清单 / 采集 / 国子监生成任务，任务按账号隔离）。
     app.include_router(radar.router)
+    app.include_router(taifu.router)
 
     @app.get("/health", response_model=HealthResponse, tags=["ops"], summary="探活（AC-8）")
     def health() -> HealthResponse:

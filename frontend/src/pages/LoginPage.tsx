@@ -5,6 +5,7 @@ import { Button } from '../components/ui/Button'
 import { InlineError } from '../components/ui/InlineError'
 import { PRODUCT_DESCRIPTION, PRODUCT_FOCUS, PRODUCT_NAME, PRODUCT_NAME_EN } from '../lib/brand'
 import { login } from '../state/auth'
+import { takeAuthNotice } from '../state/authNotice'
 
 /**
  * r23 登录页：邮箱 + 密码（不开放自助注册，账号由管理员用 `admin_cli.py` 创建）。
@@ -15,6 +16,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [notice] = useState(() => takeAuthNotice())
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -45,6 +47,7 @@ export default function LoginPage() {
         </header>
 
         <form className="sc-form" onSubmit={submit}>
+          {notice !== null ? <InlineError message={notice} /> : null}
           <label className="sc-field">
             <span className="sc-field-label">邮箱</span>
             <input

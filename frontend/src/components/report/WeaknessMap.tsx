@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import type { WeaknessItem } from '../../api/types'
 import {
   COACH_COPY,
@@ -9,6 +10,7 @@ import {
   essentialityLabel,
   foldWeakness,
   weaknessCountLabel,
+  weaknessAnchorIndex,
   weaknessRateLabel,
   weaknessRatePercent,
   weaknessSubDirectionLabel,
@@ -29,7 +31,26 @@ export interface WeaknessMapProps {
  */
 export function WeaknessMap({ items }: WeaknessMapProps) {
   const [expanded, setExpanded] = useState(false)
+  const [anchored, setAnchored] = useState<number | null>(null)
+  const location = useLocation()
   const state = blockStateOf(items)
+
+  // r79：太傅的引用可以带 `#weakness-N` 直接指到某一行。
+  // 被引用的行可能落在折叠区，所以先展开再滚动 —— 否则「点进来什么都没有」。
+  // 高亮用显式状态而不是只靠 `:target`：站内跳转是 pushState，浏览器不会重算 `:target`。
+  useEffect(() => {
+    const target = weaknessAnchorIndex(location.hash)
+    setAnchored(target)
+    if (target === null || items === null) return
+    if (!expanded && target > WEAKNESS_FOLD_LIMIT) {
+      setExpanded(true)
+      return
+    }
+    const timer = window.setTimeout(() => {
+      document.getElementById(`weakness-${target}`)?.scrollIntoView({ block: 'center' })
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [expanded, items, location.hash])
 
   if (state !== 'ready' || items === null) {
     return (
@@ -66,7 +87,11 @@ export function WeaknessMap({ items }: WeaknessMapProps) {
           {visible.map((item, index) => {
             const scopeLabel = weaknessSubDirectionLabel(item)
             return (
-              <tr key={item.key}>
+              <tr
+                key={item.key}
+                id={`weakness-${index + 1}`}
+                className={anchored === index + 1 ? 'is-anchored' : undefined}
+              >
                 <td className="sc-mono">{index + 1}</td>
                 <td>
                   <p className="sc-weak-name">{item.point}</p>

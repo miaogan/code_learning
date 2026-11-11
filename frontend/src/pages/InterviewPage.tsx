@@ -22,6 +22,12 @@ import { ConfirmModal } from '../components/ui/ConfirmModal'
 import { InlineError } from '../components/ui/InlineError'
 import { PhaseLoader } from '../components/ui/PhaseLoader'
 import { ResumeGate } from '../components/ui/ResumeGate'
+import { formatWhen } from '../lib/format'
+import {
+  clearInterviewDraft,
+  readInterviewDraft,
+  writeInterviewDraft,
+} from '../lib/interviewDraft'
 import {
   clearInterviewSession,
   readInterviewSession,
@@ -89,6 +95,8 @@ export default function InterviewPage() {
   const createAbortRef = useRef<AbortController | null>(null)
   const prefilledIdRef = useRef<string | null>(null)
   const activeRunIdRef = useRef<string | null>(null)
+  const answerDraftRef = useRef({ userId: null as string | null, runId: '', questionId: '', text: '' })
+  const latestAnswerRef = useRef({ answer: '', userId: null as string | null, runId: '', questionId: '', stage: 'configure' as Stage, submitting: false })
 
   /** 会话唯一真相：后端 GET/开局/轮次返回的镜像，页面不做 payload 解析。 */
   const [session, setSession] = useState<InterviewSession | null>(null)
@@ -98,6 +106,7 @@ export default function InterviewPage() {
   const [sources, setSources] = useState<SetupSources>(() => prefillOf(null).sources)
   const [track, setTrack] = useState<RunTrack>(EMPTY_TRACK)
   const [answer, setAnswer] = useState('')
+  const [draftNotice, setDraftNotice] = useState<string | null>(null)
   const [restore, setRestore] = useState<RestoreState>({ status: 'idle', error: null })
   /** 「重新读取」计数：run_id 不变时靠它触发恢复 effect 重跑。 */
   const [restoreTick, setRestoreTick] = useState(0)
@@ -146,7 +155,24 @@ export default function InterviewPage() {
         if (controller.signal.aborted) return
         activeRunIdRef.current = restored.run_id
         setSession(restored)
-        setAnswer('')
+        const savedDraft = restored.current_id
+          ? readInterviewDraft(userId, restored.run_id, restored.current_id)
+          : { status: 'none' as const }
+        setAnswer(savedDraft.status === 'ok' ? savedDraft.text : '')
+        setDraftNotice(
+          savedDraft.status === 'ok'
+            ? `已恢复未提交的回答（${formatWhen(savedDraft.savedAt)} 保存）`
+            : null,
+        )
+        if (savedDraft.status === 'expired' || savedDraft.status === 'invalid') {
+          clearInterviewDraft(userId, restored.run_id)
+        }
+        answerDraftRef.current = {
+          userId,
+          runId: restored.run_id,
+          questionId: restored.current_id ?? '',
+          text: savedDraft.status === 'ok' ? savedDraft.text : '',
+        }
         setTrack(EMPTY_TRACK)
         setRestore({ status: 'idle', error: null })
         setStage(restored.status === 'completed' ? 'ended' : 'chat')
@@ -158,7 +184,10 @@ export default function InterviewPage() {
       .catch((error: unknown) => {
         if (controller.signal.aborted) return
         // 服务端已没有这场（404）：锚点作废，避免下次进页面反复接一个不存在的会话。
-        if (error instanceof ApiError && error.status === 404) clearInterviewSession(userId)
+        if (error instanceof ApiError && error.status === 404) {
+          clearInterviewSession(userId)
+          clearInterviewDraft(userId, runIdParam)
+        }
         setRestore({ status: 'error', error: messageOf(error, '无法恢复本场面试') })
       })
     return () => controller.abort()
@@ -187,6 +216,63 @@ export default function InterviewPage() {
     }
   }, [])
 
+  // 当前回答防抖落盘；立即离开页面时先 flush，避免最后 300ms 的输入丢失。
+  latestAnswerRef.current = {
+    answer,
+    userId,
+    runId: session?.run_id ?? '',
+    questionId: session?.current_id ?? '',
+    stage,
+    submitting: track.submitting,
+  }
+  useEffect(() => {
+    const runId = session?.run_id ?? ''
+    const questionId = session?.current_id ?? ''
+    const shouldSave = stage === 'chat' && runId !== '' && questionId !== ''
+    answerDraftRef.current = { userId, runId, questionId, text: shouldSave ? answer : '' }
+    if (!shouldSave || track.submitting) return
+    const timer = window.setTimeout(() => {
+      writeInterviewDraft(userId, { runId, questionId, text: answer })
+    }, 300)
+    return () => {
+      window.clearTimeout(timer)
+      const latest = latestAnswerRef.current
+      // 只保存渲染时仍有效的当前编辑；结束/重开已使旧回答失效，不能被旧闭包复活。
+      if (
+        latest.stage === 'chat' &&
+        !latest.submitting &&
+        latest.userId === userId &&
+        latest.runId === runId &&
+        latest.questionId === questionId
+      ) {
+        writeInterviewDraft(userId, { runId, questionId, text: latest.answer })
+      }
+    }
+  }, [answer, session?.run_id, session?.current_id, stage, track.submitting, userId])
+
+  useEffect(() => {
+    return () => {
+      const current = answerDraftRef.current
+      if (current.text !== '' && current.runId !== '' && current.questionId !== '') {
+        writeInterviewDraft(current.userId, {
+          runId: current.runId,
+          questionId: current.questionId,
+          text: current.text,
+        })
+      }
+      // 401 会在下一个宏任务才切换登录页；用最新 ref 而不是卸载前的闭包状态，
+      // 防止重新登录后异步 GET 返回时把已清空输入恢复成旧答案。
+      const latest = latestAnswerRef.current
+      if (latest.stage === 'chat' && !latest.submitting && latest.answer !== '') {
+        writeInterviewDraft(latest.userId, {
+          runId: latest.runId,
+          questionId: latest.questionId,
+          text: latest.answer,
+        })
+      }
+    }
+  }, [])
+
   const reloadRestore = () => {
     if (!runIdParam) return
     activeRunIdRef.current = null
@@ -207,7 +293,10 @@ export default function InterviewPage() {
       if (controller.signal.aborted) return
       activeRunIdRef.current = run.run_id
       setSession(sessionOf(run))
+      clearInterviewDraft(userId, run.run_id)
+      answerDraftRef.current = { userId, runId: run.run_id, questionId: run.question.id, text: '' }
       setAnswer('')
+      setDraftNotice(null)
       setStage('chat')
       setSearchParams({ run_id: run.run_id }, { replace: true })
       // 开局成功即落本地锚点：中途离开也能从裸 `/interview` 接回来。
@@ -232,6 +321,7 @@ export default function InterviewPage() {
     const text = answer.trim()
     if (text.length === 0) return
     setTrack({ submitting: true, elapsedS: 0, error: null, turnError: null })
+    writeInterviewDraft(userId, { runId: session.run_id, questionId, text: answer })
     try {
       const turn: InterviewTurn = await api.scoreAnswer(session.run_id, {
         question_id: questionId,
@@ -257,6 +347,9 @@ export default function InterviewPage() {
         }
       })
       setAnswer('')
+      setDraftNotice(null)
+      clearInterviewDraft(userId, session.run_id)
+      answerDraftRef.current = { userId, runId: session.run_id, questionId: '', text: '' }
       setTrack((prev) => ({ ...prev, submitting: false, elapsedS: 0 }))
       if (!turn.next_question) {
         setStage('ended')
@@ -287,6 +380,9 @@ export default function InterviewPage() {
       const ended = await api.finishInterview(session.run_id)
       setSession(ended)
       setAnswer('')
+      setDraftNotice(null)
+      clearInterviewDraft(userId, session.run_id)
+      answerDraftRef.current = { userId, runId: session.run_id, questionId: '', text: '' }
       setTrack(EMPTY_TRACK)
       setStage('ended')
       clearInterviewSession(userId)
@@ -302,8 +398,11 @@ export default function InterviewPage() {
   const restart = () => {
     createAbortRef.current?.abort()
     activeRunIdRef.current = null
+    if (session) clearInterviewDraft(userId, session.run_id)
+    answerDraftRef.current = { userId, runId: '', questionId: '', text: '' }
     setSession(null)
     setAnswer('')
+    setDraftNotice(null)
     setTrack(EMPTY_TRACK)
     setStage('configure')
     setRestore({ status: 'idle', error: null })
@@ -374,6 +473,7 @@ export default function InterviewPage() {
           ) : null}
         </div>
         <SettingsBar settings={session.settings} />
+        {draftNotice !== null ? <p className="sc-meta-line" role="status">{draftNotice}</p> : null}
         <ChatStream questions={session.questions} pending={track.submitting} />
         {current === 'ended' ? (
           <>

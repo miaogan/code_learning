@@ -15,10 +15,12 @@ import { ResumeGate } from '../components/ui/ResumeGate'
 import { RingProgress } from '../components/ui/RingProgress'
 import { Select } from '../components/ui/Select'
 import { backfillNotice, filteredNotice, proficiencyRuleHint, subDirectionNotice } from '../lib/examNotice'
-import { formatElapsed } from '../lib/format'
+import { formatElapsed, formatWhen } from '../lib/format'
+import { clearExamDraft, readExamDraft, writeExamDraft } from '../lib/examDraft'
 import { DIRECTIONS, SUBDIRECTIONS } from '../lib/questionDirections'
 import { useAsync } from '../lib/useAsync'
 import { setFlow } from '../state/flow'
+import { useAuth } from '../state/auth'
 
 /** 卷面下限（AC-4：总数 ≥10、客观 ≥8），用于兜底拦截题型异常，不作为正常路径判断。 */
 const MIN_QUESTIONS = 10
@@ -64,10 +66,26 @@ export default function ExamPage() {
   const profileAsync = useAsync((signal) => api.latestProfile(signal), [])
   const { pathname } = useLocation()
   const navigate = useNavigate()
+  const { me } = useAuth()
+  const userId = me?.id ?? null
+  // 初始化是纯读：StrictMode 两次执行不会消费或清掉同一份草稿。
+  const [restored] = useState(() => readExamDraft(userId))
+  const restoredDraft = restored.status === 'ok' ? restored.draft : null
 
-  const [stage, setStage] = useState<Stage>('idle')
-  const [run, setRun] = useState<ExamRun | null>(null)
-  const [answers, setAnswers] = useState<Record<string, string[] | string>>({})
+  const [stage, setStage] = useState<Stage>(restoredDraft === null ? 'idle' : 'running')
+  const [run, setRun] = useState<ExamRun | null>(restoredDraft?.run ?? null)
+  const [answers, setAnswers] = useState<Record<string, string[] | string>>(restoredDraft?.answers ?? {})
+  const [startedAt, setStartedAt] = useState(restoredDraft?.started_at ?? '')
+  const [durable, setDurable] = useState(true)
+  const [draftNotice, setDraftNotice] = useState<string | null>(
+    restored.status === 'ok'
+      ? `已恢复你上次未提交的作答（${formatWhen(restored.draft.saved_at)} 保存）`
+      : restored.status === 'expired'
+        ? '上一份未提交的作答已超过 24 小时，已清除'
+        : restored.status === 'invalid'
+          ? '上一份未提交的作答无法恢复，已清除'
+          : null,
+  )
   const [result, setResult] = useState<ExamResult | null>(null)
   const [createError, setCreateError] = useState<string | null>(null)
   /** 「再出一套笔试」先确认：出卷中/失败时不影响当前已出分的成绩可见。 */
@@ -76,7 +94,7 @@ export default function ExamPage() {
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [pendingLeave, setPendingLeave] = useState<string | null>(null)
   const [createElapsed, setCreateElapsed] = useState(0)
-  const [runElapsed, setRunElapsed] = useState(0)
+  const [runElapsed, setRunElapsed] = useState(restored.status === 'ok' ? restored.elapsedS : 0)
   const [filterDirections, setFilterDirections] = useState<string[]>([])
   const [filterSubDirections, setFilterSubDirections] = useState<string[]>([])
   const [filterDifficulties, setFilterDifficulties] = useState<string[]>([])
@@ -93,6 +111,17 @@ export default function ExamPage() {
       mountedRef.current = false
     }
   }, [])
+
+  // 无效草稿只在挂载后清理一次；读取保持纯函数，避免 StrictMode 第二次读到空。
+  useEffect(() => {
+    if (restored.status === 'expired' || restored.status === 'invalid') clearExamDraft(userId)
+  }, [restored.status, userId])
+
+  // 从「已有卷但 0 作答」恢复时也补一个本机起点；正常新卷由 startExam 写入。
+  useEffect(() => {
+    if (stage !== 'running' || startedAt !== '') return
+    setStartedAt(new Date().toISOString())
+  }, [stage, startedAt])
 
   const profile = profileAsync.data
 
@@ -174,10 +203,9 @@ export default function ExamPage() {
     : null
   const hasAnyAnswer = answeredCount > 0
 
-  // 作答中离开保护：刷新/关闭走浏览器原生提示，站内链接先确认 —— 作答只在本页 state，
-  // 离开即丢失（面试有服务端会话可续答，笔试没有）。与润色页「生成中离开保护」同一套写法。
+  // 本地存储不可用时才保留旧的离开保护；正常情况由草稿恢复兜底，不拦 SPA 返回。
   useEffect(() => {
-    if (stage !== 'running' || !hasAnyAnswer) {
+    if (durable || stage !== 'running' || !hasAnyAnswer) {
       setPendingLeave(null)
       return
     }
@@ -200,7 +228,7 @@ export default function ExamPage() {
       window.removeEventListener('beforeunload', onBeforeUnload)
       document.removeEventListener('click', onClickCapture, true)
     }
-  }, [stage, hasAnyAnswer, pathname])
+  }, [stage, hasAnyAnswer, pathname, durable])
 
   const confirmLeave = () => {
     const href = pendingLeave
@@ -237,6 +265,10 @@ export default function ExamPage() {
       }
       setRun(created)
       setAnswers({})
+      const nextStartedAt = new Date().toISOString()
+      setStartedAt(nextStartedAt)
+      setDurable(writeExamDraft(userId, { run: created, answers: {}, startedAt: nextStartedAt }))
+      setDraftNotice(null)
       setResult(null)
       setRunElapsed(0)
       setStage('running')
@@ -262,6 +294,7 @@ export default function ExamPage() {
       const graded = await api.submitExam(run.run_id, { answers })
       if (!mountedRef.current) return
       setResult(graded)
+      clearExamDraft(userId)
       setFlow({ hasExam: true })
       setStage('submitted')
     } catch (error) {
@@ -286,7 +319,13 @@ export default function ExamPage() {
   }
 
   const setAnswer = (questionId: string, value: string[] | string) => {
-    setAnswers((prev) => ({ ...prev, [questionId]: value }))
+    setAnswers((prev) => {
+      const next = { ...prev, [questionId]: value }
+      if (run !== null && startedAt !== '') {
+        if (!writeExamDraft(userId, { run, answers: next, startedAt })) setDurable(false)
+      }
+      return next
+    })
   }
 
   return (
@@ -297,6 +336,20 @@ export default function ExamPage() {
           客观题本地判分，提交后 10 秒内出总分、用时与逐题对错；失败不会清空你的选择
         </p>
       </header>
+
+      {draftNotice !== null ? (
+        <div className="sc-meta-line" role="status">
+          <span>{draftNotice}</span>
+          <Button variant="ghost" size="sm" onClick={() => setDraftNotice(null)} aria-label="关闭草稿提示">
+            关闭
+          </Button>
+        </div>
+      ) : null}
+      {!durable && (view === 'running' || view === 'submitting') ? (
+        <p className="sc-meta-line" role="status">
+          当前浏览器无法保存本地草稿，请保持本页打开；离开前会再次提醒你。
+        </p>
+      ) : null}
 
       {view === 'gate' ? (
         <PhaseLoader title="正在读取你的最新画像" phases={['读取画像']} active={0} />

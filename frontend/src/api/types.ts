@@ -1101,3 +1101,39 @@ export interface RadarJobList {
 }
 
 
+
+/* ---------- r77 太傅对话（只读站内档案的问答） ---------- */
+
+/** 一条可核对的站内出处：`href` 由服务端白名单校验过，必然是真实存在的页面。 */
+export interface TaifuCitation {
+  label: string
+  href: string
+}
+
+export interface TaifuMessage {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  citations: TaifuCitation[]
+  created_at: string
+}
+
+export interface TaifuThread {
+  messages: TaifuMessage[]
+}
+
+export interface TaifuReply {
+  reply: string
+  citations: TaifuCitation[]
+  /** 本次真正读到的档案段数；0 表示没有任何站内记录（未调用模型）。 */
+  materials_used: number
+  /** 模型给出但不在白名单、被服务端丢弃的引用条数。 */
+  dropped_citations: number
+  /** 空档案 / 空回答 / 空问句时的中文说明；正常回答为空串。 */
+  notice: string
+  created_at: string
+}
+
+export interface TaifuClearResult {
+  deleted: number
+}
