@@ -22,7 +22,7 @@ import TutorialPage from './pages/TutorialPage'
 import UploadPage from './pages/UploadPage'
 import VersionsPage from './pages/VersionsPage'
 import ArchivePage from './pages/ArchivePage'
-import { PRODUCT_NAME, PRODUCT_TAGLINE } from './lib/brand'
+import { GITHUB_AVATAR_URL, GITHUB_OWNER, GITHUB_REPO_URL, PRODUCT_NAME, PRODUCT_TAGLINE } from './lib/brand'
 import { resetResumePrompt } from './lib/resumePrompt'
 import { logout, startAuth, useAuth } from './state/auth'
 import { dismissKeyRequired } from './state/aiGate'
@@ -107,13 +107,32 @@ export default function App() {
   return (
     <>
       <header className="sc-topbar">
-        <Link className="sc-brand" to="/" aria-label={`${PRODUCT_NAME}首页`}>
-          <span className="sc-brand-mark" aria-hidden="true">↗</span>
-          <span className="sc-brand-copy">
-            <span className="sc-brand-name">{PRODUCT_NAME}</span>
-            <span className="sc-brand-tagline">{PRODUCT_TAGLINE}</span>
-          </span>
-        </Link>
+        <div className="sc-topbar-left">
+          <Link className="sc-brand" to="/" aria-label={`${PRODUCT_NAME}首页`}>
+            <span className="sc-brand-mark" aria-hidden="true">↗</span>
+            <span className="sc-brand-copy">
+              <span className="sc-brand-name">{PRODUCT_NAME}</span>
+              <span className="sc-brand-tagline">{PRODUCT_TAGLINE}</span>
+            </span>
+          </Link>
+          {/* 项目外链：GitHub 头像即仓库入口（新窗口打开，避免离开当前工作台）。 */}
+          <a
+            className="sc-github-link"
+            href={GITHUB_REPO_URL}
+            target="_blank"
+            rel="noreferrer"
+            title={`GitHub 仓库：${GITHUB_OWNER}/code_learning`}
+          >
+            <img
+              className="sc-github-avatar"
+              src={GITHUB_AVATAR_URL}
+              alt={`${GITHUB_OWNER} 的 GitHub 头像`}
+              width={22}
+              height={22}
+            />
+            <span className="sc-github-label">GitHub</span>
+          </a>
+        </div>
         <div className="sc-topbar-right">
           <span className="sc-storage">数据按账号隔离保存</span>
           <Link className="sc-topbar-link" to="/settings" title="配置：账号与 AI 服务">

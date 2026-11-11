@@ -7306,6 +7306,38 @@ html {
   letter-spacing: 0.04em;
 }
 
+/* 页头左侧：品牌 + GitHub 仓库外链（头像即入口，窄屏只留头像）。 */
+.sc-topbar-left {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  min-width: 0;
+}
+
+.sc-github-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  color: var(--text-tertiary);
+  font-size: var(--fs-nano);
+  line-height: var(--lh-nano);
+  letter-spacing: 0.04em;
+  text-decoration: none;
+}
+
+.sc-github-link:hover {
+  color: var(--text-primary);
+}
+
+.sc-github-avatar {
+  display: block;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  object-fit: cover;
+}
+
 /* 路线文案复用现有字阶，品牌与登录页不增加新颜色或新尺寸。 */
 .sc-lab-route {
   display: flex;
@@ -7364,6 +7396,10 @@ html {
 
 @media (max-width: 640px) {
   .sc-brand-tagline {
+    display: none;
+  }
+  /* 窄屏页头空间紧张：只保留 GitHub 头像，仓库链接仍可点。 */
+  .sc-github-label {
     display: none;
   }
 }
