@@ -296,6 +296,7 @@ CREATE TABLE IF NOT EXISTS radar_techs (
     source_key     TEXT NOT NULL,
     url            TEXT NOT NULL,
     summary        TEXT NOT NULL DEFAULT '',
+    summary_zh     TEXT NOT NULL DEFAULT '',
     first_seen_at  TEXT NOT NULL,
     last_seen_at   TEXT NOT NULL
 );
@@ -410,6 +411,8 @@ _ADDED_COLUMNS: tuple[tuple[str, str, str], ...] = (
 #: 不能并入 `_ADDED_COLUMNS`（第 2 步时该表还不存在，会对空库直接报 no such table）。
 _R67_ADDED_COLUMNS: tuple[tuple[str, str, str], ...] = (
     ("radar_jobs", "discarded_reasons_json", "TEXT NOT NULL DEFAULT '{}'"),
+    # r74 摘要中文化：采集到的 GitHub description 是英文，译文单独存一列（英文原文保留可追溯）。
+    ("radar_techs", "summary_zh", "TEXT NOT NULL DEFAULT ''"),
 )
 
 

@@ -9865,3 +9865,69 @@ html {
   padding-left: var(--sp-3);
   border-left: 1px solid var(--border-subtle);
 }
+
+/* ============================================================
+   r74 · 先锋条目：中文摘要 + 仓库外链（append-only）
+   名称本身是唯一入口：采集来的英文简介先看中文，原文折叠在
+   「查看英文原文」里；外链只放行 http(s)，一律新标签打开。
+   ============================================================ */
+a.sc-radar-name--link {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--sp-1);
+  color: var(--text-primary);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: color var(--fast) var(--ease), border-color var(--fast) var(--ease);
+}
+
+a.sc-radar-name--link:hover {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+a.sc-radar-name--link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-4);
+}
+
+.sc-radar-ext {
+  font-size: var(--fs-meta);
+  line-height: 1;
+  color: var(--text-tertiary);
+}
+
+a.sc-radar-name--link:hover .sc-radar-ext {
+  color: var(--accent);
+}
+
+.sc-radar-origin {
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+}
+
+.sc-radar-origin > summary {
+  cursor: pointer;
+  width: fit-content;
+  color: var(--text-tertiary);
+}
+
+.sc-radar-origin > summary:hover {
+  color: var(--text-secondary);
+}
+
+.sc-radar-origin > summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-4);
+}
+
+.sc-radar-origin > p {
+  margin: var(--sp-1) 0 0;
+  padding-left: var(--sp-2);
+  border-left: 1px solid var(--border-subtle);
+  color: var(--text-tertiary);
+  word-break: break-word;
+}

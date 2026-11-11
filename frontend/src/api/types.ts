@@ -984,6 +984,8 @@ export interface RadarTechItem {
   source_key: string
   url: string
   summary: string
+  /** 中文摘要：采集时用 light 模型翻译并落库；空串表示还没翻（界面回退显示英文原文）。 */
+  summary_zh: string
   verdict: string
   verdict_label: string
   relevance: number
@@ -1003,6 +1005,17 @@ export interface RadarTechItem {
 export interface RadarTechList {
   items: RadarTechItem[]
   total: number
+  notice: string
+}
+
+export interface RadarTranslateRequest {
+  /** 本次最多翻几条（后端上限 50，缺省走后端配置）。 */
+  limit?: number
+}
+
+export interface RadarTranslateResult {
+  translated: number
+  remaining: number
   notice: string
 }
 

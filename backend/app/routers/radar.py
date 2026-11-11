@@ -21,6 +21,8 @@ from app.schemas import (
     RadarRunSummary,
     RadarTechItem,
     RadarTechList,
+    RadarTranslateRequest,
+    RadarTranslateResult,
 )
 from app.services import radar
 from app.services.ai import user_ai
@@ -85,6 +87,19 @@ async def run_round(
         )
     result = await radar.run_round(trigger="manual", user=user, direction=direction, repo=repo)
     return RadarRunSummary(**result)
+
+
+@router.post("/translate", response_model=RadarTranslateResult, summary="英文摘要翻成中文（可重复调用）")
+async def translate_summaries(
+    user: CurrentUser, payload: RadarTranslateRequest | None = None
+) -> RadarTranslateResult:
+    """补翻历史清单里的英文摘要；已翻过的不会被重复请求（译文落库，原文变化才重翻）。"""
+    request = payload or RadarTranslateRequest()
+    translated, remaining = await radar.translate_summaries(user, request.limit)
+    notice = f"已翻译 {translated} 条英文简介" if translated else "没有新增可翻译的摘要"
+    if remaining:
+        notice += f"，还有 {remaining} 条待翻译"
+    return RadarTranslateResult(translated=translated, remaining=remaining, notice=notice)
 
 
 @router.get("/runs/latest", response_model=RadarRunSummary, summary="最近一轮采集摘要")

@@ -52,6 +52,8 @@ import type {
   RadarRunSummary,
   RadarTechItem,
   RadarTechList,
+  RadarTranslateRequest,
+  RadarTranslateResult,
   Report,
   ReportGenerateRequest,
   ResumeJobStarted,
@@ -221,6 +223,10 @@ export const api = {
   /** 最近一轮采集摘要（含每个源的可用性）。 */
   radarLatestRun: (signal?: AbortSignal): Promise<RadarRunSummary> =>
     request<RadarRunSummary>('/api/radar/runs/latest', { signal }),
+
+  /** 把清单里剩下的英文摘要翻成中文（可重复调用，已翻过的不会重复请求）。 */
+  radarTranslate: (payload: RadarTranslateRequest = {}): Promise<RadarTranslateResult> =>
+    request<RadarTranslateResult>('/api/radar/translate', jsonInit('POST', payload)),
 
   /** 手工录入一条技术线索：不联网，直接进清单。 */
   radarManual: (payload: RadarManualRequest): Promise<RadarTechItem> =>

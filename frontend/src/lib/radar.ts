@@ -123,3 +123,20 @@ export function techMetaText(item: RadarTechItem): string {
   if (item.suspect) parts.push('疑似刷 star，结论已降档')
   return parts.join(' · ')
 }
+
+/** 采集到的仓库链接只放行 http(s)：`javascript:` 等脏值一律当没有链接（不进 `href`）。 */
+export function safeRepoUrl(url: string): string {
+  const text = url.trim()
+  return /^https?:\/\//i.test(text) ? text : ''
+}
+
+/** 这条摘要是否还值得翻：有足够拉丁字母且没有中文（与后端 `translate.needs_translation` 同口径）。 */
+export function needsTranslation(summary: string): boolean {
+  if (/[\u4e00-\u9fff]/.test(summary)) return false
+  return (summary.match(/[A-Za-z]/g) ?? []).length >= 12
+}
+
+/** 展示用摘要：中文优先，没有译文时回退英文原文（原文永远不会被译文覆盖）。 */
+export function summaryText(item: RadarTechItem): string {
+  return item.summary_zh !== '' ? item.summary_zh : item.summary
+}

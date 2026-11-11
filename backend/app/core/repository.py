@@ -1631,15 +1631,24 @@ def save_plan_state(report_id: str, daily_minutes: int, done: dict[str, bool]) -
 
 
 def radar_upsert_tech(item: dict[str, Any]) -> None:
-    """按 `tech_slug` 幂等写入：已存在只刷新 last_seen 与可变字段（首次见到的时间不动）。"""
+    """按 `tech_slug` 幂等写入：已存在只刷新 last_seen 与可变字段（首次见到的时间不动）。
+
+    英文摘要变了就清空 `summary_zh`（旧译文对应旧原文，留着就是错译），下轮翻译会重算；
+    摘要没变则保留已有译文，避免每轮采集重复烧 token。
+    """
     stamp = _now()
     with connection() as conn:
         conn.execute(
             "INSERT INTO radar_techs (tech_slug, name, direction, sub_direction, source_key, url,"
-            " summary, first_seen_at, last_seen_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) "
+            " summary, summary_zh, first_seen_at, last_seen_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, '', ?, ?) "
             "ON CONFLICT(tech_slug) DO UPDATE SET name = excluded.name,"
             " direction = excluded.direction, sub_direction = excluded.sub_direction,"
-            " url = excluded.url, summary = excluded.summary, last_seen_at = excluded.last_seen_at",
+            " url = excluded.url,"
+            # 赋值顺序有意义：SQLite 的 SET 从左到右求值，summary_zh 必须先于 summary 计算。
+            " summary_zh = CASE WHEN excluded.summary = radar_techs.summary"
+            "   THEN radar_techs.summary_zh ELSE '' END,"
+            " summary = excluded.summary, last_seen_at = excluded.last_seen_at",
             (
                 item["slug"], item["name"], item["direction"], item["sub_direction"],
                 item["source_key"], item["url"], item["summary"], stamp, stamp,
@@ -1761,7 +1770,7 @@ def radar_list_techs(
     with connection() as conn:
         rows = conn.execute(
             "SELECT t.tech_slug, t.name, t.direction, t.sub_direction, t.source_key, t.url,"
-            " t.summary, a.verdict, a.relevance, a.adoption, a.maturity, a.effort,"
+            " t.summary, t.summary_zh, a.verdict, a.relevance, a.adoption, a.maturity, a.effort,"
             " a.reasons_json, a.evidence_json, a.rule_based, a.created_at AS assessed_at,"
             " (SELECT s.stars FROM radar_snapshots s WHERE s.tech_slug = t.tech_slug"
             "  ORDER BY s.id DESC LIMIT 1) AS stars,"
@@ -1788,6 +1797,7 @@ def radar_list_techs(
                 "source_key": row["source_key"],
                 "url": row["url"],
                 "summary": row["summary"],
+                "summary_zh": row["summary_zh"] or "",
                 "verdict": row["verdict"] or "skip",
                 "relevance": int(row["relevance"] or 1),
                 "adoption": int(row["adoption"] or 1),
@@ -1958,11 +1968,42 @@ def radar_tech_name(tech_slug: str) -> str:
     return "" if row is None else str(row["name"])
 
 
+def radar_set_summary_zh(tech_slug: str, summary_zh: str) -> None:
+    """写一条中文摘要（翻译结果落库后，同一个仓库不再重复翻译）。"""
+    with connection() as conn:
+        conn.execute(
+            "UPDATE radar_techs SET summary_zh = ? WHERE tech_slug = ?",
+            (summary_zh, tech_slug),
+        )
+
+
+def radar_pending_translation(limit: int) -> list[dict[str, Any]]:
+    """待翻译条目：有英文摘要但还没有中文译文的，按最近出现时间取一页。"""
+    with connection() as conn:
+        rows = conn.execute(
+            "SELECT tech_slug, summary FROM radar_techs"
+            " WHERE summary_zh = '' AND summary <> ''"
+            " ORDER BY last_seen_at DESC LIMIT ?",
+            (max(int(limit), 1),),
+        ).fetchall()
+    return [{"slug": row["tech_slug"], "summary": row["summary"]} for row in rows]
+
+
+def radar_count_pending_translation() -> int:
+    """还有多少条「有英文摘要但没有中文译文」（补翻按钮据此决定是否还能再点）。"""
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT count(*) AS n FROM radar_techs WHERE summary_zh = '' AND summary <> ''"
+        ).fetchone()
+    return 0 if row is None else int(row["n"])
+
+
 def radar_tech_card(tech_slug: str) -> dict[str, Any] | None:
     """生成用的技术卡片：名称 / 方向 / 简介 / 链接 + 最新评估结论（不存在返回 None）。"""
     with connection() as conn:
         row = conn.execute(
             "SELECT t.tech_slug, t.name, t.direction, t.sub_direction, t.url, t.summary,"
+            " t.summary_zh,"
             " a.verdict FROM radar_techs t LEFT JOIN radar_assessments a ON a.id = ("
             "   SELECT MAX(a2.id) FROM radar_assessments a2 WHERE a2.tech_slug = t.tech_slug)"
             " WHERE t.tech_slug = ?",
@@ -1977,5 +2018,6 @@ def radar_tech_card(tech_slug: str) -> dict[str, Any] | None:
         "sub_direction": row["sub_direction"],
         "url": row["url"],
         "summary": row["summary"],
+        "summary_zh": row["summary_zh"] or "",
         "verdict": row["verdict"] or "",
     }

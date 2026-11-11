@@ -84,6 +84,8 @@ _NUMERIC_ENV_FIELDS: tuple[str, ...] = (
     "radar_gen_timeout_s",
     "radar_gen_max_questions",
     "radar_job_stale_minutes",
+    "radar_translate_timeout_s",
+    "radar_translate_batch",
 )
 
 #: r41：视觉档未开通时的**唯一**中文说明（图片入口直接透传，不静默降级成 PDF 提示）。
@@ -269,6 +271,10 @@ class Settings(BaseSettings):
     radar_gen_max_questions: int = 5
     #: 读路径惰性清扫阈值（分钟）：running 超过该时长按 failed 落库（AC-4）。
     radar_job_stale_minutes: int = 15
+    #: 摘要翻译超时（秒）：一批 20 条小 JSON，比评估略长即可。
+    radar_translate_timeout_s: float = 45.0
+    #: 一次请求最多翻多少条摘要（控制单次 token；未翻完的界面可再点一次）。
+    radar_translate_batch: int = 20
     #: GitHub Search API token（未认证配额低且易 403；留空退化为「无 token 检索」）。
     github_token: str = ""
     #: 采集后是否自动为「必学」项生成样例（默认关：每条都要烧模型配额）。

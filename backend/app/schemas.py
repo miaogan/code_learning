@@ -1137,6 +1137,8 @@ class RadarTechItem(BaseModel):
     source_key: str = ""
     url: str = ""
     summary: str = ""
+    #: 中文摘要：采集时用 light 模型翻译并落库；空串表示尚未翻译（界面回退显示英文原文）。
+    summary_zh: str = ""
     verdict: str = "skip"
     verdict_label: str = ""
     relevance: int = 1
@@ -1157,6 +1159,20 @@ class RadarTechList(BaseModel):
     items: list[RadarTechItem] = Field(default_factory=list)
     total: int = 0
     #: 本轮采集的概括说明（离线 / 降级 / 丢弃引用等），空串表示无特别情况。
+    notice: str = ""
+
+
+class RadarTranslateRequest(BaseModel):
+    """按需补翻英文摘要：一次最多翻多少条（默认 20，上限 50）。"""
+
+    limit: int = Field(default=20, ge=1, le=50)
+
+
+class RadarTranslateResult(BaseModel):
+    """补翻结果：实际翻成几条 + 还剩多少条待翻（剩余 > 0 时界面可再点一次）。"""
+
+    translated: int = 0
+    remaining: int = 0
     notice: str = ""
 
 

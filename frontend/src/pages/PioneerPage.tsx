@@ -12,7 +12,13 @@ import { PhaseLoader } from '../components/ui/PhaseLoader'
 import { Select } from '../components/ui/Select'
 import { Toast } from '../components/ui/Toast'
 import { DIRECTIONS } from '../lib/questionDirections'
-import { dimensionText, techMetaText } from '../lib/radar'
+import {
+  dimensionText,
+  needsTranslation,
+  safeRepoUrl,
+  summaryText,
+  techMetaText,
+} from '../lib/radar'
 import { useAsync } from '../lib/useAsync'
 
 /**
@@ -63,6 +69,10 @@ function TechRow({
   onGenerate: (item: RadarTechItem) => void
 }) {
   const detailId = `radar-tech-detail-${item.tech_slug}`
+  // 中文优先：有译文展示译文；原文始终留着，展开态里可回看。
+  const summaryToShow = summaryText(item)
+  const hasOriginal = item.summary_zh !== '' && item.summary !== ''
+  const link = safeRepoUrl(item.url)
   return (
     <li className="sc-radar-techrow">
       <div className="sc-radar-rowmain">
@@ -70,13 +80,34 @@ function TechRow({
           <span className={`sc-radar-verdict ${VERDICT_CLASS[item.verdict] ?? 'is-skip'}`}>
             {item.verdict_label}
           </span>
-          <span className="sc-radar-name">{item.name}</span>
+          {link !== '' ? (
+            <a
+              className="sc-radar-name sc-radar-name--link"
+              href={link}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="在新标签打开仓库"
+            >
+              {item.name}
+              <span className="sc-radar-ext" aria-hidden="true">
+                ↗
+              </span>
+            </a>
+          ) : (
+            <span className="sc-radar-name">{item.name}</span>
+          )}
           <span className="sc-radar-source">{item.source_key}</span>
         </div>
         <p className="sc-radar-meta">{techMetaText(item)}</p>
         {expanded && (
           <div className="sc-radar-rowdetail" id={detailId}>
-            {item.summary !== '' && <p className="sc-radar-summary">{item.summary}</p>}
+            {summaryToShow !== '' && <p className="sc-radar-summary">{summaryToShow}</p>}
+            {hasOriginal && (
+              <details className="sc-radar-origin">
+                <summary>查看英文原文</summary>
+                <p>{item.summary}</p>
+              </details>
+            )}
             {item.reasons.length > 0 && <p className="sc-radar-reasons">{item.reasons.join('；')}</p>}
             <p className="sc-radar-dims">{dimensionText(item)}</p>
           </div>
@@ -133,6 +164,8 @@ export default function PioneerPage() {
   const [collecting, setCollecting] = useState(false)
   const [collectError, setCollectError] = useState('')
   const [generating, setGenerating] = useState('')
+  // 补翻：历史清单里的英文摘要按需翻成中文（采集时已自动翻，这里只兜住没翻到的）。
+  const [translating, setTranslating] = useState(false)
   // 条目的详情默认折叠：按 tech_slug 记住哪些被展开，翻页后状态天然跟着条目走。
   const [expandedSlugs, setExpandedSlugs] = useState<string[]>([])
   const toggleExpanded = (slug: string): void => {
@@ -156,6 +189,10 @@ export default function PioneerPage() {
   const techs = listAsync.data
   const lastRun = runAsync.data
   const filtering = pickedVerdicts.length > 0 || pickedDirections.length > 0
+  // 当前页还有「英文且没译文」的条目时才显示补翻按钮：没待翻内容就不占位置。
+  const pendingTranslation = (techs?.items ?? []).some(
+    (item) => item.summary_zh === '' && needsTranslation(item.summary),
+  )
 
   const changeVerdicts = (next: string[]): void => {
     setVerdictFilters(next)
@@ -186,6 +223,23 @@ export default function PioneerPage() {
   const refresh = (): void => {
     listAsync.reload()
     runAsync.reload()
+  }
+
+  const translateBacklog = async (): Promise<void> => {
+    setTranslating(true)
+    try {
+      // 一批按当前页大小翻：翻完刷一次清单，译文直接替换成中文。
+      const result = await api.radarTranslate({ limit: pageSize })
+      refresh()
+      setToast({ message: result.notice, seq: Date.now() })
+    } catch (error) {
+      setToast({
+        message: error instanceof Error ? error.message : '翻译失败，请稍后重试',
+        seq: Date.now(),
+      })
+    } finally {
+      setTranslating(false)
+    }
   }
 
   const collect = async (): Promise<void> => {
@@ -432,6 +486,16 @@ export default function PioneerPage() {
                 }))}
                 onChange={changePageSize}
               />
+              {pendingTranslation && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  loading={translating}
+                  onClick={() => void translateBacklog()}
+                >
+                  翻译英文简介
+                </Button>
+              )}
               {filtering && (
                 <Button variant="ghost" size="sm" onClick={resetFilters}>
                   清除筛选

@@ -15,7 +15,7 @@ from typing import Any
 from app.core.config import get_settings
 from app.core.errors import AppError
 from app.services.ai import user_ai
-from app.services.radar import assess, normalize, rules, schedule, sources, store
+from app.services.radar import assess, normalize, rules, schedule, sources, store, translate
 
 logger = logging.getLogger("app.radar")
 
@@ -66,6 +66,7 @@ async def run_round(
         pending.append({"item": item, "signals": signals, "sha": sha, "result": result})
 
     dropped_total = await _refine_top(pending, summary, digest, run_id, user, notes)
+    await _translate_round(user, notes)
 
     if settings.radar_offline:
         notes.insert(0, "当前为离线模式，本轮只读取内置样本")
@@ -180,6 +181,8 @@ async def ingest_manual(entry: dict[str, Any], user: dict[str, Any] | None = Non
         user,
         notes,
     )
+    # 手工录入常见英文仓库描述：顺手翻成中文，界面不必再点一次补翻。
+    await _translate_round(user, notes)
     store.finish_run(
         run_id,
         [{"source_key": "manual", "status": "ok", "items": 1, "latency_ms": 0,
@@ -198,6 +201,41 @@ async def ingest_manual(entry: dict[str, Any], user: dict[str, Any] | None = Non
 
 async def _scheduled_round() -> None:
     await run_round(trigger="schedule", user=None)
+
+
+async def _translate_round(user: dict[str, Any] | None, notes: list[str]) -> int:
+    """采集后顺手翻译待翻的英文摘要（r74）。
+
+    定时轮没有账号上下文、未配置模型、上游失败都只是**不加译文**：英文原文照常展示，
+    清单页的「翻译英文简介」按钮可以再点。翻译失败绝不冒泡成采集失败。
+    """
+    if user is None:
+        return 0
+    try:
+        client = user_ai.client_for(user, "light")
+    except AppError:
+        return 0
+    try:
+        translated, _ = await translate.translate_pending(
+            max(int(get_settings().radar_translate_batch), 1), client
+        )
+    except asyncio.CancelledError:
+        raise
+    except Exception:  # noqa: BLE001 — 单条摘要翻不出来不该让整轮采集失败
+        logger.exception("radar.translate.failed")
+        notes.append("英文摘要翻译失败，已保留原文，可在清单页点「翻译英文简介」重试")
+        return 0
+    if translated:
+        notes.append(f"已翻译 {translated} 条英文简介")
+    return translated
+
+
+async def translate_summaries(user: dict[str, Any], limit: int | None = None) -> tuple[int, int]:
+    """按需补翻接口的实现：无 Key / 未开通由 `client_for` 抛 503，路由直接透传。"""
+    settings = get_settings()
+    client = user_ai.client_for(user, "light")
+    batch = max(int(settings.radar_translate_batch if limit is None else limit), 1)
+    return await translate.translate_pending(batch, client)
 
 
 def start_scheduler() -> None:
@@ -226,4 +264,5 @@ __all__ = [
     "start_scheduler",
     "stop_scheduler",
     "store",
+    "translate_summaries",
 ]

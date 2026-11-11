@@ -9,10 +9,13 @@ import {
   formatCount,
   isActiveJob,
   isTerminalJob,
+  needsTranslation,
   progressText,
+  safeRepoUrl,
   stageLabel,
   starDeltaText,
   statusLabel,
+  summaryText,
   techMetaText,
 } from '../lib/radar'
 
@@ -66,6 +69,7 @@ function tech(overrides: Partial<RadarTechItem> = {}): RadarTechItem {
     source_key: 'github',
     url: 'https://github.com/demo/vllm',
     summary: '高吞吐推理引擎',
+    summary_zh: '高吞吐推理引擎',
     verdict: 'must_learn',
     verdict_label: '必须学',
     relevance: 5,
@@ -187,5 +191,32 @@ describe('r67 radar 读数格式化', () => {
       'AI 工程 · star 12.0k（7 日 持平）',
     )
     expect(techMetaText(tech({ suspect: true }))).toContain('疑似刷 star，结论已降档')
+  })
+})
+
+describe('r74 摘要中文化与仓库外链', () => {
+  it('中文优先，没有译文时回退英文原文', () => {
+    expect(summaryText(tech({ summary_zh: '高吞吐推理引擎的中文简介' }))).toBe(
+      '高吞吐推理引擎的中文简介',
+    )
+    expect(summaryText(tech({ summary: 'High-throughput inference', summary_zh: '' }))).toBe(
+      'High-throughput inference',
+    )
+  })
+
+  it('外链只放行 http(s)，脏值与空值一律不渲染链接', () => {
+    expect(safeRepoUrl('https://github.com/demo/vllm')).toBe('https://github.com/demo/vllm')
+    expect(safeRepoUrl('  http://example.com/repo ')).toBe('http://example.com/repo')
+    expect(safeRepoUrl('javascript:alert(1)')).toBe('')
+    expect(safeRepoUrl('github.com/demo/vllm')).toBe('')
+    expect(safeRepoUrl('   ')).toBe('')
+  })
+
+  it('只有足够长的英文摘要才值得翻，中文与短词跳过', () => {
+    expect(needsTranslation('High-throughput LLM inference and serving engine')).toBe(true)
+    expect(needsTranslation('高吞吐推理引擎')).toBe(false)
+    expect(needsTranslation('支持 RAG 的检索框架')).toBe(false)
+    expect(needsTranslation('CLI tool')).toBe(false)
+    expect(needsTranslation('')).toBe(false)
   })
 })

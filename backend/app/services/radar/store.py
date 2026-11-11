@@ -155,6 +155,21 @@ def tech_card(tech_slug: str) -> dict[str, Any] | None:
     return repository.radar_tech_card(tech_slug)
 
 
+def set_summary_zh(tech_slug: str, summary_zh: str) -> None:
+    """写一条中文摘要（r74）：同一个仓库翻译一次即可，之后采集只在原文变化时重翻。"""
+    repository.radar_set_summary_zh(tech_slug, summary_zh)
+
+
+def pending_translation(limit: int) -> list[dict[str, Any]]:
+    """有英文摘要但缺中文译文的条目（按最近出现时间取一页），供按需补翻。"""
+    return repository.radar_pending_translation(limit)
+
+
+def count_pending_translation() -> int:
+    """待翻译总数（补翻接口回给界面「还剩几条」）。"""
+    return repository.radar_count_pending_translation()
+
+
 def _json_list(text: str | None) -> list[Any]:
     try:
         payload = json.loads(text or "[]")
