@@ -24,11 +24,23 @@ PROMPT_VERSION = assess.PROMPT_VERSION
 _scheduler: asyncio.Task[None] | None = None
 
 
-async def run_round(trigger: str = "schedule", user: dict[str, Any] | None = None) -> dict[str, Any]:
-    """跑一轮采集 + 评估，返回 `{run_id, started_at, finished_at, sources, notice, ...}`。"""
+async def run_round(
+    trigger: str = "schedule",
+    user: dict[str, Any] | None = None,
+    direction: str = "",
+    repo: str = "",
+) -> dict[str, Any]:
+    """跑一轮采集 + 评估，返回 `{run_id, started_at, finished_at, sources, notice, ...}`。
+
+    `direction` 命中站内闭集时只保留该方向条目；`repo` 非空时只采这一个仓库（优先于方向）。
+    """
     settings = get_settings()
+    target = direction if direction in rules.DIRECTIONS else ""
+    full_name = sources.repo_full_name(repo)
     run_id = store.create_run(trigger)
-    items, status, degraded = await sources.fetch_all(settings)
+    items, status, degraded = await sources.fetch_all(settings, direction=target, repo=full_name)
+    if target and not full_name:
+        items = [item for item in items if item["direction"] == target]
     summary = assess.profile_summary()
     digest = assess.profile_digest(summary)
     notes: list[str] = []
@@ -57,8 +69,14 @@ async def run_round(trigger: str = "schedule", user: dict[str, Any] | None = Non
 
     if settings.radar_offline:
         notes.insert(0, "当前为离线模式，本轮只读取内置样本")
+    elif full_name:
+        notes.insert(0, f"本轮只采集指定仓库 {full_name}")
     elif degraded:
         notes.insert(0, "部分信息源本轮不可用，只覆盖可用的来源")
+    if target and not full_name:
+        notes.append(f"本轮按方向「{target}」采集，只保留该方向的条目")
+        if not pending:
+            notes.append("该方向本轮没有匹配到条目，可换个方向或稍后重试")
     if dropped_total:
         notes.append(f"已丢弃 {dropped_total} 条无依据的模型引用")
 
@@ -114,11 +132,25 @@ async def _refine_top(
 
 
 async def ingest_manual(entry: dict[str, Any], user: dict[str, Any] | None = None) -> dict[str, Any]:
-    """手工录入一条线索：不联网，直接落清单 + 规则评估（可选模型细化），回读完整投影。
+    """手工录入一条线索：GitHub 仓库链接先补一次公开元数据，其余不联网，直接落清单。
 
-    返回的形状与 `store.list_techs` 的单条一致（含 `verdict`），路由再补 `verdict_label`。
+    GitHub 的 star / 库龄是评估的硬信号，手工录入时不补会让任何仓库都按 0 star 判成「跳过」；
+    补失败（限流 / 断网 / 非仓库链接）就退回纯手工字段。返回形状与 `store.list_techs` 单条一致。
     """
+    settings = get_settings()
     raw = {**entry, "source_key": "manual"}
+    full_name = "" if settings.radar_offline else sources.github_full_name(str(entry.get("url") or ""))
+    if full_name:
+        repo = await sources.fetch_repo(full_name, settings)
+        if repo is not None:
+            raw = {**raw, **repo, "source_key": "github"}
+            # 用户填了名称 / 说明就用用户的；链接统一回填成仓库的规范地址。
+            raw["name"] = str(entry.get("name") or "").strip() or repo["name"]
+            raw["summary"] = str(entry.get("summary") or "").strip() or repo["summary"]
+            raw["url"] = repo["url"] or raw["url"]
+            for field in ("direction", "sub_direction"):
+                if str(entry.get(field) or "").strip():
+                    raw[field] = str(entry[field]).strip()
     item = normalize.normalize_item(raw)
     summary = assess.profile_summary()
     digest = assess.profile_digest(summary)

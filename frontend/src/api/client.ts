@@ -47,6 +47,7 @@ import type {
   RadarJobItem,
   RadarJobList,
   RadarManualRequest,
+  RadarRunRequest,
   RadarRunSummary,
   RadarTechItem,
   RadarTechList,
@@ -186,9 +187,12 @@ export const api = {
   radarTechs: (limit = 50, signal?: AbortSignal): Promise<RadarTechList> =>
     request<RadarTechList>(`/api/radar/techs?${queryString({ limit })}`, { signal }),
 
-  /** 立即跑一轮采集与评估（离线模式下只读内置样本）。 */
-  radarRun: (): Promise<RadarRunSummary> =>
-    request<RadarRunSummary>('/api/radar/run', { method: 'POST' }),
+  /** 立即跑一轮采集与评估；可指定方向或单个仓库（都不填即全源默认轮次）。 */
+  radarRun: (payload?: RadarRunRequest): Promise<RadarRunSummary> =>
+    request<RadarRunSummary>(
+      '/api/radar/run',
+      payload === undefined ? { method: 'POST' } : jsonInit('POST', payload),
+    ),
 
   /** 最近一轮采集摘要（含每个源的可用性）。 */
   radarLatestRun: (signal?: AbortSignal): Promise<RadarRunSummary> =>

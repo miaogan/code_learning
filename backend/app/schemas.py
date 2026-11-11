@@ -1049,6 +1049,16 @@ class RadarSourceStatus(BaseModel):
     message: str = ""
 
 
+class RadarRunRequest(BaseModel):
+    """指定本轮采集范围：`direction` 走站内方向闭集，`repo` 接受 GitHub 链接或 `owner/repo`。
+
+    两者都留空时就是原有的全源默认轮次；都填时以仓库为准（只采该仓库）。
+    """
+
+    direction: str = ""
+    repo: str = ""
+
+
 class RadarRunSummary(BaseModel):
     """一轮采集的结果摘要（`/runs/latest` 也返回它）。"""
 
@@ -1096,7 +1106,7 @@ class RadarTechList(BaseModel):
 
 
 class RadarManualRequest(BaseModel):
-    """手工录入一条技术线索（不联网，直接进清单）。"""
+    """手工录入一条技术线索：GitHub 仓库链接会补一次公开元数据，其余直接进清单。"""
 
     name: str = Field(min_length=1)
     url: str = ""

@@ -933,6 +933,13 @@ export interface RadarSourceStatus {
   message: string
 }
 
+export interface RadarRunRequest {
+  /** 站内方向闭集（见 `lib/questionDirections.ts`）；空串 = 全方向。 */
+  direction?: string
+  /** GitHub 仓库链接或 `owner/repo`；填了只采这一个仓库。 */
+  repo?: string
+}
+
 export interface RadarRunSummary {
   run_id: number
   trigger: string

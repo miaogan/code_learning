@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
-import type { RadarTechItem } from '../api/types'
+import type { RadarRunRequest, RadarTechItem } from '../api/types'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { EmptyState } from '../components/ui/EmptyState'
 import { InlineError } from '../components/ui/InlineError'
 import { PhaseLoader } from '../components/ui/PhaseLoader'
 import { Toast } from '../components/ui/Toast'
+import { DIRECTIONS } from '../lib/questionDirections'
 import { dimensionText, techMetaText } from '../lib/radar'
 import { useAsync } from '../lib/useAsync'
 
@@ -72,6 +73,8 @@ export default function PioneerPage() {
   const [collecting, setCollecting] = useState(false)
   const [collectError, setCollectError] = useState('')
   const [generating, setGenerating] = useState('')
+  const [direction, setDirection] = useState('')
+  const [repo, setRepo] = useState('')
 
   // 直接读 `data`（重载期间保留上一次成功值）：按 status 派生会在采集后刷新时清空清单、闪一帧 loader。
   const techs = listAsync.data
@@ -86,7 +89,14 @@ export default function PioneerPage() {
     setCollecting(true)
     setCollectError('')
     try {
-      const result = await api.radarRun()
+      const payload: RadarRunRequest = {}
+      if (direction !== '') {
+        payload.direction = direction
+      }
+      if (repo.trim() !== '') {
+        payload.repo = repo.trim()
+      }
+      const result = await api.radarRun(payload)
       refresh()
       setToast({
         message: result.notice !== '' ? result.notice : `采集完成：本轮看到 ${result.techs_seen} 项技术`,
@@ -179,13 +189,43 @@ export default function PioneerPage() {
             </Button>
           </div>
         </div>
+        <div className="sc-radar-target">
+          <label className="sc-field sc-radar-targetdir">
+            <span className="sc-field-label">采集方向</span>
+            <select
+              className="sc-filter-select"
+              value={direction}
+              onChange={(event) => setDirection(event.target.value)}
+            >
+              <option value="">全部方向</option>
+              {DIRECTIONS.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="sc-field sc-radar-targetrepo">
+            <span className="sc-field-label">指定仓库（选填）</span>
+            <input
+              type="text"
+              value={repo}
+              onChange={(event) => setRepo(event.target.value)}
+              placeholder="https://github.com/HKUDS/LightRAG 或 HKUDS/LightRAG"
+            />
+          </label>
+        </div>
+        <p className="sc-coach-note">
+          指定仓库时只采这一个仓库；只选方向时按该方向的关键词检索，并只保留该方向的条目。两者都留空就是全源默认轮次。
+        </p>
         {collectError !== '' && <p className="sc-radar-error">{collectError}</p>}
       </Card>
 
       <Card>
         <h3 className="sc-coach-blocktitle">手工录入线索</h3>
         <p className="sc-coach-note">
-          自动采集只读公开清单，没覆盖到的技术可以手动补一条：不联网，按通用规则评估后即可生成样例。
+          自动采集只读公开清单，没覆盖到的技术可以手动补一条：粘贴 GitHub 仓库链接会自动补上
+          star / 库龄等公开数据，其余按通用规则评估后即可生成样例。
         </p>
         <div className="sc-radar-manual">
           <label className="sc-field">

@@ -15,13 +15,14 @@ from app.schemas import (
     RadarJobItem,
     RadarJobList,
     RadarManualRequest,
+    RadarRunRequest,
     RadarRunSummary,
     RadarTechItem,
     RadarTechList,
 )
 from app.services import radar
 from app.services.ai import user_ai
-from app.services.radar import jobs, rules, store
+from app.services.radar import jobs, rules, sources, store
 
 router = APIRouter(prefix="/api/radar", tags=["radar"], dependencies=[Depends(current_user)])
 
@@ -46,8 +47,19 @@ async def list_techs(limit: int = Query(default=50, ge=1, le=100)) -> RadarTechL
 
 
 @router.post("/run", response_model=RadarRunSummary, summary="立即跑一轮采集与评估")
-async def run_round(user: CurrentUser) -> RadarRunSummary:
-    result = await radar.run_round(trigger="manual", user=user)
+async def run_round(
+    user: CurrentUser, payload: RadarRunRequest | None = None
+) -> RadarRunSummary:
+    request = payload or RadarRunRequest()
+    direction = request.direction.strip()
+    repo = sources.repo_full_name(request.repo)
+    if direction and direction not in rules.DIRECTIONS:
+        raise AppError(VALIDATION_ERROR, "方向不在站内闭集，请从下拉框选择", status=400)
+    if request.repo.strip() and not repo:
+        raise AppError(
+            VALIDATION_ERROR, "仓库地址无法识别：请填 GitHub 仓库链接或 owner/repo", status=400
+        )
+    result = await radar.run_round(trigger="manual", user=user, direction=direction, repo=repo)
     return RadarRunSummary(**result)
 
 

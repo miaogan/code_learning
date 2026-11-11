@@ -171,6 +171,68 @@ def test_manual_then_generate_then_adopt_only_practice(
         assert sample["id"] not in ids_exam
 
 
+def test_github_repo_url_is_normalized() -> None:
+    """只有仓库链接才补元数据：用户主页 / issue / 非 github 链接一律返回空串。"""
+    assert sources.github_full_name("https://github.com/HKUDS/LightRAG") == "HKUDS/LightRAG"
+    assert sources.github_full_name("https://github.com/HKUDS/LightRAG.git") == "HKUDS/LightRAG"
+    assert sources.github_full_name("https://github.com/HKUDS/LightRAG/tree/main") == "HKUDS/LightRAG"
+    assert sources.github_full_name("https://github.com/HKUDS") == ""
+    assert sources.github_full_name("https://example.test/HKUDS/LightRAG") == ""
+
+
+def test_manual_github_url_uses_repo_metadata(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """粘贴 GitHub 仓库链接时补 star / 库龄：热门仓库不该再按 0 star 被判成「跳过」。"""
+    monkeypatch.setenv("RADAR_OFFLINE", "0")
+    monkeypatch.setenv("RADAR_SCHEDULE", "off")
+    monkeypatch.setenv("RADAR_MAX_ASSESS_PER_ROUND", "0")
+    get_settings.cache_clear()
+
+    async def _fake_repo(full_name: str, _settings: Any = None) -> dict[str, Any] | None:
+        assert full_name == "HKUDS/LightRAG"
+        return sources._github_item(
+            {
+                "full_name": "HKUDS/LightRAG",
+                "html_url": "https://github.com/HKUDS/LightRAG",
+                "description": "Simple and Fast Retrieval-Augmented Generation",
+                "topics": ["llm", "rag"],
+                "stargazers_count": 40642,
+                "forks_count": 5321,
+                "created_at": "2024-10-02T06:14:44Z",
+                "pushed_at": "2026-11-10T09:00:00Z",
+            }
+        )
+
+    monkeypatch.setattr(sources, "fetch_repo", _fake_repo)
+    response = client.post(
+        "/api/radar/manual",
+        json={"name": "LightRAG", "url": "https://github.com/HKUDS/LightRAG"},
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["tech_slug"] == "github:HKUDS/LightRAG"
+    assert body["verdict"] != "skip"
+    assert body["adoption"] >= 3
+
+
+def test_manual_github_url_stays_offline_in_offline_mode(
+    client: TestClient, radar_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """离线模式（AC-1）下即使粘贴仓库链接也不出网，按手工字段兜底。"""
+
+    async def _no_network(*_args: Any, **_kwargs: Any) -> dict[str, Any] | None:
+        raise AssertionError("离线模式不应联网")
+
+    monkeypatch.setattr(sources, "fetch_repo", _no_network)
+    response = client.post(
+        "/api/radar/manual",
+        json={"name": "LightRAG", "url": "https://github.com/HKUDS/LightRAG"},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["tech_slug"].startswith("manual:")
+
+
 def test_create_job_reuses_active_row(radar_env: None) -> None:
     """复用逻辑在仓储层直测：接口层的后台任务太快，`queued/running` 窗口抓不稳。"""
     slug = "manual:reuse-demo"
@@ -276,7 +338,7 @@ def test_round_marks_degraded_when_one_source_fails(
     db.init_db()
     items = sources.load_samples()
 
-    async def fake_fetch_all(_settings: Any = None) -> Any:
+    async def fake_fetch_all(_settings: Any = None, **_kwargs: Any) -> Any:
         return items, [
             {"source_key": "github", "status": "ok", "items": len(items), "latency_ms": 12,
              "message": ""},
@@ -390,3 +452,92 @@ def test_is_due_after_restart(radar_env: None) -> None:
     assert schedule.is_due("", now, slots) is True  # 从未跑过
     assert schedule.is_due((now - timedelta(hours=10)).isoformat(), now, slots) is True  # 07:00
     assert schedule.is_due((now - timedelta(minutes=5)).isoformat(), now, slots) is False
+
+
+def test_round_with_direction_filters_items(radar_env: None) -> None:
+    """指定方向只保留该方向条目；方向没有样本时如实提示，不伪造条目。"""
+    summary = asyncio.run(radar.run_round(trigger="manual", user=None, direction="SQL 与数据库"))
+    assert summary["techs_seen"] == 2
+    assert "SQL 与数据库" in summary["notice"]
+    assert all(row["direction"] == "SQL 与数据库" for row in store.list_techs(100))
+
+    empty = asyncio.run(radar.run_round(trigger="manual", user=None, direction="前端"))
+    assert empty["techs_seen"] == 0
+    assert "没有匹配到条目" in empty["notice"]
+
+
+def test_fetch_all_with_repo_reads_single_repository(
+    radar_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """指定仓库就只跑一次 `GET /repos/{owner}/{repo}`，不扫其他来源。"""
+    monkeypatch.setenv("RADAR_OFFLINE", "0")
+    get_settings.cache_clear()
+
+    async def _fake_repo(full_name: str, _settings: Any = None) -> dict[str, Any] | None:
+        assert full_name == "HKUDS/LightRAG"
+        return sources._github_item(
+            {
+                "full_name": "HKUDS/LightRAG",
+                "html_url": "https://github.com/HKUDS/LightRAG",
+                "description": "Simple and Fast Retrieval-Augmented Generation",
+                "topics": ["llm", "rag"],
+                "stargazers_count": 40642,
+                "forks_count": 5321,
+                "created_at": "2024-10-02T06:14:44Z",
+                "pushed_at": "2026-11-10T09:00:00Z",
+            }
+        )
+
+    monkeypatch.setattr(sources, "fetch_repo", _fake_repo)
+    items, status, degraded = asyncio.run(sources.fetch_all(repo="HKUDS/LightRAG"))
+    assert len(items) == 1
+    assert items[0]["slug"] == "github:HKUDS/LightRAG"
+    assert status[0]["source_key"] == "github"
+    assert degraded is False
+
+
+def test_run_api_accepts_repo_and_direction(
+    client: TestClient, radar_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`POST /run` 带 `repo` 时只采该仓库；非法方向 / 仓库地址按 400 挡住（不落空轮次）。"""
+    monkeypatch.setenv("RADAR_OFFLINE", "0")
+    get_settings.cache_clear()
+
+    async def _fake_repo(full_name: str, _settings: Any = None) -> dict[str, Any] | None:
+        assert full_name == "HKUDS/LightRAG"
+        return sources._github_item(
+            {
+                "full_name": "HKUDS/LightRAG",
+                "html_url": "https://github.com/HKUDS/LightRAG",
+                "description": "Simple and Fast Retrieval-Augmented Generation",
+                "topics": ["llm", "rag"],
+                "stargazers_count": 40642,
+                "forks_count": 5321,
+                "created_at": "2024-10-02T06:14:44Z",
+                "pushed_at": "2026-11-10T09:00:00Z",
+            }
+        )
+
+    monkeypatch.setattr(sources, "fetch_repo", _fake_repo)
+    response = client.post(
+        "/api/radar/run", json={"repo": "https://github.com/HKUDS/LightRAG", "direction": "AI 工程"}
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["techs_seen"] == 1
+    assert "HKUDS/LightRAG" in body["notice"]
+
+    bad_direction = client.post("/api/radar/run", json={"direction": "区块链"})
+    assert bad_direction.status_code == 400
+    assert "方向" in bad_direction.json()["error"]["message"]
+
+    bad_repo = client.post("/api/radar/run", json={"repo": "https://github.com/HKUDS"})
+    assert bad_repo.status_code == 400
+    assert "仓库" in bad_repo.json()["error"]["message"]
+
+
+def test_run_api_without_body_keeps_default_round(client: TestClient, radar_env: None) -> None:
+    """老调用（不带请求体）仍是全源默认轮次，不需要前端同步改造。"""
+    response = client.post("/api/radar/run")
+    assert response.status_code == 200, response.text
+    assert response.json()["techs_seen"] >= 10

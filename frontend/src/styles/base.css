@@ -8777,6 +8777,24 @@ html {
   margin-top: var(--sp-3);
 }
 
+/* 指定采集范围：方向下拉定宽，仓库输入占满剩余行宽（同一行内「圈定本轮范围」）。 */
+.sc-radar-target {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--sp-3);
+  margin-top: var(--sp-3);
+}
+
+.sc-radar-targetdir {
+  width: 160px;
+}
+
+.sc-radar-targetrepo {
+  flex: 1 1 260px;
+  min-width: 200px;
+}
+
 .sc-radar-manual .sc-btn-row {
   grid-column: 1 / -1;
 }

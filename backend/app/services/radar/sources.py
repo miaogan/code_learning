@@ -14,10 +14,13 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
+import ssl
 import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 import httpx
 
@@ -80,50 +83,122 @@ async def _get(client: httpx.AsyncClient, url: str, headers: dict[str, str], set
     raise last_error or RuntimeError("采集失败")
 
 
-def _github_query(settings: Settings) -> str:
+#: 指定方向采集时 GitHub 检索式的关键词；不在表里的方向（含空串）走默认 `topic:llm`。
+_DIRECTION_QUERIES: dict[str, str] = {
+    "AI 工程": "llm",
+    "中间件与运维": "kubernetes",
+    "SQL 与数据库": "database",
+    "前端": "frontend",
+    "后端": "backend",
+    "算法与数据结构": "algorithm",
+    "计算机基础": "compiler",
+    "研发工程实践": "ci",
+}
+
+
+def _github_query(settings: Settings, direction: str = "") -> str:
     since = normalize.window_start(hours=24 * 7)
+    term = _DIRECTION_QUERIES.get(direction, "topic:llm")
     return (
         "https://api.github.com/search/repositories?q="
-        f"topic:llm+pushed:>{since}+stars:>{settings.radar_min_stars}"
+        f"{term}+pushed:>{since}+stars:>{settings.radar_min_stars}"
         "&sort=stars&order=desc&per_page=10"
     )
 
 
+def _github_item(repo: dict[str, Any]) -> dict[str, Any] | None:
+    """GitHub 仓库对象 → 统一条目（列表检索与「按仓库补元数据」共用同一形状）。"""
+    full_name = str(repo.get("full_name") or "")
+    if not full_name:
+        return None
+    topics = [str(t) for t in (repo.get("topics") or [])]
+    text = f"{full_name} {repo.get('description') or ''} {' '.join(topics)}"
+    direction = normalize.guess_direction(text)
+    stars = int(repo.get("stargazers_count") or 0)
+    return {
+        "slug": normalize.slug_of("github", full_name),
+        "name": full_name,
+        "url": str(repo.get("html_url") or ""),
+        "summary": normalize.clean_text(repo.get("description"), 300),
+        "direction": direction,
+        "sub_direction": "",
+        "source_key": "github",
+        "stars": stars,
+        "forks": int(repo.get("forks_count") or 0),
+        "repo_created_at": str(repo.get("created_at") or ""),
+        "pushed_at": str(repo.get("pushed_at") or ""),
+        "suspect": normalize.is_suspect(str(repo.get("created_at") or ""), stars),
+    }
+
+
 def parse_github(payload: bytes) -> list[dict[str, Any]]:
     data = json.loads(payload.decode("utf-8", "ignore") or "{}")
-    items: list[dict[str, Any]] = []
-    for repo in (data.get("items") or [])[:10]:
-        full_name = str(repo.get("full_name") or "")
-        if not full_name:
-            continue
-        topics = [str(t) for t in (repo.get("topics") or [])]
-        text = f"{full_name} {repo.get('description') or ''} {' '.join(topics)}"
-        direction = normalize.guess_direction(text)
-        stars = int(repo.get("stargazers_count") or 0)
-        items.append(
-            {
-                "slug": normalize.slug_of("github", full_name),
-                "name": full_name,
-                "url": str(repo.get("html_url") or ""),
-                "summary": normalize.clean_text(repo.get("description"), 300),
-                "direction": direction,
-                "sub_direction": "",
-                "source_key": "github",
-                "stars": stars,
-                "forks": int(repo.get("forks_count") or 0),
-                "repo_created_at": str(repo.get("created_at") or ""),
-                "pushed_at": str(repo.get("pushed_at") or ""),
-                "suspect": normalize.is_suspect(str(repo.get("created_at") or ""), stars),
-            }
-        )
-    return items
+    items = [_github_item(repo) for repo in (data.get("items") or [])[:10]]
+    return [item for item in items if item is not None]
 
 
-async def fetch_github(client: httpx.AsyncClient, settings: Settings) -> list[dict[str, Any]]:
+_GITHUB_HOSTS = {"github.com", "www.github.com"}
+_REPO_PART = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9_.-]*[A-Za-z0-9])?$")
+
+
+def github_full_name(url: str) -> str:
+    """从仓库链接取 `owner/repo`；用户主页 / issue / 非 github 链接一律返回空串。"""
+    try:
+        parts = urlsplit((url or "").strip())
+    except ValueError:
+        return ""
+    if parts.scheme not in ("http", "https") or (parts.hostname or "") not in _GITHUB_HOSTS:
+        return ""
+    segments = [segment for segment in parts.path.split("/") if segment]
+    if len(segments) < 2:
+        return ""
+    owner, repo = segments[0], segments[1]
+    if repo.endswith(".git"):
+        repo = repo[: -len(".git")]
+    if not _REPO_PART.match(owner) or not _REPO_PART.match(repo):
+        return ""
+    return f"{owner}/{repo}"
+
+
+def repo_full_name(text: str) -> str:
+    """「指定仓库采集」的入参解析：仓库链接或 `owner/repo` 简写都接，其余返回空串。"""
+    value = (text or "").strip()
+    full_name = github_full_name(value)
+    if full_name:
+        return full_name
+    parts = value.split("/")
+    if len(parts) == 2 and all(_REPO_PART.match(part) for part in parts):
+        return value
+    return ""
+
+
+async def fetch_repo(full_name: str, settings: Settings | None = None) -> dict[str, Any] | None:
+    """按仓库补一次公开元数据（手工录入 GitHub 链接时用）；拿不到返回 None 由调用方兜底。"""
+    settings = settings or get_settings()
     headers = _headers({"Accept": "application/vnd.github+json"})
     if settings.github_token:
         headers["Authorization"] = f"Bearer {settings.github_token}"
-    return parse_github(await _get(client, _github_query(settings), headers, settings))
+    timeout = httpx.Timeout(settings.radar_fetch_timeout_s)
+    try:
+        async with httpx.AsyncClient(
+            timeout=timeout, follow_redirects=True, verify=not settings.radar_insecure_tls
+        ) as client:
+            payload = await _get(
+                client, f"https://api.github.com/repos/{full_name}", headers, settings
+            )
+        return _github_item(json.loads(payload.decode("utf-8", "ignore") or "{}"))
+    except (httpx.HTTPError, ValueError, OSError) as error:
+        logger.warning("按仓库采集 %s 失败：%s", full_name, error)
+        return None
+
+
+async def fetch_github(
+    client: httpx.AsyncClient, settings: Settings, query: str = ""
+) -> list[dict[str, Any]]:
+    headers = _headers({"Accept": "application/vnd.github+json"})
+    if settings.github_token:
+        headers["Authorization"] = f"Bearer {settings.github_token}"
+    return parse_github(await _get(client, query or _github_query(settings), headers, settings))
 
 
 async def fetch_hackernews(client: httpx.AsyncClient, settings: Settings) -> list[dict[str, Any]]:
@@ -250,10 +325,28 @@ def load_samples() -> list[dict[str, Any]]:
     return [normalize.normalize_item(item) for item in payload.get("items", [])]
 
 
-async def _run_source(key: str, client: httpx.AsyncClient, settings: Settings) -> dict[str, Any]:
+def _tls_failed(error: BaseException) -> bool:
+    """异常链里是否有 TLS 证书校验失败（httpx 会把它包成 `ConnectError`）。"""
+    seen: set[int] = set()
+    current: BaseException | None = error
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        text = str(current).lower()
+        if isinstance(current, ssl.SSLError) or "certificate" in text or "[ssl" in text:
+            return True
+        current = current.__cause__ or current.__context__
+    return False
+
+
+async def _run_source(
+    key: str, client: httpx.AsyncClient, settings: Settings, github_query: str = ""
+) -> dict[str, Any]:
     started = time.monotonic()
     try:
-        items = await _FETCHERS[key](client, settings)
+        if key == "github" and github_query:
+            items = await fetch_github(client, settings, github_query)
+        else:
+            items = await _FETCHERS[key](client, settings)
     except TimeoutError:
         return {"source_key": key, "status": "failed", "items": 0,
                 "latency_ms": int((time.monotonic() - started) * 1000), "message": "上游超时"}
@@ -263,9 +356,14 @@ async def _run_source(key: str, client: httpx.AsyncClient, settings: Settings) -
                 "message": f"上游返回 {error.response.status_code}"}
     except (httpx.HTTPError, ET.ParseError, ValueError, OSError) as error:
         logger.warning("采集源 %s 失败：%s", key, error)
+        message = (
+            "上游 TLS 证书校验失败（可在 backend/.env 设置 RADAR_INSECURE_TLS=true 临时跳过）"
+            if _tls_failed(error)
+            else "上游不可用或返回格式异常"
+        )
         return {"source_key": key, "status": "failed", "items": 0,
                 "latency_ms": int((time.monotonic() - started) * 1000),
-                "message": "上游不可用或返回格式异常"}
+                "message": message}
     return {
         "source_key": key,
         "status": "ok",
@@ -276,8 +374,14 @@ async def _run_source(key: str, client: httpx.AsyncClient, settings: Settings) -
     }
 
 
-async def fetch_all(settings: Settings | None = None) -> tuple[list[dict[str, Any]], list[dict[str, Any]], bool]:
-    """返回 `(归一化后的条目, 来源状态, 是否降级)`。离线模式只读样本、不建连接。"""
+async def fetch_all(
+    settings: Settings | None = None, direction: str = "", repo: str = ""
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], bool]:
+    """返回 `(归一化后的条目, 来源状态, 是否降级)`。离线模式只读样本、不建连接。
+
+    `repo` 非空时只采这一个仓库（跑一次 `GET /repos/{owner}/{repo}`，不扫其他源）；
+    `direction` 非空时把 GitHub 检索式换成本方向关键词，接由调用方按方向过滤。
+    """
     settings = settings or get_settings()
     if settings.radar_offline:
         items = load_samples()
@@ -287,13 +391,28 @@ async def fetch_all(settings: Settings | None = None) -> tuple[list[dict[str, An
             for key in SOURCE_KEYS
         ]
         return items, status, True
+    if repo:
+        started = time.monotonic()
+        item = await fetch_repo(repo, settings)
+        latency = int((time.monotonic() - started) * 1000)
+        if item is None:
+            return [], [{"source_key": "github", "status": "failed", "items": 0,
+                         "latency_ms": latency,
+                         "message": "仓库不存在、限流、网络或 TLS 证书校验失败"}], True
+        return [normalize.normalize_item(item)], [
+            {"source_key": "github", "status": "ok", "items": 1,
+             "latency_ms": latency, "message": "指定仓库采集"}
+        ], False
     timeout = httpx.Timeout(settings.radar_fetch_timeout_s)
     if settings.radar_insecure_tls:
         logger.warning("RADAR_INSECURE_TLS=true：采集链路已跳过 TLS 证书校验（仅限内网排障）")
+    query = _github_query(settings, direction) if direction else ""
     async with httpx.AsyncClient(
         timeout=timeout, follow_redirects=True, verify=not settings.radar_insecure_tls
     ) as client:
-        results = await asyncio.gather(*[_run_source(key, client, settings) for key in _FETCHERS])
+        results = await asyncio.gather(
+            *[_run_source(key, client, settings, query) for key in _FETCHERS]
+        )
     raw_items: list[dict[str, Any]] = []
     status: list[dict[str, Any]] = []
     degraded = False
