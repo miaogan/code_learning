@@ -376,35 +376,31 @@ export default function PioneerPage() {
               ariaLabel="技术结论筛选"
             />
             <div className="sc-radar-filterright">
-              <label className="sc-field sc-radar-filterdir">
-                <span className="sc-field-label">按方向筛选</span>
-                <select
-                  className="sc-filter-select"
-                  value={directionFilter}
-                  onChange={(event) => changeDirection(event.target.value)}
-                >
-                  <option value="">全部方向</option>
-                  {DIRECTIONS.map((item) => (
-                    <option key={item} value={item}>
-                      {item}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="sc-field sc-radar-pagesize">
-                <span className="sc-field-label">每页条数</span>
-                <select
-                  className="sc-filter-select"
-                  value={pageSize}
-                  onChange={(event) => changePageSize(event.target.value)}
-                >
-                  {PAGE_SIZE_OPTIONS.map((size) => (
-                    <option key={size} value={size}>
-                      {size} 条
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <select
+                className="sc-radar-select"
+                aria-label="按方向筛选"
+                value={directionFilter}
+                onChange={(event) => changeDirection(event.target.value)}
+              >
+                <option value="">全部方向</option>
+                {DIRECTIONS.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+              <select
+                className="sc-radar-select"
+                aria-label="每页条数"
+                value={pageSize}
+                onChange={(event) => changePageSize(event.target.value)}
+              >
+                {PAGE_SIZE_OPTIONS.map((size) => (
+                  <option key={size} value={size}>
+                    每页 {size} 条
+                  </option>
+                ))}
+              </select>
               {filtering && (
                 <Button variant="ghost" size="sm" onClick={resetFilters}>
                   清除筛选

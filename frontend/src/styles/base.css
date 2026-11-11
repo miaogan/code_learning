@@ -968,6 +968,7 @@ a {
   outline: none;
 }
 .sc-filter-select:focus-visible {
+  outline: none;
   border-color: var(--accent-line-30);
   box-shadow: 0 0 0 2px var(--accent-wash-06);
 }
@@ -8807,11 +8808,11 @@ html {
   margin-bottom: var(--sp-3);
 }
 
-/* 清单筛选条：结论 tab 靠左、方向下拉靠右，窄屏折行；筛到 0 条时空态文案与它同处一张卡。 */
+/* 清单筛选条：结论 tab 靠左、轻量下拉靠右，窄屏折行；筛到 0 条时空态文案与它同处一张卡。 */
 .sc-radar-filters {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
   gap: var(--sp-3);
   margin-bottom: var(--sp-3);
@@ -8819,22 +8820,48 @@ html {
   border-bottom: 1px solid var(--border-subtle);
 }
 
-.sc-radar-filterdir {
-  flex: 0 1 200px;
-  min-width: 160px;
-}
-
 /* 右侧控件组：方向 / 每页条数 / 清除筛选，窄屏整体折到下一行。 */
 .sc-radar-filterright {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
-  gap: var(--sp-3);
+  align-items: center;
+  gap: var(--sp-2);
 }
 
-.sc-radar-pagesize {
-  flex: 0 0 120px;
-  min-width: 104px;
+/* 清单内下拉：透明底 + 细边框，高 32 与 sm 按钮齐平；不放字段标签，靠首选项自解释。
+   hover 只提亮边框，焦点高亮仅键盘可达时出现（沿用科考页的柔和高亮口径）。 */
+.sc-radar-select {
+  height: var(--btn-h-sm);
+  padding: 0 var(--sp-6) 0 var(--sp-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-6);
+  background-color: transparent;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23737d89' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 10px;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  cursor: pointer;
+  appearance: none;
+  transition: border-color var(--fast) var(--ease), color var(--fast) var(--ease);
+}
+
+.sc-radar-select:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+
+.sc-radar-select:focus {
+  outline: none;
+}
+
+.sc-radar-select:focus-visible {
+  outline: none;
+  border-color: var(--accent-line-30);
+  box-shadow: 0 0 0 2px var(--accent-wash-06);
 }
 
 .sc-radar-filtered-empty {
@@ -8869,23 +8896,31 @@ html {
 .sc-radar-joblist {
   display: flex;
   flex-direction: column;
+}
+
+.sc-radar-joblist {
   gap: var(--sp-2);
 }
 
-/* 一行技术：左侧信息可换行，右侧操作按钮不压缩 */
+/* 一行技术：左侧信息可换行，右侧操作按钮不压缩。
+   清单内用分隔线而不是逐行描边卡片，避免卡中卡、层层套框。 */
 .sc-radar-techrow {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--sp-3);
-  padding: var(--sp-3);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-8);
-  background: var(--bg-raised);
-  transition: border-color var(--fast) var(--ease);
+  padding: var(--sp-3) var(--sp-2);
+  border-bottom: 1px solid var(--border-subtle);
+  border-radius: var(--radius-6);
+  background: transparent;
+  transition: background-color var(--fast) var(--ease);
+}
+
+.sc-radar-techrow:last-child {
+  border-bottom: 0;
 }
 
 .sc-radar-techrow:hover {
-  border-color: var(--border-strong);
+  background: var(--overlay-06);
 }
 
 .sc-radar-rowmain {
