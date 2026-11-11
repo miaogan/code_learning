@@ -9818,3 +9818,50 @@ html {
 .sc-select .sc-radar-select ~ .sc-select-popup .sc-select-option {
   min-height: 28px;
 }
+
+/* ============================================================
+   r73 · 先锋清单折叠（append-only）
+   原先把摘要、理由、四维分档全部平铺，单条 120px 上下，每页 10 条
+   也要频繁滚动。默认折叠为「结论 + 名称 + 元信息」，详情按需展开，
+   行距同步收紧；展开按钮仍是原生 button，键盘与读屏语义不变。
+   ============================================================ */
+.sc-radar-techrow {
+  padding: var(--sp-2);
+  gap: var(--sp-2);
+}
+
+.sc-radar-rowmain {
+  gap: var(--sp-2);
+}
+
+.sc-radar-expand {
+  align-self: flex-start;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  cursor: pointer;
+  transition: color var(--fast) var(--ease);
+}
+
+.sc-radar-expand:hover {
+  color: var(--accent);
+}
+
+.sc-radar-expand:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-4);
+}
+
+.sc-radar-rowdetail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  padding-left: var(--sp-3);
+  border-left: 1px solid var(--border-subtle);
+}

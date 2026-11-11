@@ -31,7 +31,8 @@ const VERDICT_CLASS: Record<string, string> = {
 
 /** 每页条数：与后端 `/api/radar/techs` 的 `limit` 同一口径（上限 100）。 */
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100] as const
-const DEFAULT_PAGE_SIZE = 20
+// 默认 10：折叠后一行约 90px，10 条恰好接近一屏；默认 20 会让清单必然滚两三屏。
+const DEFAULT_PAGE_SIZE = 10
 
 /** 结论筛选多选：与后端 `rules.VERDICT_LABELS` 同一套措辞（「全部」是折叠后的哨兵）。 */
 const VERDICT_OPTIONS: ChipOption<string>[] = [
@@ -51,12 +52,17 @@ const DIRECTION_OPTIONS: ChipOption<string>[] = [
 function TechRow({
   item,
   busy,
+  expanded,
+  onToggle,
   onGenerate,
 }: {
   item: RadarTechItem
   busy: boolean
+  expanded: boolean
+  onToggle: () => void
   onGenerate: (item: RadarTechItem) => void
 }) {
+  const detailId = `radar-tech-detail-${item.tech_slug}`
   return (
     <li className="sc-radar-techrow">
       <div className="sc-radar-rowmain">
@@ -68,9 +74,23 @@ function TechRow({
           <span className="sc-radar-source">{item.source_key}</span>
         </div>
         <p className="sc-radar-meta">{techMetaText(item)}</p>
-        {item.summary !== '' && <p className="sc-radar-summary">{item.summary}</p>}
-        {item.reasons.length > 0 && <p className="sc-radar-reasons">{item.reasons.join('；')}</p>}
-        <p className="sc-radar-dims">{dimensionText(item)}</p>
+        {expanded && (
+          <div className="sc-radar-rowdetail" id={detailId}>
+            {item.summary !== '' && <p className="sc-radar-summary">{item.summary}</p>}
+            {item.reasons.length > 0 && <p className="sc-radar-reasons">{item.reasons.join('；')}</p>}
+            <p className="sc-radar-dims">{dimensionText(item)}</p>
+          </div>
+        )}
+        {/* 默认只留结论 + 名称 + 元信息，摘要/理由/分档按需展开：每页 10 条也能一屏看完。 */}
+        <button
+          type="button"
+          className="sc-radar-expand"
+          aria-expanded={expanded}
+          aria-controls={detailId}
+          onClick={onToggle}
+        >
+          {expanded ? '收起详情 ▴' : '展开详情 ▾'}
+        </button>
       </div>
       <div className="sc-radar-rowact">
         <Button variant="secondary" size="sm" loading={busy} onClick={() => onGenerate(item)}>
@@ -113,6 +133,11 @@ export default function PioneerPage() {
   const [collecting, setCollecting] = useState(false)
   const [collectError, setCollectError] = useState('')
   const [generating, setGenerating] = useState('')
+  // 条目的详情默认折叠：按 tech_slug 记住哪些被展开，翻页后状态天然跟着条目走。
+  const [expandedSlugs, setExpandedSlugs] = useState<string[]>([])
+  const toggleExpanded = (slug: string): void => {
+    setExpandedSlugs((prev) => (prev.includes(slug) ? prev.filter((item) => item !== slug) : [...prev, slug]))
+  }
   const [direction, setDirection] = useState('')
   const [repo, setRepo] = useState('')
   // 采集期间的清单轮询句柄：离开页面时要清掉，避免在别的页面继续打接口。
@@ -426,6 +451,8 @@ export default function PioneerPage() {
                   key={item.tech_slug}
                   item={item}
                   busy={generating === item.tech_slug}
+                  expanded={expandedSlugs.includes(item.tech_slug)}
+                  onToggle={() => toggleExpanded(item.tech_slug)}
                   onGenerate={(row) => void generate(row)}
                 />
               ))}
