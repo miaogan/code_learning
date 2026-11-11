@@ -383,7 +383,7 @@ export default function PolishPage() {
   return (
     <section className="sc-polish-page">
       <header className="sc-page-header">
-        <h1 className="sc-page-title">简历润色</h1>
+        <h1 className="sc-page-title">修文</h1>
         <p className="sc-page-sub">
           AI 只改措辞与结构，不改事实与数字；逐条对比后可采纳，成稿随时可导出
         </p>

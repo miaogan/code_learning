@@ -52,7 +52,7 @@ export default function HistoryPage() {
   return (
     <section>
       <header className="sc-page-header">
-        <h1 className="sc-page-title">成绩趋势</h1>
+        <h1 className="sc-page-title">战绩</h1>
         <p className="sc-page-sub">
           {`最多 ${limit} 次测评的面试均分、笔试总分与短板条数，按时间倒序；变化列只与同类型上一次对比`}
         </p>
@@ -67,7 +67,7 @@ export default function HistoryPage() {
       {isEmpty ? (
         <>
           <EmptyState
-            reason="完成一次测评后，这里会出现你的成绩趋势 —— 可以对比前后两次是否真的补上了短板。"
+            reason="完成一次测评后，这里会出现你的战绩 —— 可以对比前后两次是否真的补上了短板。"
             actionLabel="开始测评"
             actionTo="/exam"
           />

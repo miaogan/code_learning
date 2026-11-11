@@ -928,7 +928,7 @@ export default function UploadPage() {
           </div>
           {saved === null && savedError === null && phase === 'idle' ? (
             <p className="sc-lab-note sc-lab-rise is-d4">
-              暂时没有简历？<Link to="/practice">在线练习</Link>和
+              暂时没有简历？<Link to="/practice">演武</Link>和
               <Link to="/learn">站内教程</Link>不需要简历，现在就能用。
             </p>
           ) : saved !== null ? (

@@ -97,7 +97,7 @@ describe('exportFileName', () => {
   })
 
   it('前缀与长度常量对外可见（页面/检查器共用同一口径）', () => {
-    expect(EXPORT_PREFIX).toBe('简历润色-')
+    expect(EXPORT_PREFIX).toBe('修文-')
     expect(EXPORT_MAX_BASE_CHARS).toBe(120)
   })
 })

@@ -192,7 +192,7 @@ export default function ArchivePage() {
     <div className="sc-page sc-archive">
       <header className="sc-archive-hero">
         <p className="sc-archive-kicker">EVIDENCE ARCHIVE</p>
-        <h1 className="sc-page-title">学习档案</h1>
+        <h1 className="sc-page-title">卷宗</h1>
         <p className="sc-page-sub">
           把画像、成绩、薄弱方向、学习进度与计划打卡汇总到一处，可一键导出或复制 Markdown。
           只汇总你在本站的记录，不代表能力评级，也不承诺求职结果。
@@ -373,7 +373,7 @@ export default function ArchivePage() {
                     </span>
                   </div>
                   <Link className="sc-archive-link" to="/history">
-                    去看成绩趋势
+                    去看战绩
                   </Link>
                 </>
               )}

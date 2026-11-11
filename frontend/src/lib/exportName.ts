@@ -1,7 +1,7 @@
 /**
  * 导出文件名（r4 D-2 的**单一命名真源**）。
  *
- * 口径：`简历润色-<原文件名去扩展名>.md`；原名不可用（空/缺失/全脏）时回退 `简历润色-<yyyy-mm-dd>.md`。
+ * 口径：`修文-<原文件名去扩展名>.md`；原名不可用（空/缺失/全脏）时回退 `修文-<yyyy-mm-dd>.md`。
  *
  * 三条边界：
  * 1. 文件名来自契约字段 `file_name`（`documents.file_name`，后端读出），**不在前端自造**；
@@ -9,8 +9,8 @@
  * 3. 纯函数（入参 + 可选 `now`），无 DOM / 无网络 → 页面、检查器与 vitest 共用同一口径，页面内零规则。
  */
 
-/** 导出名前缀（照 DESIGN 原文口径，含全角连接符）。 */
-export const EXPORT_PREFIX = '简历润色-'
+/** 导出名前缀（与「修文」入口同名，含全角连接符）。 */
+export const EXPORT_PREFIX = '修文-'
 
 /** 清洗后基名的长度上限（按 code point 计，避免中文被按字节切一半）。 */
 export const EXPORT_MAX_BASE_CHARS = 120
@@ -74,7 +74,7 @@ function dateStamp(now: Date): string {
 }
 
 /**
- * 导出文件名：`简历润色-<清洗后原名>.md`；无可用原名时回退 `简历润色-<yyyy-mm-dd>.md`。
+ * 导出文件名：`修文-<清洗后原名>.md`；无可用原名时回退 `修文-<yyyy-mm-dd>.md`。
  * 全程不抛错、不弹错误（AC-8：旧简历没有文件名也要能导出）。
  */
 export function exportFileName(fileName: string | null | undefined, now: Date = new Date()): string {

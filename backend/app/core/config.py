@@ -67,6 +67,14 @@ _NUMERIC_ENV_FIELDS: tuple[str, ...] = (
     "ai_vision_timeout_s",
     "login_max_failures",
     "login_lockout_minutes",
+    "rate_limit_window_s",
+    "rate_limit_auth_per_window",
+    "rate_limit_api_per_window",
+    "breaker_max_inflight",
+    "breaker_window_s",
+    "breaker_min_requests",
+    "breaker_error_ratio",
+    "breaker_open_s",
     "radar_fetch_timeout_s",
     "radar_fetch_max_bytes",
     "radar_run_max_techs",
@@ -204,6 +212,27 @@ class Settings(BaseSettings):
     #: 登录失败窗口 / 锁定时长（分钟）。
     login_lockout_minutes: int = 15
 
+    # --- r70 应用层防护：按 IP 限流 + 熔断 ------------------------------------
+    #: 限流总开关（排障可关；生产不建议关）。
+    rate_limit_enabled: bool = True
+    #: 滑动窗口长度（秒）：窗口内同一 IP 的请求数超过分档上限即 429。
+    rate_limit_window_s: int = 60
+    #: 登录接口每 IP 每窗口上限：暴力破解与 scrypt 计算放大 DoS 都从这里进，单独收紧。
+    rate_limit_auth_per_window: int = 10
+    #: 其余接口每 IP 每窗口上限（前端轮询后台任务约 30 次/分钟，留足余量）。
+    rate_limit_api_per_window: int = 120
+    #: 熔断总开关。
+    breaker_enabled: bool = True
+    #: 同时在飞请求上限：超过即 503，保护单进程 uvicorn 与 SQLite 写锁。
+    breaker_max_inflight: int = 32
+    #: 熔断判定窗口（秒）与窗口内最少样本数（样本不足不判，避免低流量误开）。
+    breaker_window_s: int = 60
+    breaker_min_requests: int = 20
+    #: 窗口内 5xx 占比达到该阈值即打开熔断。
+    breaker_error_ratio: float = 0.5
+    #: 熔断打开时长（秒）：到点放行一个探针，成功即恢复，失败立即再开。
+    breaker_open_s: int = 30
+
     # --- 熟练度与近卷去重（r6，可环境变量覆盖） ------------------------------
     #: 熟练度滑动窗口天数：`answered_at >= now - window` 内的作答才算数（含边界）。
     proficiency_window_days: int = 30
@@ -215,6 +244,9 @@ class Settings(BaseSettings):
     # --- r67 技术雷达（先锋 / 国子监） ----------------------------------------
     #: 离线模式：不访问任何上游，只读 `seed/radar_samples.json`（AC-1 的零成本出口）。
     radar_offline: bool = False
+    #: 采集跳过 TLS 证书校验：仅供企业代理 / 自签证书的内网环境**临时**排障，默认关。
+    #: 打开后上游内容可被中间人篡改（会进题库与国子监生成），内网问题处理完应立刻关回。
+    radar_insecure_tls: bool = False
     #: 调度口径：`inapp` = 应用内 asyncio 循环（单进程 uvicorn）；`off` = 只允许手动采集。
     radar_schedule: str = "inapp"
     #: 应用内调度的采集时刻（逗号分隔 HH:MM，+08:00）。跨日空窗接受，用手动采集弥补。

@@ -1,5 +1,5 @@
 /**
- * r63 学习档案的纯函数层（页面零计算，导出与页面共用同一份口径）。
+ * r63 卷宗（学习档案）的纯函数层（页面零计算，导出与页面共用同一份口径）。
  *
  * 三条口径：
  * 1. 画像只数 **active** 项（`status='historical'` = 最新简历里已不出现，证据保留但不计入）；
@@ -15,7 +15,7 @@ import { ALL_TUTORIAL_CHAPTERS } from './tutorials'
 import { formatChars, formatScore, formatWhen } from './format'
 
 /** 导出名前缀（与 `exportName` 同为「单一命名真源」，只是属于不同产物）。 */
-export const ARCHIVE_PREFIX = '学习档案-'
+export const ARCHIVE_PREFIX = '卷宗-'
 
 /** 薄弱方向最多列出 5 条：档案是摘要，不是完整报告。 */
 export const MAX_ARCHIVE_WEAKNESSES = 5
@@ -273,14 +273,14 @@ function stamp(now: Date): string {
 }
 
 /**
- * 学习档案 Markdown：与页面内容同源（同一份 `ArchiveSnapshot`），页面不再二次拼串。
+ * 卷宗 Markdown：与页面内容同源（同一份 `ArchiveSnapshot`），页面不再二次拼串。
  * 空数据一律给「为什么空 + 怎么补」的中文说明，不写「暂无数据」。
  */
 export function archiveMarkdown(snapshot: ArchiveSnapshot, now: Date = new Date()): string {
   const { profile, scores, versions, weaknesses, learn, plan } = snapshot
   const lines: string[] = []
 
-  lines.push('# 学习档案', '')
+  lines.push('# 卷宗', '')
   lines.push(`生成时间：${stamp(now)}`, '')
   lines.push(
     '> 本档案由「逃跑计划」站内记录汇总，只反映你在本站的测评与学习痕迹，不代表能力评级或求职结果。',
@@ -373,7 +373,7 @@ export function archiveMarkdown(snapshot: ArchiveSnapshot, now: Date = new Date(
   return `${lines.join('\n')}\n`
 }
 
-/** 导出文件名：`学习档案-<yyyy-mm-dd>.md`（同一天多次导出同名，由浏览器自动加序号）。 */
+/** 导出文件名：`卷宗-<yyyy-mm-dd>.md`（同一天多次导出同名，由浏览器自动加序号）。 */
 export function archiveFileName(now: Date = new Date()): string {
   return `${ARCHIVE_PREFIX}${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}.md`
 }

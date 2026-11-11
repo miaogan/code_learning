@@ -351,6 +351,38 @@ def test_sample_file_shape() -> None:
         assert item["name"] and item["url"]
 
 
+def test_fetch_all_tls_verify_switch(radar_env: None, monkeypatch: pytest.MonkeyPatch) -> None:
+    """`RADAR_INSECURE_TLS` 只作用于采集客户端：默认校验，显式打开才跳过（仅内网排障）。"""
+    captured: dict[str, Any] = {}
+
+    class _Stop(Exception):
+        pass
+
+    class _RecordingClient:
+        def __init__(self, **kwargs: Any) -> None:
+            captured.update(kwargs)
+
+        async def __aenter__(self) -> None:
+            raise _Stop
+
+        async def __aexit__(self, *_args: Any) -> bool:
+            return False
+
+    monkeypatch.setattr(sources.httpx, "AsyncClient", _RecordingClient)
+    monkeypatch.setenv("RADAR_OFFLINE", "0")
+    monkeypatch.setenv("RADAR_INSECURE_TLS", "false")
+    get_settings.cache_clear()
+    with pytest.raises(_Stop):
+        asyncio.run(sources.fetch_all())
+    assert captured["verify"] is True
+
+    monkeypatch.setenv("RADAR_INSECURE_TLS", "true")
+    get_settings.cache_clear()
+    with pytest.raises(_Stop):
+        asyncio.run(sources.fetch_all())
+    assert captured["verify"] is False
+
+
 def test_is_due_after_restart(radar_env: None) -> None:
     """重启补跑只看「上一轮是否早于最近一个已到的时点」：早于 → 补跑；已跑过 → 不重复。"""
     slots = schedule.parse_slots("08:00")

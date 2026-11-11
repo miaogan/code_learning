@@ -25,6 +25,8 @@ from app.core.errors import (
     INTERNAL_ERROR,
     METHOD_NOT_ALLOWED,
     NOT_FOUND,
+    RATE_LIMITED,
+    SERVICE_BUSY,
     VALIDATION_ERROR,
     AppError,
 )
@@ -54,7 +56,7 @@ from app.routers import (
     timeline,
 )
 from app.schemas import HealthResponse
-from app.services import radar as radar_service
+from app.services import radar as radar_service, rate_limit
 from app.services.ai.ai import close_ai_pool
 from app.services.assessment import question_bank
 
@@ -78,6 +80,15 @@ def _log_access(method: str, path: str, status: int, elapsed_ms: int, request_id
 def _request_id_of(request: Request) -> str:
     """异常处理器里的 trace id：优先取 `request.state`（上下文可能已随中间件退出被重置）。"""
     return str(getattr(request.state, "request_id", "") or get_request_id())
+
+
+def _error_response(code: str, message: str, status: int, retry_after: int) -> JSONResponse:
+    """限流 / 熔断的快速失败响应：保持 JSON envelope，并带 `Retry-After`（秒）。"""
+    return JSONResponse(
+        status_code=status,
+        content=AppError(code, message, status=status, retryable=True).to_body(),
+        headers={"Retry-After": str(max(1, retry_after))},
+    )
 
 
 @asynccontextmanager
@@ -134,6 +145,37 @@ def create_app() -> FastAPI:
                         ).to_body(),
                     )
         return await call_next(request)
+
+    @app.middleware("http")
+    async def limit_requests(request: Request, call_next):
+        """r70：按客户端 IP 限流 + 全局熔断，快速失败且保持 JSON envelope。
+
+        注册顺序在 `trace_requests` 之前 ⇒ 本中间件在内层，提前返回的 429/503 同样带
+        `X-Request-Id` 并进访问日志。`/health` 与 CORS 预检完全放行：前者是探活（熔断期间
+        也必须能探，否则容器会被误判不健康而重启）；后者由浏览器高频发起且不触达业务。
+        """
+        if request.method == "OPTIONS" or request.url.path == "/health":
+            return await call_next(request)
+        cfg = get_settings()
+        if cfg.rate_limit_enabled:
+            ip = rate_limit.client_ip(
+                request.headers.get("x-real-ip"),
+                request.client.host if request.client else None,
+            )
+            wait = rate_limit.hit(ip, rate_limit.bucket_of(request.url.path))
+            if wait > 0:
+                return _error_response(RATE_LIMITED, "请求过于频繁，请稍后再试", 429, wait)
+        passage = rate_limit.acquire()
+        if not passage.allowed:
+            return _error_response(SERVICE_BUSY, "服务繁忙，请稍后重试", 503, passage.retry_after)
+        status = 500
+        try:
+            response = await call_next(request)
+            status = response.status_code
+            return response
+        finally:
+            # 未捕获异常按 5xx 记：熔断要能观测到「请求直接炸了」。
+            rate_limit.release(passage, status)
 
     @app.middleware("http")
     async def trace_requests(request: Request, call_next):

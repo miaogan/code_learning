@@ -288,7 +288,11 @@ async def fetch_all(settings: Settings | None = None) -> tuple[list[dict[str, An
         ]
         return items, status, True
     timeout = httpx.Timeout(settings.radar_fetch_timeout_s)
-    async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+    if settings.radar_insecure_tls:
+        logger.warning("RADAR_INSECURE_TLS=true：采集链路已跳过 TLS 证书校验（仅限内网排障）")
+    async with httpx.AsyncClient(
+        timeout=timeout, follow_redirects=True, verify=not settings.radar_insecure_tls
+    ) as client:
         results = await asyncio.gather(*[_run_source(key, client, settings) for key in _FETCHERS])
     raw_items: list[dict[str, Any]] = []
     status: list[dict[str, Any]] = []

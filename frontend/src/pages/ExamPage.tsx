@@ -530,7 +530,7 @@ export default function ExamPage() {
       <ConfirmModal
         open={restartOpen}
         title="再出一套笔试"
-        message="将按当前画像重新组卷，本场成绩与逐题复核会被新一套覆盖（本轮成绩仍会保留在成绩趋势里）。"
+        message="将按当前画像重新组卷，本场成绩与逐题复核会被新一套覆盖（本轮成绩仍会保留在战绩里）。"
         confirmLabel="重新出卷"
         cancelLabel="留在本场"
         onConfirm={() => {

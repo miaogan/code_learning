@@ -38,21 +38,21 @@ const STEP_BASE = [
 
 /** 侧栏「工具」组：日常使用的非线性出口，不混进步骤（DESIGN §1.1）。 */
 const TOOL_ITEMS = [
-  { key: 'search', label: '搜索', to: '/search' },
-  { key: 'learn', label: '学习', to: '/learn' },
-  { key: 'practice', label: '练习', to: '/practice' },
-  { key: 'history', label: '成绩趋势', to: '/history' },
-  { key: 'polish', label: '简历润色', to: '/polish' },
-  { key: 'versions', label: '版本对比', to: '/versions' },
-  { key: 'archive', label: '学习档案', to: '/archive' },
+  { key: 'search', label: '检索', to: '/search' },
+  { key: 'learn', label: '学堂', to: '/learn' },
+  { key: 'practice', label: '演武', to: '/practice' },
+  { key: 'history', label: '战绩', to: '/history' },
+  { key: 'polish', label: '修文', to: '/polish' },
+  { key: 'versions', label: '校勘', to: '/versions' },
+  { key: 'archive', label: '卷宗', to: '/archive' },
   { key: 'pioneer', label: '先锋', to: '/pioneer' },
   { key: 'guozijian', label: '国子监', to: '/guozijian' },
 ]
 
-/** 侧栏「设置」组：只读看板（模型质量）与账号 / AI 配置，从工具组里分出来。 */
+/** 侧栏「设置」组：只读看板（评鉴）与账号 / AI 配置，从工具组里分出来。 */
 const SETTINGS_ITEMS = [
-  { key: 'eval', label: '模型质量', to: '/eval' },
-  { key: 'settings', label: '配置', to: '/settings' },
+  { key: 'eval', label: '评鉴', to: '/eval' },
+  { key: 'settings', label: '典制', to: '/settings' },
 ]
 
 /** 全局壳：顶栏 56 + 侧栏 240（<1024 收为顶部横向步骤条），主区 max 1080。 */
@@ -135,7 +135,7 @@ export default function App() {
           <div className="sc-topstepper">
             <Stepper steps={steps} orientation="horizontal" />
             {/* r21：<1024 侧栏 display:none，而 ToolNav 此前只渲染在侧栏内 —— 手机上
-                「练习 / 成绩趋势 / 简历润色」三个工具页没有任何入口。这里复用同一份
+                「演武 / 战绩 / 修文」三个工具页没有任何入口。这里复用同一份
                 TOOL_ITEMS 渲染横向工具条（组件早已支持 orientation="horizontal"）；
                 桌面由 `@media (min-width:1024px) { .sc-topstepper: display:none }` 隐藏本容器。 */}
             <ToolNav items={TOOL_ITEMS} orientation="horizontal" />

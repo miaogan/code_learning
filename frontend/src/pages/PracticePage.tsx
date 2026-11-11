@@ -538,7 +538,7 @@ export default function PracticePage() {
   return (
     <div className="sc-qa-col">
       <header className="sc-page-header">
-        <h1 className="sc-page-title">在线练习</h1>
+        <h1 className="sc-page-title">演武</h1>
         <p className="sc-page-sub">
           按语言挑题，提交即出对错与解析；已熟练掌握的题默认跳过（30 天内答对 2
           次且最近答对），判分与笔试同源

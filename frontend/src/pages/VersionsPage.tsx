@@ -104,7 +104,7 @@ export default function VersionsPage() {
   return (
     <div className="sc-page">
       <header className="sc-page-header">
-        <h1 className="sc-page-title">简历版本对比</h1>
+        <h1 className="sc-page-title">校勘</h1>
         <p className="sc-page-sub">
           每次上传存档为一个版本；选两版即可看画像与测评成绩的变化。成绩只算该版本下已完成的测评。
         </p>

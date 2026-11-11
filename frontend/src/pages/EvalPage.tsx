@@ -22,7 +22,7 @@ export default function EvalPage() {
   return (
     <section>
       <header className="sc-page-header">
-        <h1 className="sc-page-title">模型调用质量</h1>
+        <h1 className="sc-page-title">评鉴</h1>
         <p className="sc-page-sub">
           最近 {days} 天的模型调用元数据：成功率、延迟分位与失败分类。数据只来自本账号的真实调用，
           不含 Key、Prompt 与简历正文；这不是模型质量评分。

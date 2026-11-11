@@ -99,7 +99,7 @@ export default function LearnPage() {
           <p className="sc-lab-kicker sc-lab-rise">
             <span className="sc-lab-kicker-idx">02</span> CURRICULUM
           </p>
-          <h1 className="sc-lab-page-title sc-lab-rise is-d1">学习目录</h1>
+          <h1 className="sc-lab-page-title sc-lab-rise is-d1">学堂</h1>
           <p className="sc-lab-lead sc-lab-rise is-d2">
             {`站内教程共 ${ALL_TUTORIAL_CHAPTERS.length} 章，覆盖 ${TUTORIAL_DIRECTIONS.length} 个方向与基础 / 进阶 / 高级三档难度；每章都能回到对应专项练习`}
           </p>

@@ -8,8 +8,8 @@ export function AiHeavyNotice() {
   if (me === null || me.ai_capability === 'full') return null
   const text =
     me.ai_capability === 'none'
-      ? '尚未配置 AI 服务：模拟面试、诊断报告、简历润色暂时不可用。'
-      : '当前使用内置 AI 额度：模拟面试、诊断报告、简历润色需要你自己的 API Key。'
+      ? '尚未配置 AI 服务：模拟面试、诊断报告、修文暂时不可用。'
+      : '当前使用内置 AI 额度：模拟面试、诊断报告、修文需要你自己的 API Key。'
   return (
     <p className="sc-ai-notice" role="status">
       <span>{text}</span>

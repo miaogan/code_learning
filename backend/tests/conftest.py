@@ -25,6 +25,7 @@ from app.core.config import get_settings
 from app.core.db import init_db
 from app.main import app
 from app.schemas import Evidence, Profile, ProfileProject, ProfileSkill, SkillStatus
+from app.services import rate_limit
 from app.services.ai import user_ai
 from app.services.ai.ai import AIClient, reset_ai_pool
 
@@ -207,6 +208,22 @@ def _isolate_ai_pool() -> Iterator[None]:
     reset_ai_pool()
     yield
     reset_ai_pool()
+
+
+@pytest.fixture(autouse=True)
+def _isolate_protection(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """用例默认关闭 r70 的应用层防护，并清空跨用例残留的窗口 / 熔断状态。
+
+    整套用例共用同一个来源 IP（TestClient 的 `testclient`），若默认开启，无关用例会彼此
+    消耗窗口额度、偶发 429/503。限流 / 熔断自身的行为由 `test_ip_rate_limit.py` 显式开启后验证。
+    """
+    monkeypatch.setenv("RATE_LIMIT_ENABLED", "false")
+    monkeypatch.setenv("BREAKER_ENABLED", "false")
+    rate_limit.reset_all()
+    get_settings.cache_clear()
+    yield
+    rate_limit.reset_all()
+    get_settings.cache_clear()
 
 
 @pytest.fixture()

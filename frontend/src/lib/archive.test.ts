@@ -251,7 +251,7 @@ describe('buildArchiveSnapshot', () => {
 describe('archiveMarkdown', () => {
   it('包含六个小节与实测数字', () => {
     const text = archiveMarkdown(buildArchiveSnapshot(input()), NOW)
-    expect(text).toContain('# 学习档案')
+    expect(text).toContain('# 卷宗')
     expect(text).toContain('生成时间：2026-11-10 09:30')
     expect(text).toContain('## 目标与画像')
     expect(text).toContain('- 目标岗位：后端工程师')
