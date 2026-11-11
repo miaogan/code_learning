@@ -2,13 +2,13 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import type { RadarRunRequest, RadarTechItem } from '../api/types'
+import { MultiChipRow, type ChipOption } from '../components/ui/ChipRow'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { EmptyState } from '../components/ui/EmptyState'
 import { InlineError } from '../components/ui/InlineError'
 import { Pagination } from '../components/ui/Pagination'
 import { PhaseLoader } from '../components/ui/PhaseLoader'
-import { SegTabs } from '../components/polish/SegTabs'
 import { Toast } from '../components/ui/Toast'
 import { DIRECTIONS } from '../lib/questionDirections'
 import { dimensionText, techMetaText } from '../lib/radar'
@@ -32,17 +32,19 @@ const VERDICT_CLASS: Record<string, string> = {
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100] as const
 const DEFAULT_PAGE_SIZE = 20
 
-type VerdictFilter = 'all' | 'must_learn' | 'worth_knowing' | 'watch' | 'skip'
+/** 结论筛选多选：与后端 `rules.VERDICT_LABELS` 同一套措辞（「全部」是折叠后的哨兵）。 */
+const VERDICT_OPTIONS: ChipOption<string>[] = [
+  { value: 'all', label: '全部' },
+  { value: 'must_learn', label: '必学' },
+  { value: 'worth_knowing', label: '选学' },
+  { value: 'watch', label: '观望' },
+  { value: 'skip', label: '跳过' },
+]
 
-const VERDICT_KEYS: VerdictFilter[] = ['all', 'must_learn', 'worth_knowing', 'watch', 'skip']
-
-/** 结论筛选标签：与后端 `rules.VERDICT_LABELS` 同一套措辞（间隔只在「全部」与四个结论之间）。 */
-const VERDICT_TABS = [
-  { key: 'all', label: '全部' },
-  { key: 'must_learn', label: '必学' },
-  { key: 'worth_knowing', label: '选学' },
-  { key: 'watch', label: '观望' },
-  { key: 'skip', label: '跳过' },
+/** 方向筛选多选：与题库 / 学馆同一份闭集，勾满全部具体方向自动折叠回「全部」。 */
+const DIRECTION_OPTIONS: ChipOption<string>[] = [
+  { value: 'all', label: '全部' },
+  ...DIRECTIONS.map((item) => ({ value: item, label: item })),
 ]
 
 function TechRow({
@@ -83,19 +85,21 @@ export default function PioneerPage() {
   const [page, setPage] = useState(1)
   // 每页条数由用户选（后端 `limit` 上限 100），改动同样回到第 1 页。
   const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE)
-  // 清单筛选（服务端过滤）：结论走 tab、方向走下拉；筛选值变化一律回到第 1 页。
-  const [verdictFilter, setVerdictFilter] = useState<VerdictFilter>('all')
-  const [directionFilter, setDirectionFilter] = useState('')
+  // 清单筛选（服务端过滤）：结论与方向都是多选，`['all']` = 不筛选；筛选值变化一律回到第 1 页。
+  const [verdictFilters, setVerdictFilters] = useState<string[]>(['all'])
+  const [directionFilters, setDirectionFilters] = useState<string[]>(['all'])
+  const pickedVerdicts = verdictFilters.filter((item) => item !== 'all')
+  const pickedDirections = directionFilters.filter((item) => item !== 'all')
   const listAsync = useAsync(
     (signal) =>
       api.radarTechs({
         limit: pageSize,
         page,
-        direction: directionFilter,
-        verdict: verdictFilter === 'all' ? undefined : verdictFilter,
+        direction: pickedDirections,
+        verdict: pickedVerdicts,
         signal,
       }),
-    [page, pageSize, directionFilter, verdictFilter],
+    [page, pageSize, verdictFilters, directionFilters],
   )
   const runAsync = useAsync((signal) => api.radarLatestRun(signal), [])
 
@@ -125,15 +129,15 @@ export default function PioneerPage() {
   // 直接读 `data`（重载期间保留上一次成功值）：按 status 派生会在采集后刷新时清空清单、闪一帧 loader。
   const techs = listAsync.data
   const lastRun = runAsync.data
-  const filtering = verdictFilter !== 'all' || directionFilter !== ''
+  const filtering = pickedVerdicts.length > 0 || pickedDirections.length > 0
 
-  const changeVerdict = (key: string): void => {
-    setVerdictFilter(VERDICT_KEYS.includes(key as VerdictFilter) ? (key as VerdictFilter) : 'all')
+  const changeVerdicts = (next: string[]): void => {
+    setVerdictFilters(next)
     setPage(1)
   }
 
-  const changeDirection = (value: string): void => {
-    setDirectionFilter(value)
+  const changeDirections = (next: string[]): void => {
+    setDirectionFilters(next)
     setPage(1)
   }
 
@@ -148,8 +152,8 @@ export default function PioneerPage() {
   }
 
   const resetFilters = (): void => {
-    setVerdictFilter('all')
-    setDirectionFilter('')
+    setVerdictFilters(['all'])
+    setDirectionFilters(['all'])
     setPage(1)
   }
 
@@ -369,26 +373,33 @@ export default function PioneerPage() {
           </div>
           {/* 筛选放在清单卡内：筛到 0 条时卡片仍在，筛选器不会跟着消失。 */}
           <div className="sc-radar-filters">
-            <SegTabs
-              tabs={VERDICT_TABS}
-              active={verdictFilter}
-              onChange={changeVerdict}
-              ariaLabel="技术结论筛选"
-            />
+            <div className="sc-radar-filtergroups">
+              <div className="sc-lab-filter-row">
+                <span className="sc-lab-filter-label">结论</span>
+                <div className="sc-lab-filter-body">
+                  <MultiChipRow
+                    groupLabel="技术结论筛选"
+                    options={VERDICT_OPTIONS}
+                    values={verdictFilters}
+                    allValue="all"
+                    onChange={changeVerdicts}
+                  />
+                </div>
+              </div>
+              <div className="sc-lab-filter-row">
+                <span className="sc-lab-filter-label">方向</span>
+                <div className="sc-lab-filter-body">
+                  <MultiChipRow
+                    groupLabel="按方向筛选"
+                    options={DIRECTION_OPTIONS}
+                    values={directionFilters}
+                    allValue="all"
+                    onChange={changeDirections}
+                  />
+                </div>
+              </div>
+            </div>
             <div className="sc-radar-filterright">
-              <select
-                className="sc-radar-select"
-                aria-label="按方向筛选"
-                value={directionFilter}
-                onChange={(event) => changeDirection(event.target.value)}
-              >
-                <option value="">全部方向</option>
-                {DIRECTIONS.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
               <select
                 className="sc-radar-select"
                 aria-label="每页条数"

@@ -35,6 +35,7 @@ payload 形状（TECHNICAL §4.3 笔试部分 + 判分回写扩展）：
 from __future__ import annotations
 
 import random
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Any, cast
 from uuid import uuid4
@@ -64,15 +65,15 @@ def create_run(
     *,
     now: datetime | None = None,
     rng: random.Random | None = None,
-    direction: str | None = None,
-    sub_direction: str | None = None,
-    difficulty: str | tuple[str, ...] | None = None,
+    direction: str | Sequence[str] | None = None,
+    sub_direction: str | Sequence[str] | None = None,
+    difficulty: str | Sequence[str] | None = None,
     question_count: int | None = None,
 ) -> ExamRun:
     """按画像从题库选一份卷并落库（`status=running`），答案只留在服务端 payload。
 
     四个可选筛选参数（direction / sub_direction / difficulty / question_count）透传给
-    `select_paper()`；不传则与改造前逐字节一致（向后兼容）。
+    `select_paper()`，三者都支持多选（单值字符串仍兼容）；不传则与改造前逐字节一致（向后兼容）。
     """
     profile = repository.get_profile(profile_id)
     if profile is None:

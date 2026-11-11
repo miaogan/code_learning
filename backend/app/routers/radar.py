@@ -4,6 +4,8 @@
 `tech_slug` 含 `/` 与 `:`，**一律走 body 传参**；`job_id` 形如 `rj-<hex>` 才用路径参数。
 """
 
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, Query
 
 from app.core.config import get_settings
@@ -26,6 +28,9 @@ from app.services.radar import jobs, rules, sources, store
 
 router = APIRouter(prefix="/api/radar", tags=["radar"], dependencies=[Depends(current_user)])
 
+#: 多选筛选的缺省值（模块级常量，避免 ruff B008 把 `Query()` 调用当默认值）。
+_NO_FILTER: tuple[str, ...] = ()
+
 
 def _notice() -> str:
     """清单页的一句概括：离线模式 > 降级 > 空串（不编造原因）。"""
@@ -38,25 +43,29 @@ def _notice() -> str:
 async def list_techs(
     limit: int = Query(default=50, ge=1, le=100, description="每页条数"),
     page: int = Query(default=1, ge=1, description="页码，从 1 起"),
-    direction: str = Query(default="", description="按方向筛选（站内闭集，空串 = 全部）"),
-    verdict: str = Query(
-        default="", description="按结论筛选 must_learn|worth_knowing|watch|skip，空串 = 全部"
-    ),
+    direction: Annotated[
+        list[str],
+        Query(description="按方向多选（可重复传 direction=...）；不传 = 全部"),
+    ] = _NO_FILTER,
+    verdict: Annotated[
+        list[str],
+        Query(description="按结论多选 must_learn|worth_knowing|watch|skip；不传 = 全部"),
+    ] = _NO_FILTER,
 ) -> RadarTechList:
-    direction = direction.strip()
-    verdict = verdict.strip()
-    if direction and direction not in rules.DIRECTIONS:
+    directions = [item.strip() for item in direction if item.strip()]
+    verdicts = [item.strip() for item in verdict if item.strip()]
+    if any(item not in rules.DIRECTIONS for item in directions):
         raise AppError(VALIDATION_ERROR, "方向不在站内闭集，请从下拉框选择", status=400)
-    if verdict and verdict not in rules.VERDICTS:
+    if any(item not in rules.VERDICTS for item in verdicts):
         raise AppError(VALIDATION_ERROR, "结论不在闭集内，请从筛选器选择", status=400)
     items = store.list_techs(
-        limit, direction=direction, verdict=verdict, offset=(page - 1) * limit
+        limit, directions=directions, verdicts=verdicts, offset=(page - 1) * limit
     )
     return RadarTechList(
         items=[
             RadarTechItem(**row, verdict_label=rules.label_of(row["verdict"])) for row in items
         ],
-        total=store.count_techs(direction=direction, verdict=verdict),
+        total=store.count_techs(directions=directions, verdicts=verdicts),
         notice=_notice(),
     )
 

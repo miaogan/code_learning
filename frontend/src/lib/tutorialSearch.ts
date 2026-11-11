@@ -31,9 +31,9 @@ export interface Citation {
   source: 'tutorial' | 'question'
 }
 
-/** 元数据过滤条件：闭集外的取值一律静默忽略。 */
+/** 元数据过滤条件：闭集外的取值一律静默忽略；方向支持多选（数组取并集）。 */
 export interface SearchFilters {
-  direction?: string
+  direction?: string | readonly string[]
   sub_direction?: string
   level?: string
 }
@@ -145,6 +145,17 @@ function resolveFilter(value: string | undefined, closedSet: Set<string>): strin
   return value
 }
 
+/** 多选过滤取值：闭集外取值静默丢弃；一个都不剩（或本身就是全选）回 `null` = 不过滤。 */
+function resolveFilterList(
+  value: string | readonly string[] | undefined,
+  closedSet: Set<string>,
+): string[] | null {
+  const raw = typeof value === 'string' ? [value] : value
+  if (raw === undefined) return null
+  const picked = raw.filter((item): item is string => typeof item === 'string' && closedSet.has(item))
+  return picked.length === 0 ? null : picked
+}
+
 /** 字典序比较，供确定性平局排序使用。 */
 function compareText(left: string, right: string): number {
   if (left < right) return -1
@@ -186,13 +197,13 @@ export function searchTutorials(
   if (queryTerms.length === 0) return []
 
   const safeFilters: SearchFilters = filters ?? {}
-  const direction = resolveFilter(safeFilters.direction, DIRECTION_SET)
+  const directions = resolveFilterList(safeFilters.direction, DIRECTION_SET)
   const subDirection = resolveFilter(safeFilters.sub_direction, SUB_DIRECTION_SET)
   const level = resolveFilter(safeFilters.level, LEVEL_SET)
 
   const filtered = buildSectionDocs(chapters).filter(
     (doc) =>
-      (direction === null || doc.direction === direction) &&
+      (directions === null || directions.includes(doc.direction)) &&
       (subDirection === null || doc.sub_direction === subDirection) &&
       (level === null || doc.level === level),
   )

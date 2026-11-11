@@ -388,14 +388,15 @@ def select_paper(
     proficient: set[str],
     recent: list[set[str]],
     rng: random.Random | None = None,
-    direction: str | None = None,
-    sub_direction: str | None = None,
+    direction: str | Sequence[str] | None = None,
+    sub_direction: str | Sequence[str] | None = None,
     difficulty: str | Sequence[str] | None = None,
     target_count: int | None = None,
 ) -> Paper | None:
     """L1→L6 逐层换池建卷，返回命中的 `Paper`；**只有 L6 也不足**才返回 `None`（调用方 400）。
 
-    新增可选筛选参数：`direction` / `sub_direction` / `difficulty` / `target_count`。
+    新增可选筛选参数：`direction` / `sub_direction` / `difficulty` / `target_count`，三者都支持
+    多选（方向 / 子方向取并集，难度取并集；单值字符串仍兼容）。
     传入时在每层 attempt 内部对候选池先做硬过滤再组卷，保持 6 层阶梯顺序不变；
     不传任何筛选 → 行为与改造前逐字节一致（向后兼容）。
     注意：传了 `sub_direction` 但没传 `direction` 时，会在 direction 闭集中找该子方向
@@ -416,20 +417,30 @@ def select_paper(
     by_id = {str(question["id"]): question for question in available}
 
     # --- 归一筛选参数：闭集外的值一律当「未指定」，不让脏参数变成空卷 -------------------
-    if direction is not None:
-        direction = direction.strip() or None
-    if sub_direction is not None:
-        sub_direction = sub_direction.strip() or None
-        if sub_direction is not None and not any(
-            sub_direction in subs for subs in rules.SUBDIRECTIONS.values()
-        ):
-            sub_direction = None
-        elif sub_direction is not None and direction is None:
-            # 传了 sub_direction 但没传 direction → 自动查归属（r44 语义不变）
-            for dir_name, subs in rules.SUBDIRECTIONS.items():
-                if sub_direction in subs:
-                    direction = dir_name
-                    break
+    raw_directions = [direction] if isinstance(direction, str) else list(direction or [])
+    direction_set = {
+        str(item).strip()
+        for item in raw_directions
+        if str(item).strip() in rules.DIRECTIONS
+    }
+    raw_subs = [sub_direction] if isinstance(sub_direction, str) else list(sub_direction or [])
+    sub_set = {
+        str(item).strip()
+        for item in raw_subs
+        if any(str(item).strip() in subs for subs in rules.SUBDIRECTIONS.values())
+    }
+    if sub_set and not direction_set:
+        # 只给了子方向（没给方向）→ 自动补归属方向（r44 语义不变，多选时取并集）
+        for dir_name, subs in rules.SUBDIRECTIONS.items():
+            if sub_set & set(subs):
+                direction_set.add(dir_name)
+    # 展示用标签按 rules 顺序拼接，保证同一组选择每次文案一致
+    sub_label = "、".join(
+        sub
+        for dir_name in rules.DIRECTIONS
+        for sub in rules.SUBDIRECTIONS.get(dir_name, ())
+        if sub in sub_set
+    )
 
     difficulty_set: set[str] | None = None
     if difficulty is not None:
@@ -443,8 +454,11 @@ def select_paper(
         return {
             question_id
             for question_id, question in by_id.items()
-            if (direction is None or str(question.get("direction") or "").strip() == direction)
-            and (not narrow or (question.get("sub_direction") or "") == sub_direction)
+            if (
+                not direction_set
+                or str(question.get("direction") or "").strip() in direction_set
+            )
+            and (not narrow or str(question.get("sub_direction") or "").strip() in sub_set)
             and (
                 difficulty_set is None
                 or str(question.get("difficulty") or "").strip() in difficulty_set
@@ -453,7 +467,7 @@ def select_paper(
 
     # `scope` = 方向 / 难度硬过滤后的宽池；`focus` = 再叠加子方向的窄池（仅子方向聚焦时存在）。
     scope = pool(narrow=False)
-    focus = pool(narrow=True) if sub_direction is not None else None
+    focus = pool(narrow=True) if sub_set else None
     if not scope:
         # 方向 / 难度本身没有题 → 唯一 400 语义（子方向为空不再单独构成 400）。
         return None
@@ -476,7 +490,7 @@ def select_paper(
         oldest_first = list(reversed(papers))
         recent_ids = set().union(*papers) if papers else set()
         # 方向聚焦时池内只有一个方向，「方向 ≥2」恒不可满足 → 基线降到 ≥1（见 docstring）。
-        require = 1 if direction is not None else 2
+        require = 1 if direction_set else 2
 
         def attempt(
             stage: str, ids: set[str], backfill: dict[str, int], require_directions: int
@@ -540,20 +554,20 @@ def select_paper(
         # L6：全库，连方向覆盖都不再要求
         return attempt("L6", pool_ids, full, 0)
 
-    if sub_direction is None:
+    if not sub_set:
         return run_ladder(scope)
 
     # --- 子方向聚焦优先：窄池能成卷就全命中；凑不出才退化到同方向宽池并如实计数 ---------
     if focus:
         narrowed = run_ladder(focus)
         if narrowed is not None:
-            return replace(narrowed, sub_direction=sub_direction, sub_direction_backfill=0)
+            return replace(narrowed, sub_direction=sub_label, sub_direction_backfill=0)
     wide = run_ladder(scope)
     if wide is None:
         return None
     backfill_count = sum(
         1
         for question in wide.questions
-        if str(question.get("sub_direction") or "").strip() != sub_direction
+        if str(question.get("sub_direction") or "").strip() not in sub_set
     )
-    return replace(wide, sub_direction=sub_direction, sub_direction_backfill=backfill_count)
+    return replace(wide, sub_direction=sub_label, sub_direction_backfill=backfill_count)

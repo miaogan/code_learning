@@ -24,6 +24,9 @@ from app.services.interview.history import (
 
 router = APIRouter(prefix="/api", tags=["history"], dependencies=[Depends(current_user)])
 
+#: 类型多选的缺省值（模块级常量，避免 ruff B008 把 `Query()` 调用当默认值）。
+_NO_KINDS: tuple[str, ...] = ()
+
 
 @router.get(
     "/history",
@@ -37,9 +40,9 @@ def get_history(
     ] = DEFAULT_LIMIT,
     page: Annotated[int, Query(ge=1, description="页码，从 1 起")] = 1,
     kind: Annotated[
-        Literal["interview", "exam"] | None,
-        Query(description="按类型筛选：interview / exam；省略则全部"),
-    ] = None,
+        list[Literal["interview", "exam"]],
+        Query(description="按类型多选（可重复传 kind=interview&kind=exam）；不传或全选 = 全部"),
+    ] = _NO_KINDS,
 ) -> HistoryList:
     """参数由 `Query` 校验，越界即 422 → 统一错误 envelope（路由内不写 SQL）。"""
     items, total = list_history(limit, page, kind)

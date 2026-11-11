@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from collections.abc import Sequence
 from typing import Any
 
 from app.core import repository
@@ -52,25 +53,30 @@ def list_techs(
     limit: int = 50,
     *,
     tech_slug: str = "",
-    direction: str = "",
-    verdict: str = "",
+    directions: str | Sequence[str] | None = None,
+    verdicts: str | Sequence[str] | None = None,
     offset: int = 0,
 ) -> list[dict[str, Any]]:
     """技术清单：最新评估 + 最新快照 + 当前在途任务，按评估时间倒序取一页。
 
     `limit` 是每页条数，`offset` 由调用方按 `(page - 1) * limit` 计算；
     `tech_slug` 非空时只取该条（手工录入后回读用，不让调用方自己拼一份投影）；
-    `direction` / `verdict` 是清单页的筛选口径（空串 = 不过滤）。
+    `directions` / `verdicts` 是清单页的多选筛选口径（空 = 不过滤，单值字符串仍兼容）。
     """
     return repository.radar_list_techs(
-        limit, tech_slug=tech_slug, direction=direction, verdict=verdict, offset=offset
+        limit, tech_slug=tech_slug, directions=directions, verdicts=verdicts, offset=offset
     )
 
 
-def count_techs(*, tech_slug: str = "", direction: str = "", verdict: str = "") -> int:
+def count_techs(
+    *,
+    tech_slug: str = "",
+    directions: str | Sequence[str] | None = None,
+    verdicts: str | Sequence[str] | None = None,
+) -> int:
     """技术清单命中总数（与 `list_techs` 同一过滤口径），供分页器算总页数。"""
     return repository.radar_count_techs(
-        tech_slug=tech_slug, direction=direction, verdict=verdict
+        tech_slug=tech_slug, directions=directions, verdicts=verdicts
     )
 
 

@@ -108,7 +108,8 @@ function labelOf(map: Record<string, string>, value: string): string {
 
 /** 拼 `/practice` 链接：只写真实生效的筛选参数（默认值不写，链接更短也更好读）。 */
 export function practiceHref(params: {
-  direction?: string | null
+  /** 单值或多选（多选按重复键写，练习页解析两种都吃）；`all` / 空数组 = 不写参数。 */
+  direction?: string | readonly string[] | null
   /** r50：二级方向聚焦；空串 / null = 不聚焦，URL 用 `sub`（与学习目录页同参数名）。 */
   sub_direction?: string | null
   difficulty?: string | null
@@ -117,9 +118,11 @@ export function practiceHref(params: {
   limit?: number | null
 }): string {
   const query = new URLSearchParams()
-  if (params.direction !== null && params.direction !== undefined && params.direction !== 'all') {
-    query.set('direction', params.direction)
-  }
+  const directions =
+    typeof params.direction === 'string' ? [params.direction] : params.direction ?? []
+  directions
+    .filter((direction) => direction !== 'all')
+    .forEach((direction) => query.append('direction', direction))
   if (params.sub_direction !== null && params.sub_direction !== undefined && params.sub_direction !== '') {
     query.set('sub', params.sub_direction)
   }

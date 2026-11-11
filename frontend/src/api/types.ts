@@ -259,12 +259,12 @@ export interface ExamOption {
 
 export interface ExamCreateRequest {
   profile_id: string
-  /** 指定方向（如 "前端"），不传则不过滤 */
-  direction?: string | null
-  /** 指定二级方向（如 "python" / "react" / "动态规划"），不传则不过滤。传时建议同时传 direction */
-  sub_direction?: string | null
-  /** 指定难度档（如 "basic" 或 ["basic", "intermediate"]），不传则不过滤 */
-  difficulty?: string | string[] | null
+  /** 指定方向（如 ["前端", "后端"]），空数组 / 不传 = 按画像智能组卷 */
+  direction?: string[] | null
+  /** 指定二级方向（如 ["python", "react"]），空数组 / 不传 = 不过滤；未传一级方向时后端按子方向自动补归属方向 */
+  sub_direction?: string[] | null
+  /** 指定难度档（如 ["basic", "intermediate"]），空数组 / 不传 = 不过滤 */
+  difficulty?: string[] | null
   /** 目标题量，不传则默认 10–12，下限 10、上限 20 */
   question_count?: number | null
 }
@@ -352,7 +352,8 @@ export interface EvalSummary {
 /** r51 题目全文检索请求：方向 / 子方向可选，闭集外脏值由服务端静默忽略。 */
 export interface QuestionSearchRequest {
   query: string
-  direction?: string
+  /** 方向多选；空数组 / 不传 = 全部方向（后端兼容旧的单值字符串）。 */
+  direction?: string[]
   sub_direction?: string
   /** 每页条数 */
   limit?: number

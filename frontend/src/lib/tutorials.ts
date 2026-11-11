@@ -165,6 +165,85 @@ export function parseLearnSubDirection(
   return subDirectionsOf(direction).includes(value) ? value : 'all'
 }
 
+/** 多选筛选的统一判定：空数组或含 `all` 都表示不过滤（与 `MultiChipRow` 的折叠语义一致）。 */
+function isAllChoices(values: readonly string[]): boolean {
+  return values.length === 0 || values.includes('all')
+}
+
+/** 解析重复键 / 逗号并列的取值：闭集外的值静默丢弃，勾满全部具体项折叠回「全部」（空数组）。 */
+function readChoices<T extends string>(search: string, key: string, allowed: readonly T[]): T[] {
+  const picked = new URLSearchParams(search)
+    .getAll(key)
+    .flatMap((raw) => raw.split(','))
+    .filter((value): value is T => (allowed as readonly string[]).includes(value))
+  if (picked.length === 0 || picked.includes('all' as T)) return []
+  if (allowed.every((value) => picked.includes(value))) return []
+  return allowed.filter((value) => picked.includes(value))
+}
+
+/** `/learn` 的 `?direction=` 多选：空数组 = 全部方向。 */
+export function parseLearnDirections(search: string): TutorialDirection[] {
+  return readChoices(search, 'direction', TUTORIAL_DIRECTIONS)
+}
+
+/** `/learn` 的 `?sub=` 多选：子方向只在选定方向后才有意义，方向不限或越界值一律回空数组。 */
+export function parseLearnSubDirections(
+  search: string,
+  directions: readonly TutorialDirection[],
+): string[] {
+  if (isAllChoices(directions)) return []
+  const allowed = Array.from(new Set(directions.flatMap((direction) => subDirectionsOf(direction))))
+  return readChoices(search, 'sub', allowed)
+}
+
+/** `/learn` 的 `?level=` 多选：空数组 = 全部难度档。 */
+export function parseLearnLevels(search: string): TutorialLevel[] {
+  return readChoices(search, 'level', TUTORIAL_LEVELS)
+}
+
+/** 多方向并集：空数组（不过滤）返回全量，否则只保留命中方向的章节。 */
+export function chaptersInDirections(directions: readonly string[]): TutorialChapter[] {
+  if (isAllChoices(directions)) return ALL_TUTORIAL_CHAPTERS
+  return ALL_TUTORIAL_CHAPTERS.filter((chapter) => directions.includes(chapter.direction))
+}
+
+/** 多子方向并集：空数组原样返回。 */
+export function filterChaptersBySubDirections(
+  chapters: TutorialChapter[],
+  subs: readonly string[],
+): TutorialChapter[] {
+  if (isAllChoices(subs)) return chapters
+  return chapters.filter((chapter) => subs.includes(chapter.sub_direction))
+}
+
+/** 多难度档并集：空数组原样返回。 */
+export function filterChaptersByLevels(
+  chapters: TutorialChapter[],
+  levels: readonly TutorialLevel[],
+): TutorialChapter[] {
+  if (isAllChoices(levels)) return chapters
+  return chapters.filter((chapter) => levels.includes(chapter.level))
+}
+
+/**
+ * 目录页多选链接：`all` / 空数组都不写参数，链接更短也更好读。
+ * 子方向只在选定方向后写入（与解析口径一致）。
+ */
+export function learnHref(
+  directions: readonly string[] = [],
+  levels: readonly string[] = [],
+  subs: readonly string[] = [],
+): string {
+  const params = new URLSearchParams()
+  if (!isAllChoices(directions)) {
+    directions.forEach((direction) => params.append('direction', direction))
+    if (!isAllChoices(subs)) subs.forEach((sub) => params.append('sub', sub))
+  }
+  if (!isAllChoices(levels)) levels.forEach((level) => params.append('level', level))
+  const suffix = params.toString()
+  return suffix === '' ? '/learn' : `/learn?${suffix}`
+}
+
 /**
  * 目录页链接：默认值不写参数，链接更短也更好读。
  * 入参放宽为字符串：报告页方向可能不在教程覆盖范围内，调用方先按 `chaptersInDirection` 判空。

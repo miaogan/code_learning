@@ -7,6 +7,7 @@ import { ExamResultPanel } from '../components/exam/ExamResultPanel'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { Chip } from '../components/ui/Chip'
+import { MultiChipRow, type ChipOption } from '../components/ui/ChipRow'
 import { ConfirmModal } from '../components/ui/ConfirmModal'
 import { InlineError } from '../components/ui/InlineError'
 import { PhaseLoader } from '../components/ui/PhaseLoader'
@@ -28,13 +29,14 @@ const CREATE_PHASES = ['读取画像方向', '按方向选题组卷', '校验客
 type Stage = 'idle' | 'creating' | 'running' | 'submitting' | 'submitted'
 type View = 'gate' | 'empty' | 'error' | Stage
 
-/** 方向闭集与二级方向闭集：统一从 lib/questionDirections 派生（与后端 rules 逐字一致）。 */
-const DIRECTION_OPTIONS: { value: string | null; label: string }[] = [
-  { value: null, label: '按画像智能组卷' },
-  ...DIRECTIONS.map((direction) => ({ value: direction as string | null, label: direction })),
+/** 方向闭集与二级方向闭集：统一从 lib/questionDirections 派生（与后端 rules 逐字一致）。
+ * 多选的「不限」哨兵统一用空串：空数组 / 勾满具体项都会被 `MultiChipRow` 折叠成 `['']`。 */
+const DIRECTION_OPTIONS: ChipOption<string>[] = [
+  { value: '', label: '按画像智能组卷' },
+  ...DIRECTIONS.map((direction) => ({ value: direction, label: direction })),
 ]
-const DIFFICULTY_OPTIONS: { value: string | null; label: string }[] = [
-  { value: null, label: '不限难度' },
+const DIFFICULTY_OPTIONS: ChipOption<string>[] = [
+  { value: '', label: '不限难度' },
   { value: 'basic', label: '基础（basic）' },
   { value: 'intermediate', label: '进阶（intermediate）' },
   { value: 'challenge', label: '挑战（challenge）' },
@@ -74,9 +76,9 @@ export default function ExamPage() {
   const [pendingLeave, setPendingLeave] = useState<string | null>(null)
   const [createElapsed, setCreateElapsed] = useState(0)
   const [runElapsed, setRunElapsed] = useState(0)
-  const [filterDirection, setFilterDirection] = useState<string | null>(null)
-  const [filterSubDirection, setFilterSubDirection] = useState<string | null>(null)
-  const [filterDifficulty, setFilterDifficulty] = useState<string | null>(null)
+  const [filterDirections, setFilterDirections] = useState<string[]>([])
+  const [filterSubDirections, setFilterSubDirections] = useState<string[]>([])
+  const [filterDifficulties, setFilterDifficulties] = useState<string[]>([])
   const [filterCount, setFilterCount] = useState<number | null>(null)
 
   const attemptRef = useRef(0)
@@ -92,6 +94,25 @@ export default function ExamPage() {
   }, [])
 
   const profile = profileAsync.data
+
+  // 多选值里去掉「不限」哨兵后就是真正要下发的筛选；空数组 = 该维不过滤。
+  const pickedDirections = filterDirections.filter((item) => item !== '')
+  const pickedSubDirections = filterSubDirections.filter((item) => item !== '')
+  const pickedDifficulties = filterDifficulties.filter((item) => item !== '')
+  /** 子方向选项：未选一级方向时给全部子方向的并集（后端会按子方向自动补归属方向）。 */
+  const subDirectionOptions: ChipOption<string>[] = [
+    { value: '', label: '不限' },
+    ...(pickedDirections.length === 0 ? DIRECTIONS : pickedDirections)
+      .flatMap((direction) => SUBDIRECTIONS[direction] ?? [])
+      .filter((item, index, all) => all.indexOf(item) === index)
+      .map((item) => ({ value: item, label: item })),
+  ]
+
+  /** 换方向必须清掉子方向：新方向未必有当前子方向。 */
+  const selectDirections = (next: string[]) => {
+    setFilterDirections(next)
+    setFilterSubDirections([])
+  }
 
   // 门禁：画像请求三态直接决定空态 / 错误态（与面试页同一套约定）。
   // 画像已取到就保持 idle：按 status 判定会在重载瞬间退回 gate，把开考卡整块换成 loader。
@@ -199,9 +220,9 @@ export default function ExamPage() {
     try {
       const created = await api.createExam({
         profile_id: profile.id,
-        direction: filterDirection,
-        sub_direction: filterSubDirection,
-        difficulty: filterDifficulty,
+        direction: pickedDirections.length === 0 ? null : pickedDirections,
+        sub_direction: pickedSubDirections.length === 0 ? null : pickedSubDirections,
+        difficulty: pickedDifficulties.length === 0 ? null : pickedDifficulties,
         question_count: filterCount,
       })
       if (attemptRef.current !== attempt || !mountedRef.current) return
@@ -318,71 +339,65 @@ export default function ExamPage() {
               <h3>组卷偏好</h3>
               <span>不选择时按画像智能组卷</span>
             </div>
-            <div className="sc-exam-filters">
-              <label className="sc-filter">
-                <span className="sc-filter-label">方向</span>
-                <select
-                  className="sc-filter-select"
-                  value={filterDirection ?? ''}
-                  onChange={(e) => {
-                    const dir = e.target.value || null
-                    setFilterDirection(dir)
-                    setFilterSubDirection(null) // direction 变了，子方向必须重选
-                  }}
-                >
-                  {DIRECTION_OPTIONS.map((opt) => (
-                    <option key={opt.label} value={opt.value ?? ''}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="sc-filter">
-                <span className="sc-filter-label">子方向</span>
-                <select
-                  className="sc-filter-select"
-                  value={filterSubDirection ?? ''}
-                  onChange={(e) => setFilterSubDirection(e.target.value || null)}
-                  disabled={!filterDirection}
-                  title={filterDirection ? '按所选一级方向选子方向' : '请先选一级方向'}
-                >
-                  <option value="">不限（该方向全部）</option>
-                  {filterDirection && SUBDIRECTIONS[filterDirection]?.map((sub) => (
-                    <option key={sub} value={sub}>{sub}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="sc-filter">
-                <span className="sc-filter-label">难度</span>
-                <select
-                  className="sc-filter-select"
-                  value={filterDifficulty ?? ''}
-                  onChange={(e) => setFilterDifficulty(e.target.value || null)}
-                >
-                  {DIFFICULTY_OPTIONS.map((opt) => (
-                    <option key={opt.label} value={opt.value ?? ''}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="sc-filter">
-                <span className="sc-filter-label">题量</span>
-                <select
-                  className="sc-filter-select"
-                  value={filterCount ?? ''}
-                  onChange={(e) => setFilterCount(e.target.value ? Number(e.target.value) : null)}
-                >
-                  {QUESTION_COUNT_OPTIONS.map((opt) => (
-                    <option key={opt.label} value={opt.value ?? ''}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+            <div className="sc-exam-filtergroups">
+              <div className="sc-lab-filter-row">
+                <span className="sc-lab-filter-label">方向</span>
+                <div className="sc-lab-filter-body">
+                  <MultiChipRow
+                    groupLabel="组卷方向筛选"
+                    options={DIRECTION_OPTIONS}
+                    values={filterDirections}
+                    allValue=""
+                    onChange={selectDirections}
+                  />
+                </div>
+              </div>
+              <div className="sc-lab-filter-row">
+                <span className="sc-lab-filter-label">子方向</span>
+                <div className="sc-lab-filter-body">
+                  <MultiChipRow
+                    groupLabel="组卷二级方向筛选"
+                    options={subDirectionOptions}
+                    values={filterSubDirections}
+                    allValue=""
+                    onChange={setFilterSubDirections}
+                  />
+                </div>
+              </div>
+              <div className="sc-lab-filter-row">
+                <span className="sc-lab-filter-label">难度</span>
+                <div className="sc-lab-filter-body">
+                  <MultiChipRow
+                    groupLabel="组卷难度筛选"
+                    options={DIFFICULTY_OPTIONS}
+                    values={filterDifficulties}
+                    allValue=""
+                    onChange={setFilterDifficulties}
+                  />
+                </div>
+              </div>
+              <div className="sc-lab-filter-row">
+                <span className="sc-lab-filter-label">题量</span>
+                <div className="sc-lab-filter-body">
+                  <label className="sc-filter sc-exam-filtercount">
+                    <select
+                      className="sc-filter-select"
+                      value={filterCount ?? ''}
+                      aria-label="题量"
+                      onChange={(e) => setFilterCount(e.target.value ? Number(e.target.value) : null)}
+                    >
+                      {QUESTION_COUNT_OPTIONS.map((opt) => (
+                        <option key={opt.label} value={opt.value ?? ''}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              </div>
             </div>
             <p className="sc-exam-filter-note">
-              方向变化后需重新选择子方向；单选、多选与简答混排，计时从出卷后开始。
+              方向 / 子方向 / 难度都可多选，勾满全部具体项会自动回到「不限」；方向变化后需重新选择子方向。单选、多选与简答混排，计时从出卷后开始。
             </p>
 
             {createError ? (

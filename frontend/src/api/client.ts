@@ -191,13 +191,13 @@ export const api = {
 
   /* ---------- r67 技术雷达（先锋 = 清单 / 国子监 = 生成任务） ---------- */
 
-  /** 技术清单：最新评估 + 最新快照 + 当前账号在该技术上的任务 id；方向/结论为服务端筛选。 */
+  /** 技术清单：最新评估 + 最新快照 + 当前账号在该技术上的任务 id；方向/结论均为多选服务端筛选。 */
   radarTechs: (
     params: {
       limit?: number
       page?: number
-      direction?: string
-      verdict?: string
+      direction?: string[]
+      verdict?: string[]
       signal?: AbortSignal
     } = {},
   ): Promise<RadarTechList> =>
@@ -205,8 +205,8 @@ export const api = {
       `/api/radar/techs?${queryString({
         limit: params.limit ?? 50,
         page: params.page ?? 1,
-        direction: params.direction || undefined,
-        verdict: params.verdict || undefined,
+        direction: params.direction,
+        verdict: params.verdict,
       })}`,
       { signal: params.signal },
     ),
@@ -417,8 +417,10 @@ export const api = {
   reportMarkdown: (reportId: string): Promise<string> =>
     requestText(`/api/reports/${encodeURIComponent(reportId)}/markdown`),
 
-  /** 历史分页投影：`limit` 是每页条数、`page` 从 1 起、`kind` 是服务端筛选。 */
-  history: (params: { limit?: number; page?: number; kind?: RunKind } = {}): Promise<HistoryList> =>
+  /** 历史分页投影：`limit` 是每页条数、`page` 从 1 起、`kind` 是服务端类型多选。 */
+  history: (
+    params: { limit?: number; page?: number; kind?: RunKind[] } = {},
+  ): Promise<HistoryList> =>
     request<HistoryList>(
       `/api/history?${queryString({
         limit: params.limit ?? 10,

@@ -365,20 +365,26 @@ class ExamCreateRequest(BaseModel):
     """笔试组卷请求体。
 
     全部筛选字段可选：不传时走默认阶梯（画像相关度 + 6 层兜底）。
-    传入时在候选池先做硬过滤，再走阶梯；若单方向/难度凑不出结构达标的卷，
+    传入时在候选池先做硬过滤，再走阶梯；若所选方向/难度凑不出结构达标的卷，
     整轮仍以 400 出口（与 AC-8 一致）。
     """
 
     profile_id: str
-    #: 指定方向（取值见 rules.DIRECTIONS）。None = 不过滤。
-    direction: str | None = None
+    #: 指定方向（取值见 rules.DIRECTIONS），支持多选；None / 空列表 = 不过滤（按画像智能组卷）。
+    direction: list[str] | None = None
     #: 指定二级方向（如 "python" / "react" / "动态规划"，取值见 rules.SUBDIRECTIONS[direction]）。
-    #: None = 不过滤；传值时**必须**同时传 direction（二级方向从属于一级方向）。
-    sub_direction: str | None = None
-    #: 指定难度档（如 "basic" 或 ("basic", "intermediate")）。None = 不过滤。
-    difficulty: str | tuple[str, ...] | None = None
+    #: 支持多选；None = 不过滤。不传一级方向时按子方向自动补归属方向（多选取并集）。
+    sub_direction: list[str] | None = None
+    #: 指定难度档（如 ["basic"] 或 ["basic", "intermediate"]）。None = 不过滤。
+    difficulty: str | list[str] | None = None
     #: 目标题量。None = 默认 10–12。至少 10，低于会被结构闸门拒掉。
     question_count: int | None = None
+
+    @field_validator("direction", "sub_direction", "difficulty", mode="before")
+    @classmethod
+    def _single_to_list(cls, value: Any) -> Any:
+        """兼容旧的单值载荷：`"basic"` 归一成 `["basic"]`（多选是本轮唯一新形态）。"""
+        return [value] if isinstance(value, str) else value
 
 
 class ExamQuestion(BaseModel):
@@ -578,12 +584,19 @@ class QuestionSearchRequest(BaseModel):
     """r51 题目检索请求：方向 / 子方向是闭集外一律静默忽略的可选过滤。"""
 
     query: str = ""
-    direction: str = ""
+    #: 方向多选：闭集外取值由路由静默丢弃，空列表 = 不过滤。
+    direction: list[str] = Field(default_factory=list)
     sub_direction: str = ""
     #: 每页条数（沿用旧字段名，默认 5）。
     limit: int = 5
     #: 页码，从 1 起；`total` 是命中总数，前端据此算总页数。
     page: int = 1
+
+    @field_validator("direction", mode="before")
+    @classmethod
+    def _single_to_list(cls, value: Any) -> Any:
+        """兼容单选载荷：单个字符串归一成单元素列表（多选是本轮唯一新形态）。"""
+        return [value] if isinstance(value, str) else value
 
 
 class QuestionSearchItem(BaseModel):

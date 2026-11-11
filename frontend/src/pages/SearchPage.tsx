@@ -4,7 +4,7 @@ import { api } from '../api/client'
 import type { QuestionSearchItem } from '../api/types'
 import { LevelChip } from '../components/learn/LevelChip'
 import { Chip } from '../components/ui/Chip'
-import { ChipRow, type ChipOption } from '../components/ui/ChipRow'
+import { MultiChipRow, type ChipOption } from '../components/ui/ChipRow'
 import { InlineError } from '../components/ui/InlineError'
 import { Pagination } from '../components/ui/Pagination'
 import {
@@ -22,20 +22,19 @@ import {
   ALL_TUTORIAL_CHAPTERS,
   TUTORIAL_DIRECTIONS,
   chapterById,
-  parseLearnDirection,
-  tutorialHref,
+  learnHref,
+  parseLearnDirections,
 } from '../lib/tutorials'
-import type { TutorialDirectionFilter } from '../lib/tutorials'
 import { useAsync } from '../lib/useAsync'
 
-const DIRECTION_OPTIONS: ChipOption<TutorialDirectionFilter>[] = [
+const DIRECTION_OPTIONS: ChipOption<string>[] = [
   { value: 'all', label: '全部' },
   ...TUTORIAL_DIRECTIONS.map((direction) => ({ value: direction, label: direction })),
 ]
 
-/** 空结果时补一句「当前收窄在哪个方向」，避免用户以为是全库没有。 */
-function scopeText(direction: TutorialDirectionFilter): string {
-  return direction === 'all' ? '' : `（方向：${direction}）`
+/** 空结果时补一句「当前收窄在哪些方向」，避免用户以为是全库没有。 */
+function scopeText(directions: readonly string[]): string {
+  return directions.length === 0 ? '' : `（方向：${directions.join('、')}）`
 }
 
 function QuestionHit({ item }: { item: QuestionSearchItem }) {
@@ -68,7 +67,11 @@ function QuestionHit({ item }: { item: QuestionSearchItem }) {
  */
 export default function SearchPage() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const direction = parseLearnDirection(searchParams.toString())
+  // 解析结果是新数组，按 searchParams 记忆化，避免每次输入都触发题库重新请求。
+  const directions = useMemo(
+    () => parseLearnDirections(searchParams.toString()),
+    [searchParams],
+  )
 
   const [raw, setRaw] = useState('')
   const query = normalizeQuery(raw)
@@ -80,12 +83,12 @@ export default function SearchPage() {
       searchable
         ? searchTutorials(
             query,
-            direction === 'all' ? {} : { direction },
+            directions.length === 0 ? {} : { direction: directions },
             ALL_TUTORIAL_CHAPTERS,
             TUTORIAL_HIT_LIMIT,
           )
         : [],
-    [query, searchable, direction],
+    [query, searchable, directions],
   )
 
   // 题库侧是网络请求：先防抖定稿查询词，再由 useAsync 管竞态、取消与重试。
@@ -102,17 +105,17 @@ export default function SearchPage() {
   // 换方向同样是新的一组结果：回到第 1 页，避免停在上一组命中的第 N 页。
   useEffect(() => {
     setPage(1)
-  }, [direction])
+  }, [directions])
 
   const questions = useAsync(async () => {
     if (!isSearchable(settled)) return null
     return api.searchQuestions({
       query: settled,
-      direction: direction === 'all' ? undefined : direction,
+      direction: directions.length === 0 ? undefined : directions,
       limit: QUESTION_HIT_LIMIT,
       page,
     })
-  }, [settled, direction, page])
+  }, [settled, directions, page])
 
   // settled 与当前输入不一致时（还在防抖窗口里）一律按「检索中」渲染，不展示上一轮结果。
   const questionsCurrent = searchable && settled === query
@@ -129,11 +132,11 @@ export default function SearchPage() {
         ? '题库检索失败'
         : `教程 ${tutorialHits.length} 条 · 题库 ${questionTotal} 题`
 
-  const selectDirection = (next: TutorialDirectionFilter): void => {
+  const selectDirections = (next: string[]): void => {
     // 换方向清掉目录页带过来的子方向 / 难度参数，避免 URL 里留下与检索无关的筛选。
     const params = new URLSearchParams(searchParams)
-    if (next === 'all') params.delete('direction')
-    else params.set('direction', next)
+    params.delete('direction')
+    next.filter((value) => value !== 'all').forEach((value) => params.append('direction', value))
     params.delete('sub')
     params.delete('level')
     setSearchParams(params, { replace: true })
@@ -192,14 +195,15 @@ export default function SearchPage() {
         <div className="sc-lab-filter-row">
           <span className="sc-lab-filter-label">方向</span>
           <div className="sc-lab-filter-body">
-            <ChipRow
+            <MultiChipRow
               groupLabel="检索方向筛选"
               options={DIRECTION_OPTIONS}
-              value={direction}
-              onSelect={selectDirection}
+              values={directions}
+              allValue="all"
+              onChange={selectDirections}
             />
             <p className="sc-lab-filter-hint">
-              教程与题库共用同一份方向闭集；换方向会同时收窄两组结果
+              教程与题库共用同一份方向闭集；可多选，勾满全部具体方向会自动回到「全部」
             </p>
           </div>
         </div>
@@ -219,8 +223,8 @@ export default function SearchPage() {
             </div>
             {tutorialHits.length === 0 ? (
               <p className="sc-search-hint">
-                {`教程里没有匹配「${query}」的小节${scopeText(direction)}；换个关键词，或去 `}
-                <Link to={tutorialHref(direction === 'all' ? undefined : direction)}>学堂</Link>
+                {`教程里没有匹配「${query}」的小节${scopeText(directions)}；换个关键词，或去 `}
+                <Link to={learnHref(directions)}>学馆</Link>
                 {' 按方向翻。'}
               </p>
             ) : (
@@ -274,12 +278,8 @@ export default function SearchPage() {
               <p className="sc-search-hint">正在检索题库…</p>
             ) : questionData === null || questionData.items.length === 0 ? (
               <p className="sc-search-hint">
-                {`题库里没有匹配「${query}」的题面${scopeText(direction)}；换个关键词，或直接去 `}
-                <Link
-                  to={practiceHref({ direction: direction === 'all' ? null : direction })}
-                >
-                  练习
-                </Link>
+                {`题库里没有匹配「${query}」的题面${scopeText(directions)}；换个关键词，或直接去 `}
+                <Link to={practiceHref({ direction: directions })}>练习</Link>
                 {' 按方向刷题。'}
               </p>
             ) : (

@@ -591,6 +591,40 @@ def test_select_paper_target_count_respected(profile_factory: Any) -> None:
     assert len(paper_15.questions) <= 15
 
 
+def test_select_paper_filters_by_multiple_directions(profile_factory: Any) -> None:
+    """方向多选：卷面只允许落在所选方向集合内，且池子允许时仍满足 ≥2 方向覆盖。"""
+    profile = profile_factory()
+    names = ("前端", "后端", "算法与数据结构")
+    pool = [_question(f"q-{i}", direction=names[i % len(names)]) for i in range(36)]
+
+    paper = exam_selector.select_paper(
+        pool, profile, proficient=set(), recent=[], direction=["前端", "后端"]
+    )
+    assert paper is not None
+    picked = {str(q.get("direction") or "") for q in paper.questions}
+    assert picked <= {"前端", "后端"}, f"多方向筛选混入了未选方向：{sorted(picked)}"
+    assert len(picked) >= 2, "两个方向都有题时卷面应覆盖 ≥2 个方向"
+    assert paper.stage == "L1", f"多方向聚焦应命中 L1，实际 {paper.stage}"
+
+
+def test_select_paper_filters_by_multiple_sub_directions(profile_factory: Any) -> None:
+    """子方向多选：只保留所选子方向的题，标签按闭集顺序用「、」拼接，补位数为 0。"""
+    profile = profile_factory()
+    pool = [_question(f"r-{i}", sub_direction="react") for i in range(6)]
+    pool += [_question(f"v-{i}", sub_direction="vue3") for i in range(6)]
+    pool += [_question(f"js-{i}", sub_direction="js") for i in range(20)]
+
+    paper = exam_selector.select_paper(
+        pool, profile, proficient=set(), recent=[], sub_direction=["react", "vue3"]
+    )
+    assert paper is not None
+    assert all(
+        str(q.get("sub_direction") or "") in {"react", "vue3"} for q in paper.questions
+    ), "多子方向筛选混入了未选子方向"
+    assert paper.sub_direction == "react、vue3"
+    assert paper.sub_direction_backfill == 0
+
+
 def test_create_run_passes_filters_through_service(
     tmp_db: Any, profile_factory: Any, seed_questions: list[dict[str, Any]]
 ) -> None:

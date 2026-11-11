@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client'
+import type { RunKind } from '../api/types'
 import { TimelineSection } from '../components/history/TimelineSection'
 import { TrendChart } from '../components/history/TrendChart'
 import { TrendTable } from '../components/history/TrendTable'
-import { SegTabs } from '../components/polish/SegTabs'
+import { MultiChipRow, type ChipOption } from '../components/ui/ChipRow'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { EmptyState } from '../components/ui/EmptyState'
@@ -16,12 +17,13 @@ import { useAsync } from '../lib/useAsync'
 /** 每页条数：后端 `limit`（1..50），一页 10 次足够对比最近几轮，再往前翻页看更早的。 */
 const PAGE_SIZE = 10
 
-type KindFilter = 'all' | 'interview' | 'exam'
+/** 「全部」不是后端闭集成员，只在 UI 侧作哨兵（勾满面试 + 笔试会被折叠回它）。 */
+type KindFilter = RunKind | 'all'
 
-const FILTER_TABS = [
-  { key: 'all', label: '全部' },
-  { key: 'interview', label: '面试' },
-  { key: 'exam', label: '笔试' },
+const KIND_OPTIONS: ChipOption<KindFilter>[] = [
+  { value: 'all', label: '全部' },
+  { value: 'interview', label: '面试' },
+  { value: 'exam', label: '笔试' },
 ]
 
 /**
@@ -31,16 +33,17 @@ const FILTER_TABS = [
  * TrendTable 只负责展示，翻页后页首行的对比对象落在上一页也不会失真）。
  */
 export default function HistoryPage() {
-  const [kindFilter, setKindFilter] = useState<KindFilter>('all')
+  const [kindFilters, setKindFilters] = useState<KindFilter[]>(['all'])
   const [page, setPage] = useState(1)
+  const pickedKinds = kindFilters.filter((kind): kind is RunKind => kind !== 'all')
   const historyAsync = useAsync(
     () =>
       api.history({
         limit: PAGE_SIZE,
         page,
-        kind: kindFilter === 'all' ? undefined : kindFilter,
+        kind: pickedKinds.length === 0 ? undefined : pickedKinds,
       }),
-    [page, kindFilter],
+    [page, kindFilters],
   )
   const data = historyAsync.data
   const rows = data === null ? null : data.items
@@ -49,10 +52,10 @@ export default function HistoryPage() {
   const examCount = data === null ? 0 : data.exam_total
 
   const loading = historyAsync.status === 'loading' && data === null
-  const isEmpty = kindFilter === 'all' && data !== null && total === 0
+  const isEmpty = pickedKinds.length === 0 && data !== null && total === 0
 
-  const changeFilter = (key: string): void => {
-    setKindFilter(key === 'interview' || key === 'exam' ? key : 'all')
+  const changeKinds = (next: KindFilter[]): void => {
+    setKindFilters(next)
     setPage(1)
   }
 
@@ -97,7 +100,23 @@ export default function HistoryPage() {
 
       {data !== null && total > 0 ? (
         <>
-          <SegTabs tabs={FILTER_TABS} active={kindFilter} onChange={changeFilter} ariaLabel="成绩类型筛选" />
+          <div className="sc-lab-filters">
+            <div className="sc-lab-filter-row">
+              <span className="sc-lab-filter-label">类型</span>
+              <div className="sc-lab-filter-body">
+                <MultiChipRow
+                  groupLabel="成绩类型筛选"
+                  options={KIND_OPTIONS}
+                  values={kindFilters}
+                  allValue="all"
+                  onChange={changeKinds}
+                />
+                <p className="sc-lab-filter-hint">
+                  可同时看面试与笔试；勾满两项会自动回到「全部」
+                </p>
+              </div>
+            </div>
+          </div>
 
           <p className="sc-meta-line">
             <span>{`共 ${total} 次`}</span>

@@ -532,18 +532,29 @@ def list_runs(kind: str | None = None, limit: int = 20) -> list[dict[str, Any]]:
     return [_run_dict(row) for row in rows]
 
 
+def _history_kinds(kinds: str | Sequence[str] | None) -> list[str]:
+    """归一历史页类型多选：闭集外丢弃；两种类型都选中等价于不筛选（返回空列表）。"""
+    picked = [kinds] if isinstance(kinds, str) else list(kinds or [])
+    allowed = [kind for kind in picked if kind in ("interview", "exam")]
+    return [] if len(set(allowed)) >= 2 else allowed
+
+
 def history_rows(
-    kind: str | None = None, limit: int = 10, offset: int = 0
+    kinds: str | Sequence[str] | None = None, limit: int = 10, offset: int = 0
 ) -> list[dict[str, Any]]:
-    """历史页分页：已完成且 `kind ∈ {interview, exam}` 的 run，倒序（与报告页口径一致）。"""
+    """历史页分页：已完成且 `kind ∈ {interview, exam}` 的 run，倒序（与报告页口径一致）。
+
+    `kinds` 是多选类型（空 = 不筛选 / 全选）；单值字符串仍可用（旧调用方兼容）。
+    """
     sql = (
         "SELECT id, kind, profile_id, payload, status, created_at FROM runs"
         " WHERE user_id = ? AND status = ? AND kind IN (?, ?)"
     )
     params: list[Any] = [_uid(), RUN_COMPLETED, "interview", "exam"]
-    if kind is not None:
-        sql += " AND kind = ?"
-        params.append(kind)
+    picked = _history_kinds(kinds)
+    if picked:
+        sql += " AND kind IN (" + ", ".join("?" for _ in picked) + ")"
+        params.extend(picked)
     sql += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
     params.extend([limit, offset])
     with connection() as conn:
@@ -551,16 +562,17 @@ def history_rows(
     return [_run_dict(row) for row in rows]
 
 
-def count_history_rows(kind: str | None = None) -> int:
+def count_history_rows(kinds: str | Sequence[str] | None = None) -> int:
     """历史页总数：与 `history_rows` 同一过滤口径，供分页器算总页数。"""
     sql = (
         "SELECT count(*) AS n FROM runs"
         " WHERE user_id = ? AND status = ? AND kind IN (?, ?)"
     )
     params: list[Any] = [_uid(), RUN_COMPLETED, "interview", "exam"]
-    if kind is not None:
-        sql += " AND kind = ?"
-        params.append(kind)
+    picked = _history_kinds(kinds)
+    if picked:
+        sql += " AND kind IN (" + ", ".join("?" for _ in picked) + ")"
+        params.extend(picked)
     with connection() as conn:
         row = conn.execute(sql, params).fetchone()
     return int(row["n"])
@@ -1449,22 +1461,28 @@ def rebuild_question_search() -> tuple[str, int]:
 
 
 def search_questions(
-    query: str, direction: str = "", sub_direction: str = "", limit: int = 5, page: int = 1
+    query: str,
+    directions: Sequence[str] | str | None = None,
+    sub_direction: str = "",
+    limit: int = 5,
+    page: int = 1,
 ) -> dict[str, Any]:
     """题目检索：FTS5 trigram 优先，短查询 / 无虚表时降级 LIKE；答案列永不入响应。
 
     `limit` 是每页条数，`page` 从 1 起；`total` 为**命中总数**（不是本页条数），供前端翻页。
+    `directions` 是多选方向（空 = 不过滤），SQL 走 `IN (...)`；旧的单值字符串仍可用。
     """
     needle = str(query or "").strip()
     size = max(1, min(int(limit), 20))
     offset = (max(1, int(page)) - 1) * size
     if not needle:
         return {"items": [], "total": 0, "mode": "fts5", "notice": "请输入检索关键词"}
+    picked = [directions] if isinstance(directions, str) else list(directions or [])
     filters: list[str] = []
     params: list[Any] = []
-    if direction:
-        filters.append("direction = ?")
-        params.append(direction)
+    if picked:
+        filters.append("direction IN (" + ", ".join("?" for _ in picked) + ")")
+        params.extend(picked)
     if sub_direction:
         filters.append("sub_direction = ?")
         params.append(sub_direction)
@@ -1689,11 +1707,21 @@ _RADAR_TECH_JOIN = (
 )
 
 
+def _radar_picks(value: str | Sequence[str] | None) -> list[str]:
+    """单选字符串 / 多选列表统一成去重后的列表（空串 / None / 空列表 = 不过滤）。"""
+    picked = [value] if isinstance(value, str) else list(value or [])
+    return list(dict.fromkeys(item for item in picked if item))
+
+
 def _radar_tech_where(
-    *, tech_slug: str = "", direction: str = "", verdict: str = ""
+    *,
+    tech_slug: str = "",
+    directions: str | Sequence[str] | None = None,
+    verdicts: str | Sequence[str] | None = None,
 ) -> tuple[str, list[Any]]:
     """技术清单的过滤条件（列表与计数共用，避免两处口径漂移）。
 
+    `directions` / `verdicts` 都是多选，SQL 走 `IN (...)`（单值字符串仍兼容）；
     `verdict` 走 `COALESCE(a.verdict, 'skip')`：还没有评估行的技术按 `skip` 投射，
     筛「跳过」时要一并命中，与列表里的默认结论保持一致。
     """
@@ -1702,12 +1730,18 @@ def _radar_tech_where(
     if tech_slug:
         clauses.append("t.tech_slug = ?")
         params.append(tech_slug)
-    if direction:
-        clauses.append("t.direction = ?")
-        params.append(direction)
-    if verdict:
-        clauses.append("COALESCE(a.verdict, 'skip') = ?")
-        params.append(verdict)
+    picked_directions = _radar_picks(directions)
+    if picked_directions:
+        clauses.append("t.direction IN (" + ", ".join("?" for _ in picked_directions) + ")")
+        params.extend(picked_directions)
+    picked_verdicts = _radar_picks(verdicts)
+    if picked_verdicts:
+        clauses.append(
+            "COALESCE(a.verdict, 'skip') IN ("
+            + ", ".join("?" for _ in picked_verdicts)
+            + ")"
+        )
+        params.extend(picked_verdicts)
     return (" WHERE " + " AND ".join(clauses)) if clauses else "", params
 
 
@@ -1715,13 +1749,13 @@ def radar_list_techs(
     limit: int = 50,
     *,
     tech_slug: str = "",
-    direction: str = "",
-    verdict: str = "",
+    directions: str | Sequence[str] | None = None,
+    verdicts: str | Sequence[str] | None = None,
     offset: int = 0,
 ) -> list[dict[str, Any]]:
     """技术清单：最新评估 + 最新快照 + 当前账号最近一条生成任务，按评估时间倒序分页。"""
     where, filter_params = _radar_tech_where(
-        tech_slug=tech_slug, direction=direction, verdict=verdict
+        tech_slug=tech_slug, directions=directions, verdicts=verdicts
     )
     params: list[Any] = [_uid(), *filter_params, limit, offset]
     with connection() as conn:
@@ -1775,10 +1809,15 @@ def radar_list_techs(
 
 
 def radar_count_techs(
-    *, tech_slug: str = "", direction: str = "", verdict: str = ""
+    *,
+    tech_slug: str = "",
+    directions: str | Sequence[str] | None = None,
+    verdicts: str | Sequence[str] | None = None,
 ) -> int:
     """技术清单总数：与 `radar_list_techs` 同一过滤口径，供分页器算总页数。"""
-    where, params = _radar_tech_where(tech_slug=tech_slug, direction=direction, verdict=verdict)
+    where, params = _radar_tech_where(
+        tech_slug=tech_slug, directions=directions, verdicts=verdicts
+    )
     with connection() as conn:
         row = conn.execute(
             f"SELECT count(*) AS n FROM radar_techs t{_RADAR_TECH_JOIN}{where}", params

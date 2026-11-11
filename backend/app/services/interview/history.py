@@ -18,6 +18,7 @@
 排序：`repository.history_rows()` 已按 `created_at DESC` 返回，本层**不再二次排序**（口径单一来源）。
 """
 
+from collections.abc import Sequence
 from typing import Any
 
 from app.core import repository
@@ -120,23 +121,25 @@ def kind_counts() -> dict[str, int]:
 
 
 def list_history(
-    limit: int = DEFAULT_LIMIT, page: int = 1, kind: str | None = None
+    limit: int = DEFAULT_LIMIT,
+    page: int = 1,
+    kinds: str | Sequence[str] | None = None,
 ) -> tuple[list[RunSummary], int]:
     """已完成测评的**分页**投影，返回 `(本页条目, 命中总数)`。
 
-    `kind` 只接受 `interview` / `exam`（其它值按「不筛选」处理，路由层已用闭集拦一次）；
-    `total` 与列表同一过滤口径，前端据此算总页数。`limit` 越界由路由层
+    `kinds` 只接受 `interview` / `exam` 组成的多选（其它值按「不筛选」处理，路由层已用闭集拦一次）；
+    勾满两种类型与不筛选等价。`total` 与列表同一过滤口径，前端据此算总页数。`limit` 越界由路由层
     `Query(ge=1, le=50)` 拦下（422 → 统一 envelope）；这里只做防御性截断。
     """
     limit = min(max(limit, MIN_LIMIT), MAX_LIMIT)
     page = max(page, 1)
-    if kind not in {INTERVIEW_KIND, EXAM_KIND}:
-        kind = None
+    picked = [kinds] if isinstance(kinds, str) else list(kinds or [])
+    picked = [kind for kind in picked if kind in {INTERVIEW_KIND, EXAM_KIND}]
     offset = (page - 1) * limit
     report = repository.latest_report()  # 短板数共用同一份最新报告：一次读库，不逐行反查
-    total = repository.count_history_rows(kind)
+    total = repository.count_history_rows(picked)
     # 多取 LOOKAHEAD 行只为页尾行找「上一同类」；这 2 行不返回给调用方。
-    rows = repository.history_rows(kind, limit=limit + LOOKAHEAD, offset=offset)
+    rows = repository.history_rows(picked, limit=limit + LOOKAHEAD, offset=offset)
     scored = [(row, score_of(row["kind"], row["payload"] or {})) for row in rows]
     summaries: list[RunSummary] = []
     for index, (row, score) in enumerate(scored[:limit]):

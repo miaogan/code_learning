@@ -9626,3 +9626,26 @@ html {
     flex: 1 1 auto;
   }
 }
+
+/* 多选筛选组（r70）：先锋清单的「结论 / 方向」各占一行，行样式复用学馆的 sc-lab-filter-row。 */
+.sc-radar-filtergroups {
+  display: flex;
+  flex: 1 1 100%;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* 组卷偏好多选（r70）：方向 / 子方向 / 难度各占一行（复用学馆行样式），题量仍是单选下拉。 */
+.sc-exam-filtergroups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  margin: var(--sp-4) 0 var(--sp-3);
+  padding: var(--sp-4) 0 var(--sp-3);
+  border-top: 1px solid var(--border-hair);
+  border-bottom: 1px solid var(--border-hair);
+}
+
+.sc-exam-filtercount {
+  max-width: 220px;
+}
