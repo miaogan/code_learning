@@ -338,11 +338,11 @@
 
 /* ---------- r69 · 公共表单与下拉框（append-only；推导见本需求 DESIGN） ---------- */
 :root {
-  /* 下拉箭头 16 = 8×2；右缘 12，文本预留 12 + 16 + 12 = 40，短屏长文案不压箭头 */
-  --select-icon-size: 16px;
+  /* r71：下拉箭头降到 14 = 7×2， tertiary 着色让控件更像输入面，而不是一颗图标按钮。 */
+  --select-icon-size: 14px;
   /* 既有发丝网格缺省的 1px 轨道：补齐引用，不改变既有推导尺寸。 */
   --lab-rule: 1px;
-  /* SVG 着色与 --text-secondary 同值；图形集中在 token，避免各控件散落 SVG。 */
-  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23a0aab5' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  /* SVG 着色与 --text-tertiary 同值；图形集中在 token，避免各控件散落 SVG。 */
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23737d89' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
 }
 
