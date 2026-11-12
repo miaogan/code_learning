@@ -324,5 +324,5 @@ backend  success  13 步全过（Test / 四个评测门禁 / 依赖审计）
 frontend success
 ```
 
-宿主实跑（vcenv 起 uvicorn 连交付容器的 PG + Redis）：`/health` → `db=postgresql`；
+宿主实跑（宿主 venv 起 uvicorn 连交付容器的 PG + Redis）：`/health` → `db=postgresql`；
 登录 → `/api/me` → 题库检索（`闭包` 命中 12 条、`100%` 作为字面量正常命中）全通。
