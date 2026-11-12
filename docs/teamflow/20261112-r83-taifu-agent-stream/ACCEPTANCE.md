@@ -353,3 +353,22 @@ scroll=END  topbar.top=-2397
 `frontend/.tmpbuild/` 后稳定通过，非代码问题。）
 
 截图：`scripts/sticky-nav-scrolled.png`（滚到 1200px 时顶栏与侧栏仍钉住，正文不透出）。
+
+## §12 侧栏「还是会动」→ 整块固定不动（r83 修复六，r84 期间追加）
+
+用户反馈 §11 之后侧栏「还是会动」。两个残留来源：
+
+1. **40px 初始跟随**：aside 的 padding 留在自己身上，inner 的 static 起点在
+   `顶栏底 + padding-top`（实测 96）；页面一滚，inner 先从 96 跟随到 sticky 锚点 56
+   才钉住——开头这几十像素就是「还是会动」。
+   **修法**：padding 从 aside 移进 inner，static 起点 = sticky 锚点，从第一像素起零位移。
+2. **满高窗口也出内部滚动**：padding 移入后内容 884 > 可用 820，出现滚动条 +
+   滚轮劫持（指针在侧栏上滚不动页面）。**修法**：把 r38 主题侧栏纵向节奏收紧
+   92px（inner padding 40/32→16/16、两组工具组头 40→28、竖排步骤行间 gap→0），
+   内容 792 装进可用 812，整块装下、彻底不滚；max-height 改按 inner **自己的
+   padding 变量**（`--sb-pad-top/bottom`）计算，主题改 padding 时算式自动跟随。
+   矮窗口（装不下时）仍退化成内部自滚兜底。
+
+验证：`check-sticky-nav.cjs` 新增两条断言（scroll=0 时 inner.top 必须=56；
+满高窗口 scrollH===clientH 不许内部滚），三视口 + 负向自检全 PASS；
+vitest 512 测试、typecheck / lint / build、check-visual-polish 回归全 PASS。

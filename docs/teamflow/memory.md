@@ -104,3 +104,8 @@
 - 可视化不引库：色阶阈值集中在一个函数（heatLevel / trendBars 的 ok 分档），颜色不单独承载信息（每格带 title 读数）。
 - 动效一律配 `prefers-reduced-motion: reduce` 关闭；hover 抬升只在 `@media (hover:hover)`。
 - 环境坑：**杀 esbuild.exe = 杀死 vite dev server**（service 是常驻子进程）；重启 vite 必须 `--host 127.0.0.1`（默认可能只绑 ::1，CDP 脚本全走 127.0.0.1）。
+
+## sticky 侧栏「固定不动」的完整口径（r83 修复六）
+
+- sticky 元素的 static 起点到锚点之间有距离时，滚动开头会「先跟随再钉住」——用户感知为「还是会动」。要零位移：padding/间距必须放在 sticky 层自己身上，让 static 起点=锚点。
+- 要「整块固定不滚」，内容必须装得下一屏：宁可收紧侧栏纵向节奏（组头 40→28、行 gap→0），也不要留内部滚动条（滚轮会被侧栏劫持）。max-height 用 padding 变量计算，主题改 padding 算式自动跟随。

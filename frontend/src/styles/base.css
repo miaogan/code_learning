@@ -102,19 +102,31 @@ a {
   flex: 0 0 var(--sidebar-w);
   border-right: 1px solid var(--border-subtle);
   background: var(--bg-surface);
-  padding: var(--sp-6) var(--sp-4);
+  /* r83 修复六：侧栏**整体固定不动**。padding 不能留在 aside 上 —— inner 的
+     static 起点会落在 padding 之下，页面一滚 inner 先「跟随」到 sticky 锚点才钉住，
+     开头那几十像素的位移就是用户说的「还是会动」。padding 移进 inner 后，
+     static 起点 = 顶栏底 = sticky top，从第一像素起就零位移。 */
+  padding: 0;
 }
 
 /* 侧栏内容钉住（r83 §11）：<aside> 自己不 sticky —— 它要撑满整列，右边那条分隔线
    才能从顶到底不断。真正 sticky 的是里面这层，导航因此随视口常驻而不跟着页面滚走。
    内容比视口高时（矮窗口 / 窄屏字大）本层内部自己滚，不会顶出页面。 */
 .sc-sidebar-inner {
+  --sb-pad-top: var(--sp-6);
+  --sb-pad-bottom: var(--sp-6);
+  padding: var(--sb-pad-top) var(--sp-4) var(--sb-pad-bottom);
   position: sticky;
   top: calc(var(--topbar-h) + env(safe-area-inset-top));
-  /* 留一格 padding 的余量，最后一项不贴着视口底边；不写死侧栏上下 padding
-     （r38 主题把 sp-6 改成了 sp-8/sp-7，写死会在换肤后算错高度）。 */
-  max-height: calc(100vh - var(--topbar-h) - env(safe-area-inset-top) - var(--sp-6));
-  max-height: calc(100dvh - var(--topbar-h) - env(safe-area-inset-top) - var(--sp-6));
+  /* 高度扣掉**自己**的上下 padding（box-sizing:border-box 下 max-height 含 padding），
+     这样满高窗口里内容刚好装下、不出内部滚动条；矮窗口才退化成内部自滚。
+     余量走变量——主题改 padding 时自动跟着变，不需要回来改算式。 */
+  max-height: calc(
+    100vh - var(--topbar-h) - env(safe-area-inset-top) - var(--sb-pad-top) - var(--sb-pad-bottom)
+  );
+  max-height: calc(
+    100dvh - var(--topbar-h) - env(safe-area-inset-top) - var(--sb-pad-top) - var(--sb-pad-bottom)
+  );
   overflow-y: auto;
   overscroll-behavior: contain;
 }
@@ -5147,7 +5159,17 @@ body {
 .sc-sidebar {
   background: var(--bg-canvas);
   border-right: 1px solid var(--border-subtle);
-  padding: var(--sp-8) var(--sp-5) var(--sp-7);
+}
+
+/* r83 修复六：aside 的 padding 移进 sticky 层（见 .sc-sidebar 基础段的注释），
+   inner 的 static 起点因此与 sticky 锚点重合，侧栏滚动时零位移。
+   同一轮把纵向节奏收紧 92px（padding 40/32→24/20、两组工具组头 40→28、
+   每个步骤行 padding 8→4）：改前内容 884 高、可用 820，满高窗口也必须内部滚；
+   改后 792 装进 800，侧栏真正「固定不动」。 */
+.sc-sidebar-inner {
+  --sb-pad-top: var(--sp-4);
+  --sb-pad-bottom: var(--sp-4);
+  padding: var(--sb-pad-top) var(--sp-5) var(--sb-pad-bottom);
 }
 
 .sc-page {
@@ -5171,7 +5193,9 @@ body {
  * 避免此前「步骤 36 高 / 工具 32 高、两组左缘不齐」的参差感。 */
 .sc-stepper.is-vertical {
   counter-reset: scstep;
-  gap: var(--sp-1);
+  /* r83 修复六：行间 gap 收为 0——每行自带 padding 与 hover 背景，视觉上仍可分辨；
+     侧栏要「整块装进一屏」才能真的固定不动（否则满高窗口也会出内部滚动条）。 */
+  gap: 0;
 }
 
 .sc-stepper.is-vertical .sc-step {
@@ -5225,7 +5249,8 @@ body {
 
 /* 工具组：去掉分隔线（两组都有 group 标题，已经分得开），改为纯留白； */
 .sc-toolnav {
-  margin-top: var(--sp-6);
+  margin-top: var(--sp-3);
+  padding-top: var(--sp-3);
 }
 
 /* 工具项缩进到步骤文字列（padding 12 + 编号 24 + gap 8 = 44），两组左缘不再是「编号 vs 文字」的参差。 */
