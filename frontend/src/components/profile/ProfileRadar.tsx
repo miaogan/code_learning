@@ -1,8 +1,10 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 
 import type { Report, RunSummary } from '../../api/types'
 import {
   CAPABILITY_BASELINE,
+  axisFixes,
   capabilityAxes,
   capabilityCoverage,
   radarPath,
@@ -111,10 +113,16 @@ export function ProfileRadar({ report, runs }: ProfileRadarProps) {
       </div>
 
       {filledCount === 0 ? (
-        <p className="sc-coach-note">
-          还没有可用的测评数据。先完成一次召对或科考，雷达就会按真实得分生成；
-          这里不预填、也不估算任何能力值。
-        </p>
+        <div className="sc-radar-empty">
+          <p className="sc-coach-note">
+            还没有可用的测评数据。先完成一次召对或科考，雷达就会按真实得分生成；
+            这里不预填、也不估算任何能力值。
+          </p>
+          <div className="sc-radar-fixes">
+            <Link className="sc-radar-fix" to="/interview">去做一次召对</Link>
+            <Link className="sc-radar-fix" to="/exam">去做一次科考</Link>
+          </div>
+        </div>
       ) : (
         <>
           <div className="sc-radar-wrap">
@@ -222,22 +230,34 @@ export function ProfileRadar({ report, runs }: ProfileRadarProps) {
               </ul>
 
               <ol className="sc-radar-rows" aria-label="能力维度读数">
-                {axes.map((axis, index) => (
-                  <li className="sc-radar-row" key={axis.key}>
-                    <span className="sc-radar-num sc-mono">{index + 1}</span>
-                    <span className="sc-radar-axis-info">
-                      <span className="sc-radar-title">{axis.title}</span>
-                      <span className="sc-radar-basis">{axis.basis}</span>
-                    </span>
-                    <span
-                      className={
-                        axis.filled ? 'sc-radar-reading sc-mono' : 'sc-radar-reading sc-mono is-empty'
-                      }
-                    >
-                      {axis.reading}
-                    </span>
-                  </li>
-                ))}
+                {axes.map((axis, index) => {
+                  const fixes = axis.filled ? [] : axisFixes(axis.key, report, runs)
+                  return (
+                    <li className="sc-radar-row" key={axis.key}>
+                      <span className="sc-radar-num sc-mono">{index + 1}</span>
+                      <span className="sc-radar-axis-info">
+                        <span className="sc-radar-title">{axis.title}</span>
+                        <span className="sc-radar-basis">{axis.basis}</span>
+                        {fixes.length > 0 ? (
+                          <span className="sc-radar-fixes">
+                            {fixes.map((fix) => (
+                              <Link key={fix.href} className="sc-radar-fix" to={fix.href}>
+                                {fix.label}
+                              </Link>
+                            ))}
+                          </span>
+                        ) : null}
+                      </span>
+                      <span
+                        className={
+                          axis.filled ? 'sc-radar-reading sc-mono' : 'sc-radar-reading sc-mono is-empty'
+                        }
+                      >
+                        {axis.reading}
+                      </span>
+                    </li>
+                  )
+                })}
               </ol>
             </div>
           </div>

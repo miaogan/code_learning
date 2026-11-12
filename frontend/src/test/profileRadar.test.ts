@@ -3,6 +3,7 @@ import type { Report, RoleFit, RunSummary, WeaknessItem } from '../api/types'
 import {
   CAPABILITY_BASELINE,
   CAPABILITY_TITLE,
+  axisFixes,
   capabilityAxes,
   capabilityCoverage,
   radarPath,
@@ -319,6 +320,94 @@ describe('参考基线', () => {
   it('两条参考线是固定刻度（产品设定，非真实市场统计）', () => {
     expect(CAPABILITY_BASELINE.average).toBe(0.5)
     expect(CAPABILITY_BASELINE.top).toBe(0.9)
+  })
+})
+
+describe('axisFixes 缺数据轴的补齐跳转（r76）', () => {
+  it('全空数据：技术力 / 稳定度 / 学习力给召对 + 科考两个入口，报告系轴只给科考', () => {
+    expect(axisFixes('technique', null, [])).toEqual([
+      { label: '去做一次召对', href: '/interview' },
+      { label: '去做一次科考', href: '/exam' },
+    ])
+    expect(axisFixes('stability', null, [])).toEqual([
+      { label: '去做一次召对', href: '/interview' },
+      { label: '去做一次科考', href: '/exam' },
+    ])
+    expect(axisFixes('learning', null, [])).toEqual(axisFixes('stability', null, []))
+    expect(axisFixes('depth', null, [])).toEqual([{ label: '去做一次科考', href: '/exam' }])
+    expect(axisFixes('fundamentals', null, [])).toEqual([{ label: '去做一次科考', href: '/exam' }])
+    expect(axisFixes('breadth', null, [])).toEqual([{ label: '去做一次科考', href: '/exam' }])
+    expect(axisFixes('readiness', null, [])).toEqual([{ label: '去做一次科考', href: '/exam' }])
+  })
+
+  it('有有分记录但没有报告：报告系轴引导先生成报告，技术力已填不再给出口', () => {
+    const runs = [run('exam', 80)]
+    expect(axisFixes('depth', null, runs)).toEqual([
+      { label: '已有测评记录，去生成诊断报告', href: '/report' },
+    ])
+    expect(axisFixes('readiness', null, runs)).toEqual([
+      { label: '已有测评记录，去生成诊断报告', href: '/report' },
+    ])
+    expect(axisFixes('technique', null, runs)).toEqual([])
+  })
+
+  it('报告存在但薄弱地图为空：深度 / 基础 / 广度都引导再做科考', () => {
+    const empty = reportWith([])
+    expect(axisFixes('depth', empty, [])).toEqual([
+      { label: '再做一次含挑战题的科考', href: '/exam' },
+    ])
+    expect(axisFixes('fundamentals', empty, [])).toEqual([
+      { label: '再做一次含基础 / 进阶题的科考', href: '/exam' },
+    ])
+    expect(axisFixes('breadth', empty, [])).toEqual([{ label: '去做一次科考', href: '/exam' }])
+  })
+
+  it('薄弱地图只有基础题：深度补挑战题科考，基础扎实度已填给空出口，广度引导覆盖更多方向', () => {
+    const basicOnly = reportWith([weak({ difficulty: ['basic'], total: 10, wrong: 2 })])
+    expect(axisFixes('depth', basicOnly, [])).toEqual([
+      { label: '再做一次含挑战题的科考', href: '/exam' },
+    ])
+    expect(axisFixes('fundamentals', basicOnly, [])).toEqual([])
+    expect(axisFixes('breadth', basicOnly, [])).toEqual([
+      { label: '科考覆盖更多方向', href: '/exam' },
+    ])
+  })
+
+  it('稳定度 / 学习力：同类不足 2 次时缺哪类补哪类，两类都够不给出口', () => {
+    expect(axisFixes('stability', null, [run('exam', 80)])).toEqual([
+      { label: '去做一次召对', href: '/interview' },
+      { label: '再做一次科考', href: '/exam' },
+    ])
+    expect(axisFixes('learning', null, [run('interview', 5), run('interview', 6)])).toEqual([
+      { label: '去做一次科考', href: '/exam' },
+    ])
+    const both = [run('exam', 80), run('exam', 70), run('interview', 5), run('interview', 6)]
+    expect(axisFixes('stability', null, both)).toEqual([])
+    expect(axisFixes('learning', null, both)).toEqual([])
+  })
+
+  it('未计分记录不算数：稳定度只有一条有分记录时仍给补法', () => {
+    expect(axisFixes('stability', null, [run('exam', 80), run('exam', null)])).toEqual([
+      { label: '去做一次召对', href: '/interview' },
+      { label: '再做一次科考', href: '/exam' },
+    ])
+  })
+
+  it('岗位匹配：旧报告引导重新生成，岗位未命中模型引导换岗位名，命中后不给出口', () => {
+    expect(axisFixes('readiness', reportWith([]), [])).toEqual([
+      { label: '重新生成报告（画像需有目标岗位）', href: '/report' },
+    ])
+    const noModel = { ...reportWith([]), role_fit: roleFit({ items: [] }) }
+    expect(axisFixes('readiness', noModel, [])).toEqual([
+      { label: '目标岗位未命中内置能力模型，可换岗位名后重新生成报告', href: '/report' },
+    ])
+    const hit = {
+      ...reportWith([]),
+      role_fit: roleFit({
+        items: [{ name: 'Python', required: 3, user_level: 2, gap: 1, must: true }],
+      }),
+    }
+    expect(axisFixes('readiness', hit, [])).toEqual([])
   })
 })
 

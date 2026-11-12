@@ -7630,6 +7630,29 @@ html {
   color: var(--text-tertiary);
 }
 
+/* 缺数据轴的补齐入口：一行小链接，指向能产出该轴证据的模块（召对 / 科考 / 报告）。 */
+.sc-radar-empty {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.sc-radar-fixes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1) var(--sp-3);
+  margin-top: var(--sp-1);
+}
+
+.sc-radar-fix {
+  color: var(--accent);
+  font-size: var(--fs-meta);
+}
+
+.sc-radar-fix:hover {
+  text-decoration: underline;
+}
+
 .sc-chart-card {
   display: flex;
   flex-direction: column;

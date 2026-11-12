@@ -279,6 +279,105 @@ export function capabilityCoverage(axes: CapabilityAxis[]): number {
   return axes.filter((axis) => axis.filled).length
 }
 
+/**
+ * 缺数据轴的补齐入口（纯函数，r76）：每条 `filled = false` 的轴给出 1–2 个站内跳转，
+ * 指向能产出这份证据的模块（召对 / 科考 / 诊断报告）。跳转只补证据，**不预填任何读数**。
+ */
+export interface AxisFix {
+  /** 按钮文案：说明这条跳转补的是哪份证据。 */
+  label: string
+  /** 站内路由。 */
+  href: string
+}
+
+/** 各类别有分记录数（未计分记录不参与任何统计，与各轴口径一致）。 */
+function scoredCounts(runs: RunSummary[]): { interview: number; exam: number } {
+  const counts = { interview: 0, exam: 0 }
+  for (const item of runs) {
+    if (finiteScore(item.score) === null) continue
+    counts[item.kind] += 1
+  }
+  return counts
+}
+
+/** 报告缺失时的补齐路径：已有测评记录 → 先生成报告；连记录都没有 → 先做一次科考。 */
+function reportFixes(runs: RunSummary[]): AxisFix[] {
+  const { interview, exam } = scoredCounts(runs)
+  if (interview > 0 || exam > 0) {
+    return [{ label: '已有测评记录，去生成诊断报告', href: '/report' }]
+  }
+  return [{ label: '去做一次科考', href: '/exam' }]
+}
+
+/** 同类测评不足 2 次（稳定度 / 学习力）时：缺哪类就补哪类，两类都缺给两个入口；
+ * 已有 1 条有分记录的类说「再做一次」，一条都没有的类说「去做一次」。 */
+function sameKindFixes(counts: { interview: number; exam: number }): AxisFix[] {
+  const fixes: AxisFix[] = []
+  if (counts.interview < 2) {
+    fixes.push({
+      label: counts.interview >= 1 ? '再做一次召对' : '去做一次召对',
+      href: '/interview',
+    })
+  }
+  if (counts.exam < 2) {
+    fixes.push({
+      label: counts.exam >= 1 ? '再做一次科考' : '去做一次科考',
+      href: '/exam',
+    })
+  }
+  return fixes
+}
+
+/**
+ * 单条轴的补齐跳转：只对「暂无测评数据」的轴给出口；轴已有证据时返回空数组。
+ * 判定条件与各轴统计函数**同源**（同一份数据要么算得出读数、要么给得出补法，不给第三种状态）。
+ */
+export function axisFixes(key: CapabilityKey, report: Report | null, runs: RunSummary[]): AxisFix[] {
+  const counts = scoredCounts(runs)
+  const hasScored = counts.interview > 0 || counts.exam > 0
+  const weakness = report?.weakness_map
+  const hasWeakness = Array.isArray(weakness) && weakness.length > 0
+  switch (key) {
+    case 'technique':
+      return hasScored ? [] : [
+        { label: '去做一次召对', href: '/interview' },
+        { label: '去做一次科考', href: '/exam' },
+      ]
+    case 'depth':
+      if (report === null) return reportFixes(runs)
+      return hasWeakness && weakness.some((item) => item.difficulty.includes('challenge'))
+        ? []
+        : [{ label: '再做一次含挑战题的科考', href: '/exam' }]
+    case 'fundamentals':
+      if (report === null) return reportFixes(runs)
+      return hasWeakness &&
+        weakness.some(
+          (item) => item.difficulty.includes('basic') || item.difficulty.includes('intermediate'),
+        )
+        ? []
+        : [{ label: '再做一次含基础 / 进阶题的科考', href: '/exam' }]
+    case 'breadth':
+      if (report === null) return reportFixes(runs)
+      return hasWeakness
+        ? [{ label: '科考覆盖更多方向', href: '/exam' }]
+        : [{ label: '去做一次科考', href: '/exam' }]
+    case 'stability':
+    case 'learning':
+      return sameKindFixes(counts)
+    case 'readiness': {
+      if (report === null) return reportFixes(runs)
+      const fit = report.role_fit
+      if (fit === null) {
+        return [{ label: '重新生成报告（画像需有目标岗位）', href: '/report' }]
+      }
+      const scored = fit.items.filter((item) => Number.isFinite(item.required) && item.required > 0)
+      return scored.length > 0
+        ? []
+        : [{ label: '目标岗位未命中内置能力模型，可换岗位名后重新生成报告', href: '/report' }]
+    }
+  }
+}
+
 export interface RadarPoint {
   x: number
   y: number
