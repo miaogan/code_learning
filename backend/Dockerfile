@@ -5,28 +5,35 @@
 #
 # 构建上下文是 ./backend 子目录（不是仓库根）：.env、本地 *.db、tests/ 根本不会进入上下文，
 # 这是「零凭据进镜像」的主边界；backend/.dockerignore 只是纵深防御的第二道。
+#
+# r98：数据层改为 PostgreSQL，容器**不再持有任何持久状态**——数据库在 postgres 服务里，
+# 连接串由 compose 通过 DATABASE_URL 注入。`/data` 仍在：给临时产物留一个可写目录，
+# 也避免早期镜像里 `/data` 属主规则被误删后，升级卷挂载的人踩到 EACCES。
 
 FROM python:3.13-slim
 
-# DB_PATH 指到卷挂载点，SQLite 落盘才在命名卷里（默认 app.db 会写进容器可写层，down 即丢）。
 # PYTHONUNBUFFERED 让 docker logs 实时可见；PYTHONDONTWRITEBYTECODE 避免容器里生成 __pycache__。
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    DB_PATH=/data/app.db
+    PIP_DISABLE_PIP_VERSION_CHECK=1
 
 WORKDIR /app
 
 # 分层顺序不可颠倒：依赖层先于业务代码层，改 app/ 不会触发依赖重装。
+#
+# PIP_INDEX_URL 是**可选**构建参数，默认官方源。国内网络拉 pypi.org 常掉到几十 kB/s，
+# 装一次依赖能拖到半小时；此时用镜像源构建即可，不改代码逻辑：
+#   docker compose build --build-arg PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple backend
+# 或写进仓库根 .env（compose 会把它透传给 build.args）。
+ARG PIP_INDEX_URL=https://pypi.org/simple
 COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -i "$PIP_INDEX_URL" -r requirements.txt
 
 COPY app/ ./app/
 
 # 非 root 运行 + /data 归属必须在 USER app 之前完成。
-# 原因不是运维洁癖：命名卷首次挂载会继承镜像内 /data 的属主，而 app/main.py 的 lifespan
-# 启动即 init_db() + question_bank.ensure_seeded()（会写库）。属主错了 → 启动阶段 EACCES
-# → 容器起不来 → healthcheck 永不 healthy → frontend 的 service_healthy 门控把整栈挡死。
+# r98 起业务数据在 PostgreSQL，/data 只承载临时产物；这条规则保留是因为一旦有人重新挂载
+# 命名卷到 /data，属主错了就是 EACCES —— 这类错误只在容器里出现，本地永远复现不了。
 RUN useradd --uid 10001 --create-home app \
     && mkdir -p /data \
     && chown -R app:app /data

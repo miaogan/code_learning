@@ -16,9 +16,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app.core import repository
+from app.core import redis_cache, repository
 from app.core.config import get_settings
-from app.core.db import init_db
+from app.core.db import close_pool, init_db
 from app.core.errors import (
     FORBIDDEN,
     HTTP_ERROR,
@@ -107,14 +107,17 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     # 启动即补种子（数据不是 DDL，故不进 db.py）：r11 起**每次都跑**幂等导入 + 只补空列——
     # `ON CONFLICT DO NOTHING` 保证重复启动 0 新增，存量库（r10 卷）也能拿到新增题与解析。
     question_bank.ensure_seeded()
-    # r51：题库导入后重建 FTS 索引（无 FTS5 能力时数据层自行降级为 LIKE，不影响启动）。
+    # r98：题库检索由 `pg_trgm` GIN 索引支撑，重建入口保留为空操作（索引随写入自动维护）。
     repository.rebuild_question_search()
     # r67：应用内定时采集（`RADAR_SCHEDULE=inapp` 才起，其余模式完全由手动按钮驱动）。
     radar_service.start_scheduler()
     yield
-    # 关停时先停调度器（避免 task 在连接池关闭后仍在跑），再释放 AI 连接池。
+    # 关停顺序：先停调度器（避免 task 在连接池关闭后仍在跑），再释放 AI 连接池，
+    # 最后关 DB 池与 Redis 客户端 —— 反过来的话调度器最后一轮写入会撞上已关闭的池。
     await radar_service.stop_scheduler()
     await close_ai_pool()
+    close_pool()
+    redis_cache.reset_client()
 
 
 def create_app() -> FastAPI:
@@ -350,7 +353,8 @@ def create_app() -> FastAPI:
             status="ok",
             version=APP_VERSION,
             ai_configured=runtime.ready,
-            db="sqlite",
+            # r98：数据层换成 PG，探活如实报后端类型（运维靠这一行判断「连的是哪个库」）。
+            db="postgresql",
             ai_provider=runtime.provider,
             ai_model=runtime.model,
             ai_json_mode=runtime.json_mode,

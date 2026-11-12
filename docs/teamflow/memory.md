@@ -109,3 +109,14 @@
 
 - sticky 元素的 static 起点到锚点之间有距离时，滚动开头会「先跟随再钉住」——用户感知为「还是会动」。要零位移：padding/间距必须放在 sticky 层自己身上，让 static 起点=锚点。
 - 要「整块固定不滚」，内容必须装得下一屏：宁可收紧侧栏纵向节奏（组头 40→28、行 gap→0），也不要留内部滚动条（滚轮会被侧栏劫持）。max-height 用 padding 变量计算，主题改 padding 算式自动跟随。
+
+## 数据层换成 PostgreSQL + Redis（r98）
+
+- **数据层口径取代 r10 的「SQLite 落 skillcoach-data 卷」**：`DATABASE_URL` 是唯一数据源，SQLite 已下线，**没有文件库、没有降级路径**。服务名/端口/WEB_PORT 仍是跨需求契约（改任一须同改 `docker-compose.yml` + r98 DEPLOY + README）。
+- **卷拆成两个，不许复用**：PG 用 `skillcoach-pgdata`；r97 的 `skillcoach-data`（内含 `app.db`）保留但不挂载，用途只剩「升级时取数据」与「回滚」。PG 的 `initdb` 只接受空目录，复用旧卷会 `directory exists but is not empty` 直接起不来（本机实测踩到）。
+- **`?` 占位符靠薄适配层翻译**（`db.to_pg_sql()`：`?`→哨兵→`%`转义→哨兵→`%s`，只在带参数时翻译）。新写的 SQL 一律直接用 `%s`，别再扩散 `?`。`row_factory=dict_row` + `prepare_threshold=None`。
+- **检索**：FTS5 虚表删除，改 `pg_trgm` GIN；`mode` 恒 `like`、`notice` 恒空，与旧 LIKE 分支结果一致。`CREATE EXTENSION` 必须用独立连接（DDL 失败会把当前事务整个 aborted）。
+- **Redis 是加速层不是真值**：限流窗口（Lua ZSET 滑窗，被拒请求也写）、会话缓存 60s、读缓存按前缀失效、分布式锁（Lua 比对持有者释放）。降级三档：未配/`memory://`→进程内；运行期不可达→WARNING + 30s 不重试；生产未配→**拒启**。熔断**只共享错误率样本**，在飞计数保持单副本（共享会让 N 副本共用 32 的额度）。
+- **测试必须独占跑**：四个库 `sc_test` / `_empty` / `_legacy` / `_seed` 共享，多 pytest 进程并行会互相 `TRUNCATE`，表现为大量 error + 极慢。宿主跑测试要 `docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d postgres redis`（主 compose 不发布端口）。
+- **迁移脚本**：`ON CONFLICT DO NOTHING` 幂等、列取交集、非空列兜底（缺列给占位值、值为 NULL 给列自己的 DEFAULT）、批次包 SAVEPOINT 失败降级逐行、复位 IDENTITY、逐表行数校验。切换窗口内 SQLite 的新写入带不走，**必须停服迁移**。
+- **镜像构建留了镜像源参数**：`PIP_INDEX_URL` / `NPM_REGISTRY`，默认官方源；国内网络直连常掉到几十 kB/s（实测一次依赖装 18 分钟没完，换源 60 秒）。

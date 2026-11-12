@@ -1,4 +1,9 @@
-"""r53 并发写锁与日志保留期：把 PERF-REPORT 的实测结论变成回归门禁。"""
+"""并发写与日志保留期：把 PERF-REPORT 的实测结论变成回归门禁。
+
+r98：数据库换成 PostgreSQL 后，「`busy_timeout` 是否生效」这类 SQLite 专属断言没有对象了
+（PG 用行级锁 + MVCC，不需要重试窗口）。这里保留的是**换库之后仍然成立的不变量**：
+连接必须来自池、行按列名取值、8 线程并发写不丢行。
+"""
 
 from __future__ import annotations
 
@@ -11,12 +16,16 @@ WORKERS = 8
 PER_WORKER = 50
 
 
-def test_busy_timeout_effective_on_every_connection(tmp_db) -> None:
-    """每条连接都要带 busy_timeout：`connect(timeout=)` 与 PRAGMA 双保险。"""
+def test_connections_are_pooled_and_return_rows_by_name(tmp_db) -> None:
+    """连接由池统一给出，行按列名取值（与 `sqlite3.Row` 的用法逐字一致）。
+
+    这条替代了原来的 `PRAGMA busy_timeout` 断言：绕过池直连会逃逸事务归还与
+    `row_factory=dict_row`，是换驱动时最容易引入、又最难在业务层看出来的回归。
+    """
     with db.connection() as conn:
-        row = conn.execute("PRAGMA busy_timeout").fetchone()
+        row = conn.execute("SELECT 42 AS answer").fetchone()
     assert row is not None
-    assert row[0] == db.BUSY_TIMEOUT_MS == 3000
+    assert row["answer"] == 42
 
 
 def test_concurrent_ai_log_writes_have_no_lock_failures(tmp_db) -> None:

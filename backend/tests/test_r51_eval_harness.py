@@ -24,11 +24,14 @@ def _log(kind: str, elapsed_ms: int, *, model: str = "m1") -> None:
 
 
 def test_init_db_is_idempotent_with_r51_tables(tmp_db) -> None:
+    # 第二次 init_db 必须是无害空操作（全部 DDL 为 IF NOT EXISTS 形态）
     db.init_db()
     with repository.connection() as conn:
         names = {
             row["name"]
-            for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
+            for row in conn.execute(
+                "SELECT tablename AS name FROM pg_tables WHERE schemaname = 'public'"
+            )
         }
     assert "ai_call_logs" in names
 
@@ -114,7 +117,8 @@ def test_search_endpoint_never_exposes_answer(client, seed_questions) -> None:
     assert response.status_code == 200
     body = response.json()
     assert set(body) == {"items", "total", "mode", "notice"}
-    assert body["mode"] in {"fts5", "like"}
+    # r98 起只有 ILIKE 一条检索路径（FTS5 虚表已随 SQLite 下线）
+    assert body["mode"] == "like"
     for item in body["items"]:
         assert set(item) == {
             "question_id",
@@ -139,20 +143,26 @@ def test_search_dirty_filters_are_silently_ignored(client) -> None:
     assert response.json()["total"] >= 0
 
 
-def test_short_query_degrades_to_like(client) -> None:
+def test_short_query_still_matches(client) -> None:
+    """两字查询同样能命中：trigram 索引与 ILIKE 都不受「最短词长」限制。
+
+    r98 之前这条是「短查询降级 LIKE」的验证点；现在没有需要降级的分支，但它仍是个
+    有意义的回归门禁 —— 曾经 FTS5 trigram 对短串有特殊处理，换实现后必须保持能查。
+    """
     body = client.post("/api/search/questions", json={"query": "ab"}).json()
     assert body["mode"] == "like"
-    assert "全文索引" in body["notice"]
+    assert body["notice"] == ""
 
 
-def test_missing_virtual_table_degrades_to_like(client, monkeypatch) -> None:
-    monkeypatch.setattr(repository, "_question_search_table_exists", lambda _conn: False)
+def test_search_notice_is_always_empty(client) -> None:
+    """检索不再有「未启用全文索引」的降级提示：只有一个实现，就不该有第二种提示。"""
     body = client.post("/api/search/questions", json={"query": "索引"}).json()
     assert body["mode"] == "like"
-    assert body["notice"]
+    assert body["notice"] == ""
 
 
-def test_fts_rebuild_tolerates_environment(client, seed_questions) -> None:
+def test_fts_rebuild_returns_current_question_count(client, seed_questions) -> None:
+    """重建入口保留为幂等空操作：索引由 GIN 随写入维护，只回报当前题量。"""
     mode, rows = repository.rebuild_question_search()
-    assert mode in {"fts5", "like"}
-    assert rows == (len(seed_questions) if mode == "fts5" else 0)
+    assert mode == "like"
+    assert rows == len(seed_questions)

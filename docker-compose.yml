@@ -1,18 +1,64 @@
-# docker-compose.yml · SkillCoach r10 两容器交付
+# docker-compose.yml · SkillCoach r98 四容器交付
+#   postgres = PostgreSQL 16（唯一数据源，替代 SQLite 单文件）
+#   redis    = Redis 7（限流窗口 / 会话缓存 / 读缓存 / 分布式锁的共享层）
 #   frontend = nginx:alpine 静态托管 + 同源反代（浏览器唯一入口）
 #   backend  = FastAPI 非 root（不发布宿主端口，只在 compose 内网暴露 8000）
 #
-# 契约单源：docs/teamflow/memory.md「容器化交付约定」——服务名 backend/frontend、后端端口 8000、
-# 命名卷 skillcoach-data、宿主端口 ${WEB_PORT:-8080}。改任一项必须三处同改：本文件 + 本夹 DEPLOY.md + README.md。
+# 契约单源：docs/teamflow/memory.md「容器化交付约定」——服务名 backend/frontend/postgres/redis、
+# 后端端口 8000、命名卷 skillcoach-data（PG 数据）、宿主端口 ${WEB_PORT:-8080}。
+# 改任一项必须三处同改：本文件 + 本夹 DEPLOY.md + README.md。
 #
 # 硬禁令：本文件不得出现任何 Key；environment 里不得出现 AI_PROVIDER
 #（compose 的 ${VAR} 只读宿主 shell 与仓库根 .env，写进去会把 backend/.env 的显式选择冲成空值）。
+#
+# r98 起数据库口令走宿主 shell / 仓库根 .env（`POSTGRES_PASSWORD`），仓库里只有默认值占位。
+# 生产部署必须覆盖它，否则 `production_blockers` 之外的「示例口令」告警会一直亮着。
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-sc_app}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      # 校验和默认开启；这里显式写出来是给「从 SQLite 迁过来」的运维看的：
+      # PG 会在启动时校验页面完整性，坏页直接拒绝启动而不是带着损坏继续跑。
+      POSTGRES_INITDB_ARGS: '--data-checksums'
+    volumes:
+      # 卷名**必须**与 r97 的 SQLite 卷分开：那个卷里躺着 `app.db`，
+      # PG 的 initdb 只接受空目录，复用同名卷会直接 `directory exists but is not empty` 起不来。
+      - skillcoach-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # `pg_isready` 只看「能否接受连接」，比 `SELECT 1` 轻，且 PG 镜像自带。
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-sc_app}']
+      interval: 10s
+      timeout: 5s
+      start_period: 15s
+      retries: 5
+    # 不对宿主发布 5432：数据库只在 compose 内网可达（公网入口只有 nginx）。
+    # 需要本机 psql 排障时用 `docker compose exec postgres psql -U postgres`。
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # `--save ''` 关闭 RDB 落盘：Redis 里只有限流窗口、会话缓存、读缓存这类**可重建**状态，
+    # 丢了大不了重新计数/回源，落盘反而引入「快照期间 fork 抖动」和一份需要单独备份的文件。
+    command: ['redis-server', '--save', '', '--appendonly', 'no', '--maxmemory-policy', 'allkeys-lru']
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 3s
+      start_period: 5s
+      retries: 5
+
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      # 只为「国内拉 pypi 太慢」留的口子，默认官方源；写进仓库根 .env 或宿主 shell 即可覆盖。
+      args:
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
     restart: unless-stopped
     # 配置唯一来源仍是 backend/.env —— 这里只「引用」，不复制内容（Key 永不进 compose）。
     # required:false：新克隆还没有 .env 时 config/build/up 不炸，/health 如实报未就绪，而不是构造期炸进程。
@@ -20,10 +66,17 @@ services:
       - path: ./backend/.env
         required: false
     environment:
-      # 只此一项：把 SQLite 落到命名卷。禁止在此追加任何 *_API_KEY / AI_PROVIDER。
-      - DB_PATH=/data/app.db
-    volumes:
-      - skillcoach-data:/data
+      # 连接串用服务名而非 127.0.0.1：容器内回环不是 PG。
+      # 口令与 postgres 服务同源（同一个 ${POSTGRES_PASSWORD}），改一处即可。
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-sc_app}
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      postgres:
+        # 等 PG 真正可连再起后端：否则 init_db() 会在启动瞬间抛出连接错误。
+        condition: service_healthy
+      redis:
+        # Redis 挂了后端也能跑（降级为进程内实现），所以只等「启动完成」不等健康。
+        condition: service_started
     healthcheck:
       # 探针命令与 backend/Dockerfile 的 HEALTHCHECK 逐字相同（compose 会整体覆盖镜像定义），
       # 只调 interval / start_period / retries。slim 无 curl，故用标准库 urllib。
@@ -56,6 +109,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org}
     restart: unless-stopped
     ports:
       - '${WEB_PORT:-8080}:80'
@@ -68,5 +123,11 @@ services:
         condition: service_healthy
 
 volumes:
-  # 命名卷：docker compose down 保留数据，down -v 才删除（备份/恢复见 DEPLOY.md）。
+  # PostgreSQL 的数据目录。docker compose down 保留数据，down -v 才删除
+  # （备份/恢复见 DEPLOY.md：pg_dump -Fc，不要直接拷数据目录）。
+  skillcoach-pgdata:
+  # r97 及更早的 SQLite 数据卷（`app.db`）。r98 起没有任何容器挂载它，留着有两个用处：
+  #   1. 升级时从这里把 app.db 取出来跑迁移脚本；
+  #   2. 回滚到 r97 时原地可用。
+  # **不要 `docker volume rm`**：删了旧数据就再也迁不回来了。
   skillcoach-data:

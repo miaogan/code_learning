@@ -27,6 +27,7 @@ import time
 from collections import deque
 from dataclasses import dataclass
 
+from app.core import redis_cache
 from app.core.config import get_settings
 
 #: 登录接口单独收紧：暴力破解与 scrypt（n=2^14）计算放大 DoS 都从这里进。
@@ -63,6 +64,10 @@ def hit(ip: str, bucket: str) -> int:
     """记一次请求并返回需等待的秒数；`0` = 放行。
 
     被拒绝的请求同样计入窗口：持续洪泛不应在窗口刚滑过时立刻拿回满额。
+
+    r98：**窗口优先放 Redis**。进程内窗口在多副本下的错误是「每个副本各放 limits 次」，
+    实际放行量是配置值的 N 倍——这是限流最容易骗过自己的形态（压测单副本永远看不出）。
+    Redis 不可用才回落进程内窗口：宁可限流精度退化，也不能让 Redis 故障变成 503。
     """
     settings = get_settings()
     if not settings.rate_limit_enabled:
@@ -71,6 +76,10 @@ def hit(ip: str, bucket: str) -> int:
     if limit <= 0:
         return 0
     window = max(1, int(settings.rate_limit_window_s))
+    shared = redis_cache.window_hit(redis_cache.key("rl", bucket, ip), window, limit)
+    if shared is not None:
+        allowed, retry = shared
+        return 0 if allowed else max(1, retry)
     now = _now()
     key = (bucket, ip)
     with _LOCK:
@@ -193,3 +202,4 @@ def reset_all() -> None:
     with _LOCK:
         _WINDOWS.clear()
     _BREAKER.reset()
+    redis_cache.cache_delete_prefix(redis_cache.key("rl"))

@@ -34,6 +34,10 @@
 ## 快速开始（三步）
 
 ```bash
+# 0) 依赖：PostgreSQL + Redis（r98 起没有 SQLite 兜底，不起库后端起不来）
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d postgres redis
+#    PG → 127.0.0.1:5433，Redis → 127.0.0.1:6380（与 backend/.env.example 一致）
+
 # 1) 后端
 cd backend
 python -m venv .venv
@@ -56,9 +60,9 @@ npm run dev        # http://127.0.0.1:5173，/api 与 /health 已代理到 :8000
 
 `.env` 里填 `AI_API_KEY` 后 AI 链路才有真实输出；**不填也不会 500**，页面会给出中文提示（AC-8）。
 
-## Docker 部署（可选，一条命令起两容器）
+## Docker 部署（可选，一条命令起四容器）
 
-不装 Python / Node 也能跑：`frontend`（nginx 托管构建产物 + 同源反代 `/api`、`/health`）+ `backend`（FastAPI，非 root、只在容器内网），数据落命名卷。
+不装 Python / Node 也能跑：`frontend`（nginx 托管构建产物 + 同源反代 `/api`、`/health`）+ `backend`（FastAPI，非 root、只在容器内网）+ `postgres`（唯一数据源）+ `redis`（限流窗口 / 会话缓存 / 读缓存 / 分布式锁的共享层）。PG 与 Redis **不发布宿主端口**，公网入口只有 nginx。
 
 ```bash
 # 1) 准备配置：backend/.env 是容器唯一的配置来源，需在其中填上真实 AI_DEEPSEEK_API_KEY
@@ -74,6 +78,8 @@ docker compose ps        # backend 的 STATUS 应带 (healthy)
 ```
 
 - **换端口**：把 `docker.env.example` 复制成仓库根 `.env`，改 `WEB_PORT=8080`，再 `docker compose up -d`。
+- **从 SQLite 升级**（r97 → r98）：停机 → 备份 `app.db` → 起 PG 建表 → `scripts/migrate_sqlite_to_pg.py` 迁移（幂等可重跑，带行数校验与序列复位），命令见 [r98 迁移手册](./docs/teamflow/20261112-r98-redis-pg/DEPLOY.md)。
+- **备份**：`./scripts/backup_db.sh`（`pg_dump -Fc` + `pg_restore -l` 自检 + 滚动保留），建议进 cron。
 - **建号（r23）**：`docker compose exec backend python -m app.admin_cli create-user --email me@example.com --mode own`（容器内执行，数据落在同名卷）。
 - **停止**：`docker compose down`（**保留**数据卷）；`docker compose down -v` 会连数据一起删。
 - **排障与运维**（lmstudio 本地档、备份恢复、502 / 413 / 504 排查）：见 [DEPLOY.md](./docs/teamflow/20261101-r10-docker-compose-deploy/DEPLOY.md)。
@@ -141,7 +147,7 @@ git reset --hard 32487b4 && git clean -fdx
 
 ```
 frontend/   React 18 + Vite 5 + TypeScript（5 步向导 + 学习 / 练习等工具页 + 设计 token）
-backend/    FastAPI + SQLite（app/routers、app/services、app/seed）
+backend/    FastAPI + PostgreSQL + Redis（app/routers、app/services、app/seed）
 docs/teamflow/   架构总览、产品记忆、每需求一个任务夹
 ```
 
@@ -160,7 +166,7 @@ docs/teamflow/   架构总览、产品记忆、每需求一个任务夹
 |---|---|---|
 | 不做 SSR / Next.js | SSR、文件路由、RSC | 首屏无 HTML 直出、路由表手写；首屏只等本地 `/health`，可接受 |
 | 后端选 Python 而非 Node | 单运行时（全 TS）的部署便利 | 两套工具链；用三步启动、`docker compose` 与 CI 双 job 兜住 |
-| SQLite 直连、不用 ORM / 迁移框架 | SQLModel、Alembic | 手写 SQL、改字段要自己写幂等补列；结构化产物以 JSON 文本列存，schema 演进上移到 pydantic 校验；DDL 只在 `core/db.py`、SQL 只在 `core/repository.py`，并有静态门禁 |
+| PostgreSQL 直连（psycopg 连接池）、不用 ORM / 迁移框架 | SQLModel、Alembic | 手写 SQL、改字段要自己写幂等补列；结构化产物以 JSON 文本列存，schema 演进上移到 pydantic 校验；DDL 只在 `core/db.py`、SQL 只在 `core/repository.py`，并有静态门禁。r98 起 SQLite 已下线：业务层仍写 `?` 占位符，由 `db.to_pg_sql()` 统一翻译成 psycopg 的 `%s` 并转义字面量 `%` |
 | 手写 CSS + token，不引 UI 库 / Tailwind | 原子类的书写效率 | 类名集中维护；新增组件必须复用 `tokens.css`，禁止裸色值与裸尺寸，改尺寸要回写 DESIGN §0.7 推导 |
 
 **能力边界（避免误读）**：本项目是「LLM 应用工程化与可靠性」实践 —— AI 侧是 OpenAI 兼容单次调用 + pydantic 结构化校验，

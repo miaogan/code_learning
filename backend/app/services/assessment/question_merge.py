@@ -27,13 +27,14 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-import sqlite3
 import sys
 import unicodedata
 from collections import Counter
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
+
+import psycopg
 
 from app.core import repository
 from app.services.assessment import question_bank, question_shuffle
@@ -825,18 +826,17 @@ class RollbackUnavailable(RuntimeError):
 def rollback(sources: tuple[str, ...] = SOURCES) -> int:
     """按来源删除本批题库行，返回删除条数（未导入的库删 0 行；再跑一次恒 0）。
 
-    `sqlite3.connect()` 会顺手创建 0 字节库文件，所以库未初始化时由
-    `repository.delete_questions_by_source()` 先拦住（`DatabaseNotInitialized`），
-    这里再翻成中文原因，CLI 给非 0 退出码而不是 `no such table` 裸栈。
+    库未建表时由 `repository.delete_questions_by_source()` 先拦住（`DatabaseNotInitialized`），
+    这里再翻成中文原因，CLI 给非 0 退出码而不是 `UndefinedTable` 裸栈。
     """
     try:
         return repository.delete_questions_by_source(sources)
     except repository.DatabaseNotInitialized as exc:
         raise RollbackUnavailable(f"{exc}，请先启动一次后端再回滚") from None
-    except sqlite3.OperationalError as exc:
-        if "no such table" in str(exc):
-            raise RollbackUnavailable("库还没有题库表（尚未初始化），请先启动一次后端再回滚") from None
-        raise
+    except psycopg.errors.UndefinedTable:
+        raise RollbackUnavailable(
+            "库还没有题库表（尚未初始化），请先启动一次后端再回滚"
+        ) from None
 
 
 

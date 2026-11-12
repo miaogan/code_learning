@@ -20,12 +20,10 @@ import re
 from collections import Counter
 from pathlib import Path
 from typing import Any
-from uuid import uuid4
 
 import pytest
 
 from app.core import repository
-from app.core.config import get_settings
 from app.services.assessment import question_bank, question_merge as qm
 from app.services.report import rules
 
@@ -570,29 +568,22 @@ def test_rollback_deletes_only_batch_sources(tmp_db: Path) -> None:
     assert repository.delete_questions_by_source(["不存在的来源"]) == 0
 
 
-def test_rollback_reports_uninitialized_db_without_creating_it(
-    monkeypatch: pytest.MonkeyPatch, capfd: pytest.CaptureFixture[str]
+def test_rollback_reports_uninitialized_db(
+    empty_db: str, capfd: pytest.CaptureFixture[str]
 ) -> None:
-    """QA D-3：库不存在/未初始化时回滚给中文原因 + 非 0 退出码，不打栈、不建 0 字节库。"""
-    scratch = Path(__file__).resolve().parent / ".tmp"
-    scratch.mkdir(parents=True, exist_ok=True)
-    missing = scratch / f"{uuid4().hex}-uninit.db"
-    monkeypatch.setenv("DB_PATH", str(missing))
-    get_settings.cache_clear()
-    try:
-        with pytest.raises(qm.RollbackUnavailable):
-            qm.rollback()
-        assert not missing.exists(), "回滚不得把未初始化的库顺手创建成 0 字节文件"
+    """QA D-3：库存在但没建表时，回滚给中文原因 + 非 0 退出码，不打栈。
 
-        code = qm.main(["--rollback"])
-        out = capfd.readouterr().out
-        assert code != 0, "未初始化库上回滚必须失败退出（不是 exit 0 的假成功）"
-        assert "无法回滚" in out and "未初始化" in out, "必须给中文原因，提示先启动后端"
-        assert "Traceback" not in out, "不得把 sqlite3 异常原样抛给使用者"
-        assert not missing.exists()
-    finally:
-        get_settings.cache_clear()
-        missing.unlink(missing_ok=True)
+    r98：判据从「SQLite 文件不存在 / 0 字节」换成「schema 里没有 `questions` 表」。
+    行为要求不变——CLI 必须说人话（先启动后端），而不是把驱动异常原样抛出来。
+    """
+    with pytest.raises(qm.RollbackUnavailable):
+        qm.rollback()
+
+    code = qm.main(["--rollback"])
+    out = capfd.readouterr().out
+    assert code != 0, "未初始化库上回滚必须失败退出（不是 exit 0 的假成功）"
+    assert "无法回滚" in out and "未初始化" in out, "必须给中文原因，提示先启动后端"
+    assert "Traceback" not in out, "不得把驱动异常原样抛给使用者"
 
 
 # --- ⑩ 许可 ----------------------------------------------------------------

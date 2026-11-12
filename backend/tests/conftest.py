@@ -1,8 +1,10 @@
-"""零网络测试基座：每例独立临时 SQLite + FakeAI 替身（TECHNICAL §6.1）。
+"""零网络测试基座：共享 PostgreSQL 测试库 + FakeAI 替身（TECHNICAL §6.1）。
 
 约定：
-- `tmp_db` 用 `DB_PATH` 环境变量把 SQLite 指到临时目录，并 `get_settings.cache_clear()`，
-  让 `app.core.db.connection()` 每次重读配置；用例之间互不污染。
+- `_prepare_database`（会话级）建库建表，`tmp_db`（用例级）`TRUNCATE` 清数据；
+  用例之间互不污染，且不需要每例重建 27 张表。
+- 测试库 DSN 由 `TEST_DATABASE_URL` 控制，默认指向本地 compose 的 PG 实例；
+  **没有 SQLite 兜底**——r98 起数据库只有 PostgreSQL 一种形态。
 - 所有 AI 调用走 `FakeAI`（服务层 `client=` 注入）或 `patch_ai`（类级补丁，覆盖
   「路由层不注入 client」的真实链路），因此整轮测试**不产生任何外网请求**。
 """
@@ -15,15 +17,16 @@ import os
 from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any
-from uuid import uuid4
+from urllib.parse import urlparse
 
+import psycopg
 import pytest
 from fastapi.testclient import TestClient
 
-from app.core import repository
+from app.core import redis_cache, repository
 from app.core.auth import COOKIE_NAME, hash_password, new_session_token, session_expiry
 from app.core.config import get_settings
-from app.core.db import init_db
+from app.core.db import close_pool, connection, init_db
 from app.main import app
 from app.schemas import Evidence, Profile, ProfileProject, ProfileSkill, SkillStatus
 from app.services import rate_limit
@@ -32,9 +35,20 @@ from app.services.ai.ai import AIClient, reset_ai_pool
 
 SEED_PATH = Path(__file__).resolve().parent.parent / "app" / "seed" / "questions.json"
 
-#: 临时库落点：**不用 pytest 的 tmp_path** —— 本机沙箱拒写系统 Temp 目录
-#: （`PermissionError: [WinError 5]` on `pytest-of-user`），所以退到工作区内的一处 scratch 目录。
-SCRATCH_DIR = Path(__file__).resolve().parent / ".tmp"
+#: 测试库 DSN：默认与 `docker-compose.yml` 的 postgres 服务一致（口令取 compose 默认值）。
+#: 换实例只改这一个环境变量，`_prepare_database` 会自动建库。
+TEST_DSN = os.environ.get(
+    "TEST_DATABASE_URL", "postgresql://postgres:postgres@127.0.0.1:5433/sc_test"
+)
+
+#: 与主测试库同实例的空库：只有 schema、没有任何表，供「未初始化」路径用例使用。
+EMPTY_DSN = TEST_DSN.rsplit("/", 1)[0] + "/sc_test_empty"
+
+#: 存量升级专用库：用例要按旧版 DDL 重建表，不能动主测试库的结构。
+LEGACY_DSN = TEST_DSN.rsplit("/", 1)[0] + "/sc_test_legacy"
+
+#: 种子数据专用库：题库导入 1164 行是整个测试套里最贵的单步，按模块共用一次。
+SEED_DSN = TEST_DSN.rsplit("/", 1)[0] + "/sc_test_seed"
 
 #: 供画像 / 报告用例共用的简历正文：每一段都可被 `source_quote` 原样命中。
 RESUME_TEXT = (
@@ -200,30 +214,63 @@ _NEUTRAL_AI_ENV: dict[str, str] = {
 
 
 @pytest.fixture(scope="session", autouse=True)
-def _isolate_default_db() -> Iterator[None]:
-    """把「默认库」也指到一次性路径：**忘了声明 `tmp_db` 的用例会像 CI 一样失败**。
+def _prepare_database() -> Iterator[None]:
+    """整个会话只建一次库与表；每个用例靠 `tmp_db` 清数据（TRUNCATE）互相隔离。
 
-    本地开发库 `backend/app.db` 一直都在（还带着全量表），任何忘记声明 `tmp_db` 的用例都会
-    悄悄写进去 —— 既污染开发数据，又把「只有干净检出（CI）才红」的隔离问题藏起来：
-    r83 就有 4 条用例这样绿在本地、红在 CI（`no such table: taifu_memories`）。
+    r98 起数据库只有 PostgreSQL 一种形态，「每例一个临时 SQLite 文件」随之取消：
+    建 27 张表的开销不再摊到每个用例上（DROP+CREATE 每次约 80ms，乘 1700 例就是两分钟），
+    换成一次建表 + 每例 `TRUNCATE … RESTART IDENTITY CASCADE`（约 5ms）。
 
-    这里把 `DB_PATH` 指向一个**还不存在**的文件且不建表：用例一碰库就 `no such table`，
-    与干净检出时的行为完全一致。需要库的用例显式声明 `tmp_db`（它会覆盖本 fixture 的值）。
+    `DATABASE_URL` 直接写 `os.environ` 而不是 `monkeypatch`：它是会话级 fixture，
+    要覆盖本机 `backend/.env` 里的开发库地址，避免测试写进开发者自己的数据。
     """
-    SCRATCH_DIR.mkdir(exist_ok=True)
-    target = SCRATCH_DIR / f"default-{uuid4().hex}.db"
-    previous = os.environ.get("DB_PATH")
-    os.environ["DB_PATH"] = str(target)
+    _ensure_database_exists(TEST_DSN)
+    os.environ["DATABASE_URL"] = TEST_DSN
     get_settings.cache_clear()
+    close_pool()
+    init_db()
+    close_pool()
     try:
         yield
     finally:
-        if previous is None:
-            os.environ.pop("DB_PATH", None)
-        else:
-            os.environ["DB_PATH"] = previous
+        close_pool()
         get_settings.cache_clear()
-        target.unlink(missing_ok=True)
+
+
+def _ensure_database_exists(dsn: str) -> None:
+    """连不上目标库时给出可操作的中文提示；库不存在则自动创建。
+
+    测试基座依赖一个真实 PG 实例（见 `docs/teamflow/20261108-r98-redis-pg/DEPLOY.md`）。
+    这里不静默跳过——「数据库没起」被当成「测试通过」是最坏的失败模式。
+    """
+    parsed = urlparse(dsn)
+    name = parsed.path.lstrip("/")
+    admin_dsn = parsed._replace(path="/postgres").geturl()
+    try:
+        with psycopg.connect(admin_dsn, autocommit=True, connect_timeout=5) as conn:
+            found = conn.execute("SELECT 1 FROM pg_database WHERE datname = %s", (name,)).fetchone()
+            if not found:
+                conn.execute(f'CREATE DATABASE "{name}"')
+    except psycopg.OperationalError as exc:
+        raise RuntimeError(
+            f"测试需要 PostgreSQL，但连不上 {admin_dsn}（{type(exc).__name__}）。\n"
+            "请先启动：docker compose up -d postgres\n"
+            "或用 TEST_DATABASE_URL 指向一个可用实例。"
+        ) from exc
+
+
+def _truncate_all() -> None:
+    """清空所有业务表并重置自增序列；`CASCADE` 兜住外键顺序，`RESTART IDENTITY` 让
+    依赖「第一条 id = 1」的用例（雷达 runs）每次从同一起点开始。
+    """
+    with connection() as conn:
+        rows = conn.execute(
+            "SELECT tablename FROM pg_tables WHERE schemaname = 'public'"
+        ).fetchall()
+        names = [str(row["tablename"]) for row in rows]
+        if names:
+            listed = ", ".join(f'"{name}"' for name in names)
+            conn.execute(f"TRUNCATE {listed} RESTART IDENTITY CASCADE")
 
 
 @pytest.fixture(autouse=True)
@@ -236,6 +283,22 @@ def _isolate_ai_pool() -> Iterator[None]:
     reset_ai_pool()
     yield
     reset_ai_pool()
+
+
+@pytest.fixture(autouse=True)
+def _isolate_redis(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """默认把 Redis 关掉（`memory://`），用例互不串味，也不依赖本机是否跑着 Redis。
+
+    限流窗口 / 会话缓存 / 读缓存都会跨用例残留（同一个 IP、同一个测试账号），
+    不隔离的话「上一个用例把额度用完」会让下一个用例莫名 429。Redis 自身的集成行为
+    由 `test_r98_redis.py` 显式打开并 `reset_client()` 后验证。
+    """
+    monkeypatch.setenv("REDIS_URL", "memory://")
+    get_settings.cache_clear()
+    redis_cache.reset_client()
+    yield
+    redis_cache.reset_client()
+    get_settings.cache_clear()
 
 
 @pytest.fixture(autouse=True)
@@ -272,21 +335,78 @@ def neutral_ai_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
 
 
 @pytest.fixture()
-def tmp_db(monkeypatch: pytest.MonkeyPatch, neutral_ai_env: None) -> Iterator[Path]:
-    """把 SQLite 指到临时文件并建表；用例结束删库、清配置缓存。
+def tmp_db(monkeypatch: pytest.MonkeyPatch, neutral_ai_env: None) -> Iterator[str]:
+    """清空测试库后交给用例；返回 DSN（需要自己连库的用例用它）。
 
     `neutral_ai_env` 是显式依赖：任何拿到 `tmp_db`（或 `client`）的用例都自动获得环境中性化。
     """
-    SCRATCH_DIR.mkdir(exist_ok=True)
-    db_file = SCRATCH_DIR / f"{uuid4().hex}.db"
-    monkeypatch.setenv("DB_PATH", str(db_file))
+    _truncate_all()
+    yield TEST_DSN
+
+
+@pytest.fixture()
+def empty_db(monkeypatch: pytest.MonkeyPatch) -> Iterator[str]:
+    """指向一个「连得上但一张表都没有」的库，用于验证「数据库未初始化」路径。
+
+    r98 之前这个场景靠「SQLite 文件不存在 / 0 字节」表达；PG 下没有库文件，
+    等价物是「schema 空」——所以这里把 public schema 整个重建一遍。
+    """
+    yield from _fresh_database(monkeypatch, EMPTY_DSN)
+
+
+@pytest.fixture()
+def legacy_db_dsn(monkeypatch: pytest.MonkeyPatch) -> Iterator[str]:
+    """一个可以随便 DROP / 重建的独立库，供「存量库升级」类用例按旧版 DDL 造表。"""
+    yield from _fresh_database(monkeypatch, LEGACY_DSN)
+
+
+def _fresh_database(monkeypatch: pytest.MonkeyPatch, dsn: str) -> Iterator[str]:
+    """重建目标库的 public schema 并把 `DATABASE_URL` 指过去；退出时还原连接池。"""
+    _ensure_database_exists(dsn)
+    _reset_schema(dsn)
+    monkeypatch.setenv("DATABASE_URL", dsn)
     get_settings.cache_clear()
-    init_db()
+    close_pool()
     try:
-        yield db_file
+        yield dsn
     finally:
         get_settings.cache_clear()
-        db_file.unlink(missing_ok=True)
+        close_pool()
+
+
+def _reset_schema(dsn: str) -> None:
+    """把库清成「有 schema、无表」的初始态（`DROP SCHEMA … CASCADE` 比逐表 DROP 稳）。"""
+    with psycopg.connect(dsn, autocommit=True) as conn:
+        conn.execute("DROP SCHEMA public CASCADE")
+        conn.execute("CREATE SCHEMA public")
+
+
+@pytest.fixture(scope="module")
+def seeded_db() -> Iterator[str]:
+    """整模块共用一个已灌种的库：1164 题只导入一次，用例之间只读。
+
+    导入题库是这一层最贵的单步（逐条 `ON CONFLICT` 量级），按模块复用把它的成本从
+    「每例一次」降到「每文件一次」。唯一写用例自己恢复现场（见 `test_seed_roundtrip`）。
+    """
+    _ensure_database_exists(SEED_DSN)
+    _reset_schema(SEED_DSN)
+    previous = os.environ.get("DATABASE_URL")
+    os.environ["DATABASE_URL"] = SEED_DSN
+    get_settings.cache_clear()
+    close_pool()
+    try:
+        init_db()
+        from app.services.assessment import question_bank
+
+        question_bank.ensure_seeded()
+        yield SEED_DSN
+    finally:
+        if previous is None:
+            os.environ.pop("DATABASE_URL", None)
+        else:
+            os.environ["DATABASE_URL"] = previous
+        get_settings.cache_clear()
+        close_pool()
 
 
 #: 测试登录用户：固定 id = `DEFAULT_USER_ID`，让「服务层无认证上下文时写入的默认归属」

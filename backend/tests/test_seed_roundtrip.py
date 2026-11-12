@@ -12,37 +12,15 @@ r17 收口用例：`sub_direction` 上线时，`db.py` / `repository` 的 INSERT
 
 from __future__ import annotations
 
-import os
-from collections.abc import Iterator
-from pathlib import Path
 from typing import Any
 
-import pytest
-
 from app.core import repository
-from app.core.config import get_settings
-from app.core.db import connection, init_db
+from app.core.db import connection
 from app.services.assessment import question_bank
 from app.services.report import rules
 
-
-@pytest.fixture(scope="module")
-def seeded_db(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Path]:
-    """整模块共用一个已灌种的库：1164 题只导入一次，用例之间只读（唯一写用例自己恢复现场）。"""
-    db_file = tmp_path_factory.mktemp("seeded") / "seeded.db"
-    previous = os.environ.get("DB_PATH")
-    os.environ["DB_PATH"] = str(db_file)
-    get_settings.cache_clear()
-    try:
-        init_db()
-        question_bank.ensure_seeded()
-        yield db_file
-    finally:
-        if previous is None:
-            os.environ.pop("DB_PATH", None)
-        else:
-            os.environ["DB_PATH"] = previous
-        get_settings.cache_clear()
+#: r98：`seeded_db` 由 `conftest` 提供（PG 版：独立库 `sc_test_seed` + 模块内共用），
+#: 这里不再本地定义，避免两套「灌种」实现漂移。
 
 
 def _seed_fields(rows: list[dict[str, Any]]) -> set[str]:
@@ -50,7 +28,7 @@ def _seed_fields(rows: list[dict[str, Any]]) -> set[str]:
     return {key for row in rows for key in row}
 
 
-def test_every_seed_field_lands_in_database(seeded_db: Path) -> None:
+def test_every_seed_field_lands_in_database(seeded_db: str) -> None:
     """种子声明的每个字段都必须原样落库（含 sub_direction 这类新增列）。"""
     seed_rows = question_bank.load_seed()
     assert seed_rows, "题库种子为空"
@@ -79,14 +57,14 @@ def test_every_seed_field_lands_in_database(seeded_db: Path) -> None:
     assert not offenders, f"种子字段未原样落库（检查 _row_of / INSERT / SELECT 是否都带上该字段）：{offenders}"
 
 
-def test_every_seeded_question_has_sub_direction(seeded_db: Path) -> None:
+def test_every_seeded_question_has_sub_direction(seeded_db: str) -> None:
     """r17 回归：题库里的每道题都必须有二级方向（通用兜底也算，`None` 即断链）。"""
     rows = repository.list_questions()
     missing = [row["id"] for row in rows if not row.get("sub_direction")]
     assert not missing, f"{len(missing)} 道题缺 sub_direction：{missing[:5]}"
 
 
-def test_sub_direction_belongs_to_its_direction(seeded_db: Path) -> None:
+def test_sub_direction_belongs_to_its_direction(seeded_db: str) -> None:
     """二级方向必须落在其一级方向的闭集内（闭集只有 `rules.SUBDIRECTIONS` 一份）。"""
     offenders = [
         (row["id"], row["direction"], row["sub_direction"])
@@ -96,7 +74,7 @@ def test_sub_direction_belongs_to_its_direction(seeded_db: Path) -> None:
     assert not offenders, f"sub_direction 越出所在方向的闭集：{offenders[:5]}"
 
 
-def test_refresh_converges_to_zero_after_import(seeded_db: Path) -> None:
+def test_refresh_converges_to_zero_after_import(seeded_db: str) -> None:
     """导入后再次覆写必须返回 0（幂等）。
 
     这条专治 `_QUESTION_REFRESH` 漏写某列：`_normalized_question()` 若比对该列而 UPDATE 不写，
@@ -106,7 +84,7 @@ def test_refresh_converges_to_zero_after_import(seeded_db: Path) -> None:
     assert rewrote == 0, f"库内已与种子一致时覆写应为 0 行，实际改写 {rewrote} 行"
 
 
-def test_refresh_rewrites_stale_row(seeded_db: Path) -> None:
+def test_refresh_rewrites_stale_row(seeded_db: str) -> None:
     """反面用例：把库里某题改脏，覆写必须能刷回种子值（证明 UPDATE 真的写了该列）。
 
     放在文件末尾：用例结束时库已恢复成种子状态，不影响同一模块内的其它只读用例。

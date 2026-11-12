@@ -243,8 +243,12 @@ def test_legacy_payload_with_str_fields() -> None:
     assert profile.projects[0].period == "2025-2026"
 
 
-def test_repository_none_roundtrip(tmp_db: Path) -> None:
-    """AC-4③：落库 → 读回，`None` 仍是 `None`；库里存的也是 `null`，不是 `""`。"""
+def test_repository_none_roundtrip(tmp_db: str) -> None:
+    """AC-4③：落库 → 读回，`None` 仍是 `None`；库里存的也是 `null`，不是 `""`。
+
+    r98：判据从「读 SQLite 文件字节」换成「读 PG 里的 payload 文本列」—— 要验证的东西
+    没变（落库的 JSON 里是 `null` 而非空串），只是不再有库文件可读。
+    """
     repository.insert_profile(_as_profile(REAL_MODEL_DRAFT))
 
     stored = repository.get_profile("p-r8")
@@ -252,9 +256,12 @@ def test_repository_none_roundtrip(tmp_db: Path) -> None:
     assert stored.projects[0].role is None
     assert stored.projects[0].period is None
 
-    raw = tmp_db.read_bytes()
-    assert b'"role":null' in raw, "JSON 里必须是 null，不得用空串伪装已知"
-    assert b'"period":null' in raw
+    with repository.connection() as conn:
+        raw = conn.execute(
+            "SELECT payload FROM profiles WHERE id = ?", ("p-r8",)
+        ).fetchone()["payload"]
+    assert '"role":null' in raw, "JSON 里必须是 null，不得用空串伪装已知"
+    assert '"period":null' in raw
 
 
 # --- 下游空值防护（AC-4 ①~④）-----------------------------------------------

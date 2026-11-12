@@ -1,26 +1,135 @@
-"""SQLite 单库访问层：13 张业务表 + 1 张可选 FTS5 虚表，结构化产物以 JSON 文本列存（ARCHITECTURE §3.4）。
+"""PostgreSQL 单库访问层：24 张业务表，结构化产物以 JSON 文本列存（ARCHITECTURE §3.4）。
 
-不做迁移框架：只用 CREATE TABLE IF NOT EXISTS，字段变更需在 memory.md 记录一次性升级说明。
-r3 追加 `timeline_events`（成长时间线的事件快照，`(type, ref_id)` 唯一）——对既有 `app.core.db`
+r98 起 SQLite 已下线，**没有本地文件库、也没有降级路径**：`DATABASE_URL` 是唯一数据源，
+连接由 `psycopg_pool.ConnectionPool` 统一给出。为了让 2261 行 `repository.py` 的 149 处 `?`
+占位符不必逐行改写，这里保留一个薄适配层（`to_pg_sql()` + `Connection`），
+**新写的 SQL 请直接用 `%s`**，不要让适配层继续扩散。
+
+不做迁移框架：只用 CREATE TABLE IF NOT EXISTS + ADD COLUMN IF NOT EXISTS，
+字段变更需在 memory.md 记录一次性升级说明。
+r3 追加 `timeline_events`（成长时间线的事件快照，`(type, ref_id)` 唯一）——对既有库
 反复执行 `init_db()` 即得新表，无迁移语句。
 r6 追加 `questions`（题库，`seed/questions.json` 退为唯一导入源）与 `question_attempts`
 （客观题作答事件，`(question_id, run_id)` 唯一）——同样反复执行 `init_db()` 即得新表与新索引，
-既有 `app.core.db` 无需迁移语句；空库由 `services/question_bank.ensure_seeded()` 幂等补 80 行。
+空库由 `services/question_bank.ensure_seeded()` 幂等补种子行。
 r11 追加题库第五维 `questions.language`、逐题解析 `questions.explanation` 与作答事件来源
-`question_attempts.source`（TECHNICAL §2.1）。SQLite 的 `CREATE TABLE IF NOT EXISTS` 不会给
-**存量**表补列，故 `init_db()` 拆成三步定序：`SCHEMA`（新库即含新列）→ `_ensure_r11_columns()`
-（`PRAGMA table_info` 判定后 `ALTER TABLE`，缺列才动，幂等）→ `SCHEMA_INDEXES`（新索引引用
-`language` / `source`，必须在补列之后执行）。索引因此从 `SCHEMA` 抽出为独立脚本。
+`question_attempts.source`（TECHNICAL §2.1）。`CREATE TABLE IF NOT EXISTS` 不会给
+**存量**表补列，故 `init_db()` 用 `_ensure_columns()`（查 `information_schema.columns`
+后 `ALTER TABLE ADD COLUMN IF NOT EXISTS`，缺列才动，幂等）。
 """
 
+import atexit
 import logging
-import sqlite3
-from collections.abc import Iterator
+import threading
+from collections.abc import Iterable, Iterator, Sequence
 from contextlib import contextmanager
+from typing import Any
+
+import psycopg
+from psycopg.rows import dict_row
+from psycopg_pool import ConnectionPool
 
 from app.core.config import get_settings
 
 logger = logging.getLogger("app.db")
+
+#: `_now()` 的 SQL 等价物：UTC 毫秒 + `+00:00` 后缀，与业务层写入的时间串（ISO 8601 UTC）
+#: 逐字同构。PG 没有 SQLite 的 `strftime`，`to_char` 的 `MS` 恰好是 3 位毫秒。
+#: 保持字符串排序＝时间排序，是既有索引（`ORDER BY created_at DESC`）成立的前提。
+SQL_NOW_ISO = "to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS') || '+00:00'"
+
+#: 业务层（`repository.py` 149 处 SQL）统一写 `?` 占位符，由下面这层翻译成 psycopg 的 `%s`。
+#: 为什么不逐行改成 `%s`：`?` 在原文里是 SQLite 原生写法，一次性脚本替换 149 处字符串
+#: 一旦漏改就变成运行期才炸；集中翻译只有一处可测。
+_PLACEHOLDER = "?"
+_SENTINEL = "\x00"
+
+
+def to_pg_sql(sql: str) -> str:
+    """把 `?` 占位符翻成 `%s`，并转义 SQL 字面量里的 `%`。
+
+    两个动作必须一起做，且顺序不能换：
+
+    - psycopg 用 `%` 解析参数，而检索 SQL 里有 `LIKE '%kw%'` —— 不转义会报
+      `there is no parameter $kw`，这类错误只在真连 PG 时才出现（SQLite 下完全正常）；
+    - 先把 `?` 换成哨兵、再转义 `%`、最后换回 `%s`。若顺序反了，`%` 转义会把刚插入的
+      `%s` 变成 `%%s`（占位符变成字面量），参数个数对不上。
+
+    只在**带参数**时调用：psycopg 无参数 `execute()` 走 simple protocol，不做 `%` 解析，
+    此时转义反而会把 `%%` 原样写进 SQL。
+    """
+    if _PLACEHOLDER not in sql and "%" not in sql:
+        return sql
+    return sql.replace(_PLACEHOLDER, _SENTINEL).replace("%", "%%").replace(_SENTINEL, "%s")
+
+
+class Connection:
+    """`sqlite3.Connection` 的最小替身：只实现业务层真正用到的三个方法。
+
+    刻意不实现 `commit()` —— 事务边界统一由 `connection()` 上下文管理（psycopg 连接池
+    在退出时先 commit、异常时 rollback 并归还连接），业务层自己 commit 会绕开这套语义。
+    """
+
+    __slots__ = ("_raw",)
+
+    def __init__(self, raw: psycopg.Connection) -> None:
+        self._raw = raw
+
+    def execute(self, sql: str, params: Sequence[Any] | None = None) -> psycopg.Cursor:
+        if params is None:
+            return self._raw.execute(sql)
+        return self._raw.execute(to_pg_sql(sql), params)
+
+    def executemany(self, sql: str, params: Iterable[Sequence[Any]]) -> psycopg.Cursor:
+        """批量执行。psycopg3 的批量接口在 **cursor** 上，Connection 没有同名方法。"""
+        cursor = self._raw.cursor()
+        cursor.executemany(to_pg_sql(sql), params)
+        return cursor
+
+    def executescript(self, script: str) -> None:
+        """执行 `;` 分隔的建表脚本：psycopg 无参数 execute 用 simple query，原生支持多语句。"""
+        self._raw.execute(script)
+
+
+#: 连接池是进程级的：`get_settings()` 被测试改写后必须 `close_pool()`，否则旧 DSN 的连接
+#: 会继续被复用（表现为「测试改了库却仍读到上一轮数据」）。
+_pool: ConnectionPool | None = None
+_pool_lock = threading.Lock()
+
+
+def get_pool() -> ConnectionPool:
+    """懒建连接池（单例）。首次访问才连库，导入本模块不产生任何网络行为。"""
+    global _pool
+    if _pool is None:
+        with _pool_lock:
+            if _pool is None:
+                settings = get_settings()
+                _pool = ConnectionPool(
+                    settings.database_url,
+                    min_size=settings.db_pool_min_size,
+                    max_size=settings.db_pool_max_size,
+                    # `prepare_threshold=None` 关闭自动 prepared statement：pgbouncer 的
+                    # transaction 模式（公网常见前置）不支持跨事务复用预备语句。
+                    kwargs={"row_factory": dict_row, "prepare_threshold": None},
+                    timeout=settings.db_pool_timeout_s,
+                    open=True,
+                )
+    return _pool
+
+
+def close_pool() -> None:
+    """关闭并丢弃连接池（进程退出 / 测试切换数据库后调用）。"""
+    global _pool
+    with _pool_lock:
+        pool, _pool = _pool, None
+    if pool is not None:
+        pool.close()
+
+
+# 解释器退出时兜底关闭：psycopg_pool 的工作线程不随进程退出立刻结束，不显式 close 会在
+# stderr 打出 "couldn't stop thread 'pool-1-worker-0' within 5.0 seconds" —— 不影响退出码，
+# 但会让每次脚本运行都带一段噪声，排查真问题时容易误判。
+atexit.register(close_pool)
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS documents (
@@ -244,15 +353,21 @@ CREATE INDEX IF NOT EXISTS idx_ai_call_logs_user_model ON ai_call_logs (user_id,
 
 #: r51 题目全文检索：FTS5 trigram 对中文子串友好。编译选项 / tokenizer 缺失时不建虚表，
 #: 由 `repository.search_questions()` 降级为 LIKE，绝不因可选能力阻断启动。
-R51_FTS_SCHEMA = """
-CREATE VIRTUAL TABLE IF NOT EXISTS question_search USING fts5(
-    question_id UNINDEXED,
-    prompt,
-    explanation,
-    direction UNINDEXED,
-    sub_direction UNINDEXED,
-    tokenize = 'trigram'
-);
+#: r98 题库检索索引：SQLite 的 FTS5 虚表在 PostgreSQL 没有对应物，改用 `pg_trgm` + GIN
+#: 支撑 `ILIKE '%kw%'` 子串检索。
+#:
+#: **为什么不用 tsvector**：`to_tsvector('simple', …)` 把连续中文当成一个词，检索「闭包」
+#: 命中不了「闭包是什么」；`zhparser` 要额外编译扩展，部署成本与收益不匹配。trigram 对
+#: 中英文子串都能命中，且与 SQLite 时代的 LIKE 降级路径**返回结果完全一致**（只是变快），
+#: 检索语义零变化 —— 前端 `mode` 恒为 `like`，不再有「有 FTS / 无 FTS」两种分支。
+#:
+#: 索引单独建而不与 extension 同脚本：`CREATE EXTENSION` 需要超级用户，托管 PG 常见不给，
+#: 失败时只应降级为「无索引扫描」而不是让整个 `init_db()` 挂掉。
+R51_TRGM_SCHEMA = """
+CREATE INDEX IF NOT EXISTS idx_questions_prompt_trgm
+    ON questions USING gin (prompt gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_questions_explanation_trgm
+    ON questions USING gin (explanation gin_trgm_ops);
 """
 
 
@@ -270,7 +385,10 @@ CREATE TABLE IF NOT EXISTS learn_chapters (
     chapter_id      TEXT NOT NULL,
     seen            TEXT NOT NULL DEFAULT '[]',
     last_section_id TEXT NOT NULL DEFAULT '',
-    updated_at      INTEGER NOT NULL DEFAULT 0,
+    -- r98：前端传的是毫秒时间戳（13 位），SQLite 的 INTEGER 是 8 字节所以一直没暴露；
+    -- PostgreSQL 的 INTEGER 只有 4 字节（上限 2147483647），存 1.7e12 直接
+    -- NumericValueOutOfRange。凡是「存时间戳」的整数列一律 BIGINT。
+    updated_at      BIGINT NOT NULL DEFAULT 0,
     PRIMARY KEY (user_id, chapter_id)
 );
 
@@ -309,7 +427,7 @@ CREATE TABLE IF NOT EXISTS radar_techs (
 );
 
 CREATE TABLE IF NOT EXISTS radar_snapshots (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    id              INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
     tech_slug       TEXT NOT NULL,
     taken_at        TEXT NOT NULL,
     stars           INTEGER NOT NULL DEFAULT 0,
@@ -320,7 +438,7 @@ CREATE TABLE IF NOT EXISTS radar_snapshots (
 );
 
 CREATE TABLE IF NOT EXISTS radar_assessments (
-    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    id             INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
     tech_slug      TEXT NOT NULL,
     run_id         INTEGER NOT NULL DEFAULT 0,
     verdict        TEXT NOT NULL,
@@ -357,7 +475,7 @@ CREATE TABLE IF NOT EXISTS radar_jobs (
 );
 
 CREATE TABLE IF NOT EXISTS radar_runs (
-    run_id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id         INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
     trigger        TEXT NOT NULL,
     started_at     TEXT NOT NULL,
     finished_at    TEXT NOT NULL DEFAULT '',
@@ -426,10 +544,29 @@ CREATE INDEX IF NOT EXISTS idx_taifu_memories_user ON taifu_memories (user_id, c
 """
 
 
-def fts5_available(conn: sqlite3.Connection) -> bool:
-    """探测当前 SQLite 是否编译了 FTS5；不抛异常，缺能力即返回 False。"""
-    row = conn.execute("SELECT sqlite_compileoption_used('ENABLE_FTS5') AS enabled").fetchone()
-    return bool(row and row["enabled"])
+def trgm_available(conn: Connection) -> bool:
+    """探测库上是否已装 `pg_trgm` 扩展（缺扩展时检索退化为顺序扫描，功能不受影响）。"""
+    try:
+        row = conn.execute("SELECT 1 AS ok FROM pg_extension WHERE extname = 'pg_trgm'").fetchone()
+    except psycopg.Error:
+        return False
+    return row is not None
+
+
+def _try_create_trgm() -> bool:
+    """尽力创建 `pg_trgm`（幂等），失败只记日志。
+
+    **必须用独立连接**：DDL 失败会让当前事务进入 aborted 状态，之后该连接上的任何
+    语句都报 `current transaction is aborted`，把一次「少个扩展」放大成「建库全挂」。
+    托管 PG 常常不给超级用户，这正是要兜住的场景。
+    """
+    try:
+        with connection() as conn:
+            conn.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm")
+        return True
+    except psycopg.Error as exc:
+        logger.warning("db.trgm_unavailable error=%s", type(exc).__name__)
+        return False
 
 
 #: r23 存量 6 表补 `user_id`（DEFAULT 'default' 即回填旧数据）。
@@ -471,116 +608,113 @@ _R67_ADDED_COLUMNS: tuple[tuple[str, str, str], ...] = (
 
 
 
-#: r53 并发写锁：8 线程 × 50 次短事务基准里，无 busy_timeout 成功率仅 28.2%（287 次
-#: `database is locked`），设 3000ms 后 100%、0 次失败。证据见 `docs/eval/PERF-REPORT.md`。
-#: 刻意**不启用 WAL**：单进程本地库，busy_timeout 已消除写失败；WAL 会引入 -wal/-shm
-#: 文件与备份复杂度，收益不成立（README 设计取舍同源判断）。
-BUSY_TIMEOUT_MS = 3000
-
-
+#: r98 起并发写由 PostgreSQL 的行级锁与 MVCC 承担，不再需要 SQLite 时代的 `busy_timeout`
+#: 与 WAL 取舍（r53 的 8×50 基准结论仅对单文件库成立）。池获取超时单独可配，见
+#: `Settings.db_pool_timeout_s`：等连接超过该秒数即抛错，而不是无限挂住请求。
 @contextmanager
-def connection() -> Iterator[sqlite3.Connection]:
-    conn = sqlite3.connect(get_settings().db_path, timeout=BUSY_TIMEOUT_MS / 1000)
-    conn.row_factory = sqlite3.Row
-    try:
-        # 驱动参数与数据库层双保险：不同 Python 版本对 connect(timeout=) 的实现细节不同。
-        conn.execute(f"PRAGMA busy_timeout = {BUSY_TIMEOUT_MS}")
-        yield conn
-        conn.commit()
-    finally:
-        conn.close()
+def connection() -> Iterator[Connection]:
+    """从池里取一个连接执行一段事务；正常结束 commit，异常 rollback 并归还。
 
-
-def _ensure_r11_columns(conn: sqlite3.Connection) -> None:
-    """存量库补列（幂等）：缺列才 `ALTER TABLE`，第二次启动执行 0 条 DDL。
-
-    SQLite 没有 `ADD COLUMN IF NOT EXISTS`，所以只用 `PRAGMA table_info` 判定后补；
-    `ADD COLUMN ... NOT NULL DEFAULT <常量>` 合法且不重建表（沿用 r3「无迁移框架」约定）。
+    `ConnectionPool.connection()` 自带这个语义（含归还），业务层无需也不应手动提交。
     """
-    for table, column, ddl in _ADDED_COLUMNS:
-        existing = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
-        if column not in existing:
-            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
+    with get_pool().connection() as raw:
+        yield Connection(raw)
 
 
-def _ensure_r23_columns(conn: sqlite3.Connection) -> None:
-    """存量 6 表补 `user_id`（幂等）：DEFAULT 'default' 让旧数据自然归到默认用户。"""
-    for table, column, ddl in _R23_ADDED_COLUMNS:
-        existing = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
-        if column not in existing:
-            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
+def _ensure_columns(conn: Connection, columns: Sequence[tuple[str, str, str]]) -> None:
+    """存量库补列（幂等）：PostgreSQL 原生支持 `ADD COLUMN IF NOT EXISTS`。
+
+    r98 之前这里靠 `PRAGMA table_info` 先查后补，是因为 SQLite 没有该语法；换到 PG 后
+    判定交给数据库本身，少一次往返、也少一个「查到的 schema 与执行时不符」的竞态窗口。
+    `ADD COLUMN ... NOT NULL DEFAULT <常量>` 在 PG 11+ 是元数据操作，不重写全表。
+    """
+    for table, column, ddl in columns:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} {ddl}")
 
 
-def _ensure_r67_columns(conn: sqlite3.Connection) -> None:
-    """r67 存量库补列（幂等）：须在 `R67_SCHEMA` 建表之后调用。"""
-    for table, column, ddl in _R67_ADDED_COLUMNS:
-        existing = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
-        if column not in existing:
-            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
+#: r98 类型加宽：`CREATE TABLE IF NOT EXISTS` 只建表不改列，存量库（含从 SQLite 迁来的库）
+#: 里的 `integer` 必须显式改成 `bigint`，否则写入毫秒时间戳时溢出。
+#: 只放「已知会超 int4」的列 —— 无差别全改会让索引与存储无谓变大。
+_WIDEN_TO_BIGINT: tuple[tuple[str, str], ...] = (("learn_chapters", "updated_at"),)
 
 
-def _ensure_r61_columns(conn: sqlite3.Connection) -> None:
-    """r95 存量库补列（幂等）：须在 `R61_SCHEMA` 建表之后调用。"""
-    for table, column, ddl in _R61_ADDED_COLUMNS:
-        existing = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
-        if column not in existing:
-            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
+def _ensure_bigint_columns(conn: Connection) -> None:
+    """把已知会超过 int4 的整数列加宽到 bigint（幂等：已是 bigint 则不发 DDL）。"""
+    for table, column in _WIDEN_TO_BIGINT:
+        row = conn.execute(
+            "SELECT data_type FROM information_schema.columns "
+            "WHERE table_schema = 'public' AND table_name = ? AND column_name = ?",
+            (table, column),
+        ).fetchone()
+        if row is not None and str(row["data_type"]) != "bigint":
+            conn.execute(f"ALTER TABLE {table} ALTER COLUMN {column} TYPE BIGINT")
 
 
 def init_db() -> None:
+    """建库并补齐结构（幂等）：新库全建，老库只补缺的列与索引。
+
+    全部 DDL 都是 `IF NOT EXISTS` 形态，对已有库反复执行是安全的空操作；没有任何
+    「版本号表 + 迁移脚本」机制 —— 沿用 r3 约定的同时，PG 的 `ADD COLUMN IF NOT EXISTS`
+    让这套约定比 SQLite 时代更结实（不必先查 `PRAGMA` 再补）。
+    """
+    trgm_ok = _try_create_trgm()
     with connection() as conn:
-        conn.executescript(SCHEMA)          # 1. 建表（新库即含新列）
-        _ensure_r11_columns(conn)           # 2. 存量库补列（幂等）
-        conn.executescript(R23_SCHEMA)      # 3. r23 认证 / 会话 / 配额表
-        _ensure_r23_columns(conn)           # 4. 存量 6 表补 user_id（幂等）
-        conn.executescript(SCHEMA_INDEXES)  # 5. 建索引（引用补出的列）
-        conn.executescript(R23_INDEXES)     # 6. r23 隔离索引
-        conn.executescript(R42_SCHEMA)      # 7. r42 图片识别任务表
-        _dedupe_running_profile_jobs(conn)  # 8. 建部分唯一索引前先收敛历史重复 running 行
-        conn.executescript(R42_INDEXES)     # 9. r42 幂等索引
-        conn.executescript(R51_SCHEMA)      # 10. r51 模型调用日志表 + 索引
-        if fts5_available(conn):            # 11. FTS5 虚表（可选能力，缺 tokenizer 时静默降级）
-            try:
-                conn.executescript(R51_FTS_SCHEMA)
-            except sqlite3.OperationalError as exc:
-                logger.warning("db.fts5_unavailable error=%s", type(exc).__name__)
-        conn.executescript(R61_SCHEMA)      # 12. r61 学习进度 / 计划打卡表
-        _ensure_r61_columns(conn)           # 12.1 r95 存量库补 plan_states.started_on（幂等）
-        conn.executescript(R67_SCHEMA)      # 13. r67 技术雷达五表
-        _ensure_r67_columns(conn)           # 14. 存量库补 r67 列（须在建表之后）
-        _sweep_stale_radar_jobs(conn)       # 15. 建部分唯一索引前收敛重启遗留的未终态任务
-        conn.executescript(R67_INDEXES)     # 16. r67 索引（含 jobs 的 active 唯一索引）
-        conn.executescript(R77_SCHEMA)      # 17. r77 太傅对话表
-        conn.executescript(R77_INDEXES)     # 18. r77 对话索引
-        conn.executescript(R80_SCHEMA)      # 19. r80 太傅线程摘要（单行）
-        conn.executescript(R81_SCHEMA)      # 20. r81 太傅长期记忆（多条）
-        conn.executescript(R81_INDEXES)     # 21. r81 长期记忆索引
+        conn.executescript(SCHEMA)                    # 1. 业务表
+        _ensure_columns(conn, _ADDED_COLUMNS)         # 2. r11 追加列（幂等）
+        conn.executescript(R23_SCHEMA)                # 3. 认证 / 会话 / 配额表
+        _ensure_columns(conn, _R23_ADDED_COLUMNS)     # 4. 6 表补 user_id
+        conn.executescript(SCHEMA_INDEXES)            # 5. 业务索引（引用补出的列，故在其后）
+        conn.executescript(R23_INDEXES)               # 6. 隔离索引
+        conn.executescript(R42_SCHEMA)                # 7. 图片识别任务表
+        _dedupe_running_profile_jobs(conn)            # 8. 建部分唯一索引前先收敛历史重复行
+        conn.executescript(R42_INDEXES)               # 9. 幂等索引
+        conn.executescript(R51_SCHEMA)                # 10. 模型调用日志表
+        if trgm_ok:                                   # 11. 检索 GIN 索引（无扩展则跳过）
+            conn.executescript(R51_TRGM_SCHEMA)
+        conn.executescript(R61_SCHEMA)                # 12. 学习进度 / 计划打卡
+        _ensure_columns(conn, _R61_ADDED_COLUMNS)     # 12.1 r95 补 plan_states.started_on
+        _ensure_bigint_columns(conn)                  # 12.2 毫秒时间戳列加宽到 bigint
+        conn.executescript(R67_SCHEMA)                # 13. 技术雷达五表
+        _ensure_columns(conn, _R67_ADDED_COLUMNS)     # 14. 雷达补列（须在建表之后）
+        _sweep_stale_radar_jobs(conn)                 # 15. 建部分唯一索引前收敛未终态任务
+        conn.executescript(R67_INDEXES)               # 16. 雷达索引（含 jobs 的 active 唯一索引）
+        conn.executescript(R77_SCHEMA)                # 17. 太傅对话表
+        conn.executescript(R77_INDEXES)               # 18. 对话索引
+        conn.executescript(R80_SCHEMA)                # 19. 太傅线程摘要（单行）
+        conn.executescript(R81_SCHEMA)                # 20. 太傅长期记忆（多条）
+        conn.executescript(R81_INDEXES)               # 21. 长期记忆索引
 
 
-def _sweep_stale_radar_jobs(conn: sqlite3.Connection) -> None:
+def _sweep_stale_radar_jobs(conn: Connection) -> None:
     """r67 生成任务在**进程重启后不续跑**：新进程里 queued/running 一定没有活的 `asyncio` 任务，
     直接按 failed + 中文原因落库（AC-4「不会永远停在生成中」的服务端兜底）。对干净库 0 行更新。
     """
     conn.execute(
         "UPDATE radar_jobs SET status = 'failed', error_message = '任务中断，请重新生成', "
-        "updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now') || '+00:00' "
+        f"updated_at = {SQL_NOW_ISO} "
         "WHERE status IN ('queued', 'running')"
     )
 
 
-def _dedupe_running_profile_jobs(conn: sqlite3.Connection) -> None:
+def _dedupe_running_profile_jobs(conn: Connection) -> None:
     """同一 (user_id, document_id) 只保留最新一条 running 行，其余按 failed 收敛。
 
     r30 期间允许同一简历重复受理（每次新建 job 行），存量库里可能已有并行 running；
     r42 的幂等靠部分唯一索引保证，建索引前必须先收敛这些旧行，否则 `init_db()` 会直接失败。
     对干净库执行 0 行更新；对半升级库幂等（第二次启动已无重复行）。
+
+    r98：SQLite 用 `rowid` 取「最新一行」，PG 没有 rowid 也没有 `max(ctid)` 聚合，
+    改用窗口函数按 `(created_at, id)` 排序取 rn=1 —— 语义与「最后受理的那条」一致且不依赖
+    物理行序（VACUUM / 并行写入后 rowid 顺序本来也不可靠）。
     """
     conn.execute(
+        "WITH ranked AS ("
+        "  SELECT id, row_number() OVER ("
+        "    PARTITION BY user_id, document_id ORDER BY created_at DESC, id DESC"
+        "  ) AS rn FROM profile_jobs WHERE status = 'running'"
+        ") "
         "UPDATE profile_jobs SET status = 'failed', "
         "error = '旧版本重复受理的画像任务已合并，请重新生成画像', "
-        "updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now') || '+00:00' "
-        "WHERE status = 'running' AND rowid NOT IN ("
-        "  SELECT MAX(rowid) FROM profile_jobs WHERE status = 'running' "
-        "  GROUP BY user_id, document_id"
-        ")"
+        f"updated_at = {SQL_NOW_ISO} "
+        "WHERE id IN (SELECT id FROM ranked WHERE rn > 1)"
     )

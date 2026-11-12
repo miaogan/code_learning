@@ -195,7 +195,27 @@ class Settings(BaseSettings):
     #: 日志级别（DEBUG / INFO / WARNING / ERROR），非法值按 INFO 处理（不因配置错起不来）。
     log_level: str = "INFO"
 
-    db_path: str = "app.core.db"
+    # --- r98 数据层：PostgreSQL + Redis ---------------------------------------
+    #: PostgreSQL 连接串（唯一数据库，SQLite 已下线）。`postgresql://user:pw@host:5432/db`。
+    database_url: str = "postgresql://postgres:postgres@127.0.0.1:5432/sc_app"
+    #: 连接池上下限与取连接超时（秒）。上限按「单副本 × 数据库 max_connections」估算，
+    #: 多副本时每副本都开这么多，总和不能超过 PG 的 `max_connections`。
+    db_pool_min_size: int = 1
+    db_pool_max_size: int = 10
+    db_pool_timeout_s: float = 10.0
+    #: Redis 连接串；留空 = 不启用（限流/熔断回落进程内实现，缓存直通数据库）。
+    #: 生产档留空会在启动时被拦下（见 `production_blockers`），避免多副本各自计数。
+    redis_url: str = ""
+    #: 各类 Redis key 的统一前缀：同库多环境（dev/staging/prod）共用实例时避免互相踩。
+    redis_prefix: str = "sc"
+    #: 会话缓存 TTL（秒）。只缓存「token 摘要 → user_id」这一条判定，登出/改密即时删 key。
+    session_cache_ttl_s: int = 60
+    #: 业务读缓存 TTL（秒）：报告 / 画像这类「写少读多」的整份产物；0 = 关闭读缓存。
+    read_cache_ttl_s: int = 30
+    #: 分布式锁的持有时长与获取等待（秒）：后台任务防多副本重复执行的兜底。
+    lock_ttl_s: int = 900
+    lock_wait_s: float = 5.0
+
     max_upload_mb: int = 10
     cors_origins: str = "http://127.0.0.1:5173,http://localhost:5173"
 
@@ -230,7 +250,7 @@ class Settings(BaseSettings):
     rate_limit_api_per_window: int = 120
     #: 熔断总开关。
     breaker_enabled: bool = True
-    #: 同时在飞请求上限：超过即 503，保护单进程 uvicorn 与 SQLite 写锁。
+    #: 同时在飞请求上限：超过即 503，保护单进程 uvicorn 与下游连接池（r98 起是 PG 连接池）。
     breaker_max_inflight: int = 32
     #: 熔断判定窗口（秒）与窗口内最少样本数（样本不足不判，避免低流量误开）。
     breaker_window_s: int = 60
@@ -442,6 +462,12 @@ class Settings(BaseSettings):
             problems.append(
                 "CORS_ORIGINS 不能为空（同源部署也请显式写上 https://<域名>，避免来源校验失去锚点）"
             )
+        if not self.redis_url.strip():
+            problems.append(
+                "REDIS_URL 不能为空（生产档必须共享限流窗口与熔断状态；"
+                "否则多副本各自计数，实际放行量是配置值的 N 倍。"
+                "确认单副本部署时写 `memory://` 显式接受降级）"
+            )
         return problems
 
     def production_warnings(self) -> list[str]:
@@ -460,6 +486,10 @@ class Settings(BaseSettings):
             warnings.append("BREAKER_ENABLED=false：在飞请求熔断已关闭")
         if not self.secret_key.strip():
             warnings.append("SECRET_KEY 为空：用户自带 AI Key 无法加密保存（该功能对所有人不可用）")
+        if "postgres:postgres@" in self.database_url:
+            warnings.append("DATABASE_URL 仍是示例口令（postgres:postgres），公网部署请换成独立口令")
+        if self.redis_url.strip() == "memory://":
+            warnings.append("REDIS_URL=memory://：限流 / 熔断 / 缓存均为进程内，仅限单副本部署")
         runtime = self.resolve_ai()
         if not runtime.ready:
             warnings.append(f"AI 未就绪：{runtime.reason or '未知原因'}，AI 相关功能会返回 503")

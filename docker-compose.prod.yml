@@ -1,4 +1,4 @@
-# docker-compose.prod.yml · 公网部署覆盖层（r97）
+# docker-compose.prod.yml · 公网部署覆盖层（r97，r98 增补 PG/Redis 日志滚动）
 #
 # 用法（不要单独用它，必须叠加在基础 compose 之上）：
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml \
@@ -6,24 +6,44 @@
 #
 # 覆盖层只做四件事：
 #   1. 后端进入生产档（APP_ENV=production）→ 启动期安全校验生效；
-#   2. 前端终结 TLS：143→443、挂证书与 ACME webroot、换成带安全头的反代配置；
-#   3. 两个容器的日志做滚动截断（默认 json-file 会把磁盘吃满，公网跑几周就会遇到）；
+#   2. 前端终结 TLS：80→443、挂证书与 ACME webroot、换成带安全头的反代配置；
+#   3. 全部容器的日志做滚动截断（默认 json-file 会把磁盘吃满，公网跑几周就会遇到）；
 #   4. 保留一个仅回环的 8080（由 deploy.env 里的 WEB_PORT=127.0.0.1:8080 控制），
 #      用于宿主机上排障/探活，绝不对外。
+#
+# r98 注意：数据库与 Redis **不在这里发布任何端口**。它们只在 compose 内网可达，
+# 公网入口只有 nginx。要连数据库排障请用 `docker compose exec postgres psql`。
 #
 # 硬禁令与基础文件一致：这里不出现任何 Key、不出现 AI_PROVIDER。
 
 services:
   backend:
     environment:
-      - DB_PATH=/data/app.db
-      # 生产档：COOKIE_SECURE/CORS_ORIGINS 组合不安全时**拒绝启动**（错误信息里写明缺哪项）。
+      # 生产档：COOKIE_SECURE/CORS_ORIGINS/REDIS_URL 组合不安全时**拒绝启动**（错误信息里写明缺哪项）。
+      # r98：`DATABASE_URL` / `REDIS_URL` 已由基础文件的 environment 拼好（服务名 postgres / redis），
+      # 这里不再覆盖——覆盖会丢掉基础文件里的 `${POSTGRES_PASSWORD}` 变量展开。
       - APP_ENV=production
     logging:
       driver: json-file
       options:
         max-size: '20m'
         max-file: '5'
+
+  postgres:
+    # 数据库日志同样滚动：PG 默认把连接与慢查询写进容器 stdout，
+    # 公网长期运行下不截断会先吃满磁盘、再让数据库进入只读。
+    logging:
+      driver: json-file
+      options:
+        max-size: '20m'
+        max-file: '5'
+
+  redis:
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
 
   frontend:
     ports:

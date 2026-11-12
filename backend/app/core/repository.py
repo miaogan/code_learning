@@ -10,16 +10,17 @@
 
 import json
 import math
-import sqlite3
 import uuid
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 from typing import Any
 
+import psycopg
+
+from app.core import redis_cache
 from app.core.config import get_settings
 from app.core.context import DEFAULT_USER_ID, get_current_user_id
-from app.core.db import connection
+from app.core.db import SQL_NOW_ISO, connection
 from app.schemas import Profile, Report, ResumeMeta, TimelineEvent
 
 RUN_RUNNING = "running"
@@ -35,12 +36,12 @@ def _uid() -> str:
     return get_current_user_id()
 
 
-def _row_payload(row: sqlite3.Row) -> dict[str, Any]:
+def _row_payload(row: Mapping[str, Any]) -> dict[str, Any]:
     payload = json.loads(row["payload"])
     return payload if isinstance(payload, dict) else {}
 
 
-def _run_dict(row: sqlite3.Row) -> dict[str, Any]:
+def _run_dict(row: Mapping[str, Any]) -> dict[str, Any]:
     """runs 行 → 服务层通用字典（payload 已解析，供面试 / 笔试 / 报告 / 历史共用）。"""
     return {
         "id": row["id"],
@@ -188,6 +189,7 @@ def insert_profile(profile: Profile) -> None:
                 profile.updated_at or now,
             ),
         )
+    _invalidate_profiles()
 
 
 def save_profile(profile: Profile) -> None:
@@ -195,25 +197,53 @@ def save_profile(profile: Profile) -> None:
     insert_profile(profile)
 
 
-def _profile_of(row: sqlite3.Row) -> Profile:
+def _profile_of(row: Mapping[str, Any]) -> Profile:
     return Profile.model_validate_json(row["payload"])
 
 
+def _profile_cache_name(profile_id: str) -> str:
+    return redis_cache.key("profile", _uid(), profile_id)
+
+
+def _invalidate_profiles() -> None:
+    redis_cache.cache_delete_prefix(redis_cache.key("profile", _uid()))
+
+
 def get_profile(profile_id: str) -> Profile | None:
+    name = _profile_cache_name(profile_id)
+    cached = redis_cache.cache_get_json(name)
+    if cached is not None:
+        return Profile.model_validate(cached)
     with connection() as conn:
         row = conn.execute(
             "SELECT payload FROM profiles WHERE id = ? AND user_id = ?", (profile_id, _uid())
         ).fetchone()
-    return None if row is None else _profile_of(row)
+    if row is None:
+        return None
+    profile = _profile_of(row)
+    redis_cache.cache_set_json(
+        name, profile.model_dump(mode="json"), get_settings().read_cache_ttl_s
+    )
+    return profile
 
 
 def latest_profile() -> Profile | None:
+    name = _profile_cache_name("latest")
+    cached = redis_cache.cache_get_json(name)
+    if cached is not None:
+        return Profile.model_validate(cached)
     with connection() as conn:
         row = conn.execute(
             "SELECT payload FROM profiles WHERE user_id = ? ORDER BY updated_at DESC LIMIT 1",
             (_uid(),),
         ).fetchone()
-    return None if row is None else _profile_of(row)
+    if row is None:
+        return None
+    profile = _profile_of(row)
+    redis_cache.cache_set_json(
+        name, profile.model_dump(mode="json"), get_settings().read_cache_ttl_s
+    )
+    return profile
 
 
 def latest_profile_for_document(document_id: str) -> Profile | None:
@@ -256,7 +286,7 @@ def insert_profile_job(
                 (job_id, _uid(), document_id, file_name, chars, sections, "running", _now(), _now()),
             )
         return True
-    except sqlite3.IntegrityError:
+    except psycopg.errors.IntegrityError:
         return False
 
 
@@ -339,7 +369,7 @@ def fail_profile_job(job_id: str, error: str, *, user_id: str) -> None:
         )
 
 
-def _job_dict(row: sqlite3.Row) -> dict[str, Any]:
+def _job_dict(row: Mapping[str, Any]) -> dict[str, Any]:
     return {
         "job_id": row["id"],
         "document_id": row["document_id"],
@@ -376,7 +406,7 @@ def insert_resume_job(
                 (job_id, _uid(), file_name, image_count, content_hash, _now(), _now()),
             )
         return True
-    except sqlite3.IntegrityError:
+    except psycopg.errors.IntegrityError:
         return False
 
 
@@ -466,7 +496,7 @@ def fail_resume_job(job_id: str, error: str, *, user_id: str) -> None:
         )
 
 
-def _resume_job_dict(row: sqlite3.Row) -> dict[str, Any]:
+def _resume_job_dict(row: Mapping[str, Any]) -> dict[str, Any]:
     return {
         "job_id": row["id"],
         "file_name": row["file_name"],
@@ -604,27 +634,62 @@ def insert_report(report: Report) -> None:
             "INSERT INTO reports (id, user_id, payload, created_at) VALUES (?, ?, ?, ?)",
             (report.id, _uid(), report.model_dump_json(), report.generated_at or _now()),
         )
+    _invalidate_reports()
 
 
-def _report_of(row: sqlite3.Row) -> Report:
+def _report_of(row: Mapping[str, Any]) -> Report:
     return Report.model_validate_json(row["payload"])
 
 
+def _report_cache_name(report_id: str) -> str:
+    return redis_cache.key("report", _uid(), report_id)
+
+
+def _invalidate_reports() -> None:
+    """写报告后按前缀失效整片缓存。
+
+    用前缀而不是「删刚写的那个 id」：`latest` 是与 id 无关的另一个 key，新报告进来必须
+    让它一起失效，否则首页会继续显示上一份（这是最容易漏的一处）。
+    前缀带 `_uid()`，不同账号的缓存互不影响。
+    """
+    redis_cache.cache_delete_prefix(redis_cache.key("report", _uid()))
+
+
 def get_report(report_id: str) -> Report | None:
+    name = _report_cache_name(report_id)
+    cached = redis_cache.cache_get_json(name)
+    if cached is not None:
+        return Report.model_validate(cached)
     with connection() as conn:
         row = conn.execute(
             "SELECT payload FROM reports WHERE id = ? AND user_id = ?", (report_id, _uid())
         ).fetchone()
-    return None if row is None else _report_of(row)
+    if row is None:
+        return None  # 不缓存「不存在」：报告可能紧接着就被创建
+    report = _report_of(row)
+    redis_cache.cache_set_json(
+        name, report.model_dump(mode="json"), get_settings().read_cache_ttl_s
+    )
+    return report
 
 
 def latest_report() -> Report | None:
+    name = _report_cache_name("latest")
+    cached = redis_cache.cache_get_json(name)
+    if cached is not None:
+        return Report.model_validate(cached)
     with connection() as conn:
         row = conn.execute(
             "SELECT payload FROM reports WHERE user_id = ? ORDER BY created_at DESC LIMIT 1",
             (_uid(),),
         ).fetchone()
-    return None if row is None else _report_of(row)
+    if row is None:
+        return None
+    report = _report_of(row)
+    redis_cache.cache_set_json(
+        name, report.model_dump(mode="json"), get_settings().read_cache_ttl_s
+    )
+    return report
 
 
 def list_reports(limit: int = 2) -> list[Report]:
@@ -673,7 +738,7 @@ def insert_timeline_event(event: TimelineEvent) -> bool:
         return cursor.rowcount > 0
 
 
-def _timeline_of(row: sqlite3.Row) -> TimelineEvent:
+def _timeline_of(row: Mapping[str, Any]) -> TimelineEvent:
     return TimelineEvent.model_validate_json(row["payload"])
 
 
@@ -761,12 +826,17 @@ _QUESTION_SELECT = (
 #:   「幂等（第二次 0 变更）」就不成立。
 _QUESTION_FILL = (
     "UPDATE questions SET "
-    "language = CASE WHEN language = '' AND ? <> '' THEN ? ELSE language END, "
-    "explanation = CASE WHEN explanation = '' AND ? <> '' THEN ? ELSE explanation END, "
-    "sub_direction = CASE WHEN sub_direction IS NULL AND ? IS NOT NULL THEN ? ELSE sub_direction END, "
-    "updated_at = ? "
+    # r98：每个占位符都标 `::text`。PG 的参数类型由上下文推断，而 `$n <> ''`、`$n IS NOT NULL`
+    # 这类写法**给不出类型信息**（SQLite 是动态类型，从不要求），会报
+    # `IndeterminateDatatype: could not determine data type of parameter $5`。
+    "language = CASE WHEN language = '' AND ?::text <> '' THEN ?::text ELSE language END, "
+    "explanation = CASE WHEN explanation = '' AND ?::text <> '' THEN ?::text ELSE explanation END, "
+    "sub_direction = CASE WHEN sub_direction IS NULL AND ?::text IS NOT NULL "
+    "THEN ?::text ELSE sub_direction END, "
+    "updated_at = ?::text "
     "WHERE id = ? "
-    "AND ((language = '' AND ? <> '') OR (explanation = '' AND ? <> '') OR (sub_direction IS NULL AND ? IS NOT NULL))"
+    "AND ((language = '' AND ?::text <> '') OR (explanation = '' AND ?::text <> '') "
+    "OR (sub_direction IS NULL AND ?::text IS NOT NULL))"
 )
 
 
@@ -807,20 +877,22 @@ def insert_questions(questions: Sequence[dict[str, Any]]) -> int:
     """批量幂等导入（r43）：一个连接、一个事务，`executemany` 写完全部行，返回新增行数。
 
     与逐条 `insert_question()` **同 SQL、同语义**（`ON CONFLICT(id) DO NOTHING`，只增不覆盖）：
-    冲突行不产生变更，因此 `total_changes` 的差值就是新增数，重复导入恒 `0`（AC-1 不回退）。
+    冲突行不产生变更，因此 `ROW_COUNT` 就是新增数，重复导入恒 `0`（AC-1 不回退）。
     动机是启动耗时：1088 条逐条写入要 1088 次开连接 / 提事务（实测 11.26s），批量后是亚秒级。
+
+    r98：SQLite 的 `conn.total_changes` 在 psycopg 没有对应物，改用 `executemany` 返回的
+    `rowcount`（PG 的 `ROW_COUNT` 只在 `ON CONFLICT DO NOTHING` 真插入时才计数，语义等价）。
     """
     if not questions:
         return 0
     now = _now()
     rows = [_question_insert_row(question, now) for question in questions]
     with connection() as conn:
-        before = conn.total_changes
-        conn.executemany(_QUESTION_INSERT, rows)
-        return conn.total_changes - before
+        cursor = conn.executemany(_QUESTION_INSERT, rows)
+        return max(cursor.rowcount, 0)
 
 
-def _question_of(row: sqlite3.Row) -> dict[str, Any]:
+def _question_of(row: Mapping[str, Any]) -> dict[str, Any]:
     """questions 行 → 组卷字典（`options` / `answer` 就地解码，服务层不再碰 JSON 文本）。"""
     return {
         "id": row["id"],
@@ -983,9 +1055,17 @@ class DatabaseNotInitialized(RuntimeError):
     """库文件不存在 / 为 0 字节（尚未 `init_db()`）：离线运维命令无从执行，由调用方翻中文提示。"""
 
 
-def _db_file() -> Path:
-    """库文件落点：唯一来源 `config.db_path`，与 `db.connection()` 同一口径。"""
-    return Path(get_settings().db_path)
+def _require_questions_table() -> None:
+    """库还没建好时抛 `DatabaseNotInitialized`，而不是让离线工具对着空库跑出 0 行。
+
+    r98：判据从「SQLite 文件存在且非 0 字节」换成「`questions` 表存在」——PG 的连通性
+    由连接失败体现，这里要区分的是「连得上但没建表」（忘了 `init_db()` 的新库）。
+    `to_regclass` 对不存在的对象返回 NULL，且不会因为表名不存在而报错。
+    """
+    with connection() as conn:
+        found = conn.execute("SELECT to_regclass('public.questions') AS name").fetchone()
+    if not found or found["name"] is None:
+        raise DatabaseNotInitialized("questions 表不存在（数据库尚未初始化）")
 
 
 def delete_questions_by_source(sources: Sequence[str]) -> int:
@@ -1000,9 +1080,7 @@ def delete_questions_by_source(sources: Sequence[str]) -> int:
     unique = list(dict.fromkeys(str(source) for source in sources if str(source)))
     if not unique:
         return 0
-    db_file = _db_file()
-    if not db_file.is_file() or db_file.stat().st_size == 0:
-        raise DatabaseNotInitialized(f"库 {db_file.name} 不存在或为 0 字节（尚未初始化）")
+    _require_questions_table()
     placeholders = ", ".join("?" for _ in unique)
     with connection() as conn:
         cursor = conn.execute(_QUESTION_DELETE_BY_SOURCE.format(placeholders=placeholders), unique)
@@ -1118,7 +1196,7 @@ _USER_SELECT = (
 )
 
 
-def _user_dict(row: sqlite3.Row) -> dict[str, Any]:
+def _user_dict(row: Mapping[str, Any]) -> dict[str, Any]:
     return {
         "id": row["id"],
         "email": row["email"],
@@ -1235,7 +1313,26 @@ def create_session(*, token_hash: str, user_id: str, expires_at: str) -> None:
         )
 
 
+def _session_cache_name(token_hash: str) -> str:
+    return redis_cache.key("sess", token_hash)
+
+
+def _drop_session_cache(token_hashes: Sequence[str]) -> None:
+    """删会话缓存：登出 / 改密 / 停用后必须立刻失效，不能等 TTL 自然过期。"""
+    redis_cache.cache_delete(*(_session_cache_name(value) for value in token_hashes))
+
+
 def get_session(token_hash: str) -> dict[str, Any] | None:
+    """按 token 摘要取会话；命中 Redis 缓存则不打库。
+
+    **过期判定仍由调用方做**（`deps.current_user` 比对 `expires_at`）：缓存里的记录与库里
+    逐字同构，所以缓存只影响「查不查库」，不影响「算不算过期」。TTL 取 60s 量级——它的
+    作用是扛住「一次页面加载几十个并发请求」，不是替代数据库。
+    """
+    cache_name = _session_cache_name(token_hash)
+    cached = redis_cache.cache_get_json(cache_name)
+    if isinstance(cached, dict):
+        return cached
     with connection() as conn:
         row = conn.execute(
             "SELECT token_hash, user_id, created_at, expires_at FROM sessions WHERE token_hash = ?",
@@ -1243,31 +1340,43 @@ def get_session(token_hash: str) -> dict[str, Any] | None:
         ).fetchone()
     if row is None:
         return None
-    return {
+    session = {
         "token_hash": row["token_hash"],
         "user_id": row["user_id"],
         "created_at": row["created_at"],
         "expires_at": row["expires_at"],
     }
+    redis_cache.cache_set_json(cache_name, session, get_settings().session_cache_ttl_s)
+    return session
 
 
 def delete_session(token_hash: str) -> None:
     with connection() as conn:
         conn.execute("DELETE FROM sessions WHERE token_hash = ?", (token_hash,))
+    _drop_session_cache((token_hash,))
 
 
 def delete_user_sessions(user_id: str) -> None:
     with connection() as conn:
+        rows = conn.execute(
+            "SELECT token_hash FROM sessions WHERE user_id = ?", (user_id,)
+        ).fetchall()
         conn.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
+    _drop_session_cache([str(row["token_hash"]) for row in rows])
 
 
 def delete_other_sessions(user_id: str, keep_token_hash: str) -> None:
     """自助改密后只保留当前这台设备的会话，其他设备的会话立即失效。"""
     with connection() as conn:
+        rows = conn.execute(
+            "SELECT token_hash FROM sessions WHERE user_id = ? AND token_hash <> ?",
+            (user_id, keep_token_hash),
+        ).fetchall()
         conn.execute(
             "DELETE FROM sessions WHERE user_id = ? AND token_hash <> ?",
             (user_id, keep_token_hash),
         )
+    _drop_session_cache([str(row["token_hash"]) for row in rows])
 
 
 def count_ai_usage(user_id: str, day: str) -> int:
@@ -1451,42 +1560,16 @@ def ai_call_log_summary(days: int = 7) -> dict[str, Any]:
     }
 
 
-def _question_search_table_exists(conn: sqlite3.Connection) -> bool:
-    row = conn.execute(
-        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'question_search'"
-    ).fetchone()
-    return row is not None
-
-
 def rebuild_question_search() -> tuple[str, int]:
-    """题库幂等导入后重建 FTS 索引；返回 (mode, rows)，无 FTS5 能力时为 ('like', 0)。"""
+    """题库导入后的「重建检索索引」入口（保留签名，调用方无需改动）。
+
+    r98 起没有需要手工重建的索引：PG 的 GIN 索引随 `questions` 的写入自动维护。
+    这里只回报当前题量，`mode` 恒为 `like` —— 与检索侧口径一致，避免出现
+    「索引说有、检索说没有」的两套状态。
+    """
     with connection() as conn:
-        if not _question_search_table_exists(conn):
-            return "like", 0
-        existing = int(conn.execute("SELECT COUNT(*) AS n FROM question_search").fetchone()["n"])
         total = int(conn.execute("SELECT COUNT(*) AS n FROM questions").fetchone()["n"])
-        # 题库导入幂等（只增不改），行数一致即跳过重建，避免每次启动重写 1164 行。
-        if existing == total:
-            return "fts5", total
-        source = conn.execute(
-            "SELECT id, prompt, explanation, direction, sub_direction FROM questions"
-        ).fetchall()
-        conn.execute("DELETE FROM question_search")
-        conn.executemany(
-            "INSERT INTO question_search "
-            "(question_id, prompt, explanation, direction, sub_direction) VALUES (?, ?, ?, ?, ?)",
-            [
-                (
-                    row["id"],
-                    row["prompt"],
-                    row["explanation"],
-                    row["direction"],
-                    row["sub_direction"] or "",
-                )
-                for row in source
-            ],
-        )
-    return "fts5", len(source)
+    return "like", total
 
 
 def search_questions(
@@ -1496,7 +1579,11 @@ def search_questions(
     limit: int = 5,
     page: int = 1,
 ) -> dict[str, Any]:
-    """题目检索：FTS5 trigram 优先，短查询 / 无虚表时降级 LIKE；答案列永不入响应。
+    """题目检索：`ILIKE` 子串匹配 + `pg_trgm` GIN 索引；答案列永不入响应。
+
+    r98：SQLite 的 FTS5 虚表已移除，检索只剩一条路径。这**不是降级**——trigram 索引
+    对中英文子串同样有效，结果集与原来的 LIKE 分支完全一致，所以 `mode` 恒为 `like`、
+    `notice` 恒为空（前端不会再看到「未启用全文索引」的提示）。
 
     `limit` 是每页条数，`page` 从 1 起；`total` 为**命中总数**（不是本页条数），供前端翻页。
     `directions` 是多选方向（空 = 不过滤），SQL 走 `IN (...)`；旧的单值字符串仍可用。
@@ -1505,7 +1592,7 @@ def search_questions(
     size = max(1, min(int(limit), 20))
     offset = (max(1, int(page)) - 1) * size
     if not needle:
-        return {"items": [], "total": 0, "mode": "fts5", "notice": "请输入检索关键词"}
+        return {"items": [], "total": 0, "mode": "like", "notice": "请输入检索关键词"}
     picked = [directions] if isinstance(directions, str) else list(directions or [])
     filters: list[str] = []
     params: list[Any] = []
@@ -1516,46 +1603,30 @@ def search_questions(
         filters.append("sub_direction = ?")
         params.append(sub_direction)
     where = (" AND " + " AND ".join(filters)) if filters else ""
+    like = "%" + needle + "%"
     with connection() as conn:
-        if _question_search_table_exists(conn) and len(needle) >= 3:
-            match = '"' + needle.replace('"', '""') + '"'
-            total = conn.execute(
-                "SELECT count(*) AS n FROM question_search WHERE question_search MATCH ?" + where,
-                [match, *params],
-            ).fetchone()["n"]
-            rows = conn.execute(
-                "SELECT question_id, prompt, direction, sub_direction, "
-                "bm25(question_search) AS rank FROM question_search "
-                "WHERE question_search MATCH ?" + where + " ORDER BY rank ASC LIMIT ? OFFSET ?",
-                [match, *params, size, offset],
-            ).fetchall()
-            mode = "fts5"
-        else:
-            like = "%" + needle + "%"
-            total = conn.execute(
-                "SELECT count(*) AS n FROM questions"
-                " WHERE (prompt LIKE ? OR explanation LIKE ?)" + where,
-                [like, like, *params],
-            ).fetchone()["n"]
-            rows = conn.execute(
-                "SELECT id AS question_id, prompt, direction, sub_direction FROM questions "
-                "WHERE (prompt LIKE ? OR explanation LIKE ?)" + where
-                + " ORDER BY id LIMIT ? OFFSET ?",
-                [like, like, *params, size, offset],
-            ).fetchall()
-            mode = "like"
+        total = conn.execute(
+            "SELECT count(*) AS n FROM questions"
+            " WHERE (prompt ILIKE ? OR explanation ILIKE ?)" + where,
+            [like, like, *params],
+        ).fetchone()["n"]
+        rows = conn.execute(
+            "SELECT id AS question_id, prompt, direction, sub_direction FROM questions "
+            "WHERE (prompt ILIKE ? OR explanation ILIKE ?)" + where
+            + " ORDER BY id LIMIT ? OFFSET ?",
+            [like, like, *params, size, offset],
+        ).fetchall()
     items = [
         {
             "question_id": str(row["question_id"]),
             "prompt": str(row["prompt"]),
             "direction": str(row["direction"]),
             "sub_direction": str(row["sub_direction"] or ""),
-            "score": round(-float(row["rank"]), 4) if mode == "fts5" else 1.0,
+            "score": 1.0,
         }
         for row in rows
     ]
-    notice = "" if mode == "fts5" else "当前环境未启用全文索引，已按关键词包含匹配"
-    return {"items": items, "total": int(total), "mode": mode, "notice": notice}
+    return {"items": items, "total": int(total), "mode": "like", "notice": ""}
 
 
 def _json_map(value: Any) -> dict[str, bool]:
@@ -1675,7 +1746,7 @@ def save_plan_state(
 TAIFU_MESSAGE_LIMIT = 200
 
 
-def _taifu_message_of(row: sqlite3.Row) -> dict[str, Any]:
+def _taifu_message_of(row: Mapping[str, Any]) -> dict[str, Any]:
     """行 → 通用字典；`citations` 坏值一律退化为空列表（不让脏 JSON 把整个线程读崩）。"""
     raw = row["citations"]
     try:
@@ -1780,7 +1851,7 @@ def save_taifu_summary(summary: str) -> None:
 TAIFU_MEMORY_LIMIT = 20
 
 
-def _taifu_memory_of(row: sqlite3.Row) -> dict[str, Any]:
+def _taifu_memory_of(row: Mapping[str, Any]) -> dict[str, Any]:
     return {
         "id": row["id"],
         "content": str(row["content"]),
@@ -1839,7 +1910,7 @@ def delete_taifu_memories() -> int:
 #
 # 技术清单、快照与评估是**全局知识**（不按账号切）；生成任务 `radar_jobs` 带 `user_id`，
 # 读 / 采纳 / 废弃按账号隔离（AC-9）。列名投影与状态语义留在 `services/radar/store.py`，
-# 这里按「唯一 SQL 出口」约定只出读写；任务行以 `sqlite3.Row` 返回，JSON 列解码仍归塑形层。
+# 这里按「唯一 SQL 出口」约定只出读写；任务行以 `Mapping[str, Any]` 返回，JSON 列解码仍归塑形层。
 
 
 def radar_upsert_tech(item: dict[str, Any]) -> None:
@@ -1906,10 +1977,14 @@ def radar_insert_assessment(
     """写一条评估；同 `(tech_slug, input_sha256)` 已存在则跳过（返回 False = 可复算幂等）。"""
     with connection() as conn:
         cursor = conn.execute(
-            "INSERT OR IGNORE INTO radar_assessments (tech_slug, run_id, verdict, relevance,"
+            "INSERT INTO radar_assessments (tech_slug, run_id, verdict, relevance,"
             " adoption, maturity, effort, reasons_json, evidence_json, profile_digest,"
             " prompt_version, model, input_sha256, rule_based, created_at)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            # r98：SQLite 的 `INSERT OR IGNORE` 在 PG 是 `ON CONFLICT DO NOTHING`。
+            # 不指定冲突目标：唯一键 `(tech_slug, input_sha256)` 是唯一约束来源，
+            # 不带 target 也只在真冲突时静默跳过，且不会因索引改名而失效。
+            " ON CONFLICT DO NOTHING",
             (
                 tech_slug, run_id, result["verdict"], int(result["relevance"]),
                 int(result["adoption"]), int(result["maturity"]), int(result["effort"]),
@@ -2059,10 +2134,12 @@ def radar_cross_source_count() -> dict[str, int]:
 def radar_create_run(trigger: str) -> int:
     """开一轮采集，返回自增 `run_id`（采集结束后由 `radar_finish_run` 补终态）。"""
     with connection() as conn:
-        cursor = conn.execute(
-            "INSERT INTO radar_runs (trigger, started_at) VALUES (?, ?)", (trigger, _now())
-        )
-        return int(cursor.lastrowid or 0)
+        # r98：psycopg 的 cursor 没有 `lastrowid`，改用 `RETURNING` 把自增主键取回来。
+        row = conn.execute(
+            "INSERT INTO radar_runs (trigger, started_at) VALUES (?, ?) RETURNING run_id",
+            (trigger, _now()),
+        ).fetchone()
+        return int(row["run_id"]) if row else 0
 
 
 def radar_finish_run(
@@ -2106,7 +2183,7 @@ def radar_insert_job(job_id: str, tech_slug: str, *, trigger: str, parent_job_id
                 (job_id, tech_slug, _uid(), trigger, parent_job_id, stamp, stamp),
             )
         return True
-    except sqlite3.IntegrityError:
+    except psycopg.errors.IntegrityError:
         return False
 
 
@@ -2121,7 +2198,7 @@ def radar_active_job(tech_slug: str) -> dict[str, Any] | None:
     return None if row is None else {"job_id": str(row["job_id"]), "user_id": str(row["user_id"])}
 
 
-def radar_get_job_row(job_id: str) -> sqlite3.Row | None:
+def radar_get_job_row(job_id: str) -> Mapping[str, Any] | None:
     """按 id 读任务行（当前账号隔离）；行交给塑形层解析 JSON 列。"""
     with connection() as conn:
         return conn.execute(
@@ -2130,7 +2207,7 @@ def radar_get_job_row(job_id: str) -> sqlite3.Row | None:
         ).fetchone()
 
 
-def radar_job_rows(limit: int = 20, offset: int = 0) -> list[sqlite3.Row]:
+def radar_job_rows(limit: int = 20, offset: int = 0) -> list[Mapping[str, Any]]:
     with connection() as conn:
         return conn.execute(
             "SELECT * FROM radar_jobs WHERE user_id = ? ORDER BY created_at DESC"
@@ -2165,9 +2242,11 @@ def radar_sweep_stale_jobs(minutes: int) -> None:
     with connection() as conn:
         conn.execute(
             "UPDATE radar_jobs SET status = 'failed', error_message = '生成中断，请重试',"
-            " updated_at = strftime('%Y-%m-%dT%H:%M:%S', 'now') || '+00:00'"
+            f" updated_at = {SQL_NOW_ISO}"
             " WHERE status = 'running'"
-            " AND (julianday('now') - julianday(created_at)) * 24 * 60 > ?",
+            # r98：SQLite 用 julianday 差值算分钟数；PG 没有该函数，用 epoch 差值。
+            # `created_at` 是 TEXT，必须先 cast 成 timestamptz 才能参与时间运算。
+            " AND EXTRACT(EPOCH FROM (now() - created_at::timestamptz)) / 60 > ?",
             (minutes,),
         )
 

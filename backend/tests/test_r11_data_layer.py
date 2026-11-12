@@ -11,25 +11,21 @@
 3. **作答事件来源**：`source` 缺省 `'exam'`、练习写 `'practice'`，读侧以列为准。
 4. **已练题数**：`count_practiced_questions()` 按**题**去重（同题重练不虚增）。
 
-库落点沿用 `conftest.SCRATCH_DIR`（本机沙箱拒写系统 Temp），每例独立库文件。
+r98：库换成 PostgreSQL，判据同步替换——「文件不存在 / 0 字节」→「schema 里没有该表」，
+`PRAGMA schema_version` → 「结构快照逐字相同」。存量升级用独立库 `sc_test_legacy`
+（见 `legacy_db_dsn`），不污染主测试库。
 """
 
 from __future__ import annotations
 
-import sqlite3
 from collections.abc import Iterator
-from pathlib import Path
 from typing import Any
-from uuid import uuid4
 
+import psycopg
 import pytest
 
 from app.core import repository
-from app.core.config import get_settings
-from app.core.db import _ADDED_COLUMNS, init_db
-
-#: 临时库落点（与 conftest 同一处 scratch 目录，见其注释里的沙箱原因）。
-SCRATCH_DIR = Path(__file__).resolve().parent / ".tmp"
+from app.core.db import _ADDED_COLUMNS, connection, init_db
 
 #: r6 时代的 `questions` / `question_attempts` DDL（**没有** r11 三列），用于造存量库。
 LEGACY_SCHEMA = """
@@ -73,42 +69,59 @@ LEGACY_QUESTION = {
 }
 
 
-def _connect(db_file: Path) -> sqlite3.Connection:
-    conn = sqlite3.connect(db_file)
-    conn.row_factory = sqlite3.Row
-    return conn
+def _columns(table: str) -> list[str]:
+    """表的列名（按定义顺序）。PostgreSQL 用 `information_schema` 取代 `PRAGMA table_info`。"""
+    with connection() as conn:
+        rows = conn.execute(
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_schema = 'public' AND table_name = ? ORDER BY ordinal_position",
+            (table,),
+        ).fetchall()
+    return [str(row["column_name"]) for row in rows]
 
 
-def _columns(db_file: Path, table: str) -> list[str]:
-    conn = _connect(db_file)
-    try:
-        return [row["name"] for row in conn.execute(f"PRAGMA table_info({table})")]
-    finally:
-        conn.close()
+def _indexes(*tables: str) -> set[str]:
+    """若干表上的索引名。PG 的 `pg_indexes` 直接给名字，不需要像 SQLite 那样逐表 PRAGMA。"""
+    with connection() as conn:
+        rows = conn.execute(
+            "SELECT indexname FROM pg_indexes "
+            "WHERE schemaname = 'public' AND tablename = ANY(?)",
+            (list(tables),),
+        ).fetchall()
+    return {str(row["indexname"]) for row in rows}
 
 
-def _schema_version(db_file: Path) -> int:
-    conn = _connect(db_file)
-    try:
-        row = conn.execute("PRAGMA schema_version").fetchone()
-        return int(row[0])
-    finally:
-        conn.close()
+def _schema_snapshot() -> dict[str, list[str]]:
+    """全库结构指纹：`{表: [列:类型, …]}`。
+
+    代替 SQLite 的 `PRAGMA schema_version` 做「第二次 `init_db()` 没发 DDL」的判据：
+    PG 没有 schema 版本号，但「结构逐字未变」与「版本号未变」是同一件事的两种表达，
+    而结构指纹还能顺带证明「没有多出 / 少掉列」。
+    """
+    with connection() as conn:
+        rows = conn.execute(
+            "SELECT table_name, column_name, data_type FROM information_schema.columns "
+            "WHERE table_schema = 'public' ORDER BY table_name, ordinal_position"
+        ).fetchall()
+    snapshot: dict[str, list[str]] = {}
+    for row in rows:
+        snapshot.setdefault(str(row["table_name"]), []).append(
+            f"{row['column_name']}:{row['data_type']}"
+        )
+    return snapshot
 
 
 @pytest.fixture()
-def legacy_db(monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
+def legacy_db(legacy_db_dsn: str) -> Iterator[str]:
     """按 r6 DDL 造一个**未升级**的库，并塞一行存量题（不跑 `init_db()`）。"""
-    SCRATCH_DIR.mkdir(exist_ok=True)
-    db_file = SCRATCH_DIR / f"r11-legacy-{uuid4().hex}.db"
-    conn = _connect(db_file)
-    try:
-        conn.executescript(LEGACY_SCHEMA)
-        row = LEGACY_QUESTION
+    row = LEGACY_QUESTION
+    with psycopg.connect(legacy_db_dsn, autocommit=True) as conn:
+        conn.execute(LEGACY_SCHEMA)  # 无参数 execute 走 simple protocol，支持多语句
         conn.execute(
             "INSERT INTO questions (id, direction, kind, difficulty, essentiality, prompt, "
             "options, answer, source, created_at, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'seed', '2026-10-01T00:00:00Z', '2026-10-01T00:00:00Z')",
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'seed', "
+            "'2026-10-01T00:00:00Z', '2026-10-01T00:00:00Z')",
             (
                 row["id"],
                 row["direction"],
@@ -120,55 +133,36 @@ def legacy_db(monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
                 '["A"]',
             ),
         )
-        conn.commit()
-    finally:
-        conn.close()
-    assert "language" not in _columns(db_file, "questions"), "前置条件：存量库不应有新列"
-    monkeypatch.setenv("DB_PATH", str(db_file))
-    get_settings.cache_clear()
-    try:
-        yield db_file
-    finally:
-        get_settings.cache_clear()
-        db_file.unlink(missing_ok=True)
+    assert "language" not in _columns("questions"), "前置条件：存量库不应有新列"
+    yield legacy_db_dsn
 
 
-def test_init_db_adds_columns_idempotently(legacy_db: Path) -> None:
-    """AC-5：存量库跑 `init_db()` 即补三列，且第二次执行 0 条 DDL（schema_version 不变）。"""
+def test_init_db_adds_columns_idempotently(legacy_db: str) -> None:
+    """AC-5：存量库跑 `init_db()` 即补三列，且第二次执行不改结构（结构快照不变）。"""
     init_db()
-    assert {"language", "explanation"} <= set(_columns(legacy_db, "questions"))
-    assert "source" in _columns(legacy_db, "question_attempts")
+    assert {"language", "explanation"} <= set(_columns("questions"))
+    assert "source" in _columns("question_attempts")
     # 三列都来自 `_ADDED_COLUMNS` 这一份清单（加列只改那里，不允许旁路 ALTER）
     for table, column, _ddl in _ADDED_COLUMNS:
-        assert column in _columns(legacy_db, table), f"{table}.{column} 未按 _ADDED_COLUMNS 补齐"
+        assert column in _columns(table), f"{table}.{column} 未按 _ADDED_COLUMNS 补齐"
 
-    version_after_first = _schema_version(legacy_db)
-    columns_after_first = {
-        table: _columns(legacy_db, table) for table, _column, _ddl in _ADDED_COLUMNS
-    }
+    snapshot_after_first = _schema_snapshot()
 
-    init_db()  # 第二次：缺列判定为「已存在」→ 不应再发任何 DDL
+    init_db()  # 第二次：`ADD COLUMN IF NOT EXISTS` 判为已存在 → 不应再改任何结构
 
-    assert _schema_version(legacy_db) == version_after_first, "第二次 init_db 不得再改 schema"
-    for table, _column, _ddl in _ADDED_COLUMNS:
-        assert _columns(legacy_db, table) == columns_after_first[table], "列集合必须稳定"
+    assert _schema_snapshot() == snapshot_after_first, "第二次 init_db 不得再改 schema"
 
 
-def test_init_db_builds_r11_indexes_on_legacy_db(legacy_db: Path) -> None:
+def test_init_db_builds_r11_indexes_on_legacy_db(legacy_db: str) -> None:
     """索引引用新列，故必须在补列之后建：存量库升级后新索引一定存在。"""
     init_db()
-    conn = _connect(legacy_db)
-    try:
-        names = {row["name"] for row in conn.execute("PRAGMA index_list(questions)")}
-        names |= {row["name"] for row in conn.execute("PRAGMA index_list(question_attempts)")}
-    finally:
-        conn.close()
+    names = _indexes("questions", "question_attempts")
     assert {"idx_questions_lang_pool", "idx_attempts_run"} <= names
     # 老索引不因迁移丢失（反复 init 是同一份 SCHEMA_INDEXES）
     assert {"idx_questions_pool", "idx_attempts_question"} <= names
 
 
-def test_new_columns_default_empty_on_upgraded_rows(legacy_db: Path) -> None:
+def test_new_columns_default_empty_on_upgraded_rows(legacy_db: str) -> None:
     """升级不重导：存量行保留原值，新列取列默认值（`language=''`、解析空、来源 exam）。"""
     init_db()
     stored = {row["id"]: row for row in repository.list_questions()}["legacy-q1"]
@@ -179,7 +173,7 @@ def test_new_columns_default_empty_on_upgraded_rows(legacy_db: Path) -> None:
     assert stored["explanation"] == "", "存量题的 explanation 应为列默认空串"
 
 
-def test_insert_question_writes_new_columns(tmp_db: Path) -> None:
+def test_insert_question_writes_new_columns(tmp_db: str) -> None:
     """新题随行写入 language / explanation，`list_questions()` 原样读回。"""
     assert repository.count_questions() == 0
     assert repository.insert_question(
@@ -202,7 +196,7 @@ def test_insert_question_writes_new_columns(tmp_db: Path) -> None:
     assert row["source"] == "seed"
 
 
-def test_insert_question_is_idempotent(tmp_db: Path) -> None:
+def test_insert_question_is_idempotent(tmp_db: str) -> None:
     """重复导入 0 新增（AC-5）：同 `id` 第二次返回 False，行数不变、非空值不被覆盖。"""
     base = {
         "id": "dup-q1",
@@ -223,7 +217,7 @@ def test_insert_question_is_idempotent(tmp_db: Path) -> None:
     assert rows[0]["prompt"] == base["prompt"], "ON CONFLICT DO NOTHING 不得覆盖既有行"
 
 
-def test_insert_questions_batch_matches_single_row_semantics(tmp_db: Path) -> None:
+def test_insert_questions_batch_matches_single_row_semantics(tmp_db: str) -> None:
     """r43 批量导入：新增数按「真正插进去的行」计，重复部分恒 0，空批返回 0。
 
     与逐条 `insert_question()` 同 SQL 同语义（`ON CONFLICT(id) DO NOTHING`）：
@@ -256,7 +250,7 @@ def test_insert_questions_batch_matches_single_row_semantics(tmp_db: Path) -> No
     assert rows["batch-q0"]["prompt"] == base["prompt"], "既有行不得被覆盖"
 
 
-def test_fill_empty_columns_never_overwrites(tmp_db: Path) -> None:
+def test_fill_empty_columns_never_overwrites(tmp_db: str) -> None:
     """只补空单元格：非空值原样保留，缺的那列才被种子填上。"""
     repository.insert_question(
         {
@@ -282,7 +276,7 @@ def test_fill_empty_columns_never_overwrites(tmp_db: Path) -> None:
     assert row["prompt"] == "既有的题面", "对齐题面 / 答案一列都不碰"
 
 
-def test_fill_empty_columns_is_idempotent(tmp_db: Path) -> None:
+def test_fill_empty_columns_is_idempotent(tmp_db: str) -> None:
     """幂等：第二次补列返回 0（`language=''` 是通用题的合法值，不会被反复改写）。"""
     repository.insert_question(
         {
@@ -308,7 +302,7 @@ def test_fill_empty_columns_is_idempotent(tmp_db: Path) -> None:
     assert row["language"] == "", "通用题的 language 保持空串（不得被当成未填反复改写）"
 
 
-def test_fill_empty_columns_skips_rows_without_seed_values(tmp_db: Path) -> None:
+def test_fill_empty_columns_skips_rows_without_seed_values(tmp_db: str) -> None:
     """种子两个字段都为空 → 一句 SQL 都不发（返回 0，不白写 updated_at）。"""
     repository.insert_question(
         {
@@ -322,22 +316,20 @@ def test_fill_empty_columns_skips_rows_without_seed_values(tmp_db: Path) -> None
             "answer": ["A"],
         }
     )
-    conn = _connect(tmp_db)
-    try:
-        before = conn.execute("SELECT updated_at FROM questions WHERE id = 'q-blank'").fetchone()[0]
-    finally:
-        conn.close()
+    with connection() as conn:
+        before = conn.execute(
+            "SELECT updated_at FROM questions WHERE id = 'q-blank'"
+        ).fetchone()["updated_at"]
     assert repository.fill_empty_question_columns([{"id": "q-blank", "language": "", "explanation": ""}]) == 0
     assert repository.fill_empty_question_columns([]) == 0
-    conn = _connect(tmp_db)
-    try:
-        after = conn.execute("SELECT updated_at FROM questions WHERE id = 'q-blank'").fetchone()[0]
-    finally:
-        conn.close()
+    with connection() as conn:
+        after = conn.execute(
+            "SELECT updated_at FROM questions WHERE id = 'q-blank'"
+        ).fetchone()["updated_at"]
     assert after == before, "无种子值不得触碰 updated_at"
 
 
-def test_attempt_source_defaults_to_exam(tmp_db: Path) -> None:
+def test_attempt_source_defaults_to_exam(tmp_db: str) -> None:
     """AC-16：`source` 缺省 exam，练习显式写 practice；读侧以列为准。"""
     written = repository.insert_attempts(
         [
@@ -364,21 +356,17 @@ def test_attempt_source_defaults_to_exam(tmp_db: Path) -> None:
     assert by_run["practice:ps_1"]["source"] == "practice"
 
 
-def test_attempt_source_column_default_exam(tmp_db: Path) -> None:
+def test_attempt_source_column_default_exam(tmp_db: str) -> None:
     """列默认值本身也是 exam（漏传 source 的旧调用方拿到 exam，不会写成空串）。"""
-    conn = _connect(tmp_db)
-    try:
+    with connection() as conn:
         conn.execute(
             "INSERT INTO question_attempts (id, question_id, run_id, correct, answered_at, created_at) "
             "VALUES ('att-raw', 'q1', 'run-old', 1, '2026-11-01T09:00:00Z', '2026-11-01T09:00:00Z')"
         )
-        conn.commit()
-    finally:
-        conn.close()
     assert repository.list_attempts()[0]["source"] == "exam"
 
 
-def test_attempts_keep_single_event_per_run(tmp_db: Path) -> None:
+def test_attempts_keep_single_event_per_run(tmp_db: str) -> None:
     """同会话同题重复提交不写第二条（UNIQUE 兜底），跨会话重练才记新事件。"""
     def attempt(attempt_id: str, run_id: str) -> dict[str, Any]:
         return {
@@ -396,7 +384,7 @@ def test_attempts_keep_single_event_per_run(tmp_db: Path) -> None:
     assert len(repository.list_attempts()) == 2
 
 
-def test_count_practiced_questions_distinct(tmp_db: Path) -> None:
+def test_count_practiced_questions_distinct(tmp_db: str) -> None:
     """`practiced` 按题去重：同题多事件算 1，跨题累加，空库 0。"""
     assert repository.count_practiced_questions() == 0
     rows = [
@@ -420,7 +408,7 @@ def test_count_practiced_questions_distinct(tmp_db: Path) -> None:
     assert repository.count_practiced_questions() == 2
 
 
-def test_list_questions_carries_new_columns(tmp_db: Path) -> None:
+def test_list_questions_carries_new_columns(tmp_db: str) -> None:
     """读侧形状：`list_questions()` 恒带 language / explanation（不再有旧形状分支）。"""
     repository.insert_question(
         {

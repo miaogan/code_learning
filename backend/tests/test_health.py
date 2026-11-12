@@ -24,7 +24,7 @@ def test_health_returns_ok(client: TestClient) -> None:
     body = response.json()
     assert body["status"] == "ok"
     assert body["version"] == "0.1.0"
-    assert body["db"] == "sqlite"
+    assert body["db"] == "postgresql"
     assert body["ai_configured"] is False
     assert body["ai_provider"] == "legacy"
     assert isinstance(body["ai_model"], str) and body["ai_model"]

@@ -1,0 +1,22 @@
+# docker-compose.dev.yml · 本地开发端口覆盖
+#
+# 主 compose 按生产口径**不发布** PG / Redis 端口（公网入口只有 nginx，库不该被宿主直连）。
+# 但在宿主上跑 `uvicorn app.main:app` / `pytest` / 迁移脚本时，必须能从 127.0.0.1 连进去，
+# 所以要显式叠加这个覆盖文件：
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d postgres redis
+#
+# 端口与 backend/.env.example 逐字一致（PG 5433 / Redis 6380）——刻意避开 5432：
+# 很多机器上本机 PostgreSQL 已占用 5432，撞端口会连到**别的库**上，
+# 那种错误看起来像「迁移丢数据」，排查成本极高。
+#
+# 只覆盖 services 里的 ports，不动其它任何定义；生产部署不要带这个文件。
+
+services:
+  postgres:
+    ports:
+      - '5433:5432'
+
+  redis:
+    ports:
+      - '6380:6379'

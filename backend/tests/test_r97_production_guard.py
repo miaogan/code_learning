@@ -23,6 +23,10 @@ READY: dict[str, object] = {
     "ai_deepseek_base_url": "https://api.deepseek.com/v1",
     "ai_deepseek_model": "deepseek-chat",
     "ai_deepseek_api_key": "sk-test",
+    # r98：生产档要求 Redis 必配（多副本各自计数会让限流形同虚设），
+    # 这条不进 READY 的话「配置齐全」用例会因为有 1 个 blocker 而意外变红。
+    "redis_url": "redis://redis:6379/0",
+    "database_url": "postgresql://sc_user:real-password@postgres:5432/sc_app",
 }
 
 
@@ -127,3 +131,30 @@ def test_development_keeps_api_docs(monkeypatch: object) -> None:
     client = TestClient(main_module.create_app())
 
     assert client.get("/openapi.json").status_code == 200
+
+
+# --- r98：生产档必须配 Redis -------------------------------------------------
+
+
+def test_missing_redis_blocks_production_startup() -> None:
+    """多副本各自进程内计数 = 限流放大 N 倍，运行时完全看不出来，只能靠启动失败暴露。"""
+    problems = _settings(redis_url="").production_blockers()
+
+    assert len(problems) == 1
+    assert "REDIS_URL" in problems[0]
+
+
+def test_memory_redis_starts_but_warns() -> None:
+    """显式 `memory://` 是「我确认单副本」的声明：放行，但要在日志里留下证据。"""
+    settings = _settings(redis_url="memory://")
+
+    assert settings.production_blockers() == []
+    assert any("memory://" in warning for warning in settings.production_warnings())
+
+
+def test_sample_database_password_warns() -> None:
+    """示例口令不算 blocker（能启动），但必须告警——它是最常见的「忘了改」。"""
+    settings = _settings(database_url="postgresql://postgres:postgres@postgres:5432/sc_app")
+
+    assert settings.production_blockers() == []
+    assert any("DATABASE_URL" in warning for warning in settings.production_warnings())
