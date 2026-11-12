@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { RadarChapterDraft, RadarJobItem, RadarQuestionSample, RadarTechItem } from '../api/types'
 import {
   ACTIVE_JOB_STATUSES,
+  autoTranslateKey,
   canAdopt,
   canDiscard,
   discardedNotice,
@@ -283,5 +284,17 @@ describe('r87 先锋 ↔ 国子监联动：任务方向读数与跳转链接', (
     expect(bare.searchParams.get('tech')).toBe('github:demo/vllm')
     expect(bare.searchParams.get('name')).toBe('vLLM')
     expect(bare.searchParams.get('direction')).toBeNull()
+  })
+})
+
+describe('r88 自动补翻去重键', () => {
+  it('页 / 条数 / 筛选 / 总数任一变化都会换新键，同参数复现同键', () => {
+    const base = autoTranslateKey(1, 10, ['all'], ['all'], 42)
+    expect(autoTranslateKey(1, 10, ['all'], ['all'], 42)).toBe(base)
+    expect(autoTranslateKey(2, 10, ['all'], ['all'], 42)).not.toBe(base)
+    expect(autoTranslateKey(1, 20, ['all'], ['all'], 42)).not.toBe(base)
+    expect(autoTranslateKey(1, 10, ['must_learn'], ['all'], 42)).not.toBe(base)
+    expect(autoTranslateKey(1, 10, ['all'], ['AI 工程'], 42)).not.toBe(base)
+    expect(autoTranslateKey(1, 10, ['all'], ['all'], 43)).not.toBe(base)
   })
 })

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../api/client'
 import type { RadarRunRequest, RadarTechItem } from '../api/types'
@@ -13,6 +13,7 @@ import { Select } from '../components/ui/Select'
 import { Toast } from '../components/ui/Toast'
 import { DIRECTIONS } from '../lib/questionDirections'
 import {
+  autoTranslateKey,
   dimensionText,
   needsTranslation,
   safeRepoUrl,
@@ -105,6 +106,8 @@ function TechRow({
           <span className="sc-radar-source">{item.source_key}</span>
         </div>
         <p className="sc-radar-meta">{techMetaText(item)}</p>
+        {/* r88：概要直接在行内露出（中文优先，最多两行），展开态里仍有完整摘要与原文，不重复渲染。 */}
+        {!expanded && summaryToShow !== '' && <p className="sc-radar-brief">{summaryToShow}</p>}
         {expanded && (
           <div className="sc-radar-rowdetail" id={detailId}>
             {summaryToShow !== '' && <p className="sc-radar-summary">{summaryToShow}</p>}
@@ -241,6 +244,54 @@ export default function PioneerPage() {
     (item) => item.summary_zh === '' && needsTranslation(item.summary),
   )
 
+  // reload 引用稳定（useAsync 内部 useCallback），补翻函数才能安全地进 effect 依赖。
+  const listReload = listAsync.reload
+  const runReload = runAsync.reload
+  const translateBacklog = useCallback(async (): Promise<void> => {
+    setTranslating(true)
+    try {
+      // 一批按当前页大小翻：翻完刷一次清单，译文直接替换成中文。
+      const result = await api.radarTranslate({ limit: pageSize })
+      listReload()
+      runReload()
+      setToast({ message: result.notice, seq: Date.now() })
+    } catch (error) {
+      setToast({
+        message: error instanceof Error ? error.message : '翻译失败，请稍后重试',
+        seq: Date.now(),
+      })
+    } finally {
+      setTranslating(false)
+    }
+  }, [pageSize, listReload, runReload])
+
+  // r88 自动补翻：进页 / 翻页 / 改筛选后，当前页还有没翻的英文摘要就自动补翻一轮。
+  // 每个「页 + 条数 + 筛选」组合只自动试一次（去重键见 lib/radar.ts autoTranslateKey）：
+  // 失败不重试，手动的「翻译英文简介」按钮仍在 —— 翻译走 AI 有额度成本，不能让前端重试循环烧额度。
+  const autoTriedKeyRef = useRef('')
+  useEffect(() => {
+    if (listAsync.status !== 'success' || !pendingTranslation) return
+    const key = autoTranslateKey(
+      page,
+      pageSize,
+      verdictFilters,
+      directionFilters,
+      techs?.total ?? 0,
+    )
+    if (autoTriedKeyRef.current === key) return
+    autoTriedKeyRef.current = key
+    void translateBacklog()
+  }, [
+    listAsync.status,
+    pendingTranslation,
+    page,
+    pageSize,
+    verdictFilters,
+    directionFilters,
+    techs,
+    translateBacklog,
+  ])
+
   const changeVerdicts = (next: string[]): void => {
     setVerdictFilters(next)
     setPage(1)
@@ -270,23 +321,6 @@ export default function PioneerPage() {
   const refresh = (): void => {
     listAsync.reload()
     runAsync.reload()
-  }
-
-  const translateBacklog = async (): Promise<void> => {
-    setTranslating(true)
-    try {
-      // 一批按当前页大小翻：翻完刷一次清单，译文直接替换成中文。
-      const result = await api.radarTranslate({ limit: pageSize })
-      refresh()
-      setToast({ message: result.notice, seq: Date.now() })
-    } catch (error) {
-      setToast({
-        message: error instanceof Error ? error.message : '翻译失败，请稍后重试',
-        seq: Date.now(),
-      })
-    } finally {
-      setTranslating(false)
-    }
   }
 
   const collect = async (): Promise<void> => {

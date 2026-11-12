@@ -9023,6 +9023,18 @@ html {
   border-left: 2px solid var(--accent);
 }
 
+/* r88：概要行内露出（中文优先），最多两行，完整内容仍在展开详情里。 */
+.sc-radar-brief {
+  margin: 0;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--text-secondary);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
 .sc-radar-techrow:hover {
   background: var(--overlay-06);
 }

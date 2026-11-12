@@ -181,3 +181,17 @@ export function jobPioneerHref(job: RadarJobItem): string {
   if (direction !== '') query.set('direction', direction)
   return `/pioneer?${query.toString()}`
 }
+
+/**
+ * 自动补翻的去重键（r88）：页 + 每页条数 + 两路筛选 + 清单总数。
+ * 同一个键只自动补翻一次 —— 翻译走 AI 有额度成本，失败交给手动按钮，不让前端重试循环烧额度。
+ */
+export function autoTranslateKey(
+  page: number,
+  pageSize: number,
+  verdicts: readonly string[],
+  directions: readonly string[],
+  total: number,
+): string {
+  return `${page}|${pageSize}|${verdicts.join(',')}|${directions.join(',')}|${total}`
+}
