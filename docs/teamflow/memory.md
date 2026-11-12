@@ -120,3 +120,5 @@
 - **测试必须独占跑**：四个库 `sc_test` / `_empty` / `_legacy` / `_seed` 共享，多 pytest 进程并行会互相 `TRUNCATE`，表现为大量 error + 极慢。宿主跑测试要 `docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d postgres redis`（主 compose 不发布端口）。
 - **迁移脚本**：`ON CONFLICT DO NOTHING` 幂等、列取交集、非空列兜底（缺列给占位值、值为 NULL 给列自己的 DEFAULT）、批次包 SAVEPOINT 失败降级逐行、复位 IDENTITY、逐表行数校验。切换窗口内 SQLite 的新写入带不走，**必须停服迁移**。
 - **镜像构建留了镜像源参数**：`PIP_INDEX_URL` / `NPM_REGISTRY`，默认官方源；国内网络直连常掉到几十 kB/s（实测一次依赖装 18 分钟没完，换源 60 秒）。
+
+- **Redis 版本口径（r98 补）**：compose 钉 `redis:8-alpine`（实测 v8.10.3）。用到的命令只有 ZSET 滑窗 / Lua EVAL / `SET NX EX` / `EXPIRE` / `SCAN` / `DEL`，7 与 8 语义一致，升 8 零代码改动。换大版本只需重建容器：内存数据全丢但都可重建，**后端不用重启**（下一个请求即重写缓存与窗口）；滚动升级期间别改 key 格式。

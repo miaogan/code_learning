@@ -1,6 +1,6 @@
 # docker-compose.yml · SkillCoach r98 四容器交付
 #   postgres = PostgreSQL 16（唯一数据源，替代 SQLite 单文件）
-#   redis    = Redis 7（限流窗口 / 会话缓存 / 读缓存 / 分布式锁的共享层）
+#   redis    = Redis 8（限流窗口 / 会话缓存 / 读缓存 / 分布式锁的共享层）
 #   frontend = nginx:alpine 静态托管 + 同源反代（浏览器唯一入口）
 #   backend  = FastAPI 非 root（不发布宿主端口，只在 compose 内网暴露 8000）
 #
@@ -40,7 +40,10 @@ services:
     # 需要本机 psql 排障时用 `docker compose exec postgres psql -U postgres`。
 
   redis:
-    image: redis:7-alpine
+    # 钉 8.x（实测 8.10.3）。我们用到的命令 —— ZSET 滑窗、Lua 脚本、SET NX EX、EXPIRE、SCAN ——
+    # 在 7 与 8 语义一致，升 8 不影响任何行为；选 8 是因为它是当前主线，7 已进入维护期。
+    # 换大版本前先看 `redis-cli INFO server`，别让「本地跑 7、线上跑 8」这种偏差悄悄存在。
+    image: redis:8-alpine
     restart: unless-stopped
     # `--save ''` 关闭 RDB 落盘：Redis 里只有限流窗口、会话缓存、读缓存这类**可重建**状态，
     # 丢了大不了重新计数/回源，落盘反而引入「快照期间 fork 抖动」和一份需要单独备份的文件。

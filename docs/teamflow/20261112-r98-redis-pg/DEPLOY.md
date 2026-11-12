@@ -163,6 +163,26 @@ curl -s -X POST http://127.0.0.1:8080/api/search/questions \
 如果你希望 Redis 故障时**限流收紧**（宁可错杀），把 `RATE_LIMIT_ENABLED` 与 Redis 健康检查
 绑到 nginx 层做，而不是在应用层加 fail-closed —— 那会让一次 Redis 抖动变成全站 429。
 
+### Redis 版本口径
+
+compose 钉 `redis:8-alpine`（实测 **v8.10.3**）。本项目用到的命令只有 ZSET 滑窗、
+Lua 脚本（`EVAL` / `redis.call`）、`SET NX EX`、`EXPIRE`、`SCAN`、`DEL`、`PING`，
+这些在 7 与 8 上语义一致，**升 8 不需要改任何代码**；选 8 是因为它是当前主线，7 已进入维护期。
+
+换大版本时的自检（不需要迁移数据）：
+
+```bash
+docker compose up -d redis                       # 容器 Recreate，内存数据全丢
+docker exec code_learning-redis-1 redis-cli INFO server | grep redis_version
+docker exec code_learning-redis-1 redis-cli ping
+curl -s -o /dev/null -w '%{http_code}\n' -b cookie http://127.0.0.1:8080/api/me
+docker exec code_learning-redis-1 redis-cli --scan --pattern 'sc:*'   # 应出现 sc:sess / sc:rl
+```
+
+后端**不需要重启**：重连成功后的下一个请求就会把会话缓存与限流窗口写回去。
+真正要留意的只有一处——如果两副本滚动升级，中间会短暂出现「一半连 7、一半连 8」，
+共享 key 的结构（ZSET 成员、string 值）在两版之间是兼容的，但**别在此期间改 key 格式**。
+
 ---
 
 ## 5. 备份与恢复

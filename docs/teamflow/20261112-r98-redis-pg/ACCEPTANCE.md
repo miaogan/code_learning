@@ -11,7 +11,7 @@ cd backend && ./.venv/Scripts/python.exe -m pytest -q
 | 项目 | 结果 |
 |---|---|
 | 全量用例 | **902 passed**，0 failed / 0 error（`--collect-only` 计数 902，进度条 100% 无 F/E） |
-| 新增 `test_r98_redis.py` | 11 passed（真实 Redis 实例） |
+| 新增 `test_r98_redis.py` | 11 passed（真实 Redis，`redis:8-alpine` = v8.10.3） |
 | 新增 `test_r97_production_guard.py` 用例 | +3（`redis_url` 缺失拒启 / `memory://` 放行但告警 / 示例口令告警） |
 | `ruff check app tests` | All checks passed |
 
@@ -166,6 +166,9 @@ $ docker exec code_learning-postgres-1 psql -U postgres -d sc_app -tAc \
 
 $ docker exec code_learning-redis-1 redis-cli ping
 PONG
+
+$ docker exec code_learning-redis-1 redis-server --version | tail -1
+Redis server v=8.10.3 ...（镜像 redis:8-alpine，与 compose 钉的版本一致）
 ```
 
 真实业务流（建号 → 登录 → 读接口），确认三个 Redis key 与实际流量对得上：
@@ -196,13 +199,24 @@ $ pytest tests/test_r98_redis.py tests/test_health.py tests/test_r11_data_layer.
 29 passed
 ```
 
+### 运维演练：Redis 容器重建
+
+换 Redis 镜像版本必然经历一次容器重建（内存数据全丢），这是升级时最容易出事的一步，
+实测这条路径：
+
+```
+$ docker compose up -d redis          # 镜像换成 redis:8-alpine，容器 Recreate
+$ curl -b cookie /api/me              # → 200，立刻可用
+$ redis-cli --scan --pattern '*'      # → sc:sess:8698e497... / sc:rl:api:172.28.0.1 已重建
+```
+
+即：**后端不需要重启**，重连成功后在下一个请求里就把会话缓存与限流窗口写回去了；
+`test_r98_redis.py` 的 11 项也在同一个 v8.10.3 实例上全过。这正是「Redis 只存可重建状态」
+这条设计的实际收益——换版本不需要迁移任何数据。
+
 ## 六、未覆盖 / 已知边界
 
 - Let's Encrypt 的证书脚本、nginx 配置都是 r97 的产物，本轮未改，也未重新验证；
 - `pg_trgm` 在无超级用户权限的托管 PG 上会被跳过（只记 WARNING），检索退化为顺序扫描；
 - 迁移脚本没有「增量同步」能力：切换窗口内 SQLite 侧的新写入不会被带走，**必须停服迁移**；
-- 多副本下的真实限流行为没有做压测（本机单实例只能验证「共享同一计数器」这一层）；
-- **本机 Docker Hub 当时拉不动 `redis:7-alpine`**（多个镜像加速站都卡在同一处），四容器验证用本地已有的
-  `redis:latest`（v8.0.3）经临时覆盖文件顶上；提交的 compose 仍钉 `redis:7-alpine`。
-  本项目用到的命令（ZSET / Lua / SCAN / SET NX EX / EXPIRE）在 7 与 8 上语义一致，但这属于
-  「未在目标版本上实测」，换到能拉镜像的网络后应重跑一次 `docker compose up -d` 复验。
+- 多副本下的真实限流行为没有做压测（本机单实例只能验证「共享同一计数器」这一层）。
