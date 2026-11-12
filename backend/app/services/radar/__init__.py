@@ -227,15 +227,33 @@ async def _translate_round(user: dict[str, Any] | None, notes: list[str]) -> int
         return 0
     if translated:
         notes.append(f"已翻译 {translated} 条英文简介")
+    # r89：HN 等来源只有标题没描述，翻译只能得到翻译版标题——采完顺手抓正文汇总成中文概要。
+    try:
+        summarized, _ = await translate.summarize_pending(
+            max(int(get_settings().radar_translate_batch), 1), client
+        )
+    except asyncio.CancelledError:
+        raise
+    except Exception:  # noqa: BLE001 — 概要抓不到正文只是退回标题译文，不该影响采集
+        logger.exception("radar.summarize.failed")
+        return translated
+    if summarized:
+        notes.append(f"已为 {summarized} 条只有标题的条目生成中文概要")
     return translated
 
 
 async def translate_summaries(user: dict[str, Any], limit: int | None = None) -> tuple[int, int]:
-    """按需补翻接口的实现：无 Key / 未开通由 `client_for` 抛 503，路由直接透传。"""
+    """按需补翻接口的实现：无 Key / 未开通由 `client_for` 抛 503，路由直接透传。
+
+    r89：补翻同时覆盖两类欠账——英文摘要未翻（translate_pending）与「标题即简介」
+    未汇总（summarize_pending）；剩余条数取两者之和，界面提示语路由层拼。
+    """
     settings = get_settings()
     client = user_ai.client_for(user, "light")
     batch = max(int(settings.radar_translate_batch if limit is None else limit), 1)
-    return await translate.translate_pending(batch, client)
+    translated, _ = await translate.translate_pending(batch, client)
+    summarized, _ = await translate.summarize_pending(batch, client)
+    return translated + summarized, store.count_pending_translation() + store.count_pending_summary()
 
 
 def start_scheduler() -> None:

@@ -18,6 +18,7 @@ import re
 import ssl
 import time
 import xml.etree.ElementTree as ET
+from html import unescape as html_unescape
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
@@ -336,6 +337,48 @@ def _tls_failed(error: BaseException) -> bool:
             return True
         current = current.__cause__ or current.__context__
     return False
+
+
+#: r89 概要抓取：正文摘录喂给模型的上限（约 6 页 A4，足够概括「它是干啥的」）。
+_ARTICLE_MAX_BYTES = 300_000
+_ARTICLE_MAX_CHARS = 3000
+_SCRIPT_STYLE = re.compile(r"<(script|style|noscript|svg)\b[^>]*>.*?</\1>", re.IGNORECASE | re.DOTALL)
+_TAG = re.compile(r"<[^>]+>")
+_WS = re.compile(r"\s+")
+
+
+def extract_article_text(html: str) -> str:
+    """HTML → 可读正文：去脚本/样式/标签、折叠空白，截到 `_ARTICLE_MAX_CHARS`。"""
+    body = _SCRIPT_STYLE.sub(" ", html or "")
+    body = _TAG.sub(" ", body)
+    text = html_unescape(body)
+    return _WS.sub(" ", text).strip()[:_ARTICLE_MAX_CHARS]
+
+
+async def fetch_article_text(url: str, settings: Settings | None = None) -> str:
+    """抓取条目链接的正文摘录（r89），供「标题即简介」的条目汇总中文概要。
+
+    任何失败（网络 / 4xx 5xx / 超时 / 非文本）都返回空串——概要宁缺毋滥，
+    抓不到就保持标题译文，绝不让采集或补翻主流程失败。
+    """
+    target = (url or "").strip()
+    if not target.lower().startswith(("http://", "https://")):
+        return ""
+    try:
+        async with httpx.AsyncClient(
+            timeout=httpx.Timeout(10.0),
+            follow_redirects=True,
+            verify=not (settings or get_settings()).radar_insecure_tls,
+        ) as client:
+            response = await client.get(target, headers=_headers({"Accept": "text/html"}))
+            response.raise_for_status()
+            ctype = response.headers.get("content-type", "")
+            if ctype and "html" not in ctype and "xml" not in ctype and "text" not in ctype:
+                return ""
+            return extract_article_text(response.content[:_ARTICLE_MAX_BYTES].decode("utf-8", "ignore"))
+    except (httpx.HTTPError, ValueError, OSError):
+        logger.info("概要正文抓取失败 url=%s", target)
+        return ""
 
 
 async def _run_source(

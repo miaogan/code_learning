@@ -13,13 +13,14 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.config import get_settings
 from app.services.ai.ai import AIClient
-from app.services.radar import store
+from app.services.radar import sources, store
 
 logger = logging.getLogger("app.radar.translate")
 
@@ -37,6 +38,16 @@ TRANSLATE_SYSTEM = """你是技术雷达的中文编辑。把输入的英文技�
 1. 只翻译，不解释、不评价、不补充原文没有的信息，不要写「该仓库」「这个项目」之类的开场。
 2. 产品名、项目名、命令、版本号、协议名保留原文，不音译。
 3. 每条控制在一句话、最多 60 字，讲清「它是什么 / 解决什么问题」。
+4. 输入的每一条都必须有对应输出，`slug` 原样照抄，不得增删条目。
+5. 只输出 JSON：{"items": [{"slug": "...", "zh": "..."}]}，不要 Markdown 代码块。"""
+
+SUMMARIZE_SYSTEM = """你是技术雷达的中文编辑。输入条目只有标题，没有真实描述。
+根据给定的正文摘录，分析这个项目 / 这篇文章 / 这个产品是干什么的，逐条汇总成一句中文。
+
+硬性规则：
+1. 概括「它是什么 / 做了什么 / 有什么关键信息」，不是翻译标题——标题说的正文里要有依据。
+2. 正文摘录抓取失败或内容为空的条目直接跳过（宁缺毋滥，不许凭标题编造）。
+3. 产品名、项目名、公司名保留原文，不音译；每条一句话、最多 60 字。
 4. 输入的每一条都必须有对应输出，`slug` 原样照抄，不得增删条目。
 5. 只输出 JSON：{"items": [{"slug": "...", "zh": "..."}]}，不要 Markdown 代码块。"""
 
@@ -123,3 +134,72 @@ async def translate_pending(limit: int, client: AIClient) -> tuple[int, int]:
             store.set_summary_zh(slug, zh)
         translated = len(result)
     return translated, store.count_pending_translation()
+
+
+def _is_title_only(row: dict[str, Any]) -> bool:
+    """「标题即简介」：summary 与 name 相同说明上游没给真实描述（HN 只回标题的典型形状）。"""
+    return str(row.get("summary") or "").strip() == str(row.get("name") or "").strip()
+
+
+async def summarize_items(
+    items: list[dict[str, Any]], client: AIClient
+) -> dict[str, str]:
+    """批量汇总「标题即简介」的条目：`items` 每条带 `slug / name / text`（正文摘录）。
+
+    只接受「slug 在输入里、非空、含中文、且不等于标题」的汇总——模型回吐标题或
+    凭空编造的条目一律丢弃，这些条目保持标题译文，等下一轮再试。
+    """
+    if not items:
+        return {}
+    lines = [
+        f"- slug={row['slug']}｜标题：{row['name']}｜正文摘录：{row['text']}" for row in items
+    ]
+    prompt = "逐条分析并汇总下列条目：\n" + "\n".join(lines)
+    batch = await client.complete_model(
+        SUMMARIZE_SYSTEM,
+        prompt,
+        TranslationBatch,
+        timeout_s=get_settings().radar_translate_timeout_s,
+    )
+    titles = {str(row["slug"]): str(row["name"]) for row in items}
+    result: dict[str, str] = {}
+    for draft in batch.items:
+        slug = draft.slug.strip()
+        if slug not in titles:
+            continue
+        zh = clean_zh(draft.zh)
+        # 空串、无中文、或与标题相同（回吐标题）都不算汇总成功。
+        if not zh or not _CJK.search(zh) or zh == titles[slug]:
+            continue
+        result[slug] = zh
+    return result
+
+
+async def summarize_pending(
+    limit: int, client: AIClient, fetch_text: Callable[[str], Awaitable[str]] | None = None
+) -> tuple[int, int]:
+    """给「标题即简介」的条目抓正文、汇总中文概要并落库，返回 `(本轮汇总条数, 剩余条数)`。
+
+    `fetch_text` 可注入（测试用）；默认用 `sources.fetch_article_text`。抓不到正文的
+    条目本轮跳过、留在队列里（宁缺毋滥），绝不抛错拖垮采集或补翻主流程。
+    """
+    if fetch_text is None and get_settings().radar_offline:
+        # 离线模式契约：只读内置样本、不发起真实网络抓取，队列保持原样。
+        return 0, store.count_pending_summary()
+    fetch = fetch_text or sources.fetch_article_text
+    batch = [row for row in store.pending_summary(max(int(limit), 1)) if _is_title_only(row)]
+    if not batch:
+        return 0, store.count_pending_summary()
+    enriched: list[dict[str, Any]] = []
+    for row in batch:
+        text = await fetch(str(row["url"]))
+        if not text:
+            continue
+        enriched.append({"slug": row["slug"], "name": row["name"], "text": text})
+    summarized = 0
+    if enriched:
+        result = await summarize_items(enriched, client)
+        for slug, zh in result.items():
+            store.set_summary_zh(slug, zh)
+        summarized = len(result)
+    return summarized, store.count_pending_summary()

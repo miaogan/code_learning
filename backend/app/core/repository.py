@@ -2177,11 +2177,11 @@ def radar_set_summary_zh(tech_slug: str, summary_zh: str) -> None:
 
 
 def radar_pending_translation(limit: int) -> list[dict[str, Any]]:
-    """待翻译条目：有英文摘要但还没有中文译文的，按最近出现时间取一页。"""
+    """待翻译条目：有英文摘要但还没有中文译文的（r89：标题即简介的交给汇总队列）。"""
     with connection() as conn:
         rows = conn.execute(
             "SELECT tech_slug, summary FROM radar_techs"
-            " WHERE summary_zh = '' AND summary <> ''"
+            " WHERE summary_zh = '' AND summary <> '' AND trim(summary) <> trim(name)"
             " ORDER BY last_seen_at DESC LIMIT ?",
             (max(int(limit), 1),),
         ).fetchall()
@@ -2189,10 +2189,36 @@ def radar_pending_translation(limit: int) -> list[dict[str, Any]]:
 
 
 def radar_count_pending_translation() -> int:
-    """还有多少条「有英文摘要但没有中文译文」（补翻按钮据此决定是否还能再点）。"""
+    """还有多少条「有英文摘要但没有中文译文」且非标题即简介（补翻按钮据此决定是否还能再点）。"""
     with connection() as conn:
         row = conn.execute(
-            "SELECT count(*) AS n FROM radar_techs WHERE summary_zh = '' AND summary <> ''"
+            "SELECT count(*) AS n FROM radar_techs"
+            " WHERE summary_zh = '' AND summary <> '' AND trim(summary) <> trim(name)"
+        ).fetchone()
+    return 0 if row is None else int(row["n"])
+
+
+def radar_pending_summary(limit: int) -> list[dict[str, Any]]:
+    """「标题即简介」且还没有中文概要的条目（r89），按最近出现时间取一页。"""
+    with connection() as conn:
+        rows = conn.execute(
+            "SELECT tech_slug, name, summary, url FROM radar_techs"
+            " WHERE summary <> '' AND summary_zh = '' AND trim(summary) = trim(name)"
+            " ORDER BY last_seen_at DESC LIMIT ?",
+            (max(int(limit), 1),),
+        ).fetchall()
+    return [
+        {"slug": row["tech_slug"], "name": row["name"], "summary": row["summary"], "url": row["url"]}
+        for row in rows
+    ]
+
+
+def radar_count_pending_summary() -> int:
+    """「标题即简介」且还没有中文概要的条目总数（汇总进度如实回传）。"""
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT count(*) AS n FROM radar_techs"
+            " WHERE summary <> '' AND summary_zh = '' AND trim(summary) = trim(name)"
         ).fetchone()
     return 0 if row is None else int(row["n"])
 

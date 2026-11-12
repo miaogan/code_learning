@@ -170,6 +170,16 @@ def count_pending_translation() -> int:
     return repository.radar_count_pending_translation()
 
 
+def pending_summary(limit: int) -> list[dict[str, Any]]:
+    """「标题即简介」的条目（r89）：需要抓正文汇总成中文概要，而不是翻标题。"""
+    return repository.radar_pending_summary(limit)
+
+
+def count_pending_summary() -> int:
+    """「标题即简介」条目总数（汇总进度如实回传）。"""
+    return repository.radar_count_pending_summary()
+
+
 def _json_list(text: str | None) -> list[Any]:
     try:
         payload = json.loads(text or "[]")
