@@ -65,3 +65,6 @@ frontend/.htpasswd
 # 本地工作台数据与备份包（不入库）
 .workbuddy/
 code_learning-src-*.zip
+
+# 本地测试报告（junitxml 输出，不入库）
+backend/*.xml
