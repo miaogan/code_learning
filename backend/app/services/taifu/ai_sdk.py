@@ -120,6 +120,9 @@ class StreamEncoder:
                         "type": "data-done",
                         "data": {
                             "notice": str(event.get("notice") or ""),
+                            # 机器可读的收尾原因：`no_records` 该给补数据入口、`empty_reply`
+                            # 只该让人重问。前端不按中文文案反推分支。
+                            "reason": str(event.get("reason") or ""),
                             "memoriesAdded": int(event.get("memories_added") or 0),
                             "createdAt": str(event.get("created_at") or ""),
                         },

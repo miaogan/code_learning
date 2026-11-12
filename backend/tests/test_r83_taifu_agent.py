@@ -470,6 +470,26 @@ def test_stream_endpoint_short_circuits_without_records(
     frames = _frames(response.text)
     assert [item["type"] for item in frames] == ["start", "data-done", "finish", "[DONE]"]
     assert "站内记录还是空的" in frames[1]["data"]["notice"]
+    # 前端据此给「去上传简历 / 先做几道练习 / 去看诊断报告」三个入口。
+    assert frames[1]["data"]["reason"] == "no_records"
+
+
+def test_stream_endpoint_marks_a_missing_answer_as_empty_reply(
+    client: TestClient, patch_ai: Any, profile_factory: Any
+) -> None:
+    """模型没生成出正文：给 `empty_reply`，前端只提示重问，不给「去补数据」的入口。"""
+
+    repository.insert_profile(profile_factory())
+    # 只有空白也要算「没生成出回答」：`normalize_reply` 会 strip 成空串。
+    # 注意这时上游**确实流了**空白 delta，所以前端判「有没有正文」必须 trim，
+    # 否则会留下一个空白气泡、把 notice 挡在外面。
+    patch_ai(lambda _model_cls, _user: {"reply": "   ", "citations": []})
+
+    frames = _frames(client.post("/api/taifu/chat/stream", json={"question": "我先补什么"}).text)
+
+    done = next(item for item in frames if item["type"] == "data-done")
+    assert done["data"]["reason"] == "empty_reply"
+    assert done["data"]["notice"] == policy.EMPTY_REPLY_NOTICE
 
 
 def test_stream_endpoint_rejects_blank_question(client: TestClient, patch_ai: Any) -> None:
@@ -479,4 +499,6 @@ def test_stream_endpoint_rejects_blank_question(client: TestClient, patch_ai: An
     frames = _frames(response.text)
     assert frames[1]["type"] == "data-done"
     assert frames[1]["data"]["notice"] == policy.EMPTY_QUESTION_NOTICE
+    # 空问句不是「没数据」：不该弹「去上传简历」那三个入口。
+    assert frames[1]["data"]["reason"] == "empty_question"
     assert frames[-1]["type"] == "[DONE]"

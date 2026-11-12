@@ -24,7 +24,7 @@ import {
 import {
   argsLine,
   cappedOf,
-  noticeOf,
+  doneOf,
   partsToView,
   rowKeysOf,
   textOf,
@@ -145,7 +145,8 @@ function MessageRow({
   const view = partsToView(message.parts)
   const isUser = message.role === 'user'
   const text = textOf(message.parts)
-  const notice = noticeOf(message.parts)
+  const done = doneOf(message.parts)
+  const notice = done?.notice ?? ''
   const capped = cappedOf(message.parts)
   const citations =
     view.find((item) => item.kind === 'citations')?.items ?? fallbackCitations ?? []
@@ -215,6 +216,13 @@ function MessageRow({
           {meta.memoriesUsed > 0 ? `，参考 ${meta.memoriesUsed} 条记忆` : ''}
         </p>
       ) : null}
+
+      {/* r81 的可审计性：这一轮新记住了什么，必须当场说，不能只留在记忆面板里等用户自己发现。 */}
+      {done && done.memoriesAdded > 0 ? (
+        <p className="sc-taifu-hint">
+          已记住 {done.memoriesAdded} 条新事实，可在下方「记忆」里查看或忘掉
+        </p>
+      ) : null}
     </div>
   )
 }
@@ -263,6 +271,8 @@ export function TaifuLauncher({ userId }: TaifuLauncherProps) {
   const [threadError, setThreadError] = useState('')
   const [question, setQuestion] = useState('')
   const [sendError, setSendError] = useState('')
+  /** 这一问没有回答的原因（空档案 / 这次没生成出来）：面板级提示，不留在消息列表里。 */
+  const [emptyReply, setEmptyReply] = useState<{ notice: string; reason: string } | null>(null)
   /** 历史消息的引用：UIMessage 的 data part 有类型约束，历史里那几条单独按 id 存一份。 */
   const historyCitesRef = useRef<Record<string, TaifuCitation[]>>({})
   /** 这一问的上下文与回滚点：失败时按它收回问句、恢复输入框。 */
@@ -315,10 +325,15 @@ export function TaifuLauncher({ userId }: TaifuLauncherProps) {
     onFinish: ({ message }) => {
       const snapshot = sendSnapshotRef.current
       sendSnapshotRef.current = null
-      if (textOf(message.parts)) return
+      // 必须 trim：上游可能只流了空白（`normalize_reply` 会 strip 成空串），
+      // 拿 `'   '` 当正文会留下一个空白气泡，还把 notice 挡在外面。
+      if (textOf(message.parts).trim()) return
       // 没有正文（空档案 / 模型没生成出来）：服务端不落库，界面也不该留下这一问。
+      const done = doneOf(message.parts)
       setMessages((prev) => prev.slice(0, snapshot?.count ?? Math.max(0, prev.length - 2)))
       if (snapshot) setQuestion(snapshot.text)
+      // 但要说清为什么 —— 服务端的 notice 与 reason 现在有地方落，不再随消息一起被丢掉。
+      if (done?.notice) setEmptyReply({ notice: done.notice, reason: done.reason })
     },
   })
 
@@ -421,6 +436,7 @@ export function TaifuLauncher({ userId }: TaifuLauncherProps) {
     if (!open) {
       setClearArmed(false)
       setSendError('')
+      setEmptyReply(null)
       return
     }
     if (threadStatus === 'idle') void loadThread()
@@ -483,6 +499,7 @@ export function TaifuLauncher({ userId }: TaifuLauncherProps) {
     sendSnapshotRef.current = { count: messages.length, text }
     setQuestion('')
     setSendError('')
+    setEmptyReply(null)
     sendMessage({ text })
   }, [focus, location.pathname, messages.length, pending, question, sendMessage])
 
@@ -552,6 +569,24 @@ export function TaifuLauncher({ userId }: TaifuLauncherProps) {
     }
     if (memoriesStatus === 'idle') void loadMemories()
   }, [memoriesOpen, memoriesStatus, loadMemories])
+
+  // r81：这一轮真记住了新事实，就把**已展开**的记忆列表刷一遍 —— 否则条数还是旧的，
+  // 用户会怀疑「到底记没记住」。没展开过（`memories === null`）不读，保持「展开才读」。
+  const lastMemoriesAdded = useMemo(() => {
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const item = messages[index]
+      if (item.role !== 'assistant') continue
+      const done = doneOf(item.parts)
+      if (done) return done.memoriesAdded
+    }
+    return 0
+  }, [messages])
+  const refreshedMemoriesFor = useRef(0)
+  useEffect(() => {
+    if (lastMemoriesAdded <= 0 || lastMemoriesAdded === refreshedMemoriesFor.current) return
+    refreshedMemoriesFor.current = lastMemoriesAdded
+    if (memories !== null) void loadMemories()
+  }, [lastMemoriesAdded, memories, loadMemories])
 
   const clearThread = useCallback(async () => {
     if (!clearArmed) {
@@ -810,6 +845,34 @@ export function TaifuLauncher({ userId }: TaifuLauncherProps) {
               <div className="sc-taifu-error" role="alert">
                 <p>{sendError}</p>
                 <button type="button" className="sc-taifu-textbtn" onClick={() => setSendError('')}>
+                  知道了
+                </button>
+              </div>
+            ) : null}
+
+            {/* r83 修复：这一问没有回答时，问句按 r78 的口径收回（服务端不落库、刷新不该留孤儿），
+                但「为什么没有」必须留在面板上；没有可读记录时还要给补数据的入口。 */}
+            {emptyReply ? (
+              <div className="sc-taifu-empty" role="status">
+                <p className="sc-taifu-notice">{emptyReply.notice}</p>
+                {emptyReply.reason === 'no_records' ? (
+                  <p className="sc-taifu-exits">
+                    <Link className="sc-taifu-linkbtn" to="/" onClick={() => setOpen(false)}>
+                      去上传简历
+                    </Link>
+                    <Link className="sc-taifu-linkbtn" to="/practice" onClick={() => setOpen(false)}>
+                      先做几道练习
+                    </Link>
+                    <Link className="sc-taifu-linkbtn" to="/report" onClick={() => setOpen(false)}>
+                      去看诊断报告
+                    </Link>
+                  </p>
+                ) : null}
+                <button
+                  type="button"
+                  className="sc-taifu-textbtn"
+                  onClick={() => setEmptyReply(null)}
+                >
                   知道了
                 </button>
               </div>

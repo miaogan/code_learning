@@ -142,13 +142,38 @@ export function textOf(parts: readonly unknown[]): string {
     .join('')
 }
 
-/** 本轮的结束语（空档案 / 没生成出来时是唯一可见内容）。 */
-export function noticeOf(parts: readonly unknown[]): string {
+/** 本轮的收尾信息：提示文案、机器可读原因、本轮新增记忆条数。 */
+export interface DoneView {
+  /** 空档案 / 没生成出来时的中文说明；正常回答为空串。 */
+  notice: string
+  /** `no_records` = 没有可读记录（该给补数据入口）；`empty_reply` = 这次没生成出来。 */
+  reason: string
+  memoriesAdded: number
+}
+
+/**
+ * 读 `data-done`。
+ *
+ * `reason` 是服务端给的**机器可读**收尾原因：前端按它决定要不要给「去补数据」的入口，
+ * 而不是拿 notice 的中文文案做字符串匹配（文案一改，分支就静默失效）。
+ */
+export function doneOf(parts: readonly unknown[]): DoneView | null {
   for (const raw of parts) {
     const part = asRecord(raw)
-    if (part.type === 'data-done') return asText(asRecord(part.data).notice)
+    if (part.type !== 'data-done') continue
+    const data = asRecord(part.data)
+    return {
+      notice: asText(data.notice),
+      reason: asText(data.reason),
+      memoriesAdded: Number(data.memoriesAdded) || 0,
+    }
   }
-  return ''
+  return null
+}
+
+/** 本轮的结束语（空档案 / 没生成出来时是唯一可见内容）。 */
+export function noticeOf(parts: readonly unknown[]): string {
+  return doneOf(parts)?.notice ?? ''
 }
 
 /** 是否撞到了取料轮次上限：撞到了就如实说明，别让用户以为「就这些」。 */

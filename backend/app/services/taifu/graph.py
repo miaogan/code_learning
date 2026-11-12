@@ -283,7 +283,18 @@ async def _finalize(state: TaifuState, client: AIClient) -> dict[str, Any]:
     """收尾：空回答给中文提示，有回答才写历史；溢出时补一次摘要。"""
     blocked = state.get("blocked") or ""
     if blocked:
-        _emit({"type": "done", "reply": "", "notice": blocked, "memories_added": 0, "created_at": ""})
+        # `reason` 让前端能区分「没东西可读」与「这次没生成出来」：前者该给补数据的入口，
+        # 后者只该让用户重问一次。只靠 notice 文案反推是把中文当成机器可读契约。
+        _emit(
+            {
+                "type": "done",
+                "reply": "",
+                "notice": blocked,
+                "reason": "no_records",
+                "memories_added": 0,
+                "created_at": "",
+            }
+        )
         return {"created_at": ""}
 
     reply = policy.normalize_reply(state.get("reply") or "")
@@ -298,6 +309,7 @@ async def _finalize(state: TaifuState, client: AIClient) -> dict[str, Any]:
                 "type": "done",
                 "reply": "",
                 "notice": policy.EMPTY_REPLY_NOTICE,
+                "reason": "empty_reply",
                 "memories_added": context.memories_added,
                 "created_at": "",
             }

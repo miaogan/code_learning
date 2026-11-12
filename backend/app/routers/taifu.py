@@ -81,9 +81,9 @@ async def chat_stream(payload: TaifuChatRequest, user: CurrentUser) -> Streaming
     focus = policy.sanitize_focus(payload.focus)
     encoder = ai_sdk.StreamEncoder()
     if not question:
-        return _stream(_notice_stream(encoder, policy.EMPTY_QUESTION_NOTICE))
+        return _stream(_notice_stream(encoder, policy.EMPTY_QUESTION_NOTICE, "empty_question"))
     if not _has_any_record():
-        return _stream(_notice_stream(encoder, policy.EMPTY_BRIEF_NOTICE))
+        return _stream(_notice_stream(encoder, policy.EMPTY_BRIEF_NOTICE, "no_records"))
     client = user_ai.client_for(user, "light")
 
     async def events() -> AsyncIterator[str]:
@@ -113,13 +113,23 @@ async def chat_stream(payload: TaifuChatRequest, user: CurrentUser) -> Streaming
 
 
 async def _notice_stream(
-    encoder: ai_sdk.StreamEncoder, notice: str
+    encoder: ai_sdk.StreamEncoder, notice: str, reason: str
 ) -> AsyncIterator[str]:
-    """零成本短路也要走同一条协议：前端只认一套帧，不为「没档案」写分支。"""
+    """零成本短路也要走同一条协议：前端只认一套帧，不为「没档案」写分支。
+
+    `reason` 是给前端的机器可读分支依据（`empty_question` / `no_records`）——没有档案时
+    要给「去补数据」的三个入口，空问句时不该给，靠 notice 中文反推太脆。
+    """
     for chunk in encoder.start():
         yield chunk
     for chunk in encoder.encode(
-        {"type": "done", "notice": notice, "memories_added": 0, "created_at": ""}
+        {
+            "type": "done",
+            "notice": notice,
+            "reason": reason,
+            "memories_added": 0,
+            "created_at": "",
+        }
     ):
         yield chunk
     for chunk in encoder.finish():

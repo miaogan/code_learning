@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   argsLine,
   cappedOf,
+  doneOf,
   noticeOf,
   partsToView,
   rowKeysOf,
@@ -105,5 +106,32 @@ describe('rowKeysOf', () => {
 
   it('空列表给空数组（空态不渲染任何行）', () => {
     expect(rowKeysOf([])).toEqual([])
+  })
+})
+
+describe('doneOf', () => {
+  it('读出提示、机器可读原因与本轮记忆条数', () => {
+    const done = doneOf([
+      { type: 'data-done', data: { notice: '站内记录还是空的', reason: 'no_records', memoriesAdded: 1 } },
+    ])
+
+    expect(done).toEqual({ notice: '站内记录还是空的', reason: 'no_records', memoriesAdded: 1 })
+  })
+
+  it('缺字段一律按空值兜底（旧服务端没有 reason 时不能崩）', () => {
+    expect(doneOf([{ type: 'data-done', data: {} }])).toEqual({
+      notice: '',
+      reason: '',
+      memoriesAdded: 0,
+    })
+    expect(doneOf([{ type: 'text', text: '正常回答' }])).toBe(null)
+    expect(doneOf([])).toBe(null)
+  })
+
+  it('noticeOf 与 done.notice 同源（空回答的提示只从 data-done 来）', () => {
+    expect(noticeOf([{ type: 'data-done', data: { notice: '这次没生成出来' } }])).toBe(
+      '这次没生成出来',
+    )
+    expect(noticeOf([{ type: 'text', text: '正常回答' }])).toBe('')
   })
 })

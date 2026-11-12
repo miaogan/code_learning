@@ -159,3 +159,52 @@ RESULT: REPRODUCED
 - `test_encoder_gives_each_stream_its_own_message_id`：两个编码器给出不同 id、前缀是 `msg_`、显式指定仍生效。
 - `test_stream_endpoint_gives_each_reply_a_distinct_message_id`：同一个端点连问两次，两个 `start` 帧的 `messageId` 必须不同（端到端锁住这条契约）。
 - `rowKeysOf` 3 条：唯一 id 原样用、重复 id 追加序号且整列无重复、空列表给空数组。
+
+## 8. 交付后修复之二：空回答的说明与本轮记忆提示（2026-11-12）
+
+§7 修完之后继续核查前端，发现两处**契约与界面不一致**：
+
+### 8.1 没有回答时，用户什么都看不到
+
+| 项 | 内容 |
+| --- | --- |
+| 现象 | 空档案 / 模型没生成出正文时，问句被弹回输入框，界面上没有任何说明；r78 的三个「补数据」出口也没了 |
+| 根因 | `onFinish` 里 `if (textOf(message.parts)) return` 之后无脑回滚消息 —— 服务端**特意发来的** `data-done.notice` 随消息一起被丢掉；且判断用的是 `textOf` 原值，上游只流空白（`normalize_reply` 会 strip 成空串）时 `'   '` 也算"有正文"，会留下一个空白气泡把提示挡在外面 |
+| 修法 | ①`onFinish` 改 `textOf(...).trim()` 判空；②回滚消息（保持 r78「不留刷新即消失的孤儿」的口径）但把 `notice` 收进**面板级提示** `emptyReply`；③`data-done` 增加机器可读的 `reason`：`no_records` 给「去上传简历 / 先做几道练习 / 去看诊断报告」三个入口，`empty_reply` 只提示重问 |
+| 为什么加 reason | 原计划按 `materials === 0` 判断要不要给入口，但空问句也是 `materials === 0`，会误导用户去补数据。也考虑过匹配 notice 文案 —— 中文一改分支就静默失效，所以由服务端给枚举值 |
+
+### 8.2 r81 的「本轮记住 N 条」提示丢了
+
+| 项 | 内容 |
+| --- | --- |
+| 现象 | 太傅记住了新事实，界面上没有任何提示，用户只能自己去展开记忆面板数条数 |
+| 根因 | 换成 `useChat` 后只渲染了 `data-meta`（读取段数 / 参考记忆数），`data-done.memoriesAdded` 再没人读 |
+| 修法 | `lib/taifuStream.ts` 新增 `doneOf(parts)` 统一读收尾信息（`notice` / `reason` / `memoriesAdded`），回答下方在 `memoriesAdded > 0` 时显示「已记住 N 条新事实，可在下方「记忆」里查看或忘掉」；同时把**已展开**的记忆列表刷新一遍（`memories === null` 不读，保持「展开才读」） |
+
+### 8.3 验证
+
+```text
+backend: pytest tests/test_r83_taifu_agent.py -q → 20 passed（新增 2 条 reason 断言）
+backend: pytest -q --junitxml                   → 854 tests / 0 failures / 0 errors / 1 skipped
+backend: ruff check app tests                   → All checks passed
+frontend: vitest run --maxWorkers=1             → 38 files / 490 tests passed（新增 3 条 doneOf）
+frontend: typecheck / eslint --max-warnings 0 / vite build → 通过
+```
+
+真实浏览器（`node logs/teamflow/20261112-r83-taifu-agent-stream/scripts/check-empty-state.cjs`）：
+
+```text
+PASS 没有可读记录时：面板说明原因 + 三个补数据入口，问句收回输入框
+PASS 这次没生成出来时：只说明原因、不误导用户去补数据，空白正文不落气泡
+PASS 本轮记住 1 条时，在回答下方当场告知
+RESULT: PASS
+```
+
+> 本机环境提示：`vitest run` 并行跑时偶发 `EPERM ... \ssr\<hash>`（沙箱文件系统 shim 挡住 SSR 模块缓存写入），
+> 会导致个别测试文件静默不执行（38 → 35/36 个文件）。用 `--maxWorkers=1` 串行跑可稳定得到 38 files / 490 tests。
+
+### 8.4 保持不变的边界
+
+- 空回答**仍然不落库**、问句**仍然收回**（r78 口径）：提示放在面板上而不是消息列表里，刷新不会留下孤儿问句。
+- `reason` 只进流式协议（`data-done`），不动 HTTP 契约 `TaifuReply`，非流式端点零变化。
+- 三个入口的路由是闭集常量，不接受服务端下发 URL —— 提示文案可以变，入口不能被远端指定。

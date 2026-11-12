@@ -10677,3 +10677,27 @@ a.sc-radar-name--link:hover .sc-radar-ext {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+/* --- r83 修复：空回答的面板级提示 ---------------------------------------------
+   没有回答时问句按 r78 的口径收回（服务端不落库，刷新不留孤儿），但「为什么没有」
+   必须留在面板上；没有可读记录时再给三个补数据的入口。 */
+.sc-taifu-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  margin-top: var(--sp-3);
+}
+
+/* 提示条自带 margin-top，作为这个堆栈的第一块时由父级 gap 负责间距。 */
+.sc-taifu-empty .sc-taifu-notice {
+  align-self: stretch;
+  margin: 0;
+}
+
+.sc-taifu-exits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  margin: 0;
+}
