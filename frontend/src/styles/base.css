@@ -9017,6 +9017,12 @@ html {
   border-bottom: 0;
 }
 
+/* r87：国子监深链定位到的条目，用与任务行选中同源的强调底色，一眼能看到落点。 */
+.sc-radar-techrow.is-hit {
+  background: var(--accent-tint);
+  border-left: 2px solid var(--accent);
+}
+
 .sc-radar-techrow:hover {
   background: var(--overlay-06);
 }
@@ -9174,6 +9180,22 @@ html {
   align-items: center;
   justify-content: space-between;
   gap: var(--sp-2);
+}
+
+/* r87 国子监 ↔ 先锋 / 演武联动：详情头部回链与已入库任务的练习入口。 */
+.sc-radar-detailhead-links {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.sc-radar-backlink {
+  font-size: var(--fs-meta);
+  color: var(--accent);
+}
+
+.sc-radar-backlink:hover {
+  text-decoration: underline;
 }
 
 .sc-radar-jobrow {

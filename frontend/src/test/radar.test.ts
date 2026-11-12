@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { RadarJobItem, RadarQuestionSample, RadarTechItem } from '../api/types'
+import type { RadarChapterDraft, RadarJobItem, RadarQuestionSample, RadarTechItem } from '../api/types'
 import {
   ACTIVE_JOB_STATUSES,
   canAdopt,
@@ -9,6 +9,10 @@ import {
   formatCount,
   isActiveJob,
   isTerminalJob,
+  jobDirection,
+  jobPioneerHref,
+  jobPracticeHref,
+  jobSubDirection,
   needsTranslation,
   progressText,
   safeRepoUrl,
@@ -56,6 +60,19 @@ function job(overrides: Partial<RadarJobItem> = {}): RadarJobItem {
     trigger: 'manual',
     created_at: '2026-11-10T09:00:00Z',
     updated_at: '2026-11-10T09:01:00Z',
+    ...overrides,
+  }
+}
+
+function chapter(overrides: Partial<RadarChapterDraft> = {}): RadarChapterDraft {
+  return {
+    id: 'chap-1',
+    title: 'vLLM 上手',
+    direction: 'AI 工程',
+    sub_direction: '部署与推理',
+    level: 'intermediate',
+    summary: '推理引擎的原理与落地。',
+    sections: [],
     ...overrides,
   }
 }
@@ -218,5 +235,53 @@ describe('r74 摘要中文化与仓库外链', () => {
     expect(needsTranslation('支持 RAG 的检索框架')).toBe(false)
     expect(needsTranslation('CLI tool')).toBe(false)
     expect(needsTranslation('')).toBe(false)
+  })
+})
+
+describe('r87 先锋 ↔ 国子监联动：任务方向读数与跳转链接', () => {
+  it('方向读数：章节草稿优先，其次第一条题；空白值修剪，两者皆无返回空串', () => {
+    expect(jobDirection(job({ chapter: chapter() }))).toBe('AI 工程')
+    expect(
+      jobDirection(job({ chapter: chapter({ direction: '  ' }), questions: [question()] })),
+    ).toBe('AI 工程')
+    expect(jobDirection(job({ chapter: chapter({ direction: ' 后端 ' }) }))).toBe('后端')
+    expect(jobDirection(job())).toBe('')
+    expect(jobSubDirection(job({ chapter: chapter({ sub_direction: ' Agent ' }) }))).toBe('Agent')
+    expect(
+      jobSubDirection(
+        job({ chapter: chapter({ sub_direction: '' }), questions: [question({ sub_direction: 'RAG' })] }),
+      ),
+    ).toBe('RAG')
+  })
+
+  it('练习入口：只有已入库且推得出方向的任务才有，其余一律空串', () => {
+    const adopted = job({ status: 'adopted', chapter: chapter() })
+    const url = new URL(jobPracticeHref(adopted), 'http://localhost')
+    expect(url.pathname).toBe('/practice')
+    expect(url.searchParams.get('direction')).toBe('AI 工程')
+    expect(url.searchParams.get('sub')).toBe('部署与推理')
+    // 未入库的题不在练习池里，不给入口
+    expect(jobPracticeHref(job({ status: 'succeeded', chapter: chapter() }))).toBe('')
+    expect(jobPracticeHref(job({ status: 'running' }))).toBe('')
+    expect(jobPracticeHref(job({ status: 'discarded' }))).toBe('')
+    expect(jobPracticeHref(job({ status: 'failed' }))).toBe('')
+    // 入库了但推不出方向：不猜，入口也不给
+    expect(
+      jobPracticeHref(
+        job({ status: 'adopted', chapter: chapter({ direction: '' }), questions: [] }),
+      ),
+    ).toBe('')
+  })
+
+  it('先锋回链：tech 必带，name / direction 推得出才带', () => {
+    const url = new URL(jobPioneerHref(job({ chapter: chapter() })), 'http://localhost')
+    expect(url.pathname).toBe('/pioneer')
+    expect(url.searchParams.get('tech')).toBe('github:demo/vllm')
+    expect(url.searchParams.get('name')).toBe('vLLM')
+    expect(url.searchParams.get('direction')).toBe('AI 工程')
+    const bare = new URL(jobPioneerHref(job()), 'http://localhost')
+    expect(bare.searchParams.get('tech')).toBe('github:demo/vllm')
+    expect(bare.searchParams.get('name')).toBe('vLLM')
+    expect(bare.searchParams.get('direction')).toBeNull()
   })
 })

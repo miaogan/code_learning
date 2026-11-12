@@ -6,6 +6,7 @@
  */
 
 import type { RadarJobItem, RadarTechItem } from '../api/types'
+import { practiceHref } from './studyPlan'
 
 /** 在途状态：`queued` / `running`，页面据此决定是否继续轮询。 */
 export const ACTIVE_JOB_STATUSES = ['queued', 'running'] as const
@@ -139,4 +140,44 @@ export function needsTranslation(summary: string): boolean {
 /** 展示用摘要：中文优先，没有译文时回退英文原文（原文永远不会被译文覆盖）。 */
 export function summaryText(item: RadarTechItem): string {
   return item.summary_zh !== '' ? item.summary_zh : item.summary
+}
+
+/* ---------- r87 先锋 ↔ 国子监联动的纯函数层 ---------- */
+
+/** 任务的方向读数：章节草稿优先，其次第一条题；都没有返回空串（不猜方向）。 */
+export function jobDirection(job: RadarJobItem): string {
+  const fromChapter = job.chapter?.direction ?? ''
+  if (fromChapter.trim() !== '') return fromChapter.trim()
+  const fromQuestion = job.questions[0]?.direction ?? ''
+  return fromQuestion.trim()
+}
+
+/** 任务的二级方向读数：与方向同源（章节草稿优先，其次第一条题），空串 = 不聚焦。 */
+export function jobSubDirection(job: RadarJobItem): string {
+  const fromChapter = job.chapter?.sub_direction ?? ''
+  if (fromChapter.trim() !== '') return fromChapter.trim()
+  const fromQuestion = job.questions[0]?.sub_direction ?? ''
+  return fromQuestion.trim()
+}
+
+/**
+ * 国子监 → 演武的练习入口：**只有已扩充入库的任务**题目才真的在练习池里，
+ * 其他状态（在途 / 已完成未入库 / 已废弃 / 失败）一律不给入口；推不出方向同样不给。
+ */
+export function jobPracticeHref(job: RadarJobItem): string {
+  if (job.status !== 'adopted') return ''
+  const direction = jobDirection(job)
+  if (direction === '') return ''
+  return practiceHref({ direction, sub_direction: jobSubDirection(job) })
+}
+
+/** 国子监 → 先锋的回链：带方向参数（先锋落为筛选）与技术名（未命中时提示用），第一页大概率能定位。 */
+export function jobPioneerHref(job: RadarJobItem): string {
+  const query = new URLSearchParams()
+  query.set('tech', job.tech_slug)
+  const name = job.tech_name.trim()
+  if (name !== '') query.set('name', name)
+  const direction = jobDirection(job)
+  if (direction !== '') query.set('direction', direction)
+  return `/pioneer?${query.toString()}`
 }

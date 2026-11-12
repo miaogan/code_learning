@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../api/client'
 import type { RadarJobItem } from '../api/types'
 import { Button } from '../components/ui/Button'
@@ -16,6 +16,8 @@ import {
   discardedNotice,
   discardReasonLines,
   isActiveJob,
+  jobPioneerHref,
+  jobPracticeHref,
   progressText,
   statusLabel,
 } from '../lib/radar'
@@ -138,8 +140,13 @@ function JobDetail({
     <div className="sc-radar-detailbody">
       <div className="sc-radar-detailhead">
         <h3 className="sc-coach-blocktitle">{job.tech_name || job.tech_slug}</h3>
-        <span className={`sc-radar-jobstatus ${STATUS_CLASS[job.status] ?? 'is-failed'}`}>
-          {statusLabel(job.status)}
+        <span className="sc-radar-detailhead-links">
+          <Link className="sc-radar-backlink" to={jobPioneerHref(job)}>
+            在先锋看这项技术 ↗
+          </Link>
+          <span className={`sc-radar-jobstatus ${STATUS_CLASS[job.status] ?? 'is-failed'}`}>
+            {statusLabel(job.status)}
+          </span>
         </span>
       </div>
 
@@ -257,7 +264,17 @@ function JobDetail({
       )}
       {job.status === 'adopted' && (
         <p className="sc-coach-note">
-          已扩充入库：{job.questions.length} 条题已进入练习池（不进入科考卷）。
+          已扩充入库：{job.questions.length} 条题已进入练习池（不进入科考卷）。{' '}
+          {jobPracticeHref(job) !== '' ? (
+            <>
+              <Link className="sc-radar-backlink" to={jobPracticeHref(job)}>
+                去演武按方向练一遍 →
+              </Link>{' '}
+              （链接已带好方向与二级方向筛选）
+            </>
+          ) : (
+            '可在练习页按方向筛选这些题。'
+          )}
         </p>
       )}
       {job.status === 'discarded' && <p className="sc-coach-note">这份草稿已废弃，题目未入库。</p>}
@@ -386,7 +403,7 @@ export default function GuozijianPage() {
                       />
                       <p className="sc-coach-note">
                         雷达生成的题只进练习池、不进科考卷；章节草稿不并入官方教程。
-                        扩充入库后可到练习页按方向练习。
+                        扩充入库后用上面的「去演武」链接直达对应方向的练习。
                       </p>
                     </div>
                   )}

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../api/client'
 import type { RadarRunRequest, RadarTechItem } from '../api/types'
 import { MultiChipRow, type ChipOption } from '../components/ui/ChipRow'
@@ -59,12 +59,15 @@ function TechRow({
   item,
   busy,
   expanded,
+  hit,
   onToggle,
   onGenerate,
 }: {
   item: RadarTechItem
   busy: boolean
   expanded: boolean
+  /** r87：从国子监深链定位到的条目，短暂高亮便于一眼找到。 */
+  hit: boolean
   onToggle: () => void
   onGenerate: (item: RadarTechItem) => void
 }) {
@@ -74,7 +77,10 @@ function TechRow({
   const hasOriginal = item.summary_zh !== '' && item.summary !== ''
   const link = safeRepoUrl(item.url)
   return (
-    <li className="sc-radar-techrow">
+    <li
+      className={hit ? 'sc-radar-techrow is-hit' : 'sc-radar-techrow'}
+      id={`radar-tech-${item.tech_slug}`}
+    >
       <div className="sc-radar-rowmain">
         <div className="sc-radar-rowtitle">
           <span className={`sc-radar-verdict ${VERDICT_CLASS[item.verdict] ?? 'is-skip'}`}>
@@ -134,6 +140,10 @@ function TechRow({
 
 export default function PioneerPage() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+  // r87：国子监「在先锋看这项技术」带回的深链 —— `tech` 定位某项技术，`direction` 落为方向筛选。
+  const linkTech = searchParams.get('tech') ?? ''
+  const linkDirection = searchParams.get('direction') ?? ''
   const [page, setPage] = useState(1)
   // 每页条数由用户选（后端 `limit` 上限 100），改动同样回到第 1 页。
   const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE)
@@ -168,9 +178,46 @@ export default function PioneerPage() {
   const [translating, setTranslating] = useState(false)
   // 条目的详情默认折叠：按 tech_slug 记住哪些被展开，翻页后状态天然跟着条目走。
   const [expandedSlugs, setExpandedSlugs] = useState<string[]>([])
+  // 深链命中的高亮：只标从国子监带回来的那一条，手动展开不触发。
+  const [hitSlug, setHitSlug] = useState('')
+  // 深链未命中：目标技术在当前页找不到（在后面的分页里），给一句不催不挡的提示。
+  const [missName, setMissName] = useState('')
   const toggleExpanded = (slug: string): void => {
     setExpandedSlugs((prev) => (prev.includes(slug) ? prev.filter((item) => item !== slug) : [...prev, slug]))
   }
+
+  // r87 深链消费之一：`direction` 合法时直接落为方向筛选（服务端过滤后第一页大概率就有目标技术）。
+  // 只在参数变化时执行；随后技术定位成功/失败都会清掉 URL 参数，不会反复触发。
+  useEffect(() => {
+    if (linkDirection === '' || !DIRECTIONS.includes(linkDirection)) return
+    setDirectionFilters([linkDirection])
+    setPage(1)
+  }, [linkDirection])
+
+  // r87 深链消费之二：清单加载后定位 `tech` —— 命中就展开 + 高亮 + 滚过去，
+  // 未命中（在后面的分页里）给一句不催不挡的提示；消费完清掉 URL 参数（replace，不留历史记录）。
+  useEffect(() => {
+    if (linkTech === '' || listAsync.status !== 'success') return
+    const linkName = searchParams.get('name') ?? ''
+    const hit = (listAsync.data?.items ?? []).find((item) => item.tech_slug === linkTech)
+    if (hit !== undefined) {
+      setExpandedSlugs((prev) => (prev.includes(hit.tech_slug) ? prev : [...prev, hit.tech_slug]))
+      setHitSlug(hit.tech_slug)
+      setMissName('')
+      window.requestAnimationFrame(() => {
+        document.getElementById(`radar-tech-${hit.tech_slug}`)?.scrollIntoView({ block: 'center' })
+      })
+    } else {
+      setHitSlug('')
+      setMissName(linkName !== '' ? linkName : linkTech)
+    }
+    setSearchParams({}, { replace: true })
+  }, [linkTech, listAsync.status, listAsync.data, searchParams, setSearchParams])
+
+  // 翻页 / 改每页条数后，未命中提示不再有意义（用户已经在主动找了），静默清掉。
+  useEffect(() => {
+    setMissName('')
+  }, [page, pageSize])
   const [direction, setDirection] = useState('')
   const [repo, setRepo] = useState('')
   // 采集期间的清单轮询句柄：离开页面时要清掉，避免在别的页面继续打接口。
@@ -447,6 +494,11 @@ export default function PioneerPage() {
             <h3 className="sc-coach-blocktitle">技术清单</h3>
             <span className="sc-radar-count">共 {techs.total} 项</span>
           </div>
+          {missName !== '' && (
+            <p className="sc-coach-note">
+              从国子监带来的「{missName}」不在当前页：它可能在后面的分页里，翻页或换个方向筛选找找。
+            </p>
+          )}
           {/* 筛选放在清单卡内：筛到 0 条时卡片仍在，筛选器不会跟着消失。 */}
           <div className="sc-radar-filters">
             <div className="sc-radar-filtergroups">
@@ -516,6 +568,7 @@ export default function PioneerPage() {
                   item={item}
                   busy={generating === item.tech_slug}
                   expanded={expandedSlugs.includes(item.tech_slug)}
+                  hit={hitSlug === item.tech_slug}
                   onToggle={() => toggleExpanded(item.tech_slug)}
                   onGenerate={(row) => void generate(row)}
                 />
