@@ -199,6 +199,11 @@ class Settings(BaseSettings):
     max_upload_mb: int = 10
     cors_origins: str = "http://127.0.0.1:5173,http://localhost:5173"
 
+    # --- r97 公网部署：运行环境 + 启动期安全校验 ------------------------------
+    #: `development`（默认）| `production`。生产档启用启动前的安全校验（见下方两个方法）：
+    #: 只校验「配置组合本身不安全」，不改任何既有默认值——本机与测试用默认档行为零变化。
+    app_env: str = "development"
+
     # --- r23 登录 / 多用户 / 用户自带 AI Key ---------------------------------
     #: 会话 Cookie 是否带 `Secure`：开发走 http 时必须 false，生产 https 置 true。
     cookie_secure: bool = False
@@ -407,6 +412,58 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
+    # --- r97 公网部署：启动期安全校验 ------------------------------------------
+    #
+    # 分两档，语义刻意不同：
+    #   blockers = 「配置组合本身会让公网部署失去一条安全边界」→ 拒绝启动（fail fast）；
+    #   warnings = 「能跑，但某项加固被关掉了」→ 只记日志，不拦人（排障时关限流是合理操作）。
+    # 只在 `APP_ENV=production` 时生效，开发与测试档零变化。
+
+    @property
+    def is_production(self) -> bool:
+        return self.app_env.strip().lower() in ("production", "prod")
+
+    def production_blockers(self) -> list[str]:
+        """生产档下必须修掉才能启动的配置问题（中文，直接进启动异常信息）。"""
+        if not self.is_production:
+            return []
+        problems: list[str] = []
+        if not self.cookie_secure:
+            problems.append(
+                "COOKIE_SECURE 必须为 true（公网只走 HTTPS；http 下会话 Cookie 会被明文传输）"
+            )
+        origins = self.cors_origin_list
+        if "*" in origins:
+            problems.append(
+                "CORS_ORIGINS 不能包含 *（浏览器凭据模式与通配来源互斥，且等于放开跨站请求）"
+            )
+        if not origins:
+            problems.append(
+                "CORS_ORIGINS 不能为空（同源部署也请显式写上 https://<域名>，避免来源校验失去锚点）"
+            )
+        return problems
+
+    def production_warnings(self) -> list[str]:
+        """生产档下「能启动但不建议」的项：只记 WARNING 日志，不影响可用性。"""
+        if not self.is_production:
+            return []
+        warnings: list[str] = []
+        if any(
+            origin.startswith("http://") or "localhost" in origin or "127.0.0.1" in origin
+            for origin in self.cors_origin_list
+        ):
+            warnings.append("CORS_ORIGINS 仍含本机 / http 来源，公网部署请只留 https 正式域名")
+        if not self.rate_limit_enabled:
+            warnings.append("RATE_LIMIT_ENABLED=false：按 IP 限流已关闭，公网暴露将失去第一道闸")
+        if not self.breaker_enabled:
+            warnings.append("BREAKER_ENABLED=false：在飞请求熔断已关闭")
+        if not self.secret_key.strip():
+            warnings.append("SECRET_KEY 为空：用户自带 AI Key 无法加密保存（该功能对所有人不可用）")
+        runtime = self.resolve_ai()
+        if not runtime.ready:
+            warnings.append(f"AI 未就绪：{runtime.reason or '未知原因'}，AI 相关功能会返回 503")
+        return warnings
 
 
 @lru_cache

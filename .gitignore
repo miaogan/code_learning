@@ -45,6 +45,8 @@ pytest-of-*/
 .env
 .env.*
 !.env.example
+# r97：公网部署的后端配置模板要进仓库，真实 backend/.env 仍然忽略
+!.env.production.example
 
 # 公网 Basic Auth 密码文件（内网穿透暴露端口后的唯一鉴权闸门）：绝不入库，
 # 本地用 scripts/gen-htpasswd.sh 生成；compose 运行时挂载进 nginx 容器
@@ -68,3 +70,10 @@ code_learning-src-*.zip
 
 # 本地测试报告（junitxml 输出，不入库）
 backend/*.xml
+
+# ---- 公网部署产物（r97）：证书、ACME 验证目录、数据库备份、compose 生产变量 ----
+# 证书里有私钥，webroot 是续期临时文件，备份是整库副本：三者都绝不入库。
+certs/
+certbot/
+backups/
+deploy.env

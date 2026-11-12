@@ -77,6 +77,15 @@ docker compose ps        # backend 的 STATUS 应带 (healthy)
 - **建号（r23）**：`docker compose exec backend python -m app.admin_cli create-user --email me@example.com --mode own`（容器内执行，数据落在同名卷）。
 - **停止**：`docker compose down`（**保留**数据卷）；`docker compose down -v` 会连数据一起删。
 - **排障与运维**（lmstudio 本地档、备份恢复、502 / 413 / 504 排查）：见 [DEPLOY.md](./docs/teamflow/20261101-r10-docker-compose-deploy/DEPLOY.md)。
+- **公网部署（r97）**：内网这套只监听 http，**不能直接对外**。上公网用生产覆盖层（TLS + 安全响应头 + 启动期安全校验）：
+  ```bash
+  cp backend/.env.production.example backend/.env   # 改 CORS_ORIGINS / SECRET_KEY / AI Key
+  cp deploy.env.example deploy.env                  # 改 PUBLIC_DOMAIN / ACME_EMAIL
+  ./scripts/cert.sh init                            # 先签证书（80 需空闲）
+  docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file deploy.env up -d --build
+  ./scripts/backup_db.sh                            # 备份（建议进 cron）
+  ```
+  完整顺序、验收命令、排障表、安全清单见 [公网部署手册](./docs/teamflow/20261112-r97-public-deploy/DEPLOY.md)。
 
 ## 自检命令
 

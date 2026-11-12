@@ -94,6 +94,15 @@ def _error_response(code: str, message: str, status: int, retry_after: int) -> J
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    # r97：生产档先做安全校验再碰数据库 —— 配置不安全时宁可按启动失败暴露出来，
+    # 也不要「带病上线后被访问到」。开发档 blockers / warnings 恒为空，行为零变化。
+    settings = get_settings()
+    blockers = settings.production_blockers()
+    if blockers:
+        raise RuntimeError("生产环境配置不安全，已拒绝启动：" + "；".join(blockers))
+    for warning in settings.production_warnings():
+        logging.getLogger(__name__).warning("production.config_warning=%s", warning)
+
     init_db()
     # 启动即补种子（数据不是 DDL，故不进 db.py）：r11 起**每次都跑**幂等导入 + 只补空列——
     # `ON CONFLICT DO NOTHING` 保证重复启动 0 新增，存量库（r10 卷）也能拿到新增题与解析。
@@ -115,6 +124,11 @@ def create_app() -> FastAPI:
         title="逃跑计划 API",
         version=APP_VERSION,
         description="外包工程师的 AI 应用 / Agent 后端跃迁工作台：简历证据 → 能力验证 → 项目补强",
+        # r97：生产档不暴露 /docs、/redoc、/openapi.json —— 接口清单对公网没有使用价值，
+        # 只降低扫描与爬取成本。开发 / 测试档保持默认路径，联调零变化。
+        docs_url=None if settings.is_production else "/docs",
+        redoc_url=None if settings.is_production else "/redoc",
+        openapi_url=None if settings.is_production else "/openapi.json",
         lifespan=lifespan,
     )
     app.add_middleware(

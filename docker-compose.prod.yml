@@ -1,0 +1,45 @@
+# docker-compose.prod.yml · 公网部署覆盖层（r97）
+#
+# 用法（不要单独用它，必须叠加在基础 compose 之上）：
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+#     --env-file deploy.env up -d --build
+#
+# 覆盖层只做四件事：
+#   1. 后端进入生产档（APP_ENV=production）→ 启动期安全校验生效；
+#   2. 前端终结 TLS：143→443、挂证书与 ACME webroot、换成带安全头的反代配置；
+#   3. 两个容器的日志做滚动截断（默认 json-file 会把磁盘吃满，公网跑几周就会遇到）；
+#   4. 保留一个仅回环的 8080（由 deploy.env 里的 WEB_PORT=127.0.0.1:8080 控制），
+#      用于宿主机上排障/探活，绝不对外。
+#
+# 硬禁令与基础文件一致：这里不出现任何 Key、不出现 AI_PROVIDER。
+
+services:
+  backend:
+    environment:
+      - DB_PATH=/data/app.db
+      # 生产档：COOKIE_SECURE/CORS_ORIGINS 组合不安全时**拒绝启动**（错误信息里写明缺哪项）。
+      - APP_ENV=production
+    logging:
+      driver: json-file
+      options:
+        max-size: '20m'
+        max-file: '5'
+
+  frontend:
+    ports:
+      # 基础文件的 ${WEB_PORT:-8080}:80 仍会生效：deploy.env 里设成 127.0.0.1:8080，
+      # 于是这个调试口只绑回环，公网只能走 80/443。
+      - '80:80'
+      - '443:443'
+    volumes:
+      # 证书目录（certbot 写、nginx 只读）与 ACME webroot（续期验证文件）。
+      - ./certs:/etc/nginx/certs:ro
+      - ./certbot/www:/var/www/certbot:ro
+      # 覆盖镜像内自带的 default.conf：TLS 入口 + 全站安全头。
+      - ./frontend/nginx.prod.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./frontend/security-headers.conf:/etc/nginx/conf.d/security-headers.conf:ro
+    logging:
+      driver: json-file
+      options:
+        max-size: '20m'
+        max-file: '5'
