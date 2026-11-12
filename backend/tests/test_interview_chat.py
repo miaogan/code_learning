@@ -814,3 +814,98 @@ def test_finish_run_unknown_404(tmp_db: Any) -> None:
         interview_service.finish_run("no-such-run")
     assert excinfo.value.code == NOT_FOUND
     assert excinfo.value.status == 404
+
+
+# --- r92：每题追问上限 + 跳过换题 ---------------------------------------------
+
+
+def test_follow_up_capped_per_question(
+    tmp_db: Any, profile_factory: Any, fake_ai: Any
+) -> None:
+    """r92：同一道题最多追问一次——追问的追问必须被拦下，静默降级为计划正题。
+
+    模型每轮都要求 follow_up（分数 6 分、配额充足）：旧逻辑会在一道题上连续追问
+    （全局 4 次配额可以全烧在同一题上）；新逻辑每条追问链深度 ≤ 1。
+    """
+    profile = _seed_profile(profile_factory)
+    fake_ai.responder = _responder(next_of=lambda round_no, _ctx: _follow_up(round_no))
+    run = _create(fake_ai, profile.id, None)
+    _drive(run.run_id, fake_ai)
+
+    payload = _payload_of(run.run_id)
+    entries = payload["questions"]
+    # 每条追问的父题必须是计划正题（parent_id 为空），不得出现「追问的追问」。
+    by_id = {str(entry["id"]): entry for entry in entries}
+    for entry in entries:
+        if entry.get("parent_id"):
+            parent = by_id.get(str(entry["parent_id"]))
+            assert parent is not None
+            assert not parent.get("parent_id"), "追问链深度超过 1：还在同一技术点上问到底"
+    follow_ups = sum(1 for entry in entries if entry.get("parent_id"))
+    assert follow_ups >= 1, "每题一次的追问额度没有被用上（用例失效）"
+    assert payload["follow_up_count"] == follow_ups
+
+
+def test_skip_question_advances_without_scoring(
+    tmp_db: Any, profile_factory: Any, fake_ai: Any
+) -> None:
+    """r92 跳过：不计分、不调 AI，直接换下一道计划正题；跳过标记落库。"""
+    profile = _seed_profile(profile_factory)
+    fake_ai.responder = _responder(next_of=lambda _round_no, _ctx: {"mode": "advance"})
+    run = _create(fake_ai, profile.id, None)
+    calls_before = len(fake_ai.calls)
+
+    session = interview_service.skip_question(run.run_id)
+    assert len(fake_ai.calls) == calls_before, "跳过不得调用 AI"
+    assert session.current_id == "iq-2", "跳过 iq-1 后应直接投放计划第 2 题"
+    payload = _payload_of(run.run_id)
+    first = payload["questions"][0]
+    assert first["skipped"] is True
+    assert first["answer"] is None and first["score"] is None
+    assert payload["answered_count"] == 0
+    assert payload["current_id"] == "iq-2"
+
+    # 跳过后再作答推进不受影响（守门 / 计划投放照常）。
+    fake_ai.responder = _responder(next_of=lambda _round_no, _ctx: {"mode": "advance"})
+    turn = asyncio.run(
+        interview_service.score_answer(
+            run.run_id, "iq-2", "第 2 题作答：先讲背景，再讲做法与结果", client=fake_ai
+        )
+    )
+    assert turn.score == 6.0
+    assert turn.next_question is not None and turn.next_question.id == "iq-3"
+
+
+def test_skip_last_question_completes_run(
+    tmp_db: Any, profile_factory: Any, fake_ai: Any
+) -> None:
+    """r92：把最后一题也跳过 → 本场直接结束，与答满共用同一结束形状。"""
+    profile = _seed_profile(profile_factory)
+    fake_ai.responder = _responder(next_of=lambda _round_no, _ctx: {"mode": "advance"})
+    run = _create(fake_ai, profile.id, None)
+    payload = _payload_of(run.run_id)
+    last_id = f"iq-{len(payload['plan'])}"
+
+    # 连续跳到最后一题再跳过它：每一跳都不调 AI（calls 计数不变）。
+    session = interview_service.load_session(run.run_id)
+    while session.current_id is not None and session.current_id != last_id:
+        session = interview_service.skip_question(run.run_id)
+    session = interview_service.skip_question(run.run_id)
+    assert session.status == "completed"
+    assert session.current_id is None
+    skipped = {str(entry["id"]) for entry in _payload_of(run.run_id)["questions"] if entry.get("skipped")}
+    assert last_id in skipped
+
+
+def test_skip_rejects_completed_and_unknown_run(tmp_db: Any, profile_factory: Any, fake_ai: Any) -> None:
+    """r92：已结束的场与不存在的 run 跳过必须拒绝，零副作用。"""
+    profile = _seed_profile(profile_factory)
+    fake_ai.responder = _responder(next_of=lambda _round_no, _ctx: {"mode": "advance"})
+    run = _create(fake_ai, profile.id, None)
+    interview_service.finish_run(run.run_id)
+    with pytest.raises(AppError) as finished:
+        interview_service.skip_question(run.run_id)
+    assert finished.value.status == 400
+    with pytest.raises(AppError) as missing:
+        interview_service.skip_question("no-such-run")
+    assert missing.value.status == 404

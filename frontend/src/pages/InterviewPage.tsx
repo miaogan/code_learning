@@ -114,11 +114,19 @@ export default function InterviewPage() {
   const [finishOpen, setFinishOpen] = useState(false)
   const [finishing, setFinishing] = useState(false)
   const [finishError, setFinishError] = useState<string | null>(null)
+  /** 跳过本题（r92）：确认弹框与在途/失败状态，换一道正题。 */
+  const [skipOpen, setSkipOpen] = useState(false)
+  const [skipping, setSkipping] = useState(false)
+  const [skipError, setSkipError] = useState<string | null>(null)
 
   const profile = profileAsync.data
   /** 本地会话锚点按账号隔离（与上传会话同一口径）。 */
   const { me } = useAuth()
   const userId = me?.id ?? null
+
+  // 恢复中：带 ?run_id= 且会话未就绪（首帧也算，避免闪一帧配置卡）；失败态单独走错误分支。
+  // 放在计时 effect 之前：恢复期间的走表 effect 依赖它。
+  const restoring = runIdParam !== null && session === null && restore.status !== 'error'
 
   // 画像到手即预填（同一画像只应用一次，重载不覆盖用户手改）。
   useEffect(() => {
@@ -210,6 +218,15 @@ export default function InterviewPage() {
     return () => window.clearInterval(timer)
   }, [track.submitting])
 
+  // 恢复加载计时：restoring 的 PhaseLoader 也吃 track.elapsedS，不起表就永远显示「已用 0s」。
+  useEffect(() => {
+    if (!restoring) return
+    const timer = window.setInterval(() => {
+      setTrack((prev) => ({ ...prev, elapsedS: prev.elapsedS + 1 }))
+    }, 1000)
+    return () => window.clearInterval(timer)
+  }, [restoring])
+
   useEffect(() => {
     return () => {
       createAbortRef.current?.abort()
@@ -293,6 +310,8 @@ export default function InterviewPage() {
       if (controller.signal.aborted) return
       activeRunIdRef.current = run.run_id
       setSession(sessionOf(run))
+      // r91：开局计时到此为止——elapsedS 不清零的话，进对话第一眼就是「已用 Ns」（开局耗时）。
+      setTrack(EMPTY_TRACK)
       clearInterviewDraft(userId, run.run_id)
       answerDraftRef.current = { userId, runId: run.run_id, questionId: run.question.id, text: '' }
       setAnswer('')
@@ -363,6 +382,8 @@ export default function InterviewPage() {
       setTrack((prev) => ({
         ...prev,
         submitting: false,
+        // r91：失败那一轮的计时不再残留——用户留在输入框重试，提示行不该还挂着旧秒数。
+        elapsedS: 0,
         turnError: messageOf(error, '评分失败或超时，你的答案已保留，可直接重试'),
       }))
     }
@@ -394,6 +415,41 @@ export default function InterviewPage() {
     }
   }
 
+  /**
+   * 跳过当前题（r92）：本题不计分，直接换下一道计划正题；跳过最后一题即本场结束。
+   * 与 finishSession 同形状：不调 AI、返回整场会话镜像，零 AI 成本。
+   */
+  const skipQuestion = async () => {
+    if (!session || skipping) return
+    setSkipping(true)
+    setSkipError(null)
+    try {
+      const next = await api.skipInterview(session.run_id)
+      setSession(next)
+      setAnswer('')
+      setDraftNotice(null)
+      clearInterviewDraft(userId, session.run_id)
+      answerDraftRef.current = {
+        userId,
+        runId: session.run_id,
+        questionId: next.current_id ?? '',
+        text: '',
+      }
+      setTrack(EMPTY_TRACK)
+      if (next.status === 'completed') {
+        setStage('ended')
+        clearInterviewSession(userId)
+        setFlow({ hasInterview: true })
+      } else {
+        writeInterviewSession(userId, session.run_id)
+      }
+    } catch (error) {
+      setSkipError(messageOf(error, '跳过失败，请重试'))
+    } finally {
+      setSkipping(false)
+    }
+  }
+
   /** 重开一场：清会话与 ?run_id=，按当前画像重新预填。 */
   const restart = () => {
     createAbortRef.current?.abort()
@@ -407,6 +463,8 @@ export default function InterviewPage() {
     setStage('configure')
     setRestore({ status: 'idle', error: null })
     setFinishOpen(false)
+    setSkipOpen(false)
+    setSkipError(null)
     setFinishError(null)
     setSearchParams({}, { replace: true })
     clearInterviewSession(userId)
@@ -426,8 +484,7 @@ export default function InterviewPage() {
           ? 'empty'
           : 'error'
         : 'loading'
-  // 恢复中：带 ?run_id= 且会话未就绪（首帧也算，避免闪一帧配置卡）；失败态单独走错误分支。
-  const restoring = runIdParam !== null && session === null && restore.status !== 'error'
+  // 恢复中判定已上移到 state 定义之后（计时 effect 依赖它）；这里只算画像派生视图。
   const creating = stage === 'creating'
   const hasSession = session !== null
 
@@ -462,14 +519,24 @@ export default function InterviewPage() {
             {current === 'ended' ? ' · 本场已结束' : ''}
           </p>
           {current === 'chat' ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={track.submitting || finishing}
-              onClick={() => setFinishOpen(true)}
-            >
-              结束本场面试
-            </Button>
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={track.submitting || skipping || finishing}
+                onClick={() => setSkipOpen(true)}
+              >
+                跳过本题，换个技术点
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={track.submitting || skipping || finishing}
+                onClick={() => setFinishOpen(true)}
+              >
+                结束本场面试
+              </Button>
+            </>
           ) : null}
         </div>
         <SettingsBar settings={session.settings} />
@@ -487,6 +554,13 @@ export default function InterviewPage() {
           </>
         ) : (
           <>
+            {skipError ? (
+              <InlineError
+                message={skipError}
+                onRetry={() => void skipQuestion()}
+                retryLabel="重试跳过"
+              />
+            ) : null}
             {finishError ? (
               <InlineError
                 message={finishError}
@@ -581,6 +655,18 @@ export default function InterviewPage() {
           void finishSession()
         }}
         onCancel={() => setFinishOpen(false)}
+      />
+      <ConfirmModal
+        open={skipOpen}
+        title="跳过本题"
+        message="跳过后本题不计分，直接进入下一道计划正题；已写未提交的草稿会一并清掉。"
+        confirmLabel="跳过，换下一题"
+        cancelLabel="继续作答"
+        onConfirm={() => {
+          setSkipOpen(false)
+          void skipQuestion()
+        }}
+        onCancel={() => setSkipOpen(false)}
       />
     </section>
   )

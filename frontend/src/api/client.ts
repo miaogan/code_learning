@@ -416,6 +416,13 @@ export const api = {
       jsonInit('POST', {}),
     ),
 
+  /** 跳过当前题目（r92，不调用 AI）：本题不计分，直接换下一道计划正题。 */
+  skipInterview: (runId: string): Promise<InterviewSession> =>
+    request<InterviewSession>(
+      `/api/interviews/${encodeURIComponent(runId)}/skip`,
+      jsonInit('POST', {}),
+    ),
+
   createExam: (payload: ExamCreateRequest): Promise<ExamRun> =>
     request<ExamRun>('/api/exams', jsonInit('POST', payload)),
 

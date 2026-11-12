@@ -52,6 +52,11 @@ QUESTION_ID_PREFIX = "iq"
 #: 口径与评分段定义对齐：0–3 = 答非所问 / 空泛套话，继续追问同一方向只会浪费轮次。
 FOLLOW_UP_MIN_SCORE = 4
 
+#: 每道题的追问上限（r92）：同一道题最多追问一次，之后无论答得如何都必须换下一道正题。
+#: 之前只看全局配额（4 次/场），模型可以在一道题上连续追问到底——用户明确反馈
+#: 「得分太低还一直追问，应该允许换一个技术点，而不是问到底」。
+MAX_FOLLOW_UPS_PER_QUESTION = 1
+
 #: AC-6：最近 N 轮「题面 + 作答 + 分数」全文进提示词，更早的只送题面摘要。
 HISTORY_WINDOW = 3
 
@@ -97,6 +102,8 @@ ROUND_SYSTEM = """你是程序员模拟面试官。本轮候选人在回答当�
 - 先根据上一答的质量给分，再按分数决定 follow_up 还是 advance —— 分数是决策前提，不是事后追认。
 - 本轮分数 < 4（答非所问 / 空泛套话 / 与题目无关）→ 必须 mode=advance：候选人在此方向基础不牢，
   继续追问只会打击信心且浪费轮次，换到下一个方向的正题（prompt 可留空）。
+- 每道题最多追问一次：allow_follow_up 为 false 时（含当前题本身已是追问）不得再 follow_up，
+  必须 advance 换下一道正题，不要在同一技术点上问到底。
 - 分数 ≥ 4 且 allow_follow_up 为 true 且上一答有可深挖之处 → mode=follow_up，题面必须接住上一答
   （追问细节 / 澄清 / 施压），不要换题；题面要具体、可回答，≤120 字。
 - 否则 mode=advance，按 next_plan 的下一题推进（prompt 可留空，服务端用计划原文投放）。
@@ -363,6 +370,27 @@ def _entries(payload: dict[str, Any]) -> list[dict[str, Any]]:
     return [item for item in questions if isinstance(item, dict)]
 
 
+def _chain_len(entries: list[dict[str, Any]], target: dict[str, Any]) -> int:
+    """当前题的追问链长度（0 = 计划正题本身，1 = 已是第一次追问）。
+
+    沿 `parent_id` 向上走根题；环与断链都安全返回已走深度（防御脏 payload）。
+    """
+    by_id = {str(entry.get("id") or ""): entry for entry in entries}
+    depth = 0
+    seen: set[str] = set()
+    cursor = target
+    while True:
+        parent_id = cursor.get("parent_id")
+        if not isinstance(parent_id, str) or not parent_id or parent_id in seen:
+            return depth
+        parent = by_id.get(parent_id)
+        if parent is None:
+            return depth
+        depth += 1
+        seen.add(parent_id)
+        cursor = parent
+
+
 def _score_of(entry: dict[str, Any]) -> float | None:
     """已答判定：`score` 是数字才算答过（未答恒为 None，bool 不算分数）。"""
     score = entry.get("score")
@@ -424,8 +452,8 @@ def _round_input(
                 "hint": candidate.get("hint"),
             }
     follow_up_count = int(payload.get("follow_up_count") or 0)
-    # r8 D-4：轮次/追问额度一律由「实际计划题量」派生（`rules.max_turns`），不再拿
-    # 只描述标准卷的 `MAX_INTERVIEW_TURNS` 直接跟本场发言数比 —— 否则 9 题卷会溢出 1 轮。
+    # r92：每题追问上限 —— 当前题已是追问（链长 ≥ 1）时守门直接关闭，模型被告知不得再 follow_up。
+    follow_up_cap_open = _chain_len(entries, target) < MAX_FOLLOW_UPS_PER_QUESTION
     planned_total = _planned_total(payload, entries, follow_up_count)
     return json.dumps(
         {
@@ -454,7 +482,8 @@ def _round_input(
                 "follow_ups_left": rules.follow_ups_left(planned_total, len(entries), follow_up_count),
                 "turns_left": max(0, rules.max_turns(planned_total) - len(entries)),
             },
-            "allow_follow_up": rules.is_follow_up_allowed(
+            "allow_follow_up": follow_up_cap_open
+            and rules.is_follow_up_allowed(
                 str(target.get("kind") or ""), follow_up_count, len(entries), planned_total
             ),
         },
@@ -481,6 +510,7 @@ def _next_question(
 
     追问被以下任一条件拦下时**静默降级**为第 ② 步：
     - 守门（challenge 父题 / 配额用尽 / 题面空或重复）——这是 `is_follow_up_allowed` 的职责；
+    - 每题追问上限（r92：当前题已在追问链上，不得在同一技术点问到底）；
     - 本轮分数 < FOLLOW_UP_MIN_SCORE（低分意味着答非所问或空泛套话，继续追问只会浪费轮次）。
     提问不受影响，整轮绝不因文案问题 502。计划正题一律取计划原文，不让模型改写（避免配比漂移）。
     """
@@ -489,11 +519,13 @@ def _next_question(
     follow_up_count = int(payload.get("follow_up_count") or 0)
     planned_total = _planned_total(payload, entries, follow_up_count)
     score_too_low = score is not None and score < FOLLOW_UP_MIN_SCORE
+    chain_too_deep = _chain_len(entries, target) >= MAX_FOLLOW_UPS_PER_QUESTION
     if (
         draft is not None
         and str(draft.mode or "").strip() == "follow_up"
         and prompt
         and not score_too_low
+        and not chain_too_deep
         and rules.is_follow_up_allowed(
             str(target.get("kind") or ""),
             follow_up_count,
@@ -771,6 +803,57 @@ def finish_run(run_id: str) -> InterviewSession:
         # 时间线是旁路：写失败自行返回 None，绝不打断结束动作。
         timeline.record_run_event(
             {"id": run_id, "kind": INTERVIEW_KIND, "payload": payload, "status": RUN_COMPLETED}
+        )
+    return load_session(run_id)
+
+
+# --- 跳过当前题（r92：用户主动换技术点，零 AI 调用） ------------------------
+
+
+def skip_question(run_id: str) -> InterviewSession:
+    """跳过当前发言：不计分、不调 AI，直接推进到计划的下一道正题。
+
+    与 `score_answer` 的 advance 落点一致（下一题取计划原文），但有三处刻意不同：
+    - **不调用 AI**：跳过不需要评分，用户只是不想在这道题上继续；
+    - 目标发言落库 `skipped: true`（answer / score 保持 None，聚合与报告天然排除未答条目）；
+    - **不跑 `validate_session`**：跳过不改变已提出发言的题量/配比（题目只是从「待答」
+      变成「已跳过」），结构闸门仍由答满最后一条的路径把关。
+    计划走完（跳过的是最后一题）即置 `completed`，与答满共用结束形状。
+    """
+    run = repository.get_run(run_id)
+    if run is None or str(run.get("kind") or "") != INTERVIEW_KIND:
+        raise AppError(NOT_FOUND, "没有找到这次面试记录，请先开始一次面试", status=404)
+    if str(run.get("status") or "") == RUN_COMPLETED:
+        raise AppError(VALIDATION_ERROR, "这场面试已经结束，可重开一场", status=400)
+
+    payload: dict[str, Any] = dict(run.get("payload") or {})
+    entries = _entries(payload)
+    current_id = payload.get("current_id")
+    if not isinstance(current_id, str) or not current_id:
+        current_id = _current_of(payload, entries)  # v1 payload 没有 current_id 的降级口径
+    target = next((entry for entry in entries if str(entry.get("id") or "") == current_id), None)
+    if target is None:
+        raise AppError(NOT_FOUND, "现在没有待作答的题目，请刷新页面查看本场状态", status=404)
+
+    target["skipped"] = True
+    next_question = _next_question(payload, target, None, entries)
+    status = str(run.get("status") or RUN_RUNNING)
+    if next_question is None:
+        payload["current_id"] = None
+        status = RUN_COMPLETED
+    else:
+        if not any(str(entry.get("id") or "") == next_question.id for entry in entries):
+            entries.append(_entry_of(next_question))
+        payload["current_id"] = next_question.id
+        payload["turn"] = int(payload.get("turn") or 0) + 1
+
+    payload["questions"] = entries
+    payload["answered_count"] = sum(1 for entry in entries if _score_of(entry) is not None)
+    payload["total"] = _total_of(payload, entries)
+    repository.save_run(run_id, payload, status)
+    if status == RUN_COMPLETED:
+        timeline.record_run_event(
+            {"id": run_id, "kind": INTERVIEW_KIND, "payload": payload, "status": status}
         )
     return load_session(run_id)
 

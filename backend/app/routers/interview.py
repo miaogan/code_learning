@@ -30,6 +30,7 @@ from app.services.interview.interview import (
     list_sessions as list_interview_sessions,
     load_session,
     score_answer as score_interview_answer,
+    skip_question as skip_interview_question,
 )
 
 router = APIRouter(
@@ -67,6 +68,15 @@ async def submit_answer(
 )
 def finish_run(run_id: str) -> InterviewSession:
     return finish_interview_run(run_id)
+
+
+@router.post(
+    "/{run_id}/skip",
+    response_model=InterviewSession,
+    summary="跳过当前题目（不计分不调 AI，直接换下一道正题）",
+)
+def skip_run(run_id: str) -> InterviewSession:
+    return skip_interview_question(run_id)
 
 
 @router.get(

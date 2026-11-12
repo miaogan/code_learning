@@ -597,6 +597,17 @@ export default function ExamPage() {
             <Button variant="secondary" onClick={() => setRestartOpen(true)}>
               再出一套笔试
             </Button>
+            {/* r90：重新筛选 = 回到组卷条件表单（上次的方向 / 子方向 / 难度 / 题数选择保留），
+              改完再开考；出卷中反悔走 cancelCreate 会回到本结果页，成绩不丢。 */}
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setStage('idle')
+                window.scrollTo({ top: 0 })
+              }}
+            >
+              重新筛选
+            </Button>
           </div>
 
           {/* 已有成绩时再出卷失败：错误与重试贴着结果页，不丢失本场成绩。 */}
