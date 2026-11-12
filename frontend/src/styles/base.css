@@ -10502,3 +10502,178 @@ a.sc-radar-name--link:hover .sc-radar-ext {
   font-size: var(--fs-meta);
   line-height: var(--lh-small);
 }
+
+/* --- r82 · 按需深读：焦点 chip、已读明细、回答列表、复制、页面入口 ---------------- */
+
+/* 焦点条贴在「当前页面」下面：它是一问的上下文，不属于消息体。 */
+.sc-taifu-focus {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-4);
+  border-top: 1px solid var(--border-hair);
+  background: var(--bg-inset);
+}
+
+.sc-taifu-focuslabel {
+  flex: none;
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+}
+
+.sc-taifu-focustext {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--accent);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sc-taifu-detail {
+  margin: var(--sp-2) 0 0;
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+}
+
+/* r83 工具卡：模型读了什么、读到没有，界面上都要看得见。
+   左边线是唯一的状态色 —— 进行中用中性灰，读到了用强调色，没读到用危险色。 */
+.sc-tool {
+  display: grid;
+  gap: 2px;
+  margin: var(--sp-2) 0;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border-subtle);
+  border-left: 2px solid var(--accent);
+  border-radius: var(--radius-6);
+  background: var(--bg-inset);
+}
+
+.sc-tool.is-running {
+  border-left-color: var(--border-strong);
+}
+
+.sc-tool.is-miss {
+  border-left-color: var(--danger);
+}
+
+.sc-tool-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  color: var(--text-primary);
+  font-size: var(--fs-meta);
+  font-weight: 500;
+  line-height: var(--lh-meta);
+}
+
+.sc-tool-dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: currentColor;
+  opacity: 0.55;
+}
+
+.sc-tool.is-running .sc-tool-dot {
+  animation: sc-tool-pulse 1s ease-in-out infinite;
+}
+
+.sc-tool-args {
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+}
+
+.sc-tool-summary {
+  color: var(--text-secondary);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+}
+
+@keyframes sc-tool-pulse {
+  50% {
+    opacity: 0.15;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sc-tool.is-running .sc-tool-dot {
+    animation: none;
+  }
+}
+
+/* 回答里的真实列表（`.sc-taifu-list` 是示例问题用的无符号列表，两者不能混）。 */
+.sc-taifu-points {
+  margin: 0 0 var(--sp-2);
+  padding-left: var(--sp-5);
+  color: var(--text-secondary);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+}
+
+.sc-taifu-points li {
+  margin: var(--sp-1) 0;
+}
+
+.sc-taifu-points li::marker {
+  color: var(--accent);
+}
+
+.sc-taifu-copy {
+  display: block;
+  margin: var(--sp-1) 0 0 auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  cursor: pointer;
+}
+
+.sc-taifu-copy:hover {
+  color: var(--accent);
+}
+
+.sc-taifu-copy:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* 页面内的「问太傅」入口：医案薄弱组 / 简历要点 / 演武错题本共用。 */
+.sc-taifu-inline {
+  margin-top: var(--sp-2);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-tertiary);
+  font-family: var(--font-sans);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  cursor: pointer;
+  text-align: left;
+}
+
+/* 在一行 chip + 按钮的头部里，margin 会把整行顶歪（ResumePointers）。 */
+.sc-hint-head .sc-taifu-inline {
+  margin-top: 0;
+}
+
+.sc-taifu-inline:hover {
+  color: var(--accent);
+}
+
+.sc-taifu-inline:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

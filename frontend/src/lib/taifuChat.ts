@@ -52,3 +52,86 @@ export function uniqueCitations(citations: TaifuCitation[]): TaifuCitation[] {
   })
   return kept
 }
+
+/** 行内片段：`**文字**` 之外的都算普通文本。 */
+export interface InlineSpan {
+  text: string
+  bold: boolean
+}
+
+/** 行内加粗切分：未闭合的 `**` 按普通文本处理（不猜模型的意图，也不吞字符）。 */
+export function splitBold(text: string): InlineSpan[] {
+  const spans: InlineSpan[] = []
+  const pattern = /\*\*([^*]+)\*\*/g
+  let cursor = 0
+  let match = pattern.exec(text)
+  while (match !== null) {
+    if (match.index > cursor) {
+      spans.push({ text: text.slice(cursor, match.index), bold: false })
+    }
+    spans.push({ text: match[1], bold: true })
+    cursor = match.index + match[0].length
+    match = pattern.exec(text)
+  }
+  if (cursor < text.length) {
+    spans.push({ text: text.slice(cursor), bold: false })
+  }
+  return spans.filter((span) => span.text.length > 0)
+}
+
+/**
+ * 回答块：段落或列表。
+ *
+ * 太傅的回答里常有「1. 先补 X / 2. 再补 Y」这种清单，原样渲染会把 `- ` 和 `1. `
+ * 当正文显示（用户看到的是符号而不是列表）。这里只做**块级**的轻量解析，
+ * 行内加粗交给 `splitBold`，不引入 Markdown 渲染器（回答是纯文本，不需要链接/表格/代码块）。
+ */
+export interface ReplyBlock {
+  kind: 'p' | 'list'
+  /** 仅 `kind === 'list'`：有序（`1.`）还是无序（`-` / `*` / `·`）。 */
+  ordered?: boolean
+  /** 仅 `kind === 'p'`。 */
+  text?: string
+  /** 仅 `kind === 'list'`。 */
+  items?: string[]
+}
+
+const UNORDERED_ITEM = /^\s*[-*·•]\s+(.*)$/
+const ORDERED_ITEM = /^\s*\d+[.、)]\s+(.*)$/
+
+/** 把回答正文切成块：空行结束列表，连续同类列表项合并成一个块。 */
+export function parseReplyBlocks(text: string): ReplyBlock[] {
+  const blocks: ReplyBlock[] = []
+  let list: ReplyBlock | null = null
+  const flush = () => {
+    if (list !== null) {
+      blocks.push(list)
+      list = null
+    }
+  }
+  const lines = text.replace(/\r\n?/g, '\n').split('\n')
+  for (const raw of lines) {
+    const line = raw.trim()
+    if (!line) {
+      flush()
+      continue
+    }
+    const unordered = UNORDERED_ITEM.exec(line)
+    const ordered = unordered === null ? ORDERED_ITEM.exec(line) : null
+    if (unordered !== null || ordered !== null) {
+      const isOrdered = ordered !== null
+      if (list === null || list.ordered !== isOrdered) {
+        flush()
+        list = { kind: 'list', ordered: isOrdered, items: [] }
+      }
+      list.items?.push((unordered ?? ordered)?.[1].trim() ?? '')
+      continue
+    }
+    flush()
+    blocks.push({ kind: 'p', text: line })
+  }
+  flush()
+  return blocks.filter((block) =>
+    block.kind === 'list' ? (block.items?.length ?? 0) > 0 : Boolean(block.text),
+  )
+}

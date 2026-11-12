@@ -1,3 +1,5 @@
+import { useChat } from '@ai-sdk/react'
+import { DefaultChatTransport, type UIMessage } from 'ai'
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import type {
   CSSProperties,
@@ -7,16 +9,25 @@ import type {
 } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 
-import { ApiError, api } from '../../api/client'
-import type { TaifuMemoryItem, TaifuMessage } from '../../api/types'
+import { API_BASE, ApiError, api } from '../../api/client'
+import type { TaifuCitation, TaifuFocus, TaifuMemoryItem } from '../../api/types'
+import { onTaifuAsk } from '../../lib/taifuBridge'
 import {
   TAIFU_QUESTION_MAX,
   TAIFU_SAMPLES,
   canSend,
   clampQuestion,
-  paragraphsOf,
+  parseReplyBlocks,
+  splitBold,
   uniqueCitations,
 } from '../../lib/taifuChat'
+import {
+  argsLine,
+  cappedOf,
+  noticeOf,
+  partsToView,
+  textOf,
+} from '../../lib/taifuStream'
 import {
   clampTaifuPosition,
   defaultTaifuPosition,
@@ -74,6 +85,136 @@ function memoriesLabel(memories: TaifuMemoryItem[] | null): string {
   return `记忆 · ${memories.length} 条`
 }
 
+/** 焦点兜底文案：页面给了 label 就用它；没给就按类型说清是哪一条（不显示空白的「正在问：」）。 */
+function focusText(focus: TaifuFocus): string {
+  if (focus.kind === 'weakness') return `报告第 ${focus.index} 组`
+  if (focus.kind === 'attempt') return focus.question_id
+  return focus.anchor.length > 12 ? `${focus.anchor.slice(0, 12)}…` : focus.anchor
+}
+
+/** 行内加粗：只认 `**x**`，其余原样 —— 回答是纯文本，不为它引一个 Markdown 渲染器。 */
+function inlineSpans(text: string) {
+  return splitBold(text).map((span, index) =>
+    span.bold ? <strong key={index}>{span.text}</strong> : <span key={index}>{span.text}</span>,
+  )
+}
+
+/** 回答正文：段落 + 列表（`-` / `1.`）+ 行内加粗。列表符号不再裸露成正文。 */
+function ReplyBody({ content, messageId }: { content: string; messageId: string }) {
+  return (
+    <>
+      {parseReplyBlocks(content).map((block, index) => {
+        const key = `${messageId}-${index}`
+        if (block.kind !== 'list') {
+          return <p key={key}>{inlineSpans(block.text ?? '')}</p>
+        }
+        const Tag = block.ordered ? 'ol' : 'ul'
+        return (
+          <Tag className="sc-taifu-points" key={key}>
+            {(block.items ?? []).map((item, itemIndex) => (
+              <li key={itemIndex}>{inlineSpans(item)}</li>
+            ))}
+          </Tag>
+        )
+      })}
+    </>
+  )
+}
+
+/**
+ * 一条消息：正文、工具卡、依据与元信息都从 `parts` 推导。
+ *
+ * 历史消息由 `/thread` 转成只有 text part 的 UIMessage，引用走 `fallbackCitations`
+ * （服务端历史里带 citations，但 UIMessage 的 data part 是有类型约束的，不为它放宽类型）。
+ */
+function MessageRow({
+  message,
+  copiedId,
+  onCopy,
+  fallbackCitations,
+}: {
+  message: UIMessage
+  copiedId: string
+  onCopy: (id: string, text: string) => void
+  fallbackCitations?: TaifuCitation[]
+}) {
+  const view = partsToView(message.parts)
+  const isUser = message.role === 'user'
+  const text = textOf(message.parts)
+  const notice = noticeOf(message.parts)
+  const capped = cappedOf(message.parts)
+  const citations =
+    view.find((item) => item.kind === 'citations')?.items ?? fallbackCitations ?? []
+  const meta = view.find((item) => item.kind === 'meta')
+
+  return (
+    <div className={isUser ? 'sc-taifu-msg is-user' : 'sc-taifu-msg'}>
+      {view
+        .filter((item) => item.kind === 'text' || item.kind === 'tool')
+        .map((item) =>
+          item.kind === 'text' ? (
+            <div className="sc-taifu-msgtext" key={item.key}>
+              <ReplyBody content={item.text} messageId={`${message.id}-${item.key}`} />
+            </div>
+          ) : (
+            <div
+              key={item.key}
+              className={[
+                'sc-tool',
+                item.state === 'running' ? 'is-running' : '',
+                item.state === 'done' && !item.ok ? 'is-miss' : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
+            >
+              <span className="sc-tool-head">
+                <span className="sc-tool-dot" aria-hidden="true" />
+                {item.label}
+              </span>
+              {argsLine(item.args) ? (
+                <span className="sc-tool-args">{argsLine(item.args)}</span>
+              ) : null}
+              {item.state === 'running' ? (
+                <span className="sc-tool-summary">正在读取…</span>
+              ) : item.summary ? (
+                <span className="sc-tool-summary">{item.summary}</span>
+              ) : null}
+            </div>
+          ),
+        )}
+
+      {notice ? <p className="sc-taifu-notice">{notice}</p> : null}
+      {capped ? (
+        <p className="sc-taifu-hint">已达取料上限，先按读到的内容回答。</p>
+      ) : null}
+
+      {!isUser && text ? (
+        <button type="button" className="sc-taifu-copy" onClick={() => onCopy(message.id, text)}>
+          {copiedId === message.id ? '已复制' : '复制'}
+        </button>
+      ) : null}
+
+      {citations.length > 0 ? (
+        <p className="sc-taifu-cites">
+          <span className="sc-taifu-citeslabel">依据</span>
+          {uniqueCitations(citations).map((citation) => (
+            <Link key={citation.href} to={citation.href} className="sc-taifu-cite">
+              {citation.label}
+            </Link>
+          ))}
+        </p>
+      ) : null}
+
+      {meta ? (
+        <p className="sc-taifu-hint">
+          本次读取 {meta.materials} 段站内记录
+          {meta.memoriesUsed > 0 ? `，参考 ${meta.memoriesUsed} 条记忆` : ''}
+        </p>
+      ) : null}
+    </div>
+  )
+}
+
 export interface TaifuLauncherProps {
   /** 当前登录账号：位置记忆与对话都按账号隔离，换账号不会复用上一个人的记录。 */
   userId: string
@@ -114,16 +255,71 @@ export function TaifuLauncher({ userId }: TaifuLauncherProps) {
   const titleId = useId()
   const panelId = useId()
 
-  const [thread, setThread] = useState<TaifuMessage[]>([])
   const [threadStatus, setThreadStatus] = useState<ThreadStatus>('idle')
   const [threadError, setThreadError] = useState('')
   const [question, setQuestion] = useState('')
-  const [pending, setPending] = useState(false)
   const [sendError, setSendError] = useState('')
-  const [notice, setNotice] = useState('')
-  const [meta, setMeta] = useState<{ materials: number; dropped: number; added: number } | null>(
-    null,
+  /** 历史消息的引用：UIMessage 的 data part 有类型约束，历史里那几条单独按 id 存一份。 */
+  const historyCitesRef = useRef<Record<string, TaifuCitation[]>>({})
+  /** 这一问的上下文与回滚点：失败时按它收回问句、恢复输入框。 */
+  const askRef = useRef<{ page: string; focus: TaifuFocus | null }>({
+    page: location.pathname,
+    focus: null,
+  })
+  const sendSnapshotRef = useRef<{ count: number; text: string } | null>(null)
+  /** r82 焦点：从页面「问太傅」带过来的那一条；发送后保留，便于同一话题连续追问。 */
+  const [focus, setFocus] = useState<{ value: TaifuFocus; label: string } | null>(null)
+
+  // r83：请求体自己拼，不把 UIMessage 结构暴露给后端 —— 服务端契约仍是 {question, page, focus}，
+  // 旧端点与流式端点共用同一个请求模型。
+  const transport = useMemo(
+    () =>
+      new DefaultChatTransport({
+        api: `${API_BASE}/api/taifu/chat/stream`,
+        prepareSendMessagesRequest: ({ messages: current }) => {
+          const last = [...current].reverse().find((item) => item.role === 'user')
+          return {
+            body: {
+              question: last ? textOf(last.parts) : '',
+              page: askRef.current.page,
+              focus: askRef.current.focus,
+            },
+          }
+        },
+      }),
+    [],
   )
+
+  const {
+    messages,
+    sendMessage,
+    setMessages,
+    status,
+    stop,
+  } = useChat({
+    transport,
+    onError: (err) => {
+      // 失败不留半条对话：收回这句问话，把原文放回输入框让用户改。
+      const snapshot = sendSnapshotRef.current
+      sendSnapshotRef.current = null
+      if (snapshot) {
+        setMessages((prev) => prev.slice(0, snapshot.count))
+        setQuestion(snapshot.text)
+      }
+      setSendError(err.message || '问太傅失败，请稍后重试')
+    },
+    onFinish: ({ message }) => {
+      const snapshot = sendSnapshotRef.current
+      sendSnapshotRef.current = null
+      if (textOf(message.parts)) return
+      // 没有正文（空档案 / 模型没生成出来）：服务端不落库，界面也不该留下这一问。
+      setMessages((prev) => prev.slice(0, snapshot?.count ?? Math.max(0, prev.length - 2)))
+      if (snapshot) setQuestion(snapshot.text)
+    },
+  })
+
+  const pending = status === 'submitted' || status === 'streaming'
+  const [copiedId, setCopiedId] = useState('')
   const [clearArmed, setClearArmed] = useState(false)
   const [clearing, setClearing] = useState(false)
   // r81 长期记忆：默认收起，展开时才读（与线程同一口径：收起态零请求）。
@@ -158,13 +354,24 @@ export function TaifuLauncher({ userId }: TaifuLauncherProps) {
     setThreadError('')
     try {
       const data = await api.taifuThread(20)
-      setThread(data.messages)
+      // 历史里只有正文 + 引用：正文转成 text part，引用单独存（见 historyCitesRef 的注释）。
+      const cites: Record<string, TaifuCitation[]> = {}
+      const seeded = data.messages.map((item) => {
+        if (item.citations.length > 0) cites[item.id] = item.citations
+        return {
+          id: item.id,
+          role: item.role,
+          parts: [{ type: 'text', text: item.content }],
+        } as UIMessage
+      })
+      historyCitesRef.current = cites
+      setMessages(seeded)
       setThreadStatus('ready')
     } catch (error) {
       setThreadError(errorText(error))
       setThreadStatus('error')
     }
-  }, [])
+  }, [setMessages])
 
   useEffect(() => {
     const syncViewport = () => {
@@ -185,9 +392,23 @@ export function TaifuLauncher({ userId }: TaifuLauncherProps) {
 
   // 路由变化后旧页面的上下文已失效，收起浮窗，等用户重新发问。
   // `hash` 也要看：引用可能指向当前页的锚点（`/report#weakness-3`），只变 hash 时 pathname 不变。
+  // r82：焦点同源失效 —— 上一页的「第 3 组」带到下一页会问错对象，必须一起清掉。
   useEffect(() => {
     setOpen(false)
+    setFocus(null)
   }, [location.pathname, location.hash])
+
+  // r82：页面上的「问太傅」入口唤起浮窗。不自动发送：与示例问题同一交互（先填进输入框，用户可改）。
+  useEffect(() => {
+    return onTaifuAsk((ask) => {
+      setOpen(true)
+      setQuestion(ask.question)
+      setFocus({ value: ask.focus, label: ask.label })
+      setSendError('')
+      // 面板刚展开时输入框还没挂载，等一帧再聚焦。
+      window.setTimeout(() => inputRef.current?.focus(), 0)
+    })
+  }, [])
 
   // 打开面板才读历史：收起状态不发请求（常驻件零后台开销）。
   useEffect(() => {
@@ -227,12 +448,15 @@ export function TaifuLauncher({ userId }: TaifuLauncherProps) {
   }, [open])
 
   // 新消息 / 等待态 / 展开记忆都把视图带到最底部：用户不该手动滚才能看到刚来的内容。
+  // 新消息 / 等待态 / 展开记忆都把视图带到最底部。
+  // r83：依赖整个 `messages` 而不是长度 —— 流式期间长度不变、内容一直在长，
+  // 不跟着滚的话用户要手动拖滚动条才能看到正在生成的字。
   useEffect(() => {
     if (!open) return
     const body = bodyRef.current
     if (body === null) return
     body.scrollTop = body.scrollHeight
-  }, [open, thread.length, pending, notice, sendError, memoriesOpen, memories?.length])
+  }, [open, messages, pending, sendError, memoriesOpen, memories?.length])
 
   const panelStyle = useMemo<CSSProperties | undefined>(() => {
     const layout = taifuPanelLayout(position, viewport.width, viewport.height)
@@ -245,62 +469,30 @@ export function TaifuLauncher({ userId }: TaifuLauncherProps) {
     }
   }, [position, viewport.height, viewport.width])
 
-  const send = useCallback(async () => {
+  const send = useCallback(() => {
     const text = clampQuestion(question)
     if (!canSend(text, pending)) return
-    const localId = `local-${Date.now()}`
-    const localMessage: TaifuMessage = {
-      id: localId,
-      role: 'user',
-      content: text,
-      citations: [],
-      created_at: new Date().toISOString(),
-    }
+    // 上下文与回滚点在发车这一刻定格：流式途中切页面不会把「这一问」的焦点弄混。
+    askRef.current = { page: location.pathname, focus: focus?.value ?? null }
+    sendSnapshotRef.current = { count: messages.length, text }
     setQuestion('')
-    setPending(true)
     setSendError('')
-    setNotice('')
-    setThread((current) => [...current, localMessage])
+    sendMessage({ text })
+  }, [focus, location.pathname, messages.length, pending, question, sendMessage])
+
+  /** 复制回答原文（含列表符号与 `**`）：用户要的是能贴到别处的纯文本，不是渲染后的富文本。 */
+  const copyMessage = useCallback(async (id: string, text: string) => {
     try {
-      const reply = await api.taifuChat(text, location.pathname)
-      setMeta({
-        materials: reply.materials_used,
-        dropped: reply.dropped_citations,
-        added: reply.memories_added,
-      })
-      setNotice(reply.notice)
-      if (reply.memories_added > 0) {
-        // 记忆变了：丢掉缓存让计数重新读（展开态会立刻重拉，收起态等下次展开）。
-        // 不能让旧数组留在界面上充当「最新条数」。
-        setMemories(null)
-        setMemoriesStatus('idle')
-      }
-      if (!reply.reply) {
-        // 服务端没有可回答的内容（如空档案）时它不会落库，这里也必须收回问句，
-        // 否则界面上会留下一条刷新即消失的「有问无答」。
-        setThread((current) => current.filter((item) => item.id !== localId))
-        setQuestion(text)
-        return
-      }
-      setThread((current) => [
-        ...current,
-        {
-          id: `local-a-${Date.now()}`,
-          role: 'assistant',
-          content: reply.reply,
-          citations: reply.citations,
-          created_at: reply.created_at || new Date().toISOString(),
-        },
-      ])
-    } catch (error) {
-      // 失败不留半条对话：收回这句问话，让用户改一改或直接重发。
-      setThread((current) => current.filter((item) => item.id !== localId))
-      setQuestion(text)
-      setSendError(errorText(error))
-    } finally {
-      setPending(false)
+      if (!navigator.clipboard) throw new Error('clipboard unavailable')
+      await navigator.clipboard.writeText(text)
+      setCopiedId(id)
+      window.setTimeout(() => {
+        setCopiedId((current) => (current === id ? '' : current))
+      }, 2000)
+    } catch {
+      setSendError('复制失败，请手动选中回答文本')
     }
-  }, [location.pathname, pending, question])
+  }, [])
 
   const loadMemories = useCallback(async () => {
     setMemoriesStatus('loading')
@@ -364,9 +556,8 @@ export function TaifuLauncher({ userId }: TaifuLauncherProps) {
     setSendError('')
     try {
       await api.taifuClear()
-      setThread([])
-      setNotice('')
-      setMeta(null)
+      setMessages([])
+      historyCitesRef.current = {}
       setThreadStatus('ready')
     } catch (error) {
       setSendError(errorText(error))
@@ -374,11 +565,11 @@ export function TaifuLauncher({ userId }: TaifuLauncherProps) {
       setClearing(false)
       setClearArmed(false)
     }
-  }, [clearArmed])
+  }, [clearArmed, setMessages])
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    void send()
+    send()
   }
 
   const onPointerDown = (event: ReactPointerEvent<HTMLButtonElement>) => {
@@ -530,6 +721,22 @@ export function TaifuLauncher({ userId }: TaifuLauncherProps) {
             当前：{pageLabelOf(location.pathname)}
           </div>
 
+          {/* r82：焦点必须可见、可取消 —— 否则用户不知道这一问带的是哪一条，也撤不掉。 */}
+          {focus ? (
+            <div className="sc-taifu-focus">
+              <span className="sc-taifu-focuslabel">正在问</span>
+              <span className="sc-taifu-focustext">{focus.label || focusText(focus.value)}</span>
+              <button
+                type="button"
+                className="sc-taifu-linkbtn"
+                onClick={() => setFocus(null)}
+                aria-label="取消焦点，改问整体情况"
+              >
+                取消
+              </button>
+            </div>
+          ) : null}
+
           <div className="sc-taifu-body" ref={bodyRef}>
             {threadStatus === 'loading' ? (
               <p className="sc-taifu-hint">正在读取你的站内记录…</p>
@@ -544,7 +751,7 @@ export function TaifuLauncher({ userId }: TaifuLauncherProps) {
               </div>
             ) : null}
 
-            {threadStatus === 'ready' && thread.length === 0 ? (
+            {threadStatus === 'ready' && messages.length === 0 ? (
               <>
                 <p className="sc-taifu-bubble">
                   我是太傅。我会先读你的画像、测评、练习与学习记录，再回答「先补什么、为什么、怎么补」。
@@ -569,49 +776,31 @@ export function TaifuLauncher({ userId }: TaifuLauncherProps) {
               </>
             ) : null}
 
-            {thread.map((message) => (
-              <div
+            {messages.map((message) => (
+              <MessageRow
                 key={message.id}
-                className={message.role === 'user' ? 'sc-taifu-msg is-user' : 'sc-taifu-msg'}
-              >
-                <div className="sc-taifu-msgtext">
-                  {paragraphsOf(message.content).map((paragraph, index) => (
-                    <p key={`${message.id}-${index}`}>{paragraph}</p>
-                  ))}
-                </div>
-                {message.role === 'assistant' && message.citations.length > 0 ? (
-                  <p className="sc-taifu-cites">
-                    <span className="sc-taifu-citeslabel">依据</span>
-                    {uniqueCitations(message.citations).map((citation) => (
-                      <Link key={citation.href} to={citation.href} className="sc-taifu-cite">
-                        {citation.label}
-                      </Link>
-                    ))}
-                  </p>
-                ) : null}
-              </div>
+                message={message}
+                copiedId={copiedId}
+                onCopy={(id, text) => void copyMessage(id, text)}
+                fallbackCitations={historyCitesRef.current[message.id]}
+              />
             ))}
 
-            {pending ? <p className="sc-taifu-hint">太傅正在看你的记录…</p> : null}
-            {notice ? <p className="sc-taifu-notice">{notice}</p> : null}
-            {sendError ? (
-              <p className="sc-taifu-hint is-error" role="alert">
-                {sendError}
-              </p>
-            ) : null}
-            {meta ? (
+            {pending ? (
               <p className="sc-taifu-hint">
-                本次读取 {meta.materials} 段站内记录
-                {meta.dropped > 0 ? `，已丢弃 ${meta.dropped} 条无依据引用` : ''}
-                {meta.added > 0 ? `，记住 ${meta.added} 条新事实` : ''}
+                太傅正在看你的记录…
+                <button type="button" className="sc-taifu-linkbtn" onClick={stop}>
+                  停止
+                </button>
               </p>
             ) : null}
-            {meta !== null && meta.materials === 0 ? (
-              <p className="sc-taifu-shortcuts">
-                <Link to="/">去上传简历</Link>
-                <Link to="/practice">先做几道练习</Link>
-                <Link to="/report">去看诊断报告</Link>
-              </p>
+            {sendError ? (
+              <div className="sc-taifu-error" role="alert">
+                <p>{sendError}</p>
+                <button type="button" className="sc-taifu-textbtn" onClick={() => setSendError('')}>
+                  知道了
+                </button>
+              </div>
             ) : null}
 
             {/* r81：长期记忆必须可查看、可删除 —— 否则用户不知道太傅「记住了自己什么」。 */}
@@ -696,7 +885,7 @@ export function TaifuLauncher({ userId }: TaifuLauncherProps) {
           </form>
           <p className="sc-taifu-foot">
             只读：不改你的画像、报告或计划，也不会自动投递。
-            {thread.length > 0 ? (
+            {messages.length > 0 ? (
               <button
                 type="button"
                 className="sc-taifu-linkbtn"

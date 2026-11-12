@@ -627,6 +627,21 @@ def latest_report() -> Report | None:
     return None if row is None else _report_of(row)
 
 
+def list_reports(limit: int = 2) -> list[Report]:
+    """最近 N 份报告（新→旧）。r83 的 `compare_reports` 工具靠它做跨报告对比。
+
+    `brief` 仍只读 `latest_report()`：对比是「用户主动要看」的能力，不该抬高每轮问答的取料成本。
+    """
+    rows = limit if limit > 0 else 0
+    with connection() as conn:
+        cursor = conn.execute(
+            "SELECT payload FROM reports WHERE user_id = ? ORDER BY created_at DESC LIMIT ?",
+            (_uid(), rows),
+        )
+        fetched = cursor.fetchall()
+    return [_report_of(row) for row in fetched]
+
+
 # --- timeline ------------------------------------------------------------
 
 _TIMELINE_INSERT = (
@@ -935,6 +950,20 @@ def list_questions() -> list[dict[str, Any]]:
     with connection() as conn:
         rows = conn.execute(_QUESTION_SELECT + " ORDER BY id").fetchall()
     return [_question_of(row) for row in rows]
+
+
+def get_question(question_id: str) -> dict[str, Any] | None:
+    """单题读取（r82 太傅明细）：主键命中即返回，不存在返回 `None`。
+
+    与 `list_questions()` 共用 `_QUESTION_SELECT` / `_question_of()`，
+    不改排序口径、不做二次统计 —— 明细层要的只是「这一题原本长什么样」。
+    """
+    key = str(question_id or "").strip()
+    if not key:
+        return None
+    with connection() as conn:
+        row = conn.execute(_QUESTION_SELECT + " WHERE id = ?", (key,)).fetchone()
+    return None if row is None else _question_of(row)
 
 
 def count_questions() -> int:

@@ -1110,6 +1110,25 @@ export interface TaifuCitation {
   href: string
 }
 
+/**
+ * r82 页面带来的焦点：用户「点了哪一条」。服务端据此再取一条明细。
+ *
+ * 闭集三类，字段互斥：weakness 用 index（1 起）、attempt 用 question_id、resume 用逐字原句。
+ * 服务端还会再校验「这一组 / 这题 / 这句」在库里存不存在，所以这里传的值可能被静默忽略——
+ * 界面以响应里的 `detail` 为准，不能假设「传了就一定读到了」。
+ */
+export type TaifuFocus =
+  | { kind: 'weakness'; index: number }
+  | { kind: 'attempt'; question_id: string }
+  | { kind: 'resume'; anchor: string }
+
+/** 本轮真的读到了哪一条明细。`detail === null` 表示没读到（没传 / 越界 / 数据不存在）。 */
+export interface TaifuDetailRef {
+  kind: string
+  label: string
+  href: string
+}
+
 export interface TaifuMessage {
   id: string
   role: 'user' | 'assistant'
@@ -1135,6 +1154,8 @@ export interface TaifuReply {
   memories_used: number
   /** 本轮新记住几条（r81）：界面只据此提示，具体内容在记忆列表里看。 */
   memories_added: number
+  /** r82：本轮读到的明细；`null` = 没传焦点 / 焦点越界 / 该条数据不存在。 */
+  detail: TaifuDetailRef | null
   /** 空档案 / 空回答 / 空问句时的中文说明；正常回答为空串。 */
   notice: string
   created_at: string

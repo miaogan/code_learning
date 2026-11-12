@@ -37,6 +37,13 @@ MEMORY_ITEM_MIN = 6
 #: 每轮最多新增长期记忆条数：一次说十件事是自述，不是对话。
 MEMORY_ITEMS_PER_TURN = 2
 
+#: r82 焦点闭集：页面只能把「用户点了哪一条」说成这三种，其余一律当没传。
+FOCUS_KINDS: frozenset[str] = frozenset({"weakness", "attempt", "resume"})
+#: 题号上限：题库 id 都是短 slug；超长（或带奇怪字符）一律当非法，不往 SQL 送。
+FOCUS_QUESTION_ID_MAX = 64
+#: 简历原句上限：`ResumePointer.anchor_text` ≤40 字，这里留一倍余量给正文里更长的句子。
+FOCUS_ANCHOR_MAX = 80
+
 EMPTY_QUESTION_NOTICE = "先写下你想问的问题，比如「我最近一次测评为什么掉分」。"
 EMPTY_BRIEF_NOTICE = (
     "你的站内记录还是空的：先上传简历并生成技术画像，或先做一次计分测评 / 练习，"
@@ -77,7 +84,9 @@ TAIFU_SYSTEM = """你是「太傅」，逃跑计划的跃迁参谋，服务对�
 5. 【当前页面】只用于理解「这里 / 这条」这类指代；不要因为用户在这一页就编造该页没有的数据。
 6. 【早期对话摘要】是你自己在前几轮写下的记忆：只用来理解「上次说的那个」，**不是依据**，也不能从里面挑引用。
 7. 【长期记忆】是用户此前明确说过的背景与偏好：用来知道「他是谁」，同样**不是依据**；与【档案】冲突时以【档案】为准。
-8. 只输出一个 JSON 对象：{"reply": "回答正文", "citations": ["/report"], "summary": "早期对话摘要", "memories": ["值得长期记住的新事实"]}，不要代码围栏，不要额外解释。"""
+8. 【重点明细】是用户刚从页面上点开的那一条的原始记录（题面、解析、正文原句），比【档案】更细，**同样是依据**：
+   回答「这条 / 这题 / 这段」时优先用它，可以引用它的 href；明细里没有的内容不要补。
+9. 只输出一个 JSON 对象：{"reply": "回答正文", "citations": ["/report"], "summary": "早期对话摘要", "memories": ["值得长期记住的新事实"]}，不要代码围栏，不要额外解释。"""
 
 SUMMARY_NONE = "（无：这是本次线程的开头，或对话还短到不需要压缩）"
 SUMMARY_TASK = {
@@ -98,6 +107,9 @@ MEMORY_TASK = (
 USER_PROMPT_TEMPLATE = """【档案】
 {materials}
 
+【重点明细】（用户刚从页面上点开的那一条，比【档案】更细；同样是依据，优先用它回答「这条 / 这题 / 这段」）
+{detail}
+
 【长期记忆】（用户口头说过、档案里没有的背景与偏好；不是依据，不能当引用出处）
 {memories}
 【早期对话摘要】{summary}
@@ -114,6 +126,8 @@ USER_PROMPT_TEMPLATE = """【档案】
 约束：citations 最多 4 条且必须逐字来自【档案】；没有可引用的内容时给空数组。"""
 
 NO_HISTORY = "（这是本轮对话的第一句）"
+#: 没有明细时的占位：必须明确说「不要猜『这条』指什么」，否则模型会把摘要里最近的一组当成本条。
+DETAIL_NONE = "（本轮没有额外明细：直接按【档案】回答；不要猜「这条 / 这题 / 这段」指的是哪一条。）"
 
 
 class TaifuDraftReply(BaseModel):
@@ -152,6 +166,46 @@ def sanitize_page(raw: Any) -> dict[str, str] | None:
     if entry is None:
         return None
     return {"path": path, "label": entry[0], "hint": entry[1]}
+
+
+def sanitize_focus(raw: Any) -> dict[str, Any] | None:
+    """把页面带来的焦点归一成闭集里的三种之一；不合法一律 `None`（== 没传）。
+
+    **不做库内校验**（这一组报告里有没有、这道题有没有作答、这句在不在正文里）——
+    那是 `deep_read.build_detail()` 的事。这里只保证「形状可信」：
+    未知 kind、0 或负数序号、空题号、空原句、超长字段都进不了下游。
+
+    `bool` 要单独排除：Python 里 `True` 是 `int` 的实例，`index=True` 会变成第 1 组，
+    把「脏数据」静默解释成「第一条」是最不该发生的一类猜测。
+    """
+    if raw is None:
+        return None
+    if isinstance(raw, dict):
+        data: dict[str, Any] = raw
+    else:
+        data = {
+            name: getattr(raw, name, "")
+            for name in ("kind", "index", "question_id", "anchor")
+        }
+    kind = flatten(data.get("kind"))
+    if kind not in FOCUS_KINDS:
+        return None
+    if kind == "weakness":
+        index = data.get("index")
+        if isinstance(index, bool) or not isinstance(index, int) or index < 1:
+            return None
+        return {"kind": kind, "index": index}
+    if kind == "attempt":
+        question_id = flatten(data.get("question_id"))
+        if not question_id or len(question_id) > FOCUS_QUESTION_ID_MAX:
+            return None
+        if not re.fullmatch(r"[0-9A-Za-z_-]+", question_id):
+            return None
+        return {"kind": kind, "question_id": question_id}
+    anchor = flatten(data.get("anchor"))
+    if not anchor or len(anchor) > FOCUS_ANCHOR_MAX:
+        return None
+    return {"kind": kind, "anchor": anchor}
 
 
 def sanitize_question(raw: Any) -> str:
@@ -233,6 +287,19 @@ def render_memories(contents: list[str]) -> str:
     return "\n".join(lines) or MEMORIES_NONE
 
 
+def render_detail(detail: dict[str, Any] | None) -> str:
+    """把「重点明细」渲染成提示词里的独立一块（编号固定 `[1]`，不与档案段混排）。
+
+    明细是**单条**，所以不参与档案的 `[1]..[n]` 编号：混在一起模型会以为它是第 n 段摘要，
+    回答时就会把摘要里的其它组也当成本条的依据。
+    """
+    if not detail:
+        return DETAIL_NONE
+    head = f"[1] {detail.get('label') or '重点明细'}（href: {detail.get('href') or ''}）"
+    body = "\n".join(f"- {line}" for line in detail.get("lines") or [])
+    return f"{head}\n{body}" if body else head
+
+
 def build_user_prompt(
     sections: list[dict[str, Any]],
     history: list[dict[str, Any]],
@@ -242,10 +309,12 @@ def build_user_prompt(
     summary: str = "",
     memories: list[str] | None = None,
     compact: bool = False,
+    detail: dict[str, Any] | None = None,
 ) -> str:
-    """拼用户消息：档案逐段编号 + 段 href + 行，后接长期记忆、线程摘要、当前页面与本次问题。
+    """拼用户消息：档案逐段编号 + 段 href + 行，后接**重点明细**、长期记忆、线程摘要、当前页面与本次问题。
 
     `page` / `summary` / `memories` 都只用于**理解**，**不是**依据：三者都不进引用白名单。
+    `detail` 相反 —— 它是服务端从库里重新取的一条真值，**进**白名单（由调用方合进 `sanitize_reply`）。
     `compact=True` 时才要求模型回写摘要：窗口还没溢出时压摘要既无信息量、又白占篇幅。
     """
     blocks: list[str] = []
@@ -262,6 +331,7 @@ def build_user_prompt(
     )
     return USER_PROMPT_TEMPLATE.format(
         materials=rendered_materials,
+        detail=render_detail(detail),
         memories=render_memories(list(memories or [])),
         summary=flatten(summary) or SUMMARY_NONE,
         page=page_line,
@@ -269,6 +339,141 @@ def build_user_prompt(
         question=flatten(question),
         memory_task=MEMORY_TASK,
         summary_task=SUMMARY_TASK[compact],
+    )
+
+
+TAIFU_AGENT_SYSTEM = """你是「太傅」，逃跑计划的跃迁参谋，服务对象是想转向 AI 应用 / Agent 后端的外包工程师。
+
+硬性规则：
+1. 只能使用【档案】里出现过的内容，以及你**实际调用工具读到**的内容；没有的数字、项目、结论一律不写。
+2. 不要写链接、锚点或页面路径 —— 引用由系统根据你读了什么自动附上，你写了也不会显示。
+3. 信息不足时，先调工具去读，别猜。可用的工具：
+   - `read_weakness_detail`：读某个薄弱分组的诊断与样例题（用户问「这一组怎么补」「为什么总错」）；
+   - `read_question_detail`：读某道错题的题面 / 答案 / 解析（用户问「这题为什么错」）；
+   - `read_resume_anchor`：读简历某一条的原句与前后文（用户问「这句怎么改」）；
+   - `compare_reports`：对比最近两份报告（用户问「有没有进步」「比上次好在哪」）；
+   - `remember`：把用户明确说过的、档案里没有的事实或偏好记成长期记忆。
+4. 工具说「未读到」时，就照实说没读到，不要用相似内容替代，也不要假装读过。
+5. 不需要细节就直接回答 —— 为了「更完整」而反复调工具是浪费，用户等的是结论。
+6. 【当前页面】只用于理解「这里 / 这条」这类指代；不要因为用户在这一页就编造该页没有的数据。
+7. 【早期对话摘要】与【长期记忆】只用来理解背景，**不是依据**；与【档案】冲突时以【档案】为准。
+8. 不承诺求职结果，不把模拟测评说成工作经历，不编造项目指标。
+9. 直接输出中文正文（可以分段、可以用 `-` 列表、可以用 `**加粗**`），不要输出 JSON，不要代码围栏。"""
+
+AGENT_PROMPT_TEMPLATE = """【档案】
+{materials}
+
+【长期记忆】（用户口头说过、档案里没有的背景与偏好；不是依据）
+{memories}
+【早期对话摘要】{summary}
+【当前页面】{page}
+【页面焦点】{focus}
+
+【最近对话】
+{history}
+
+【问题】{question}
+
+请直接回答。需要明细时先调工具；不需要就直接给结论。"""
+
+NO_FOCUS = "（本轮没有页面焦点：不要猜「这条 / 这题 / 这段」指的是哪一条。）"
+
+#: 焦点 → 提示模型该调哪个工具。只给方向，不给明细 —— 明细必须经工具才算「读到」。
+_FOCUS_HINTS: dict[str, str] = {
+    "weakness": (
+        "薄弱明细 · 报告第 {index} 组。需要细节时调 read_weakness_detail，"
+        "point 传【薄弱地图】里对应的分组名。"
+    ),
+    "attempt": (
+        "错题明细 · 题号 {question_id}。需要细节时调 read_question_detail，"
+        "question_id 传这个题号。"
+    ),
+    "resume": (
+        "简历原句「{anchor}」。需要细节时调 read_resume_anchor，anchor_text 逐字传这句话。"
+    ),
+}
+
+
+def render_focus(focus: dict[str, Any] | None) -> str:
+    """把闭集校验过的焦点渲染成一句提示；不认识的一律按「没有焦点」。"""
+    if not focus:
+        return NO_FOCUS
+    template = _FOCUS_HINTS.get(str(focus.get("kind") or ""))
+    if template is None:
+        return NO_FOCUS
+    try:
+        return template.format(**focus)
+    except (KeyError, IndexError):
+        return NO_FOCUS
+
+
+def build_agent_prompt(
+    sections: list[dict[str, Any]],
+    history: list[dict[str, Any]],
+    question: str,
+    page: dict[str, str] | None = None,
+    *,
+    summary: str = "",
+    memories: list[str] | None = None,
+    focus: dict[str, Any] | None = None,
+) -> str:
+    """r83 的首轮用户消息：与 `build_user_prompt` 同源，但**不再注入明细**。
+
+    明细改由工具取 —— 这样「模型读到了」与「模型没读」在事件流里是可区分的，
+    也是这一轮把「深读」从 if 分支换成工具调用的关键。
+    也不再要求模型回写 summary / memories：前者由 finalize 的后置小调用负责，
+    后者走 `remember` 工具（用户能在界面上看见它记了什么）。
+    """
+    blocks: list[str] = []
+    for index, section in enumerate(sections, start=1):
+        head = f"[{index}] {section['label']}（href: {section['href']}）"
+        body = "\n".join(f"- {line}" for line in section["lines"])
+        blocks.append(f"{head}\n{body}")
+    rendered_materials = "\n\n".join(blocks) or "（无）"
+    rendered_history = (
+        "\n".join(_history_line(item) for item in history[-HISTORY_LIMIT:]) or NO_HISTORY
+    )
+    page_line = (
+        f"{page['label']}（{page['path']}）—— {page['hint']}" if page is not None else PAGE_UNKNOWN
+    )
+    return AGENT_PROMPT_TEMPLATE.format(
+        materials=rendered_materials,
+        memories=render_memories(list(memories or [])),
+        summary=flatten(summary) or SUMMARY_NONE,
+        page=page_line,
+        focus=render_focus(focus),
+        history=rendered_history,
+        question=flatten(question),
+    )
+
+
+class TaifuSummary(BaseModel):
+    """finalize 后置调用的输出：只有摘要，不掺别的字段。"""
+
+    summary: str = ""
+
+
+SUMMARY_SYSTEM = """你在压缩一段对话的早期部分，供后续轮次当作背景。
+
+只保留：用户已确认的身份 / 目标 / 约束，以及你已经给过的结论与建议要点。
+不写链接、不写客套话、不写下一步提问。输出一个 JSON 对象：{"summary": "..."}"""
+
+SUMMARY_PROMPT = """【已有摘要】
+{summary}
+
+【需要并入的对话】
+{history}
+
+请合并成一段不超过 {limit} 字的摘要：只保留仍然成立的内容，已有摘要里过时的说法可以丢掉。
+如果这些对话没有产生值得长期保留的信息，summary 给空字符串。"""
+
+
+def build_summary_prompt(existing: str, history: list[dict[str, Any]]) -> str:
+    """线程摘要的独立提示词。摘要从主调用里拆出来，是因为流式正文没法再塞一个 JSON 字段。"""
+    return SUMMARY_PROMPT.format(
+        summary=flatten(existing) or SUMMARY_NONE,
+        history="\n".join(_history_line(item) for item in history) or NO_HISTORY,
+        limit=SUMMARY_MAX,
     )
 
 

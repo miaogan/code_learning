@@ -207,9 +207,10 @@ def test_chat_without_records_skips_model(client: TestClient, patch_ai: Any) -> 
     assert client.get("/api/taifu/thread").json()["messages"] == []
 
 
-def test_chat_persists_thread_with_allowlisted_citations(
+def test_chat_persists_thread_and_ignores_model_citations(
     client: TestClient, patch_ai: Any, profile_factory: Any
 ) -> None:
+    """r83 起引用只由工具取料产生：模型就算在回答里塞 href，也没有通道进响应。"""
     repository.insert_profile(profile_factory())
     repository.insert_report(_report())
     seen: dict[str, str] = {}
@@ -229,8 +230,9 @@ def test_chat_persists_thread_with_allowlisted_citations(
     assert response.status_code == 200
     body = response.json()
     assert body["reply"] == "先补部署与推理。\n\n再补 Redis。"
-    assert body["citations"] == [{"label": "最近诊断", "href": "/report"}]
-    assert body["dropped_citations"] == 1
+    # 模型给的 "/report" 与 "/tmp/fake" 都不进引用：引用来自「实际读了哪一条」，不来自模型自述。
+    assert body["citations"] == []
+    assert body["dropped_citations"] == 0
     assert body["materials_used"] == 2
     assert "href: /report" in seen["prompt"]
     assert "【当前页面】医案（诊断报告）" in seen["prompt"]
@@ -238,7 +240,7 @@ def test_chat_persists_thread_with_allowlisted_citations(
     messages = client.get("/api/taifu/thread").json()["messages"]
     assert [item["role"] for item in messages] == ["user", "assistant"]
     assert messages[0]["content"] == "我先补什么"
-    assert messages[1]["citations"] == [{"label": "最近诊断", "href": "/report"}]
+    assert messages[1]["citations"] == []
 
 
 def test_overlong_question_is_clamped_not_rejected(
@@ -391,8 +393,12 @@ def test_overflowing_thread_stores_and_feeds_back_summary(
 
     seen: dict[str, str] = {}
 
-    def _responder(_model_cls: type[Any], user_prompt: str) -> dict[str, Any]:
-        seen["prompt"] = user_prompt
+    def _responder(model_cls: type[Any] | None, user_prompt: str) -> dict[str, Any]:
+        # 同一个 responder 喂两个出口：流式正文（model_cls=None）与摘要补全。
+        if model_cls is policy.TaifuSummary:
+            seen["summary"] = user_prompt
+        else:
+            seen["prompt"] = user_prompt
         return {
             "reply": "接着上次讲缓存。",
             "citations": [],
@@ -404,7 +410,9 @@ def test_overflowing_thread_stores_and_feeds_back_summary(
 
     assert first.status_code == 200
     assert first.json()["summary_used"] is False  # 这一轮还只有旧对话，没有记忆
-    assert policy.SUMMARY_TASK[True] in seen["prompt"]
+    # r83：摘要由 finalize 的独立小调用生成，提示词是「已有摘要 + 本轮对话」，不再要求主模型回写。
+    assert "【需要并入的对话】" in seen["summary"]
+    assert "旧问题 1" in seen["summary"]
     stored = repository.get_taifu_summary()
     assert stored.startswith("用户目标是 AI 应用工程师")
 

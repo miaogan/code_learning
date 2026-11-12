@@ -65,6 +65,7 @@ import type {
   TaifuClearResult,
   TaifuMemories,
   TaifuMemoryResult,
+  TaifuFocus,
   TaifuReply,
   TaifuThread,
   TimelineEvent,
@@ -78,7 +79,9 @@ export type PracticeStatsParams = Pick<
 >
 
 /** 前端唯一 HTTP 出口：页面不得直接 fetch。 */
-const BASE = (import.meta.env.VITE_API_BASE ?? '').replace(/\/$/, '')
+/** 后端基址：空串表示同源（开发期走 vite proxy）。流式端点要自己拼地址，所以这里导出。 */
+export const API_BASE = (import.meta.env.VITE_API_BASE ?? '').replace(/\/$/, '')
+const BASE = API_BASE
 
 export class ApiError extends Error {
   readonly code: string
@@ -477,8 +480,8 @@ export const api = {
     request<TaifuThread>(`/api/taifu/thread?limit=${limit}`, { signal }),
 
   /** 问一句：服务端自己读档案再生成回答；`page` 只用于消解「这里 / 这条」的指代。 */
-  taifuChat: (question: string, page = ''): Promise<TaifuReply> =>
-    request<TaifuReply>('/api/taifu/chat', jsonInit('POST', { question, page })),
+  taifuChat: (question: string, page = '', focus: TaifuFocus | null = null): Promise<TaifuReply> =>
+    request<TaifuReply>('/api/taifu/chat', jsonInit('POST', { question, page, focus })),
 
   /** 清空对话（只删对话记录，不动画像 / 报告 / 测评 / 练习数据与长期记忆）。 */
   taifuClear: (): Promise<TaifuClearResult> =>

@@ -5,6 +5,8 @@ import {
   canSend,
   clampQuestion,
   paragraphsOf,
+  parseReplyBlocks,
+  splitBold,
   uniqueCitations,
 } from '../lib/taifuChat'
 
@@ -46,5 +48,43 @@ describe('r77 太傅对话纯函数', () => {
       { label: '最近诊断', href: '/report' },
       { label: '/practice', href: '/practice' },
     ])
+  })
+})
+
+describe('r82 回答渲染：列表与行内加粗', () => {
+  it('连续无序项合并成一块', () => {
+    expect(parseReplyBlocks('- 先补并发\n- 再补观测')).toEqual([
+      { kind: 'list', ordered: false, items: ['先补并发', '再补观测'] },
+    ])
+  })
+
+  it('有序与无序列表不混进同一块', () => {
+    expect(parseReplyBlocks('1. 先补并发\n- 再补观测')).toEqual([
+      { kind: 'list', ordered: true, items: ['先补并发'] },
+      { kind: 'list', ordered: false, items: ['再补观测'] },
+    ])
+  })
+
+  it('空行结束列表，前后段落仍是段落', () => {
+    expect(parseReplyBlocks('结论：\n\n- a\n- b\n\n收尾')).toEqual([
+      { kind: 'p', text: '结论：' },
+      { kind: 'list', ordered: false, items: ['a', 'b'] },
+      { kind: 'p', text: '收尾' },
+    ])
+  })
+
+  it('不是列表的普通行原样成段（「1 小时」不是编号）', () => {
+    expect(parseReplyBlocks('1 小时后再看')).toEqual([{ kind: 'p', text: '1 小时后再看' }])
+    expect(parseReplyBlocks('  \n\n ')).toEqual([])
+  })
+
+  it('行内加粗：成对才生效，未闭合按普通文本', () => {
+    expect(splitBold('先看 **并发** 再看观测')).toEqual([
+      { text: '先看 ', bold: false },
+      { text: '并发', bold: true },
+      { text: ' 再看观测', bold: false },
+    ])
+    expect(splitBold('**没闭合')).toEqual([{ text: '**没闭合', bold: false }])
+    expect(splitBold('')).toEqual([])
   })
 })

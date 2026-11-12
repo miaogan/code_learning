@@ -10,6 +10,7 @@ import asyncio
 import json
 import logging
 import time
+from collections.abc import AsyncIterator
 from typing import Any, TypeVar
 
 import httpx
@@ -252,6 +253,143 @@ class AIClient:
         """最小连通性探测（设置页「测试连接」）：只验证端点 / Key / 模型可用。"""
         await self._chat("你是 API 连通性检测助手。", "请只回复 OK 两个字母。")
 
+    async def stream_chat(
+        self,
+        system: str,
+        messages: list[dict[str, Any]],
+        *,
+        tools: list[dict[str, Any]] | None = None,
+        timeout_s: float | None = None,
+    ) -> AsyncIterator[dict[str, Any]]:
+        """流式补全：逐事件产出 `text` / `tool_call`，结束时给一个 `done`。
+
+        r83：与 `_request` 共用同一套就绪检查、鉴权头、错误映射与调用日志，
+        区别只在传输方式 —— 这里是 `stream()` + 逐行 SSE，不是等整包 JSON。
+
+        **不重试**：正文已经流给用户之后再重来一遍，会让人看到重复内容；
+        流式失败一律往上抛，由路由层提示「重问一次」。
+
+        上游不支持 SSE 时（自建端点常见）退回整包解析，把 content 与 tool_calls
+        摊成同样形状的事件 —— 调用方不必区分两种上游。
+        """
+        runtime = self._runtime
+        if not runtime.ready:
+            logger.warning("ai.skipped provider=%s reason=%s", runtime.provider, runtime.reason)
+            _persist_call_log(runtime, kind="skipped")
+            raise AppError(AI_UNAVAILABLE, runtime.reason or _UNCONFIGURED_REASON, status=503)
+        timeout = runtime.timeout_s if timeout_s is None else timeout_s
+        url = f"{runtime.base_url.rstrip('/')}/chat/completions"
+        payload: dict[str, Any] = {
+            "model": runtime.model,
+            "messages": [{"role": "system", "content": system}, *messages],
+            "temperature": 0.2,
+            "stream": True,
+        }
+        if tools:
+            payload["tools"] = tools
+            payload["tool_choice"] = "auto"
+        # 流式不带 `response_format`：这里产出的是自然语言正文，JSON mode 只对结构化补全有意义。
+        headers = {"Content-Type": "application/json", "Accept": "text/event-stream"}
+        api_key = runtime.api_key.strip()
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+        prompt_chars = len(system) + sum(
+            len(str(item.get("content") or "")) for item in messages
+        )
+        logger.info(
+            "ai.stream provider=%s model=%s timeout_s=%s tools=%s prompt_chars=%s",
+            runtime.provider,
+            runtime.model,
+            timeout,
+            len(tools or []),
+            prompt_chars,
+        )
+        started = time.perf_counter()
+        first_at: float | None = None
+        pending: dict[int, dict[str, Any]] = {}
+        finish_reason = "stop"
+        try:
+            async with _shared_client().stream(
+                "POST", url, headers=headers, json=payload, timeout=timeout
+            ) as response:
+                if response.status_code >= 400:
+                    # 错误响应可能带正文（上游回显原因），读完即弃：状态码足够定位，正文含隐私不进日志。
+                    await response.aread()
+                    _raise_for_status(runtime, response.status_code, started, prompt_chars)
+                if _is_event_stream(response):
+                    async for chunk in _iter_sse_json(response):
+                        choices = chunk.get("choices") or []
+                        for choice in choices:
+                            delta = choice.get("delta") or {}
+                            content = delta.get("content")
+                            if content:
+                                if first_at is None:
+                                    first_at = time.perf_counter()
+                                yield {"kind": "text", "text": str(content)}
+                            for call in delta.get("tool_calls") or []:
+                                _absorb_tool_delta(pending, call)
+                            if choice.get("finish_reason"):
+                                finish_reason = str(choice["finish_reason"])
+                else:
+                    # 非 SSE：上游忽略了 stream=True，整包返回。行为对齐，不让调用方感知差异。
+                    body = await response.aread()
+                    message = _message_of(body, runtime, response.status_code, started, prompt_chars)
+                    text = message.get("content")
+                    if text:
+                        if first_at is None:
+                            first_at = time.perf_counter()
+                        yield {"kind": "text", "text": str(text)}
+                    for index, call in enumerate(message.get("tool_calls") or []):
+                        _absorb_tool_delta(pending, {**call, "index": index})
+        except httpx.TimeoutException as exc:
+            elapsed_ms = int((time.perf_counter() - started) * 1000)
+            logger.warning(
+                "ai.stream.failed provider=%s model=%s kind=timeout elapsed_ms=%s",
+                runtime.provider,
+                runtime.model,
+                elapsed_ms,
+            )
+            _persist_call_log(runtime, kind="timeout", elapsed_ms=elapsed_ms)
+            raise AppError(
+                AI_UNAVAILABLE, "AI 服务响应超时，请稍后重试", status=503, retryable=True
+            ) from exc
+        except httpx.HTTPError as exc:
+            elapsed_ms = int((time.perf_counter() - started) * 1000)
+            logger.warning(
+                "ai.stream.failed provider=%s model=%s kind=connect error=%s",
+                runtime.provider,
+                runtime.model,
+                type(exc).__name__,
+            )
+            _persist_call_log(runtime, kind="connect", elapsed_ms=elapsed_ms)
+            raise AppError(
+                AI_UNAVAILABLE, "AI 服务连接失败，请稍后重试", status=503, retryable=True
+            ) from exc
+        elapsed_ms = int((time.perf_counter() - started) * 1000)
+        logger.info(
+            "ai.stream.done provider=%s model=%s elapsed_ms=%s first_ms=%s tool_calls=%s",
+            runtime.provider,
+            runtime.model,
+            elapsed_ms,
+            int((first_at - started) * 1000) if first_at else -1,
+            len(pending),
+        )
+        _persist_call_log(
+            runtime, kind="success", elapsed_ms=elapsed_ms, prompt_chars=prompt_chars
+        )
+        for index in sorted(pending):
+            call = pending[index]
+            if not call.get("name"):
+                continue
+            yield {
+                "kind": "tool_call",
+                "index": index,
+                "id": call.get("id") or f"call_{index}",
+                "name": call["name"],
+                "arguments": call.get("arguments") or "{}",
+            }
+        yield {"kind": "done", "finish_reason": finish_reason}
+
     async def _chat(self, system: str, user: str, timeout_s: float | None = None) -> str:
         return await self._request(system, user, timeout_s=timeout_s)
 
@@ -412,6 +550,132 @@ class AIClient:
             raise AppError(
                 AI_UNAVAILABLE, "AI 返回内容无法解析", status=502, retryable=True
             ) from exc
+
+
+def _is_event_stream(response: httpx.Response) -> bool:
+    """上游是否真按 SSE 回了。自建端点常忽略 `stream: true`，要靠这个分支兜住。"""
+    return "text/event-stream" in response.headers.get("content-type", "")
+
+
+async def _iter_sse_json(response: httpx.Response) -> AsyncIterator[dict[str, Any]]:
+    """逐行读 SSE，只挑 `data:` 行解析成 JSON；空行、注释行、非 JSON 行一律跳过。
+
+    宽容解析是必需的：部分实现在心搏（keep-alive）里塞注释、在末尾补空 `data:`。
+    这些都不该让整轮回答失败。
+    """
+    async for line in response.aiter_lines():
+        if not line.startswith("data:"):
+            continue
+        raw = line[5:].strip()
+        if not raw:
+            continue
+        if raw == "[DONE]":
+            return
+        try:
+            payload = json.loads(raw)
+        except ValueError:
+            continue
+        if isinstance(payload, dict):
+            yield payload
+
+
+def _absorb_tool_delta(pending: dict[int, dict[str, Any]], call: dict[str, Any]) -> None:
+    """把流式分片的 tool_calls 按 `index` 拼回完整调用。
+
+    `id` 与 `name` 只在首片出现，后续片只有 `arguments` 增量；
+    覆盖而非追加（同一字段重复下发时追加会把函数名拼成两遍）。
+    """
+    index = int(call.get("index") or 0)
+    slot = pending.setdefault(index, {"id": "", "name": "", "arguments": ""})
+    call_id = call.get("id")
+    if call_id:
+        slot["id"] = str(call_id)
+    function = call.get("function") or {}
+    name = function.get("name")
+    if name:
+        slot["name"] = str(name)
+    arguments = function.get("arguments")
+    if arguments:
+        slot["arguments"] += str(arguments)
+
+
+def _raise_for_status(
+    runtime: AiRuntime,
+    status_code: int,
+    started: float,
+    prompt_chars: int,
+) -> None:
+    """流式路径的状态码错误映射：逐条对齐 `_request`，保证两种出网方式文案一致。"""
+    elapsed_ms = int((time.perf_counter() - started) * 1000)
+    if status_code == 429 or status_code >= 500:
+        logger.warning(
+            "ai.stream.failed provider=%s model=%s kind=upstream status=%s elapsed_ms=%s",
+            runtime.provider,
+            runtime.model,
+            status_code,
+            elapsed_ms,
+        )
+        _persist_call_log(
+            runtime,
+            kind="upstream",
+            elapsed_ms=elapsed_ms,
+            status_code=status_code,
+            prompt_chars=prompt_chars,
+        )
+        raise AppError(AI_UNAVAILABLE, "AI 服务暂时不可用，请稍后重试", status=503, retryable=True)
+    logger.warning(
+        "ai.stream.failed provider=%s model=%s kind=rejected status=%s elapsed_ms=%s",
+        runtime.provider,
+        runtime.model,
+        status_code,
+        elapsed_ms,
+    )
+    _persist_call_log(
+        runtime,
+        kind="rejected",
+        elapsed_ms=elapsed_ms,
+        status_code=status_code,
+        prompt_chars=prompt_chars,
+    )
+    message = (
+        "AI 调用被拒绝，请检查你在设置页填写的 API Key 与额度"
+        if runtime.provider == "user"
+        else "AI 调用被拒绝，请检查服务端账号与额度"
+    )
+    raise AppError(AI_UNAVAILABLE, message, status=502, retryable=False)
+
+
+def _message_of(
+    body: bytes,
+    runtime: AiRuntime,
+    status_code: int,
+    started: float,
+    prompt_chars: int,
+) -> dict[str, Any]:
+    """非 SSE 回退路径：从整包里取 `choices[0].message`。"""
+    try:
+        payload = json.loads(body)
+        message = payload["choices"][0]["message"]
+        if not isinstance(message, dict):
+            raise TypeError("message 不是对象")
+        return message
+    except (ValueError, KeyError, IndexError, TypeError) as exc:
+        elapsed_ms = int((time.perf_counter() - started) * 1000)
+        logger.warning(
+            "ai.stream.failed provider=%s model=%s kind=malformed status=%s elapsed_ms=%s",
+            runtime.provider,
+            runtime.model,
+            status_code,
+            elapsed_ms,
+        )
+        _persist_call_log(
+            runtime,
+            kind="malformed",
+            elapsed_ms=elapsed_ms,
+            status_code=status_code,
+            prompt_chars=prompt_chars,
+        )
+        raise AppError(AI_UNAVAILABLE, "AI 返回内容无法解析", status=502, retryable=True) from exc
 
 
 def _extract_json_object(text: str) -> object | None:

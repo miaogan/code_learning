@@ -8,6 +8,7 @@ import {
   languageChips,
   promptPreview,
 } from '../../lib/practice'
+import { askTaifu } from '../../lib/taifuBridge'
 import { PromptBody } from '../exam/PromptBody'
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
@@ -134,6 +135,20 @@ export function WrongBookList({
                       </div>
                       <Explanation text={item.explanation} />
                     </div>
+                    {/* r82：这题的作答记录 + 解析都在服务端，太傅能读到「你答错」与正确答案。 */}
+                    <button
+                      type="button"
+                      className="sc-taifu-inline"
+                      onClick={() =>
+                        askTaifu({
+                          question: '这题我为什么错？',
+                          focus: { kind: 'attempt', question_id: item.question_id },
+                          label: promptPreview(item.prompt),
+                        })
+                      }
+                    >
+                      问太傅：这题为什么错
+                    </button>
                   </div>
                 ) : null}
                 <div className="sc-qa-wrong-meta">

@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import type { ResumePointer } from '../../api/types'
 import { COACH_COPY, blockStateOf, polishHref } from '../../lib/coach'
+import { askTaifu } from '../../lib/taifuBridge'
 import { Card } from '../ui/Card'
 
 export interface ResumePointersProps {
@@ -47,6 +48,20 @@ export function ResumePointers({ pointers, notice }: ResumePointersProps) {
             <div className="sc-hint-head">
               {/* 段落 + 行号由服务端拼好（与 .md 同源），前端不再自造一份中文段名 */}
               <span className="sc-chip">{pointer.location}</span>
+              {/* r82：这条原句是简历正文的逐字切片，正好当焦点原句用（服务端会再验一次）。 */}
+              <button
+                type="button"
+                className="sc-taifu-inline"
+                onClick={() =>
+                  askTaifu({
+                    question: '这句简历怎么写更好？',
+                    focus: { kind: 'resume', anchor: pointer.anchor_text },
+                    label: pointer.location,
+                  })
+                }
+              >
+                问太傅
+              </button>
               <Link
                 className="sc-btn sc-btn--secondary is-sm"
                 to={polishHref(pointer.focus_key, pointer.section, pointer.anchor_text)}

@@ -1272,11 +1272,37 @@ class RadarJobList(BaseModel):
 # `citations` 只会是服务端白名单校验后的站内路由，前端可直接渲染为链接。
 
 
+class TaifuDetailRef(BaseModel):
+    """r82：本轮**真的读到了**哪一条明细（界面据此显示「已读取：…」）。
+
+    `None`（不是空对象）= 没传焦点、焦点越界、或该条数据不存在 —— 三种情况界面一律不提示，
+    因为对用户来说它们是同一件事：这次没有额外读料。
+    """
+
+    kind: str = ""
+    label: str = ""
+    href: str = ""
+
+
 class TaifuCitation(BaseModel):
     """一条可核对的站内出处：`href` 必然来自档案摘要里真实存在的段。"""
 
     label: str = ""
     href: str
+
+
+class TaifuFocus(BaseModel):
+    """r82 页面带来的焦点：用户「点了哪一条」，服务端据此再取一次料。
+
+    `kind` 故意是 `str` 而不是 `Literal`：非法值必须**等同于没传**（AC-1），
+    走原有摘要问答而不是 422 把用户挡在门外。闭集校验在 `policy.sanitize_focus()`，
+    与 `sanitize_page()` 同一手法。三个字段按 kind 各用其一，其余忽略。
+    """
+
+    kind: str = Field(default="", description="weakness | attempt | resume；其余一律忽略")
+    index: int = Field(default=0, description="weakness：报告里第 N 组（1 起）")
+    question_id: str = Field(default="", description="attempt：题目 id")
+    anchor: str = Field(default="", description="resume：简历正文里的逐字原句")
 
 
 class TaifuMessage(BaseModel):
@@ -1298,6 +1324,8 @@ class TaifuChatRequest(BaseModel):
     #: 当前页面的 pathname（前端原样传）：服务端按闭集白名单归一，只用于消解指代，
     #: 不进引用白名单，也不会被当作「依据」。
     page: str = Field(default="", description="当前页面路径，如 /report")
+    #: r82：页面带来的焦点（哪一条）。缺省 / 非法一律按「没传」处理，行为与 r81 完全一致。
+    focus: TaifuFocus | None = Field(default=None, description="从页面点过来的那一条")
 
 
 class TaifuReply(BaseModel):
@@ -1313,6 +1341,8 @@ class TaifuReply(BaseModel):
     memories_used: int = 0
     #: 本轮新记住几条（r81）：界面据此提示「已记住 N 条，可在记忆里查看或删除」。
     memories_added: int = 0
+    #: r82：本轮读到的明细（没读到为 `None`）。
+    detail: TaifuDetailRef | None = None
     #: 空档案 / 空回答 / 空问句时的中文说明；正常回答时为空串。
     notice: str = ""
     created_at: str = ""

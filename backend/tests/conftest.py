@@ -455,7 +455,13 @@ def polish_responder() -> Responder:
 
 @pytest.fixture()
 def patch_ai(monkeypatch: pytest.MonkeyPatch) -> Callable[[Responder], None]:
-    """类级打补丁：路由层未注入 `client` 时也会命中 FakeAI（端到端用例零网络）。"""
+    """类级打补丁：路由层未注入 `client` 时也会命中 FakeAI（端到端用例零网络）。
+
+    r83 起太傅走流式，所以同一个 responder 要同时喂两个出口：
+    - `complete_model`：结构化补全（摘要、画像等），返回值直接过 `model_cls` 校验；
+    - `stream_chat`：正文流。第一轮若 responder 给了 `memories` / `tool_calls`，**只发工具调用**，
+      从第二轮起才发正文 —— 这样「模型先读料再回答」和真实链路同形，也能让图走一次 tools 节点。
+    """
 
     def _install(responder: Responder) -> None:
         async def fake_complete_model(
@@ -469,9 +475,68 @@ def patch_ai(monkeypatch: pytest.MonkeyPatch) -> Callable[[Responder], None]:
         ) -> Any:
             return model_cls.model_validate(responder(model_cls, user))
 
+        calls = {"round": 0}
+
+        async def fake_stream_chat(
+            self: AIClient,
+            system: str,
+            messages: list[dict[str, Any]],
+            *,
+            tools: list[dict[str, Any]] | None = None,
+            timeout_s: float | None = None,
+        ) -> Any:
+            calls["round"] += 1
+            payload = responder(None, _last_user_text(messages))
+            pending = _tool_calls_of(payload)
+            if calls["round"] == 1 and pending:
+                for index, call in enumerate(pending):
+                    yield {
+                        "kind": "tool_call",
+                        "index": index,
+                        "id": call["id"],
+                        "name": call["name"],
+                        "arguments": json.dumps(call["arguments"], ensure_ascii=False),
+                    }
+                yield {"kind": "done", "finish_reason": "tool_calls"}
+                return
+            text = str(payload.get("reply") or "")
+            if text:
+                yield {"kind": "text", "text": text}
+            yield {"kind": "done", "finish_reason": "stop"}
+
         monkeypatch.setattr(AIClient, "complete_model", fake_complete_model)
+        monkeypatch.setattr(AIClient, "stream_chat", fake_stream_chat)
 
     return _install
+
+
+def _last_user_text(messages: list[dict[str, Any]]) -> str:
+    for item in reversed(messages):
+        if item.get("role") == "user":
+            return str(item.get("content") or "")
+    return ""
+
+
+def _tool_calls_of(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """responder 的返回 → 工具调用。`memories` 按 r83 的新语义转成 `remember` 调用。"""
+    calls: list[dict[str, Any]] = []
+    for index, content in enumerate(payload.get("memories") or []):
+        calls.append(
+            {
+                "id": f"call_mem_{index}",
+                "name": "remember",
+                "arguments": {"content": str(content)},
+            }
+        )
+    for index, call in enumerate(payload.get("tool_calls") or []):
+        calls.append(
+            {
+                "id": str(call.get("id") or f"call_{index}"),
+                "name": str(call["name"]),
+                "arguments": call.get("arguments") or {},
+            }
+        )
+    return calls
 
 
 @pytest.fixture()

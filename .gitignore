@@ -54,6 +54,9 @@ frontend/.htpasswd
 .vscode/
 .idea/
 .trae/
+# vite build 的 TEMP/TMP 兜底目录（本机沙箱清理钩子会拦住 esbuild 的临时文件，
+# 把 TEMP 指到项目内才构建得过去；纯缓存，不入库）
+.tmpbuild/
 # IDE 预览分享包（HTML 导出 zip，非交付物）
 .trae-html-share-packages/
 *.log

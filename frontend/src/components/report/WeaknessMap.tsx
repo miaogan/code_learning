@@ -15,6 +15,7 @@ import {
   weaknessRatePercent,
   weaknessSubDirectionLabel,
 } from '../../lib/coach'
+import { askTaifu } from '../../lib/taifuBridge'
 import { Card } from '../ui/Card'
 
 export interface WeaknessMapProps {
@@ -125,6 +126,20 @@ export function WeaknessMap({ items }: WeaknessMapProps) {
                   <p className="sc-weak-count sc-mono">
                     {weaknessCountLabel(item.wrong, item.total)}
                   </p>
+                  {/* r82：把「我在看这一行」告诉太傅 —— 它据此只读这一组的明细，而不是整份摘要。 */}
+                  <button
+                    type="button"
+                    className="sc-taifu-inline"
+                    onClick={() =>
+                      askTaifu({
+                        question: '这条薄弱怎么补？',
+                        focus: { kind: 'weakness', index: index + 1 },
+                        label: item.point,
+                      })
+                    }
+                  >
+                    问太傅：这条怎么补
+                  </button>
                 </td>
                 <td>
                   {/* 横条只是错误率的可视化通道：读数（% 与「错 x / 共 y 题」）仍在同一行，不与数字脱钩。 */}
