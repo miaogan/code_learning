@@ -1626,29 +1626,42 @@ def get_plan_state(report_id: str) -> dict[str, Any]:
     """某份报告的打卡状态；从未写过时 `updated_at` 为空串（前端据此回推本地记录）。"""
     with connection() as conn:
         row = conn.execute(
-            "SELECT daily_minutes, done, updated_at FROM plan_states "
+            "SELECT daily_minutes, done, started_on, updated_at FROM plan_states "
             "WHERE user_id = ? AND report_id = ?",
             (_uid(), report_id),
         ).fetchone()
     if row is None:
-        return {"report_id": report_id, "daily_minutes": 30, "done": {}, "updated_at": ""}
+        return {
+            "report_id": report_id,
+            "daily_minutes": 30,
+            "done": {},
+            "started_on": "",
+            "updated_at": "",
+        }
     return {
         "report_id": report_id,
         "daily_minutes": int(row["daily_minutes"] or 30),
         "done": _json_map(row["done"]),
+        "started_on": str(row["started_on"] or ""),
         "updated_at": str(row["updated_at"]),
     }
 
 
-def save_plan_state(report_id: str, daily_minutes: int, done: dict[str, bool]) -> None:
-    """整份覆盖写（打卡 map 最多几十条，无需增量）。"""
+def save_plan_state(
+    report_id: str, daily_minutes: int, done: dict[str, bool], started_on: str = ""
+) -> None:
+    """整份覆盖写（打卡 map 最多几十条，无需增量）。
+
+    `started_on` 是 r95 的起始日：它跟着整份状态一起写，所以「顺延 / 重新开始」与
+    打卡勾选走同一条路径，不存在两种写语义。
+    """
     with connection() as conn:
         conn.execute(
-            "INSERT INTO plan_states (user_id, report_id, daily_minutes, done, updated_at) "
-            "VALUES (?, ?, ?, ?, ?) ON CONFLICT(user_id, report_id) DO UPDATE SET "
+            "INSERT INTO plan_states (user_id, report_id, daily_minutes, done, started_on, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(user_id, report_id) DO UPDATE SET "
             "daily_minutes = excluded.daily_minutes, done = excluded.done, "
-            "updated_at = excluded.updated_at",
-            (_uid(), report_id, int(daily_minutes), _json_text(done), _now()),
+            "started_on = excluded.started_on, updated_at = excluded.updated_at",
+            (_uid(), report_id, int(daily_minutes), _json_text(done), started_on, _now()),
         )
 
 

@@ -403,6 +403,8 @@ export interface PlanStatePayload {
   daily_minutes: 15 | 30 | 60
   /** task_id → 是否已打卡；服务端只保留 `true` 条目。 */
   done: Record<string, boolean>
+  /** r95 计划起始日（本机日历日 `YYYY-MM-DD`）；空串 = 还没开始计时。 */
+  started_on: string
 }
 
 export interface PlanState extends PlanStatePayload {

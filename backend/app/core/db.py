@@ -279,10 +279,17 @@ CREATE TABLE IF NOT EXISTS plan_states (
     report_id     TEXT NOT NULL,
     daily_minutes INTEGER NOT NULL DEFAULT 30,
     done          TEXT NOT NULL DEFAULT '{}',
+    started_on    TEXT NOT NULL DEFAULT '',
     updated_at    TEXT NOT NULL,
     PRIMARY KEY (user_id, report_id)
 );
 """
+
+#: r95 存量库补列：`plan_states` 由 `R61_SCHEMA` 建表，补列须在它之后执行。
+#: `started_on` 是「计划起始日」（用户本机日历日 `YYYY-MM-DD`），空串＝还没开始计时。
+_R61_ADDED_COLUMNS: tuple[tuple[str, str, str], ...] = (
+    ("plan_states", "started_on", "TEXT NOT NULL DEFAULT ''"),
+)
 
 
 #: r67 技术雷达：五张表（采集 → 快照 → 评估 → 生成任务 → 采集轮次）。
@@ -512,6 +519,14 @@ def _ensure_r67_columns(conn: sqlite3.Connection) -> None:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
 
 
+def _ensure_r61_columns(conn: sqlite3.Connection) -> None:
+    """r95 存量库补列（幂等）：须在 `R61_SCHEMA` 建表之后调用。"""
+    for table, column, ddl in _R61_ADDED_COLUMNS:
+        existing = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
+        if column not in existing:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
+
+
 def init_db() -> None:
     with connection() as conn:
         conn.executescript(SCHEMA)          # 1. 建表（新库即含新列）
@@ -530,6 +545,7 @@ def init_db() -> None:
             except sqlite3.OperationalError as exc:
                 logger.warning("db.fts5_unavailable error=%s", type(exc).__name__)
         conn.executescript(R61_SCHEMA)      # 12. r61 学习进度 / 计划打卡表
+        _ensure_r61_columns(conn)           # 12.1 r95 存量库补 plan_states.started_on（幂等）
         conn.executescript(R67_SCHEMA)      # 13. r67 技术雷达五表
         _ensure_r67_columns(conn)           # 14. 存量库补 r67 列（须在建表之后）
         _sweep_stale_radar_jobs(conn)       # 15. 建部分唯一索引前收敛重启遗留的未终态任务

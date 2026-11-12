@@ -135,7 +135,13 @@ def test_plan_empty_state_then_roundtrip(client: TestClient) -> None:
     report_id = "rep-r61"
 
     empty = client.get(f"/api/plans/{report_id}").json()
-    assert empty == {"report_id": report_id, "daily_minutes": 30, "done": {}, "updated_at": ""}
+    assert empty == {
+        "report_id": report_id,
+        "daily_minutes": 30,
+        "done": {},
+        "started_on": "",
+        "updated_at": "",
+    }
 
     saved = client.put(f"/api/plans/{report_id}", json={"daily_minutes": 60, "done": {"t-1": True, "t-2": False}})
     assert saved.status_code == 200
@@ -166,3 +172,71 @@ def test_plan_is_scoped_per_report(client: TestClient) -> None:
     assert other["daily_minutes"] == 30
     assert other["done"] == {}
     assert other["updated_at"] == ""
+
+
+# --- r95 计划按日历推进：起始日净化与整份读写 ---------------------------------
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("2026-11-12", "2026-11-12"),
+        ("  2026-11-12 ", "2026-11-12"),
+        ("2026-02-31", ""),
+        ("2026-13-01", ""),
+        ("2026/11/12", ""),
+        ("20261112", ""),
+        ("", ""),
+        (None, ""),
+        (20261112, ""),
+    ],
+)
+def test_clean_date_accepts_only_real_calendar_days(value: Any, expected: str) -> None:
+    assert learn.clean_date(value) == expected
+
+
+def test_plan_started_on_roundtrip(client: TestClient) -> None:
+    repository.insert_report(_report("rep-r95"))
+
+    saved = client.put(
+        "/api/plans/rep-r95",
+        json={"daily_minutes": 30, "done": {"t-1": True}, "started_on": "2026-11-12"},
+    )
+
+    assert saved.status_code == 200
+    assert saved.json()["started_on"] == "2026-11-12"
+    assert client.get("/api/plans/rep-r95").json()["started_on"] == "2026-11-12"
+
+
+def test_plan_bad_started_on_is_silently_dropped(client: TestClient) -> None:
+    """起始日是后台同步字段：脏值静默落空串（＝未开始），不能把整次同步打成 422。"""
+    repository.insert_report(_report("rep-r95-bad"))
+
+    response = client.put(
+        "/api/plans/rep-r95-bad",
+        json={"daily_minutes": 30, "done": {}, "started_on": "2026-02-31"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["started_on"] == ""
+    # 打卡照常写入：起始日不合法不影响其它字段
+    assert client.get("/api/plans/rep-r95-bad").json()["started_on"] == ""
+
+
+def test_plan_started_on_survives_unrelated_writes(client: TestClient) -> None:
+    """整份覆盖写下，勾选打卡 / 改时长不会把起始日抹掉（前端每次都带整份状态）。"""
+    repository.insert_report(_report("rep-r95-keep"))
+    client.put(
+        "/api/plans/rep-r95-keep",
+        json={"daily_minutes": 30, "done": {}, "started_on": "2026-11-10"},
+    )
+
+    client.put(
+        "/api/plans/rep-r95-keep",
+        json={"daily_minutes": 60, "done": {"t-9": True}, "started_on": "2026-11-10"},
+    )
+
+    stored = client.get("/api/plans/rep-r95-keep").json()
+    assert stored["daily_minutes"] == 60
+    assert stored["done"] == {"t-9": True}
+    assert stored["started_on"] == "2026-11-10"

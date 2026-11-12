@@ -634,10 +634,15 @@ class LearnProgress(BaseModel):
 
 
 class PlanStatePayload(BaseModel):
-    """7 天计划打卡状态：`daily_minutes` 是时长偏好，`done` 只记「做完」。"""
+    """7 天计划打卡状态：`daily_minutes` 是时长偏好，`done` 只记「做完」。
+
+    `started_on`（r95）是计划起始日：用户本机日历日 `YYYY-MM-DD`，空串＝还没开始计时。
+    它让「Day N」与真实日期对上，从而能回答「今天该做哪天 / 落后几天 / 该顺延了」。
+    """
 
     daily_minutes: Literal[15, 30, 60] = 30
     done: dict[str, bool] = Field(default_factory=dict, description="task_id → 是否已打卡")
+    started_on: str = Field(default="", description="计划起始日 YYYY-MM-DD；空串＝未开始")
 
 
 class PlanState(PlanStatePayload):

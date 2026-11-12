@@ -370,16 +370,39 @@ def test_graph_stops_after_the_tool_round_cap(
     profile_factory: Any, tmp_db: Any
 ) -> None:
     repository.insert_profile(profile_factory())
-    # 模型每轮都要读料：不允许无限循环。
-    client = _ScriptedClient([_tool("read_weakness_detail", '{"point":"事件循环"}')] * 5)
+    # 模型每轮都要读料：不允许无限循环；封顶后摘掉 tools 强制文字作答。
+    client = _ScriptedClient(
+        [_tool("read_weakness_detail", '{"point":"事件循环"}')] * (graph.MAX_TOOL_ROUNDS + 1)
+        + [_text("按已读到的材料，先补事件循环。")]
+    )
 
     events = asyncio.run(_events("这条怎么补", client))
 
     kinds = [event["type"] for event in events]
     assert kinds.count("tool_start") == graph.MAX_TOOL_ROUNDS
     assert "capped" in kinds
-    # 到顶后仍再调一次模型（总要说句话），但不会执行第 4 轮工具。
-    assert client.calls == graph.MAX_TOOL_ROUNDS + 1
+    # 封顶那轮 agent + 摘掉 tools 的强制作答轮：总要说句话。
+    assert client.calls == graph.MAX_TOOL_ROUNDS + 2
+    assert events[-1]["reply"] == "按已读到的材料，先补事件循环。"
+
+
+def test_graph_cap_forces_text_when_top_round_has_no_prose(
+    profile_factory: Any, tmp_db: Any
+) -> None:
+    """封顶那轮模型只发 tool_calls 不带正文：回答也不能是空的（r94 用户实测）。"""
+    repository.insert_profile(profile_factory())
+    client = _ScriptedClient(
+        [_tool("read_weakness_detail", '{"point":"事件循环"}')] * (graph.MAX_TOOL_ROUNDS + 1)
+        + [_text("基于已取的料作答。")]
+    )
+
+    events = asyncio.run(_events("这条怎么补", client))
+
+    kinds = [event["type"] for event in events]
+    # capped 提示在强制作答之前发出：用户边看提示边等正文。
+    assert kinds.index("capped") < kinds.index("done")
+    assert events[-1]["notice"] == ""
+    assert events[-1]["reply"] == "基于已取的料作答。"
 
 
 def test_graph_skips_model_when_there_is_no_record(tmp_db: Any) -> None:

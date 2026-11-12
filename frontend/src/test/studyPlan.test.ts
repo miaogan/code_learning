@@ -6,15 +6,21 @@ import {
   PLAN_DAY_COUNT,
   PLAN_VERSION,
   buildStudyPlan,
+  dayOffset,
+  isoDay,
   mergePlanState,
   parsePlanState,
   parseStoredPlan,
+  planPace,
   planPushPayload,
   planStats,
   practiceHref,
+  resumeDay,
   samePlanState,
+  shiftDay,
   type PlanMinutes,
   type PlanState,
+  type StudyPlan,
 } from '../lib/studyPlan'
 
 function makeReport(weakness: WeaknessItem[] | null): Report {
@@ -315,13 +321,13 @@ describe('计划本地存储的解析', () => {
 /* ---------- r61 打卡上云：上推载荷与跨设备合并 ---------- */
 
 function planState(dailyMinutes: PlanMinutes, done: Record<string, true>): PlanState {
-  return { version: PLAN_VERSION, daily_minutes: dailyMinutes, done }
+  return { version: PLAN_VERSION, daily_minutes: dailyMinutes, done, started_on: '' }
 }
 
 describe('打卡上云载荷', () => {
   it('只带 true 条目（取消打卡不在 map 里）', () => {
     const payload = planPushPayload(planState(30, { a: true, c: true }))
-    expect(payload).toEqual({ daily_minutes: 30, done: { a: true, c: true } })
+    expect(payload).toEqual({ daily_minutes: 30, done: { a: true, c: true }, started_on: '' })
     expect(JSON.stringify(payload)).not.toContain('false')
   })
 })
@@ -359,5 +365,144 @@ describe('打卡状态等价判断', () => {
   it('时长或多出一个已打卡项都算有差异', () => {
     expect(samePlanState(planState(30, { a: true }), { daily_minutes: 15, done: { a: true } })).toBe(false)
     expect(samePlanState(planState(30, { a: true }), { daily_minutes: 30, done: { a: true, b: true } })).toBe(false)
+  })
+})
+
+/* ---------- r95 计划按日历推进 ---------- */
+
+function stubPlan(): StudyPlan {
+  return {
+    version: PLAN_VERSION,
+    report_id: 'report-1',
+    daily_minutes: 30,
+    days: Array.from({ length: PLAN_DAY_COUNT }, (_, index) => ({
+      day: index + 1,
+      minutes: 15,
+      tasks: [
+        {
+          id: `t${index + 1}`,
+          kind: 'review' as const,
+          title: '读一节',
+          est_min: 15,
+          direction: null,
+          chapter_id: null,
+          section_id: null,
+          href: '/learn',
+          reason: '通用建议',
+          shortfall: null,
+        },
+      ],
+    })),
+    truncated: false,
+    updated_at: '',
+  }
+}
+
+describe('日历日工具', () => {
+  it('isoDay 取本机日历日（不是 UTC，凌晨不差一天）', () => {
+    expect(isoDay(new Date(2026, 10, 12, 0, 30))).toBe('2026-11-12')
+    expect(isoDay(new Date(2026, 0, 1, 23, 59))).toBe('2026-01-01')
+  })
+
+  it('shiftDay 跨月跨年正确，坏值返回 null', () => {
+    expect(shiftDay('2026-11-30', 1)).toBe('2026-12-01')
+    expect(shiftDay('2026-01-01', -1)).toBe('2025-12-31')
+    expect(shiftDay('2026-03-01', -1)).toBe('2026-02-28')
+    expect(shiftDay('2026-02-31', 0)).toBeNull()
+    expect(shiftDay('2026/11/12', 1)).toBeNull()
+  })
+
+  it('dayOffset 只按日历日算差值', () => {
+    expect(dayOffset('2026-11-12', '2026-11-12')).toBe(0)
+    expect(dayOffset('2026-11-30', '2026-12-03')).toBe(3)
+    expect(dayOffset('2026-12-03', '2026-11-30')).toBe(-3)
+    expect(dayOffset('', '2026-11-12')).toBeNull()
+  })
+})
+
+describe('计划与今天对齐', () => {
+  it('没开始计时：不标今天、也不算落后', () => {
+    const pace = planPace(stubPlan(), {}, '', '2026-11-12')
+    expect(pace.started).toBe(false)
+    expect(pace.todayDay).toBeNull()
+    expect(pace.behindDays).toBe(0)
+    expect(pace.firstOpenDay).toBe(1)
+  })
+
+  it('第 2 天且 Day 1 已做完：今天=2、没落后', () => {
+    const pace = planPace(stubPlan(), { t1: true }, '2026-11-11', '2026-11-12')
+    expect(pace).toMatchObject({ started: true, todayDay: 2, expired: false, behindDays: 0 })
+    expect(pace.firstOpenDay).toBe(2)
+  })
+
+  it('第 3 天但 Day 1 没做完：落后 1 天', () => {
+    const pace = planPace(stubPlan(), { t2: true }, '2026-11-10', '2026-11-12')
+    expect(pace.todayDay).toBe(3)
+    expect(pace.behindDays).toBe(1)
+    expect(pace.firstOpenDay).toBe(1)
+  })
+
+  it('7 天走完：过期、今天不再是第 7 天，落后按全部未完成天算', () => {
+    const pace = planPace(stubPlan(), { t1: true, t2: true }, '2026-11-01', '2026-11-12')
+    expect(pace.expired).toBe(true)
+    expect(pace.todayDay).toBeNull()
+    expect(pace.behindDays).toBe(5)
+  })
+
+  it('时钟回拨（起始日在未来）按第 1 天处理，不出现负数天', () => {
+    const pace = planPace(stubPlan(), {}, '2026-11-20', '2026-11-12')
+    expect(pace.todayDay).toBe(1)
+    expect(pace.behindDays).toBe(0)
+    expect(pace.expired).toBe(false)
+  })
+
+  it('顺延：把第一个没做完的天挪到今天', () => {
+    expect(resumeDay(3, '2026-11-12')).toBe('2026-11-10')
+    expect(resumeDay(1, '2026-11-12')).toBe('2026-11-12')
+    expect(resumeDay(0, '2026-11-12')).toBeNull()
+  })
+})
+
+describe('起始日跨设备', () => {
+  it('云端起始日优先；云端为空时保留本机刚点的「今天开始」', () => {
+    const local = { ...planState(30, {}), started_on: '2026-11-12' }
+    expect(
+      mergePlanState(local, {
+        daily_minutes: 30,
+        done: {},
+        started_on: '2026-11-01',
+        updated_at: '2026-11-10T00:00:00+00:00',
+      }).started_on,
+    ).toBe('2026-11-01')
+    expect(
+      mergePlanState(local, {
+        daily_minutes: 30,
+        done: { t1: true },
+        started_on: '',
+        updated_at: '2026-11-10T00:00:00+00:00',
+      }).started_on,
+    ).toBe('2026-11-12')
+  })
+
+  it('起始日进上推载荷；坏值落空串', () => {
+    expect(planPushPayload({ ...planState(30, {}), started_on: '2026-11-12' }).started_on).toBe(
+      '2026-11-12',
+    )
+    expect(planPushPayload({ ...planState(30, {}), started_on: '2026-02-31' }).started_on).toBe('')
+  })
+
+  it('起始日不同算有差异；本地缓存里的坏日期读回即丢弃', () => {
+    expect(
+      samePlanState(
+        { daily_minutes: 30, done: {}, started_on: '2026-11-12' },
+        { daily_minutes: 30, done: {}, started_on: '2026-11-11' },
+      ),
+    ).toBe(false)
+    expect(
+      parsePlanState(JSON.stringify({ ...planState(30, {}), started_on: '2026-13-01' }))?.started_on,
+    ).toBe('')
+    expect(
+      parsePlanState(JSON.stringify({ ...planState(30, {}), started_on: '2026-11-12' }))?.started_on,
+    ).toBe('2026-11-12')
   })
 })

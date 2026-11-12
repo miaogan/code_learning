@@ -4269,6 +4269,57 @@ input:not([type='radio']):not([type='checkbox']):not([type='file']):disabled {
   color: var(--text-tertiary);
 }
 
+/* r95 计划按日历推进：今天在哪天 / 落后几天 / 顺延入口 */
+.sc-plan-pace {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.sc-plan-pace-text {
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-secondary);
+}
+
+.sc-plan-pace.is-idle .sc-plan-pace-text {
+  color: var(--text-tertiary);
+}
+
+.sc-plan-pace-btn {
+  height: var(--chip-h);
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--accent-line-30);
+  border-radius: var(--radius-4);
+  background: var(--accent-tint);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--accent-soft);
+  cursor: pointer;
+}
+
+.sc-plan-pace-btn:hover,
+.sc-plan-pace-btn:focus-visible {
+  border-color: var(--accent);
+  background: var(--accent-wash-06);
+}
+
+.sc-plan-day.is-today:not(.is-done) {
+  border-color: var(--accent-line-30);
+  background: var(--accent-wash-06);
+}
+
+.sc-plan-daytoday {
+  padding: 0 var(--sp-1);
+  border-radius: var(--radius-4);
+  background: var(--accent-tint);
+  font-family: var(--font-mono);
+  font-size: var(--fs-nano);
+  letter-spacing: 0.04em;
+  color: var(--accent-soft);
+}
+
 .sc-plan-list {
   display: flex;
   flex-direction: column;

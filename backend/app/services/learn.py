@@ -8,6 +8,7 @@
 """
 
 import re
+from datetime import date
 from typing import Any
 
 from app.core import repository
@@ -16,9 +17,29 @@ from app.schemas import LearnChapterProgress, LearnProgress, PlanState, PlanStat
 
 #: 章节 / 小节 / 任务 id 都是程序生成的短标识，超出闭集形态一律视为脏值丢弃。
 _ID_PATTERN = re.compile(r"^[A-Za-z0-9_.:-]{1,64}$")
+#: r95 计划起始日：只认 `YYYY-MM-DD`，且必须是真实存在的日历日（`2026-02-31` 落空）。
+_DATE_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 MAX_CHAPTERS = 200
 MAX_SEEN = 200
 MAX_TASKS = 200
+
+
+def clean_date(value: Any) -> str:
+    """把起始日收敛到 `YYYY-MM-DD`；形态或日历不成立一律返回空串（＝未开始）。
+
+    与 id 净化同口径：**静默夹取不报错**——这个字段由后台自动同步写，用户没有重试入口。
+    空串是安全值：前端只会退回「还没开始计时」，不会算错日期。
+    """
+    if not isinstance(value, str):
+        return ""
+    text = value.strip()
+    if not _DATE_PATTERN.match(text):
+        return ""
+    try:
+        date.fromisoformat(text)
+    except ValueError:
+        return ""
+    return text
 
 
 def clean_id(value: Any) -> str:
@@ -87,5 +108,7 @@ def write_plan(report_id: str, payload: PlanStatePayload) -> PlanState:
         tid = clean_id(task_id)
         if tid and flag:
             done[tid] = True
-    repository.save_plan_state(report_id, payload.daily_minutes, done)
+    repository.save_plan_state(
+        report_id, payload.daily_minutes, done, clean_date(payload.started_on)
+    )
     return read_plan(report_id)

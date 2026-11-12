@@ -2,10 +2,11 @@
 
 ```
 START → prepare → agent ──(有 tool_calls 且未达上限)──→ tools ──→ agent
-                     └──(无 tool_calls / 已达上限)────→ finalize → END
+                     └──(无 tool_calls)──────────────→ finalize → END
+                     └──(有 tool_calls 且已达上限)──→ final ──→ finalize
 ```
 
-三条不可越的边界：
+四条不可越的边界：
 1. **出网只经 `AIClient`**：图里不出现 `ChatOpenAI`、不出现 `langchain_core` 的消息类型，
    所有消息都是 OpenAI 的 dict 形状 —— 配额、调用日志、隐私边界、退避口径全部沿用既有实现；
 2. **取料只经 `tools`**：节点不直接查库拿明细，模型也不能越过工具看到别的东西；
@@ -190,9 +191,35 @@ def _route_after_agent(state: TaifuState) -> str:
     if not state.get("pending"):
         return "finalize"
     if int(state.get("rounds") or 0) > MAX_TOOL_ROUNDS:
-        # 已达上限：不再执行这一轮工具，直接生成 —— 界面会显示「已达取料上限」。
-        return "finalize"
+        # 已达上限：不再执行工具，进 final 节点摘掉 tools 强制文字作答 ——
+        # 封顶那轮模型往往只发 tool_calls 不带正文，直接 finalize 会让回答空掉。
+        return "final"
     return "tools"
+
+
+async def _final_answer(state: TaifuState, client: AIClient) -> dict[str, Any]:
+    """已达取料上限：**摘掉 tools** 再调一次模型，强制它基于已读到的材料给文字回答。
+
+    不带 tools 的请求模型只会输出正文；封顶前读到的工具结果都还在 dialogue 里，
+    所以这一轮是「拿着已取的料作答」，不是凭空重新想。
+    """
+    _emit({"type": "capped"})
+    chunks: list[str] = []
+    async for event in client.stream_chat(
+        policy.TAIFU_AGENT_SYSTEM,
+        list(state.get("dialogue") or []),
+        timeout_s=TAIFU_TIMEOUT_S,
+    ):
+        if event["kind"] == "text":
+            text = str(event.get("text") or "")
+            if text:
+                chunks.append(text)
+                _emit({"type": "token", "delta": text})
+    text = "".join(chunks)
+    reply = state.get("reply") or ""
+    if text:
+        reply = f"{reply}\n\n{text}".strip() if reply else text
+    return {"agent_text": text, "pending": [], "reply": reply}
 
 
 async def _tools(state: TaifuState) -> dict[str, Any]:
@@ -301,8 +328,6 @@ async def _finalize(state: TaifuState, client: AIClient) -> dict[str, Any]:
     context: tools.ToolContext = state["context"]
     citations = list(state.get("citations") or [])
     capped = int(state.get("rounds") or 0) > MAX_TOOL_ROUNDS
-    if capped:
-        _emit({"type": "capped"})
     if not reply:
         _emit(
             {
@@ -360,18 +385,25 @@ def build(client: AIClient):
     async def finalize_node(state: TaifuState) -> dict[str, Any]:
         return await _finalize(state, client)
 
+    async def final_node(state: TaifuState) -> dict[str, Any]:
+        return await _final_answer(state, client)
+
     graph.add_node("prepare", _prepare)
     graph.add_node("agent", agent_node)
     graph.add_node("tools", _tools)
+    graph.add_node("final", final_node)
     graph.add_node("finalize", finalize_node)
     graph.add_edge(START, "prepare")
     graph.add_conditional_edges(
         "prepare", _route_after_prepare, {"agent": "agent", "finalize": "finalize"}
     )
     graph.add_conditional_edges(
-        "agent", _route_after_agent, {"tools": "tools", "finalize": "finalize"}
+        "agent",
+        _route_after_agent,
+        {"tools": "tools", "final": "final", "finalize": "finalize"},
     )
     graph.add_edge("tools", "agent")
+    graph.add_edge("final", "finalize")
     graph.add_edge("finalize", END)
     return graph.compile()
 

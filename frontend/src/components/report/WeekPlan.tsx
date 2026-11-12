@@ -6,19 +6,24 @@ import { useLearnProgress } from '../../state/learnProgress'
 import {
   PLAN_DAY_COUNT,
   PLAN_EMPTY_NOTICE,
+  PLAN_EXPIRED_NOTICE,
+  PLAN_IDLE_NOTICE,
   PLAN_LEGACY_NOTICE,
   PLAN_MINUTES,
   PLAN_SYNCED_NOTICE,
   PLAN_VERSION,
   buildStudyPlan,
   isDayDone,
+  isoDay,
   mergePlanState,
   parsePlanState,
   parseStoredPlan,
+  planPace,
   planPushPayload,
   planStateStorageKey,
   planStats,
   planStorageKey,
+  resumeDay,
   samePlanState,
   type PlanMinutes,
   type PlanState,
@@ -37,16 +42,16 @@ const PUSH_DELAY_MS = 800
 
 /** 读打卡状态：存储不可用（隐私模式 / 配额满）时退回空状态，不影响计划展示。 */
 function readState(key: string): PlanState {
+  const empty: PlanState = {
+    version: PLAN_VERSION,
+    daily_minutes: DEFAULT_MINUTES,
+    done: {},
+    started_on: '',
+  }
   try {
-    return (
-      parsePlanState(window.localStorage.getItem(key)) ?? {
-        version: PLAN_VERSION,
-        daily_minutes: DEFAULT_MINUTES,
-        done: {},
-      }
-    )
+    return parsePlanState(window.localStorage.getItem(key)) ?? empty
   } catch {
-    return { version: PLAN_VERSION, daily_minutes: DEFAULT_MINUTES, done: {} }
+    return empty
   }
 }
 
@@ -181,6 +186,16 @@ export function WeekPlan({ report, userId }: WeekPlanProps) {
     pushSoon()
   }
 
+  /** r95：起始日与打卡走同一条写入路径（同一个 PlanState + 同一次防抖上推）。 */
+  const setStartedOn = (value: string) => {
+    setPlanState((previous) => {
+      const next: PlanState = { ...previous, started_on: value }
+      writeState(stateKey, next)
+      return next
+    })
+    pushSoon()
+  }
+
   if (report.weakness_map === null) {
     return (
       <Card className="sc-coach-block">
@@ -204,6 +219,16 @@ export function WeekPlan({ report, userId }: WeekPlanProps) {
   }
 
   const stats = planStats(plan, planState.done)
+  const today = isoDay(new Date())
+  const pace = planPace(plan, planState.done, planState.started_on, today)
+  const resumeTarget = pace.firstOpenDay === null ? null : resumeDay(pace.firstOpenDay, today)
+  const paceText = !pace.started
+    ? PLAN_IDLE_NOTICE
+    : pace.expired
+      ? `${PLAN_EXPIRED_NOTICE}（还有 ${pace.behindDays} 天没做完）`
+      : pace.behindDays > 0
+        ? `今天是第 ${pace.todayDay} 天 · 前面还有 ${pace.behindDays} 天没做完`
+        : `今天是第 ${pace.todayDay} 天 · 进度没落下`
 
   return (
     <Card className="sc-coach-block">
@@ -212,6 +237,27 @@ export function WeekPlan({ report, userId }: WeekPlanProps) {
         <p className="sc-coach-meta">{`已完成 ${stats.completed} / ${stats.total} 项 · ${stats.percent}%`}</p>
       </div>
       <p className="sc-coach-note">{PLAN_SYNCED_NOTICE}</p>
+
+      <div className={pace.started ? 'sc-plan-pace' : 'sc-plan-pace is-idle'}>
+        <span className="sc-plan-pace-text">{paceText}</span>
+        {!pace.started ? (
+          <button type="button" className="sc-plan-pace-btn" onClick={() => setStartedOn(today)}>
+            今天开始
+          </button>
+        ) : pace.expired ? (
+          <button type="button" className="sc-plan-pace-btn" onClick={() => setStartedOn(today)}>
+            从今天重新排
+          </button>
+        ) : pace.behindDays > 0 && resumeTarget !== null ? (
+          <button
+            type="button"
+            className="sc-plan-pace-btn"
+            onClick={() => setStartedOn(resumeTarget)}
+          >
+            顺延到今天
+          </button>
+        ) : null}
+      </div>
 
       <div className="sc-plan-duration" role="group" aria-label="每天可用时长">
         <span className="sc-plan-duration-label">每天可用</span>
@@ -244,10 +290,20 @@ export function WeekPlan({ report, userId }: WeekPlanProps) {
       <ol className="sc-plan-list">
         {plan.days.map((day) => {
           const dayDone = isDayDone(day, planState.done)
+          const dayClass = [
+            'sc-plan-day',
+            dayDone ? 'is-done' : '',
+            day.day === pace.todayDay ? 'is-today' : '',
+          ]
+            .filter((name) => name !== '')
+            .join(' ')
           return (
-            <li className={dayDone ? 'sc-plan-day is-done' : 'sc-plan-day'} key={day.day}>
+            <li className={dayClass} key={day.day}>
               <div className="sc-plan-dayhead">
                 <span className="sc-plan-daynum sc-mono">{`Day ${day.day}`}</span>
+                {day.day === pace.todayDay ? (
+                  <span className="sc-plan-daytoday">今天</span>
+                ) : null}
                 <span className="sc-plan-dayminutes">{`约 ${day.minutes} 分钟`}</span>
                 {dayDone ? <span className="sc-plan-daystate">已完成</span> : null}
               </div>

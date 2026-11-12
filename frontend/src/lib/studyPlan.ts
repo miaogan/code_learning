@@ -74,13 +74,20 @@ export interface PlanState {
   version: typeof PLAN_VERSION
   daily_minutes: PlanMinutes
   done: Record<string, true>
+  /** r95 计划起始日（本机日历日 `YYYY-MM-DD`）；空串 = 还没开始计时。 */
+  started_on: string
 }
 
 export const PLAN_LEGACY_NOTICE = '旧报告不含薄弱地图，重新生成后可生成按短板排的学习计划'
 export const PLAN_EMPTY_NOTICE = '本次测评还没有可排入计划的短板，完成一轮有计分的测评后再来'
 /** 必须在界面上明说：打卡只记「做完」，不进评分；r61 起随账号同步（本地只是缓存）。 */
 export const PLAN_SYNCED_NOTICE =
-  '计划与打卡保存在账号下：换设备登录同一账号可以接着打卡。打卡只记「做完」，不计入熟练度或成绩。'
+  '计划、起始日与打卡都保存在账号下：换设备登录同一账号可以接着打卡。打卡只记「做完」，不计入熟练度或成绩。'
+/** r95：计划还没和日历对齐时的说明（Day 1 = 开始那天）。 */
+export const PLAN_IDLE_NOTICE =
+  '计划还没开始计时：点「今天开始」，Day 1 就是今天，之后每天对应一天。'
+/** r95：7 天窗口走完但还有任务没做完。 */
+export const PLAN_EXPIRED_NOTICE = '7 天已经过完，还剩没做完的任务：可以从今天重新排。'
 
 const LEVEL_ORDER: Record<TutorialLevel, number> = { 基础: 0, 进阶: 1, 高级: 2 }
 
@@ -516,6 +523,117 @@ export function isDayDone(day: StudyDay, done: Record<string, true>): boolean {
   return day.tasks.length > 0 && day.tasks.every((task) => done[task.id] === true)
 }
 
+/* ---------- r95 计划按日历推进：起始日 ↔ 今天 ---------- */
+
+const DAY_MS = 86_400_000
+const ISO_DAY_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
+
+/** 本机日历日 `YYYY-MM-DD`。`toISOString()` 是 UTC，东八区凌晨会差一天，不能直接用。 */
+export function isoDay(date: Date): string {
+  const month = `${date.getMonth() + 1}`.padStart(2, '0')
+  const day = `${date.getDate()}`.padStart(2, '0')
+  return `${date.getFullYear()}-${month}-${day}`
+}
+
+function dayMsOf(iso: string): number | null {
+  const match = ISO_DAY_PATTERN.exec(iso.trim())
+  if (match === null) return null
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const ms = Date.UTC(year, month - 1, day)
+  const read = new Date(ms)
+  // `2026-02-31` 形态合法但日历不成立，Date 会进位到 3 月；回读不一致即判坏值。
+  if (
+    read.getUTCFullYear() !== year ||
+    read.getUTCMonth() !== month - 1 ||
+    read.getUTCDate() !== day
+  ) {
+    return null
+  }
+  return ms
+}
+
+/** 是不是一个真实存在的日历日（`YYYY-MM-DD`）。 */
+export function isPlanDay(value: string): boolean {
+  return dayMsOf(value) !== null
+}
+
+/** `from` → `to` 的整天差（正数＝`to` 更晚）；任一侧不可解返回 `null`。 */
+export function dayOffset(from: string, to: string): number | null {
+  const a = dayMsOf(from)
+  const b = dayMsOf(to)
+  if (a === null || b === null) return null
+  return Math.round((b - a) / DAY_MS)
+}
+
+/** 某个日历日挪 `days` 天（负数往前），返回 `YYYY-MM-DD`；不可解返回 `null`。 */
+export function shiftDay(iso: string, days: number): string | null {
+  const ms = dayMsOf(iso)
+  if (ms === null) return null
+  const shifted = new Date(ms + days * DAY_MS)
+  const month = `${shifted.getUTCMonth() + 1}`.padStart(2, '0')
+  const day = `${shifted.getUTCDate()}`.padStart(2, '0')
+  return `${shifted.getUTCFullYear()}-${month}-${day}`
+}
+
+/** 计划与日历的对齐关系：今天对应哪天、落下了几天、第一个还没做完的是哪天。 */
+export interface PlanPace {
+  /** 起始日可解＝已经开始计时。 */
+  started: boolean
+  /** 起始日到今天的整天差（时钟回拨可能为负，页面按第 1 天处理）。 */
+  offset: number | null
+  /** 今天对应的 Day（1–7）；未开始或 7 天已过完为 `null`。 */
+  todayDay: number | null
+  /** 7 天窗口已经走完（`offset ≥ 7`）：今天不再属于这份计划。 */
+  expired: boolean
+  /** 今天之前还没做完的天数（不含今天本身）；未开始恒 0。 */
+  behindDays: number
+  /** 第一个还有未完成任务的 Day（1–7）；全部做完为 `null`。 */
+  firstOpenDay: number | null
+}
+
+/**
+ * 「今天该做哪天」的单一判定口。
+ *
+ * 三种状态刻意互斥：未开始（没有任何日期锚点）/ 进行中（`todayDay` 有值）/ 已过期
+ * （7 天走完）。过期后不再假装「今天还是第 7 天」——那样用户会永远看到一个假的今天。
+ */
+export function planPace(
+  plan: StudyPlan,
+  done: Record<string, true>,
+  startedOn: string,
+  today: string,
+): PlanPace {
+  const offset = startedOn === '' ? null : dayOffset(startedOn, today)
+  const started = offset !== null
+  const elapsed = offset === null ? null : Math.max(0, offset)
+  const expired = elapsed !== null && elapsed >= PLAN_DAY_COUNT
+  const todayDay =
+    elapsed === null || elapsed >= PLAN_DAY_COUNT ? null : elapsed + 1
+  // 未开始不算「落后」（还没承诺哪天做）；今天本身不算落后（今天还有时间）；
+  // 过期后 7 天全部算过去。
+  const reach = !started
+    ? 0
+    : expired
+      ? PLAN_DAY_COUNT
+      : Math.max(0, (todayDay ?? 1) - 1)
+  let firstOpenDay: number | null = null
+  let behindDays = 0
+  for (const day of plan.days) {
+    if (isDayDone(day, done)) continue
+    if (firstOpenDay === null) firstOpenDay = day.day
+    if (day.day <= reach) behindDays += 1
+  }
+  return { started, offset, todayDay, expired, behindDays, firstOpenDay }
+}
+
+/** 「顺延」：把第一个没完成的那天挪到今天（前面已完成的进度不动）。 */
+export function resumeDay(firstOpenDay: number, today: string): string | null {
+  if (firstOpenDay < 1) return null
+  return shiftDay(today, -(firstOpenDay - 1))
+}
+
 function isPlanMinutes(value: unknown): value is PlanMinutes {
   return value === 15 || value === 30 || value === 60
 }
@@ -534,6 +652,8 @@ export function planStateStorageKey(userId: string, reportId: string): string {
 export interface RemotePlanState {
   daily_minutes: PlanMinutes
   done: Record<string, boolean>
+  /** r95：旧记录 / 老服务端没有该字段，按「未开始」处理。 */
+  started_on?: string
   updated_at?: string
 }
 
@@ -541,17 +661,25 @@ export interface RemotePlanState {
 export function planPushPayload(state: PlanState): {
   daily_minutes: PlanMinutes
   done: Record<string, boolean>
+  started_on: string
 } {
   const done: Record<string, boolean> = {}
   for (const [taskId, flag] of Object.entries(state.done)) {
     if (flag) done[taskId] = true
   }
-  return { daily_minutes: state.daily_minutes, done }
+  return {
+    daily_minutes: state.daily_minutes,
+    done,
+    started_on: isPlanDay(state.started_on) ? state.started_on : '',
+  }
 }
 
 /**
- * 云端优先、打卡取并集：云端已有记录时时长以云端为准（跨设备改过的偏好不能被本机旧值覆盖），
+ * 云端优先、打卡取并集：云端已有记录时时长与起始日以云端为准（跨设备改过的偏好不能被本机旧值覆盖），
  * 打卡保留两侧的 `true`（打卡是单调的，不存在「云端取消本机打卡」这种语义）。
+ *
+ * 起始日另有一条口子：云端记录存在但起始日为空（旧版本写的打卡 / 本机离线时才开始），
+ * 此时保留本机起始日——否则本机刚点的「今天开始」会被一次旧云端记录抹成未开始。
  */
 export function mergePlanState(local: PlanState, remote: RemotePlanState): PlanState {
   const hasRemote = (remote.updated_at ?? '') !== ''
@@ -562,12 +690,19 @@ export function mergePlanState(local: PlanState, remote: RemotePlanState): PlanS
   for (const [taskId, flag] of Object.entries(remote.done)) {
     if (flag === true) done[taskId] = true
   }
-  return { ...local, daily_minutes: minutes, done }
+  const remoteStart = remote.started_on ?? ''
+  const started_on = isPlanDay(remoteStart)
+    ? remoteStart
+    : isPlanDay(local.started_on)
+      ? local.started_on
+      : ''
+  return { ...local, daily_minutes: minutes, done, started_on }
 }
 
 /** 两次打卡状态是否等价（`done` 只比较键集合，不比较 `false` 残留）。 */
 export function samePlanState(a: RemotePlanState, b: RemotePlanState): boolean {
   if (a.daily_minutes !== b.daily_minutes) return false
+  if ((a.started_on ?? '') !== (b.started_on ?? '')) return false
   const keysA = Object.keys(a.done).filter((taskId) => a.done[taskId])
   const keysB = Object.keys(b.done).filter((taskId) => b.done[taskId])
   if (keysA.length !== keysB.length) return false
@@ -613,7 +748,13 @@ export function parsePlanState(raw: string | null): PlanState | null {
     for (const [key, value] of Object.entries(parsed.done as Record<string, unknown>)) {
       if (value === true) done[key] = true
     }
-    return { version: PLAN_VERSION, daily_minutes: parsed.daily_minutes, done }
+    const startedOn = typeof parsed.started_on === 'string' ? parsed.started_on : ''
+    return {
+      version: PLAN_VERSION,
+      daily_minutes: parsed.daily_minutes,
+      done,
+      started_on: isPlanDay(startedOn) ? startedOn : '',
+    }
   } catch {
     return null
   }
