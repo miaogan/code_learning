@@ -309,3 +309,20 @@ recall@5 与旧 FTS5 内存库完全一致——**切库没有带来召回回归
 当前部署是单进程（`backend/Dockerfile` 的 `CMD` 无 `--workers`），所以成立。已在两处 docstring 写明前提与改法（多副本时关掉启动清扫、只留读路径的 `radar_sweep_stale_jobs` 按 `radar_job_stale_minutes` 超时清扫，或给 `radar_jobs` 加属主列）。
 
 > 补一句口径：r98 引入 Redis 分布式锁是为了「多副本时共享状态」，但**上图这两处尚未多副本安全**。上多副本前必须先处理这里，否则滚动发布会随机失败正在进行的雷达生成与简历画像任务。
+
+### 8.4 本轮验证记录
+
+```
+$ pytest -q -p no:randomly
+910 passed / 0 failed / 0 error          （含新增 test_r98_pg_dialect.py 8 项）
+
+$ ruff check backend/app backend/tests scripts/
+All checks passed!
+
+$ CI #117（提交 da6bd25）
+backend  success  13 步全过（Test / 四个评测门禁 / 依赖审计）
+frontend success
+```
+
+宿主实跑（vcenv 起 uvicorn 连交付容器的 PG + Redis）：`/health` → `db=postgresql`；
+登录 → `/api/me` → 题库检索（`闭包` 命中 12 条、`100%` 作为字面量正常命中）全通。
