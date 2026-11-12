@@ -16,7 +16,7 @@ psycopg-pool>=3.2
 redis>=5.0
 
 # 开发 / 测试
-pytest>=8.0
+pytest>=9.2.0
 ruff>=0.4
 
 # r83：太傅编排层（只做图，不用 langchain 模型抽象 —— 出网仍走 services/ai）
