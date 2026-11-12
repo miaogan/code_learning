@@ -5974,6 +5974,146 @@ body {
   gap: var(--sp-4);
 }
 
+/* r96 首页「今日计划」（只读：今天还剩什么 + 点哪里接着做） */
+.sc-today {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  margin-top: var(--sp-5);
+  padding: var(--sp-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-8);
+  background: var(--bg-inset);
+}
+
+.sc-today::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: var(--sp-4);
+  bottom: var(--sp-4);
+  width: 2px;
+  background: var(--accent);
+}
+
+.sc-today-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-3);
+}
+
+.sc-today-tag {
+  font-size: var(--fs-nano);
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+}
+
+.sc-today-meta {
+  margin-left: auto;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-secondary);
+}
+
+.sc-today-tasks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sc-today-task {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.sc-today-dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--border-strong);
+}
+
+.sc-today-dot.is-next {
+  background: var(--accent);
+}
+
+.sc-today-link {
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--text-secondary);
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sc-today-link:hover,
+.sc-today-link:focus-visible {
+  color: var(--accent-soft);
+}
+
+.sc-today-min {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: var(--fs-nano);
+  color: var(--text-tertiary);
+}
+
+.sc-today-hint {
+  margin: 0;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+}
+
+.sc-today-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-4);
+}
+
+.sc-today-next {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  min-height: var(--chip-h);
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--accent-line-30);
+  border-radius: var(--radius-4);
+  background: var(--accent-tint);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--accent-soft);
+  text-decoration: none;
+}
+
+.sc-today-next:hover,
+.sc-today-next:focus-visible {
+  border-color: var(--accent);
+  background: var(--accent-wash-06);
+}
+
+.sc-today-go {
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+}
+
+.sc-today-go:hover,
+.sc-today-go:focus-visible {
+  color: var(--accent-soft);
+}
+
 /* 五步管线 */
 .sc-lab-pipeline {
   margin-top: var(--lab-gap-lg);

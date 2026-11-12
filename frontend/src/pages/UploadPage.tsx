@@ -5,6 +5,7 @@ import { ApiError, api } from '../api/client'
 import type { ProfileMergeSummary, ResumeMeta } from '../api/types'
 import { PRODUCT_FOCUS } from '../lib/brand'
 import { mergeSummaryText } from '../components/profile/mergeModel'
+import { TodayPlan } from '../components/report/TodayPlan'
 import { Button } from '../components/ui/Button'
 import { Chip } from '../components/ui/Chip'
 import { ConfirmModal } from '../components/ui/ConfirmModal'
@@ -1195,6 +1196,9 @@ export default function UploadPage() {
           </span>
         </div>
       ) : null}
+
+      {/* r96：回访用户进来先看「今天该做什么」，没有可排计划时组件自己整块不渲染。 */}
+      {phase === 'idle' && saved !== null ? <TodayPlan /> : null}
 
       {failure !== null && phase === 'error' ? (
         <div className="sc-lab-panel">

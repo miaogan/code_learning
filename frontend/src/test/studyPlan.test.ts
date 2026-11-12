@@ -18,6 +18,7 @@ import {
   resumeDay,
   samePlanState,
   shiftDay,
+  todayPlan,
   type PlanMinutes,
   type PlanState,
   type StudyPlan,
@@ -504,5 +505,44 @@ describe('起始日跨设备', () => {
     expect(
       parsePlanState(JSON.stringify({ ...planState(30, {}), started_on: '2026-11-12' }))?.started_on,
     ).toBe('2026-11-12')
+  })
+})
+
+/* ---------- r96 今日计划视图（首页只读卡片） ---------- */
+
+describe('今天的计划视图', () => {
+  it('没有可排任务时整块不显示（status=none）', () => {
+    const empty = { ...stubPlan(), days: [] }
+    expect(todayPlan(empty, {}, '', '2026-11-12').status).toBe('none')
+  })
+
+  it('没开始计时：idle，指向计划第一项', () => {
+    const view = todayPlan(stubPlan(), {}, '', '2026-11-12')
+    expect(view).toMatchObject({ status: 'idle', day: null, remaining: 0, openDays: 7 })
+    expect(view.nextTask?.id).toBe('t1')
+    expect(view.tasks).toEqual([])
+  })
+
+  it('进行中：只给今天的任务，nextTask 是今天第一条没做的', () => {
+    const view = todayPlan(stubPlan(), { t1: true }, '2026-11-10', '2026-11-12')
+    expect(view.status).toBe('active')
+    expect(view.day).toBe(3)
+    expect(view.tasks.map((task) => task.id)).toEqual(['t3'])
+    expect(view.remaining).toBe(1)
+    expect(view.nextTask?.id).toBe('t3')
+    expect(view.openDays).toBe(6)
+  })
+
+  it('今天做完了：done，不再给「接着做」的第二条', () => {
+    const view = todayPlan(stubPlan(), { t1: true }, '2026-11-12', '2026-11-12')
+    expect(view).toMatchObject({ status: 'done', day: 1, remaining: 0 })
+    expect(view.nextTask).toBeNull()
+  })
+
+  it('7 天走完：expired，不假装今天是第 7 天，nextTask 回到全计划第一项', () => {
+    const view = todayPlan(stubPlan(), { t2: true }, '2026-11-01', '2026-11-12')
+    expect(view).toMatchObject({ status: 'expired', day: null, remaining: 0 })
+    expect(view.openDays).toBe(6)
+    expect(view.nextTask?.id).toBe('t1')
   })
 })

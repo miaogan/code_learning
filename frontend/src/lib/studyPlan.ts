@@ -634,6 +634,79 @@ export function resumeDay(firstOpenDay: number, today: string): string | null {
   return shiftDay(today, -(firstOpenDay - 1))
 }
 
+/* ---------- r96 今日计划视图（首页只读卡片用） ---------- */
+
+/** `none` = 没有可排的任务；`idle` = 没开始计时；`active` = 今天还有没做完的；`done` = 今天做完了；`expired` = 7 天走完。 */
+export type TodayPlanStatus = 'none' | 'idle' | 'active' | 'done' | 'expired'
+
+export interface TodayPlanView {
+  status: TodayPlanStatus
+  /** 今天对应的 Day（1–7）；`idle` / `expired` / `none` 为 `null`。 */
+  day: number | null
+  /** 今天的任务（只读展示用）；非 `active` / `done` 时为空数组。 */
+  tasks: StudyTask[]
+  /** 今天还没做完的条数。 */
+  remaining: number
+  /** 「接着做」指向的任务：今天是下一项；未开始 / 过期时是全计划第一项。 */
+  nextTask: StudyTask | null
+  /** 整个计划里还没做完的天数（过期提示与「还有 N 天」文案用）。 */
+  openDays: number
+}
+
+function firstOpenTask(plan: StudyPlan, done: Record<string, true>): StudyTask | null {
+  for (const day of plan.days) {
+    const task = day.tasks.find((item) => done[item.id] !== true)
+    if (task !== undefined) return task
+  }
+  return null
+}
+
+/**
+ * 首页「今日计划」的唯一判定口（只读，不改任何状态）。
+ *
+ * 与报告页共用 `planPace`，所以「今天第几天 / 是否过期」两处口径必然一致：
+ * 未开始不给假的 Day 1，过期也不给假的第 7 天。
+ */
+export function todayPlan(
+  plan: StudyPlan,
+  done: Record<string, true>,
+  startedOn: string,
+  today: string,
+): TodayPlanView {
+  const empty: TodayPlanView = {
+    status: 'none',
+    day: null,
+    tasks: [],
+    remaining: 0,
+    nextTask: null,
+    openDays: 0,
+  }
+  if (plan.days.length === 0) return empty
+
+  const pace = planPace(plan, done, startedOn, today)
+  const openDays = plan.days.filter((day) => !isDayDone(day, done)).length
+  if (!pace.started || pace.expired) {
+    return {
+      ...empty,
+      status: pace.started ? 'expired' : 'idle',
+      nextTask: firstOpenTask(plan, done),
+      openDays,
+    }
+  }
+
+  const day = plan.days.find((item) => item.day === pace.todayDay) ?? null
+  const tasks = day?.tasks ?? []
+  const remaining = tasks.filter((task) => done[task.id] !== true).length
+  return {
+    status: remaining === 0 ? 'done' : 'active',
+    day: pace.todayDay,
+    tasks,
+    remaining,
+    nextTask: tasks.find((task) => done[task.id] !== true) ?? null,
+    openDays,
+  }
+}
+
 function isPlanMinutes(value: unknown): value is PlanMinutes {
   return value === 15 || value === 30 || value === 60
 }
