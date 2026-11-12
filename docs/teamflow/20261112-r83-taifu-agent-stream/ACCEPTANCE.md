@@ -299,3 +299,57 @@ Python 3.11（CI 版本）建独立 venv 跑：854 tests / 0 failures  ← 排�
 CI 的 `Test` 步骤本身没问题 —— 它正是**唯一能把这类问题照出来**的地方。要改的是测试：
 本地环境不该比 CI「更宽松」（有现成的库、现成的表）。护栏加在 conftest 而不是 workflow，
 这样本地、CI、以及以后任何干净检出都按同一套规则失败。
+
+## §11 下滑时菜单栏跟着滚走（r83 修复四，本轮）
+
+### 11.1 现象与实测
+
+用户反馈「下滑的时候菜单栏也会随着滑动」。CDP 实测（1280×900、/history 40 条、可滚 3241px）：
+
+```text
+scroll=0    topbar.top=0     rootStyleH=900px   ← #root 被 height:100% 锁成一屏
+scroll=600  topbar.top=0
+scroll=1600 topbar.top=-756  ← 顶到包含块底边，sticky 失效
+scroll=END  topbar.top=-2397
+侧栏 .sc-sidebar 从 scroll=200 起 top 一路变负（导航滚出视口）
+```
+
+### 11.2 根因
+
+`.sc-topbar` **本来就是** `position: sticky; top: 0` —— 不是忘了写，而是被 reset 破坏了：
+
+> sticky 元素只能在**父盒子 content box** 范围内滑动；滑出父盒子（到达其底边）就跟随页面滚走。
+
+而 `base.css` 的 reset 里 `html, body, #root { height: 100% }` 把 `#root` 钉成**恰好一屏高**（900px）。
+顶栏的父盒子就是 `#root`，于是「一屏之后顶栏必然滚走」——前 844px（900−56）内看着正常，
+再往下就别扭。侧栏同理：`<aside>` 不 sticky，整列随页面滚。
+
+### 11.3 修法
+
+1. **`#root` 改最小高度**：`html, body` 保持 `height: 100%`，`#root` 改 `min-height: 100% / 100dvh`
+   ——包含块随内容长高，顶栏整页钉住。全库检索确认没有子元素依赖 `#root` 的确定高度。
+2. **侧栏导航常驻**：`<aside>` 自己**不** sticky（它要撑满整列，右侧分隔线才能通到页脚）；
+   `App.tsx` 里给侧栏内容包一层 `<div className="sc-sidebar-inner">` 做 sticky
+   （`top: 顶栏高`、`max-height: 视口 − 顶栏 − 一格 padding`、`overflow-y: auto`）——
+   矮窗口下侧栏**内部**自滚，导航仍常驻；r38 主题改过侧栏 padding（sp-8/sp-7），
+   所以余量取 `--sp-6` 而不写死上下 padding。
+
+### 11.4 验证
+
+`logs/teamflow/20261112-r83-taifu-agent-stream/scripts/check-sticky-nav.cjs`（三个视口 + 负向自检）：
+
+```text
+桌面 1280×900   ：scroll 0/200/600/1600/2600/END 全程 topbar.top=0、侧栏导航 top=56，
+                  <aside> 高度仍等于 .sc-shell 高度（分隔线通到页脚）
+矮窗 1280×420   ：侧栏内部自滚（clientH=340 < scrollH=812），导航仍钉住，无横向溢出
+手机 390×844    ：侧栏隐藏（<1024），顶栏钉住，无横向溢出
+负向自检 LEGACY_ROOT=1：注入 `#root{height:100%;min-height:0}` 复现旧行为
+                  （scroll=1600 时 topbar.top=-756，与修前实测一致）→ 断言有效
+```
+
+前端质量门：typecheck / lint 0 warning / **38 文件 492 测试** / build 通过。
+（本机 `vite build` 偶发 `[vite:esbuild-transpile] remove %TEMP%\esbuild-*: Access is denied`——
+宿主 fs shim 挡临时目录删除，与 vitest 的 `EPERM \ssr\<hash>` 同族；`TEMP` 指到工作区
+`frontend/.tmpbuild/` 后稳定通过，非代码问题。）
+
+截图：`scripts/sticky-nav-scrolled.png`（滚到 1200px 时顶栏与侧栏仍钉住，正文不透出）。

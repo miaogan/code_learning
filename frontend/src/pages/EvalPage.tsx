@@ -3,7 +3,7 @@ import { api } from '../api/client'
 import { EmptyState } from '../components/ui/EmptyState'
 import { InlineError } from '../components/ui/InlineError'
 import { PhaseLoader } from '../components/ui/PhaseLoader'
-import { kindRows, latencyLabel, rateLabel, summaryNotice, trendRows } from '../lib/eval'
+import { kindRows, latencyLabel, rateLabel, summaryNotice, trendBars, trendRows } from '../lib/eval'
 import { useAsync } from '../lib/useAsync'
 
 const WINDOWS = [7, 30] as const
@@ -55,6 +55,7 @@ export default function EvalPage() {
           reason={summaryNotice(data)}
           actionLabel="去练习"
           actionTo="/practice"
+          hints={['做一次召对 / 科考 / 练习，调用会自动计入这里', '失败分类按次数排序，用来定位高频问题']}
         />
       ) : null}
 
@@ -110,6 +111,21 @@ export default function EvalPage() {
           </table>
 
           <h2>每日趋势</h2>
+          {/* r84 §2：柱状速览（柱高=调用量，色深=成功率）——表格保留精确读数，柱子给形状。 */}
+          <div className="sc-evbars">
+            {trendBars(trendRows(data)).map((bar) => (
+              <div className="sc-evbar-col" key={bar.day} title={bar.text}>
+                <div className="sc-evbar-track">
+                  <span
+                    className="sc-evbar"
+                    data-ok={bar.ok}
+                    style={{ height: `${bar.height}px` }}
+                  />
+                </div>
+                <span className="sc-evbar-label">{bar.label}</span>
+              </div>
+            ))}
+          </div>
           <table>
             <thead>
               <tr>

@@ -16,6 +16,7 @@ import { EmptyState } from '../components/ui/EmptyState'
 import { InlineError } from '../components/ui/InlineError'
 import { PhaseLoader } from '../components/ui/PhaseLoader'
 import { ResumeGate } from '../components/ui/ResumeGate'
+import { ErrorBoundary } from '../components/ui/ErrorBoundary'
 import { RingProgress } from '../components/ui/RingProgress'
 import { Toast } from '../components/ui/Toast'
 import { polishRoleHref } from '../lib/coach'
@@ -470,13 +471,17 @@ export default function ReportPage() {
                 </div>
                 <span className="sc-lab-aside">按严重度排序 · 每条可回题目</span>
               </div>
-              {report.shortfalls.map((shortfall, index) => (
-                <ShortfallCard
-                  key={`${shortfall.name}-${index}`}
-                  shortfall={shortfall}
-                  order={index + 1}
-                />
-              ))}
+              {/* r84 §1：区块级边界 —— 一张卡拿到缺字段的脏数据，不能把整份医案打黑；
+                  缩在这一张兜底卡里，其余短板与下面的提升路线照常显示。 */}
+              <ErrorBoundary label="报告 · 短板区">
+                {report.shortfalls.map((shortfall, index) => (
+                  <ShortfallCard
+                    key={`${shortfall.name}-${index}`}
+                    shortfall={shortfall}
+                    order={index + 1}
+                  />
+                ))}
+              </ErrorBoundary>
             </section>
 
             {/* 提升路线三块（r7）：DOM 必须在短板主轴之后（超长内容不抢首屏，AC-14） */}
@@ -527,12 +532,18 @@ export default function ReportPage() {
                 reason="还没有可汇总的测评：先完成一轮召对或科考，再回来生成带题目证据的短板清单。"
                 actionLabel="去完成一次测评"
                 actionTo="/interview"
+                altLabel="去做题"
+                altTo="/practice"
+                hints={['召对 / 科考完成后自动计入医案', '短板清单只由真实答题证据生成，不会编引用']}
               />
             ) : (
               <EmptyState
                 reason="还没有医案：完成一轮召对或科考后，这里会给出 3–5 条带题目证据的短板，按严重度排序并直连基础课程。"
                 actionLabel="生成医案"
                 onAction={regenerate}
+                altLabel="去做题"
+                altTo="/practice"
+                hints={['先看「画像 → 报告」确认档案已就绪', '每条短板都会给出对应的基础课程入口']}
               />
             )}
             <div className="sc-btn-row">

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { EvalSummary } from '../api/types'
-import { kindLabel, kindRows, latencyLabel, rateLabel, summaryNotice, trendRows } from '../lib/eval'
+import { kindLabel, kindRows, latencyLabel, rateLabel, summaryNotice, trendBars, trendRows } from '../lib/eval'
 
 function summary(overrides: Partial<EvalSummary> = {}): EvalSummary {
   return {
@@ -60,5 +60,39 @@ describe('eval 看板纯函数', () => {
     expect(summaryNotice(summary({ total: 0, notice: '' }))).toBe('暂无模型调用记录')
     expect(summaryNotice(summary({ total: 0, notice: '自定义提示' }))).toBe('自定义提示')
     expect(summaryNotice(summary({ total: 4, notice: '降级说明' }))).toBe('降级说明')
+  })
+
+  describe('trendBars（r84 每日趋势柱）', () => {
+    it('柱高按窗口内最大调用量归一，最高柱正好顶满 maxHeight', () => {
+      const bars = trendBars(
+        [
+          { day: '2026-11-08', label: '11-08', rate: 1, total: 4 },
+          { day: '2026-11-09', label: '11-09', rate: 0.95, total: 8 },
+        ],
+        64,
+      )
+      expect(bars[0].height).toBe(32)
+      expect(bars[1].height).toBe(64)
+    })
+
+    it('色阶阈值：≥90% high、≥60% mid、其余 low', () => {
+      const bars = trendBars([
+        { day: 'a', label: 'a', rate: 0.95, total: 3 },
+        { day: 'b', label: 'b', rate: 0.7, total: 3 },
+        { day: 'c', label: 'c', rate: 0.4, total: 3 },
+      ])
+      expect(bars.map((bar) => bar.ok)).toEqual(['high', 'mid', 'low'])
+    })
+
+    it('0 调用的日子柱高为 0、成功率给占位符', () => {
+      const bars = trendBars([{ day: 'a', label: '11-01', rate: 0, total: 0 }])
+      expect(bars[0].height).toBe(0)
+      expect(bars[0].text).toBe('0 次 · —')
+    })
+
+    it('读数文本拼接调用量与成功率', () => {
+      const bars = trendBars([{ day: 'a', label: '11-01', rate: 0.9, total: 5 }])
+      expect(bars[0].text).toBe('5 次 · 90.0%')
+    })
   })
 })

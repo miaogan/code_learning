@@ -90,3 +90,17 @@
 - 任务产物：docs/teamflow/<日期-rN-slug>/（一需求一夹，建后不可变）
 - backlog（需求/任务/缺陷）事实源：$DSH_HOME/teamflow/<workspace>/（按工作区/项目隔离）
 - 运行日志：logs/teamflow/<runId>/（run 期间的项目内暂存；run 结束由 host 归档到 $DSH_HOME/teamflow/<workspace>/logs/<runId>/，项目内不留存）
+
+## sticky 导航
+
+- **sticky 失效先查包含块**：sticky 只能在父盒子 content box 内滑动；`#root { height:100% }` 这类 reset 会把包含块锁成一屏 → 顶栏「滑一屏就掉」。修法是父级改 `min-height`，不是给 sticky 元素加别的属性。`overflow`（非 visible）与 `transform` 是另外两个常见凶手。
+- **结构钉法**：要「导航常驻 + 分隔线通到底」并存时，外层容器保持撑满（画边线），内容单独包一层做 sticky（`top: 顶栏高` + `max-height: 视口−顶栏−余量` + `overflow-y:auto` 矮窗口内部自滚）。余量走 token（`--sp-6`），不写死 padding（主题会改）。
+- 本机 `vite build` 偶发 `remove %TEMP%\esbuild-*: Access is denied`：宿主 fs shim 挡临时目录删除（与 vitest `EPERM \ssr\<hash>` 同族）；`TEMP` 指到工作区 `frontend/.tmpbuild/` 即过，非代码问题，不为此改依赖或配置。
+
+## 视觉打磨（r84）
+
+- **React 渲染错误会卸载整棵树**：一个缺字段的卡片 = 整页全黑。路由级 + 区块级 ErrorBoundary 双层兜底；路由级必须 `key=pathname` 重置边界 state。
+- **streak 锚点规则**：今天没练但昨天练了 → streak 保留（早晨打开显示 0 会劝退用户）；锦上添花的信息（徽章类）失败时静默隐藏，不报错、不给新用户看 0/7。
+- 可视化不引库：色阶阈值集中在一个函数（heatLevel / trendBars 的 ok 分档），颜色不单独承载信息（每格带 title 读数）。
+- 动效一律配 `prefers-reduced-motion: reduce` 关闭；hover 抬升只在 `@media (hover:hover)`。
+- 环境坑：**杀 esbuild.exe = 杀死 vite dev server**（service 是常驻子进程）；重启 vite 必须 `--host 127.0.0.1`（默认可能只绑 ::1，CDP 脚本全走 127.0.0.1）。

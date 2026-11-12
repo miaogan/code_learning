@@ -6,9 +6,17 @@
 }
 
 html,
-body,
-#root {
+body {
   height: 100%;
+}
+
+/* #root 只给**最小**高度。写成 height:100% 会把 #root 的盒子锁成「一屏」，
+   而 sticky 的包含块正是父盒子的 content box —— .sc-topbar 滑到一屏（900px）
+   就顶到包含块底边开始跟着往上滚（r83 §11 实测 scroll=1600 时 top=-756）。
+   最小高度随内容长高，顶栏才能整页钉住。 */
+#root {
+  min-height: 100%;
+  min-height: 100dvh;
 }
 
 body {
@@ -95,6 +103,20 @@ a {
   border-right: 1px solid var(--border-subtle);
   background: var(--bg-surface);
   padding: var(--sp-6) var(--sp-4);
+}
+
+/* 侧栏内容钉住（r83 §11）：<aside> 自己不 sticky —— 它要撑满整列，右边那条分隔线
+   才能从顶到底不断。真正 sticky 的是里面这层，导航因此随视口常驻而不跟着页面滚走。
+   内容比视口高时（矮窗口 / 窄屏字大）本层内部自己滚，不会顶出页面。 */
+.sc-sidebar-inner {
+  position: sticky;
+  top: calc(var(--topbar-h) + env(safe-area-inset-top));
+  /* 留一格 padding 的余量，最后一项不贴着视口底边；不写死侧栏上下 padding
+     （r38 主题把 sp-6 改成了 sp-8/sp-7，写死会在换肤后算错高度）。 */
+  max-height: calc(100vh - var(--topbar-h) - env(safe-area-inset-top) - var(--sp-6));
+  max-height: calc(100dvh - var(--topbar-h) - env(safe-area-inset-top) - var(--sp-6));
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .sc-main {
@@ -10703,4 +10725,337 @@ a.sc-radar-name--link:hover .sc-radar-ext {
   flex-wrap: wrap;
   gap: var(--sp-3);
   margin: 0;
+}
+
+/* ============================================================
+   r84 · 视觉打磨
+   ①错误边界兜底卡 ②空态引导卡 ③打卡热力图 ④评鉴每日趋势柱
+   ⑤顶栏 streak 徽章 ⑥微动效（进场 stagger / hover 抬升 / 雷达入场）
+   约定：只追加；颜色一律走 tokens.css，不出现裸色值 / 裸尺寸。
+   ============================================================ */
+
+/* ---------- ① 错误边界兜底卡 ---------- */
+.sc-fault {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  padding: var(--sp-7) var(--sp-6);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-12);
+  background: var(--bg-surface);
+}
+
+.sc-fault-label {
+  margin: 0;
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: var(--fs-nano);
+  line-height: var(--lh-nano);
+  letter-spacing: 0.14em;
+}
+
+.sc-fault-title {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--fs-card);
+  line-height: var(--lh-card);
+  font-weight: 600;
+}
+
+.sc-fault-reason {
+  margin: 0;
+  max-width: 560px;
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  overflow-wrap: anywhere;
+}
+
+.sc-fault-actions {
+  display: flex;
+  gap: var(--sp-3);
+  margin-top: var(--sp-2);
+}
+
+/* ---------- ② 空态引导卡：撑起高度 + 步骤提示，别让整版面像坏了 ---------- */
+.sc-empty {
+  min-height: 280px;
+  justify-content: center;
+}
+
+.sc-empty-icon {
+  font-size: 22px;
+  color: var(--accent);
+}
+
+.sc-empty-hints {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  color: var(--text-tertiary);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+
+.sc-empty-action {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+}
+
+/* ---------- ③ 打卡热力图（战绩页；7 行 × 12 周，颜色走 accent 透明度梯度） ---------- */
+.sc-heat {
+  display: flex;
+  gap: var(--sp-4);
+  align-items: flex-start;
+  overflow-x: auto;
+  padding: var(--sp-4) var(--sp-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-12);
+  background: var(--bg-surface);
+}
+
+.sc-heat-grid {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(7, 12px);
+  gap: 3px; /* 12px 格子 + 3px 缝是热力图惯例；tokens 无此粒度，沿用裸值约定 */
+}
+
+.sc-heat-cell {
+  width: 12px;
+  height: 12px;
+  border-radius: var(--radius-4);
+  background: var(--overlay-04);
+}
+
+.sc-heat-cell[data-level='1'] {
+  background: var(--accent-tint);
+}
+
+.sc-heat-cell[data-level='2'] {
+  background: var(--accent);
+  opacity: 0.45;
+}
+
+.sc-heat-cell[data-level='3'] {
+  background: var(--accent);
+  opacity: 0.75;
+}
+
+.sc-heat-cell[data-level='4'] {
+  background: var(--accent);
+}
+
+.sc-heat-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  flex: 0 0 auto;
+}
+
+.sc-heat-summary {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+}
+
+.sc-heat-strong {
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.sc-heat-legend {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  color: var(--text-tertiary);
+  font-size: var(--fs-nano);
+  line-height: var(--lh-nano);
+}
+
+/* ---------- ④ 评鉴每日趋势柱（SVG，柱高=调用量，色深=成功率） ---------- */
+.sc-evbars {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--sp-2);
+  height: 96px;
+  padding: var(--sp-3) var(--sp-4) 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-8);
+  background: var(--bg-surface);
+  overflow-x: auto;
+}
+
+.sc-evbar-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-1);
+  flex: 1 0 32px;
+  min-width: 32px;
+}
+
+.sc-evbar-track {
+  display: flex;
+  align-items: flex-end;
+  height: 64px;
+  width: 100%;
+}
+
+.sc-evbar {
+  width: 100%;
+  border-radius: var(--radius-4) var(--radius-4) 0 0;
+  background: var(--accent);
+  opacity: 0.35;
+}
+
+.sc-evbar[data-ok='high'] {
+  opacity: 0.9;
+}
+
+.sc-evbar[data-ok='mid'] {
+  opacity: 0.55;
+}
+
+.sc-evbar-label {
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: var(--fs-nano);
+  line-height: var(--lh-nano);
+  white-space: nowrap;
+}
+
+/* ---------- ⑤ 顶栏 streak 徽章 ---------- */
+.sc-streak {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-1) var(--sp-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-8);
+  color: var(--text-secondary);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  white-space: nowrap;
+}
+
+.sc-streak-count {
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.sc-streak .sc-ring {
+  flex: 0 0 auto;
+}
+
+/* ---------- ⑥ 微动效：页面进场 stagger ---------- */
+@keyframes sc-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 路由切换时 sc-page 整体重挂，前几个直接子块按序浮入；delay 用裸值（毫秒级节奏，
+   tokens 无时间刻度序列，沿用既有 --fast/--slow 之外的裸值约定）。 */
+.sc-page > :nth-child(1) {
+  animation: sc-rise 0.4s var(--ease) both;
+}
+
+.sc-page > :nth-child(2) {
+  animation: sc-rise 0.4s var(--ease) 0.05s both;
+}
+
+.sc-page > :nth-child(3) {
+  animation: sc-rise 0.4s var(--ease) 0.1s both;
+}
+
+.sc-page > :nth-child(n + 4) {
+  animation: sc-rise 0.4s var(--ease) 0.15s both;
+}
+
+/* 卡片 hover 抬升：只给带链接交互的大卡，1px 起伏不抢焦点 */
+@keyframes sc-radar-in {
+  from {
+    opacity: 0;
+    transform: scale(0.72);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* 雷达值多边形入场：从中心收拢展开（transform-box 让 scale 以自身中心为原点） */
+.sc-radar-svg polygon {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: sc-radar-in 0.5s var(--ease) 0.1s both;
+}
+
+/* 分数环入场：整环淡入 + 弧线用 transition 平滑（数值异步到达时 dasharray 会变） */
+.sc-ring-value {
+  transition: stroke-dasharray 0.5s var(--ease), stroke-dashoffset 0.5s var(--ease);
+}
+
+/* 尊重系统「减少动态效果」：全部动画只保留终态 */
+@media (prefers-reduced-motion: reduce) {
+  .sc-page > :nth-child(1),
+  .sc-page > :nth-child(2),
+  .sc-page > :nth-child(3),
+  .sc-page > :nth-child(n + 4) {
+    animation: none;
+  }
+
+  .sc-radar-svg polygon {
+    animation: none;
+  }
+
+  .sc-ring-value {
+    transition: none;
+  }
+}
+
+/* 卡片 hover 抬升（承接上面的 keyframes 区块）：只给可滚动到详情的大卡，1px 起伏不抢焦点。
+   .sc-course-card 自带 border/阴影过渡（r43），这里只补位移；reduced-motion 一并关掉。 */
+@media (hover: hover) {
+  .sc-lab-sf,
+  .sc-course-card {
+    transition: transform var(--fast) var(--ease), border-color var(--fast) var(--ease),
+      box-shadow var(--fast) var(--ease);
+  }
+
+  .sc-lab-sf:hover,
+  .sc-course-card:hover {
+    transform: translateY(-1px);
+    border-color: var(--border-strong);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sc-lab-sf,
+    .sc-course-card {
+      transition: none;
+    }
+
+    .sc-lab-sf:hover,
+    .sc-course-card:hover {
+      transform: none;
+    }
+  }
 }

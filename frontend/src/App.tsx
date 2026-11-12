@@ -2,9 +2,11 @@ import { useEffect, useRef } from 'react'
 import { Link, Route, Routes, useLocation } from 'react-router-dom'
 import { AiKeyModal } from './components/ui/AiKeyModal'
 import { Button } from './components/ui/Button'
+import { ErrorBoundary } from './components/ui/ErrorBoundary'
 import { Stepper, type StepItem, type StepState } from './components/ui/Stepper'
 import { ToolNav } from './components/ui/ToolNav'
 import { TaifuLauncher } from './components/taifu/TaifuLauncher'
+import { StreakBadge } from './components/ui/StreakBadge'
 import EvalPage from './pages/EvalPage'
 import ExamPage from './pages/ExamPage'
 import GuozijianPage from './pages/GuozijianPage'
@@ -136,6 +138,7 @@ export default function App() {
           </a>
         </div>
         <div className="sc-topbar-right">
+          <StreakBadge />
           <span className="sc-storage">数据按账号隔离保存</span>
           <Link className="sc-topbar-link" to="/settings" title="配置：账号与 AI 服务">
             {me.display_name}
@@ -148,9 +151,13 @@ export default function App() {
 
       <div className="sc-shell">
         <aside className="sc-sidebar">
-          <Stepper steps={steps} orientation="vertical" />
-          <ToolNav items={TOOL_ITEMS} />
-          <ToolNav items={SETTINGS_ITEMS} label="设置" />
+          {/* r83 §11：外层 <aside> 保持撑满整列（右侧分隔线不断），sticky 交给这层，
+              导航才不会随页面滚走。见 base.css .sc-sidebar-inner。 */}
+          <div className="sc-sidebar-inner">
+            <Stepper steps={steps} orientation="vertical" />
+            <ToolNav items={TOOL_ITEMS} />
+            <ToolNav items={SETTINGS_ITEMS} label="设置" />
+          </div>
         </aside>
         <main className="sc-main">
           <div className="sc-topstepper">
@@ -164,26 +171,30 @@ export default function App() {
           </div>
           <div className="sc-page">
             <AiKeyModal />
-            <Routes>
-              <Route path="/" element={<UploadPage />} />
-              <Route path="/profile" element={<ProfilePage />} />
-              <Route path="/interview" element={<InterviewPage />} />
-              <Route path="/exam" element={<ExamPage />} />
-              <Route path="/report" element={<ReportPage />} />
-              <Route path="/history" element={<HistoryPage />} />
-              <Route path="/eval" element={<EvalPage />} />
-              <Route path="/polish" element={<PolishPage />} />
-              <Route path="/versions" element={<VersionsPage />} />
-              <Route path="/archive" element={<ArchivePage />} />
-              <Route path="/practice" element={<PracticePage />} />
-              <Route path="/pioneer" element={<PioneerPage />} />
-              <Route path="/guozijian" element={<GuozijianPage />} />
-              <Route path="/search" element={<SearchPage />} />
-              <Route path="/learn" element={<LearnPage />} />
-              <Route path="/learn/:chapterId" element={<TutorialPage />} />
-              <Route path="/settings" element={<SettingsPage />} />
-              <Route path="*" element={<NotFoundPage />} />
-            </Routes>
+            {/* r84 §1：路由级渲染错误边界。key=pathname —— 路由切换时重置边界，
+                否则 A 页崩过一次，边界 state 里留着 error，B 页会一直看到兜底卡。 */}
+            <ErrorBoundary key={pathname} label="页面">
+              <Routes>
+                <Route path="/" element={<UploadPage />} />
+                <Route path="/profile" element={<ProfilePage />} />
+                <Route path="/interview" element={<InterviewPage />} />
+                <Route path="/exam" element={<ExamPage />} />
+                <Route path="/report" element={<ReportPage />} />
+                <Route path="/history" element={<HistoryPage />} />
+                <Route path="/eval" element={<EvalPage />} />
+                <Route path="/polish" element={<PolishPage />} />
+                <Route path="/versions" element={<VersionsPage />} />
+                <Route path="/archive" element={<ArchivePage />} />
+                <Route path="/practice" element={<PracticePage />} />
+                <Route path="/pioneer" element={<PioneerPage />} />
+                <Route path="/guozijian" element={<GuozijianPage />} />
+                <Route path="/search" element={<SearchPage />} />
+                <Route path="/learn" element={<LearnPage />} />
+                <Route path="/learn/:chapterId" element={<TutorialPage />} />
+                <Route path="/settings" element={<SettingsPage />} />
+                <Route path="*" element={<NotFoundPage />} />
+              </Routes>
+            </ErrorBoundary>
           </div>
         </main>
       </div>

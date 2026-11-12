@@ -67,3 +67,28 @@ export function summaryNotice(summary: EvalSummary): string {
   if (summary.total === 0) return summary.notice || '暂无模型调用记录'
   return summary.notice
 }
+
+/* ---------- r84 §2：每日趋势柱（柱高=调用量，色深=成功率；纯投影） ---------- */
+
+export interface TrendBar {
+  /** 稳定 key：日键。 */
+  day: string
+  /** 横轴短标签 MM-DD（复用 TrendRow 的切片口径）。 */
+  label: string
+  /** 柱高（px，0–maxHeight，按窗口内最大调用量归一）。 */
+  height: number
+  /** 成功率色阶：high ≥90% / mid ≥60% / low 其余（0 调用不算，恒 low 不渲染）。 */
+  ok: 'high' | 'mid' | 'low'
+  /** 读数文本：`N 次 · x.x%`。 */
+  text: string
+}
+
+export function trendBars(rows: readonly TrendRow[], maxHeight = 64): TrendBar[] {
+  const maxTotal = Math.max(0, ...rows.map((row) => row.total))
+  return rows.map((row) => {
+    const height = maxTotal > 0 ? Math.round((row.total / maxTotal) * maxHeight) : 0
+    const ok = row.rate >= 0.9 ? 'high' : row.rate >= 0.6 ? 'mid' : 'low'
+    const rateText = row.total > 0 ? rateLabel(row.rate) : '—'
+    return { day: row.day, label: row.label, height, ok, text: `${row.total} 次 · ${rateText}` }
+  })
+}

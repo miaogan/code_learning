@@ -5,6 +5,7 @@ import type { RunKind } from '../api/types'
 import { TimelineSection } from '../components/history/TimelineSection'
 import { TrendChart } from '../components/history/TrendChart'
 import { TrendTable } from '../components/history/TrendTable'
+import { HeatCalendar } from '../components/history/HeatCalendar'
 import { MultiChipRow, type ChipOption } from '../components/ui/ChipRow'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
@@ -47,6 +48,9 @@ export default function HistoryPage() {
   )
   const data = historyAsync.data
   const rows = data === null ? null : data.items
+  // r84 §2：热力图要近 12 周全量，单独拉一份（与上方的分页列表各取所需，互不影响）。
+  const heatAsync = useAsync(() => api.history({ limit: 200, page: 1 }), [])
+  const heatRows = heatAsync.data === null ? [] : heatAsync.data.items
   const total = data === null ? 0 : data.total
   const interviewCount = data === null ? 0 : data.interview_total
   const examCount = data === null ? 0 : data.exam_total
@@ -137,6 +141,7 @@ export default function HistoryPage() {
 
           {rows !== null && rows.length > 0 ? (
             <>
+              <HeatCalendar rows={heatRows} />
               <TrendChart rows={rows} />
               <Card>
                 <TrendTable rows={rows} />
