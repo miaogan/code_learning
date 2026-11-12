@@ -13,6 +13,12 @@ import { PhaseLoader } from '../components/ui/PhaseLoader'
 import { RingProgress } from '../components/ui/RingProgress'
 import { formatChars } from '../lib/format'
 import {
+  NEWCOMER_GUIDE,
+  STEP_HREFS,
+  STEP_HINTS,
+  firstOpenStepIndex,
+} from '../lib/onboarding'
+import {
   PROFILE_JOB_POLL_MS,
   isJobRunning,
   jobElapsedSec,
@@ -870,6 +876,9 @@ export default function UploadPage() {
     },
   ] as const
 
+  /** 新用户指引：第一个还没完成的步骤就是「从这里开始」的那步（全部完成不再指路）。 */
+  const currentStep = firstOpenStepIndex(pipeline.map((step) => step.state))
+
   return (
     <section className="sc-lab-home">
       <header className="sc-lab-hero">
@@ -1324,8 +1333,11 @@ export default function UploadPage() {
           <h2>一次闭环，五步</h2>
           <p>UPLOAD → PROFILE → MEASURE → REPAIR</p>
         </div>
+        {saved === null ? (
+          <p className="sc-lab-newcomer">{NEWCOMER_GUIDE}</p>
+        ) : null}
         <div className="sc-lab-pipe-grid">
-          {pipeline.map((step) => (
+          {pipeline.map((step, index) => (
             <article
               className={
                 step.state === 'done'
@@ -1339,9 +1351,26 @@ export default function UploadPage() {
               <span className="sc-lab-pipe-num">{step.num}</span>
               <h3>{step.title}</h3>
               <p>{step.desc}</p>
+              <p className="sc-lab-pipe-hint">{STEP_HINTS[index]}</p>
               <span className="sc-lab-pipe-state">
                 {step.state === 'done' ? 'DONE' : step.state === 'now' ? 'RUNNING' : 'TODO'}
               </span>
+              {index === currentStep ? (
+                index === 0 ? (
+                  <button
+                    type="button"
+                    className="sc-lab-pipe-start"
+                    onClick={() => inputRef.current?.click()}
+                    disabled={busy}
+                  >
+                    从这里开始 →
+                  </button>
+                ) : (
+                  <Link className="sc-lab-pipe-start" to={STEP_HREFS[index]}>
+                    从这里开始 →
+                  </Link>
+                )
+              ) : null}
             </article>
           ))}
         </div>

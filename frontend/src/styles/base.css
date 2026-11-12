@@ -6009,6 +6009,37 @@ body {
   color: var(--accent);
 }
 
+/* r86 新用户指引：没上传简历时五步区顶部的上路说明；每张卡加术语对照与当前步入口。 */
+.sc-lab-newcomer {
+  margin: 0;
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-inset);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--text-secondary);
+}
+
+.sc-lab-pipe-start {
+  align-self: flex-start;
+  margin-top: var(--sp-2);
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: var(--fs-meta);
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.sc-lab-pipe-start:hover {
+  text-decoration: underline;
+}
+
+.sc-lab-pipe-start:disabled {
+  color: var(--text-tertiary);
+  cursor: default;
+}
+
 /* 上传 / 生成中的整块面板 */
 .sc-lab-panel {
   position: relative;
