@@ -26,6 +26,7 @@ import {
   cappedOf,
   noticeOf,
   partsToView,
+  rowKeysOf,
   textOf,
 } from '../../lib/taifuStream'
 import {
@@ -129,13 +130,16 @@ function ReplyBody({ content, messageId }: { content: string; messageId: string 
  */
 function MessageRow({
   message,
-  copiedId,
+  rowKey,
+  copiedKey,
   onCopy,
   fallbackCitations,
 }: {
   message: UIMessage
-  copiedId: string
-  onCopy: (id: string, text: string) => void
+  /** 列表行 key：重复 id 时带序号，"已复制"也按它区分，避免两条消息串台。 */
+  rowKey: string
+  copiedKey: string
+  onCopy: (key: string, text: string) => void
   fallbackCitations?: TaifuCitation[]
 }) {
   const view = partsToView(message.parts)
@@ -189,8 +193,8 @@ function MessageRow({
       ) : null}
 
       {!isUser && text ? (
-        <button type="button" className="sc-taifu-copy" onClick={() => onCopy(message.id, text)}>
-          {copiedId === message.id ? '已复制' : '复制'}
+        <button type="button" className="sc-taifu-copy" onClick={() => onCopy(rowKey, text)}>
+          {copiedKey === rowKey ? '已复制' : '复制'}
         </button>
       ) : null}
 
@@ -319,7 +323,9 @@ export function TaifuLauncher({ userId }: TaifuLauncherProps) {
   })
 
   const pending = status === 'submitted' || status === 'streaming'
-  const [copiedId, setCopiedId] = useState('')
+  const [copiedKey, setCopiedKey] = useState('')
+  // 行 key 与消息一一对应：重复 id 追加序号，渲染与"已复制"都按它区分。
+  const rowKeys = useMemo(() => rowKeysOf(messages), [messages])
   const [clearArmed, setClearArmed] = useState(false)
   const [clearing, setClearing] = useState(false)
   // r81 长期记忆：默认收起，展开时才读（与线程同一口径：收起态零请求）。
@@ -481,13 +487,13 @@ export function TaifuLauncher({ userId }: TaifuLauncherProps) {
   }, [focus, location.pathname, messages.length, pending, question, sendMessage])
 
   /** 复制回答原文（含列表符号与 `**`）：用户要的是能贴到别处的纯文本，不是渲染后的富文本。 */
-  const copyMessage = useCallback(async (id: string, text: string) => {
+  const copyMessage = useCallback(async (key: string, text: string) => {
     try {
       if (!navigator.clipboard) throw new Error('clipboard unavailable')
       await navigator.clipboard.writeText(text)
-      setCopiedId(id)
+      setCopiedKey(key)
       window.setTimeout(() => {
-        setCopiedId((current) => (current === id ? '' : current))
+        setCopiedKey((current) => (current === key ? '' : current))
       }, 2000)
     } catch {
       setSendError('复制失败，请手动选中回答文本')
@@ -776,15 +782,21 @@ export function TaifuLauncher({ userId }: TaifuLauncherProps) {
               </>
             ) : null}
 
-            {messages.map((message) => (
-              <MessageRow
-                key={message.id}
-                message={message}
-                copiedId={copiedId}
-                onCopy={(id, text) => void copyMessage(id, text)}
-                fallbackCitations={historyCitesRef.current[message.id]}
-              />
-            ))}
+            {messages.map((message, index) => {
+              // key 不能直接吃 `message.id`：服务端 id 撞了会让整列 React key 重复、
+              // 「已复制」串台。`rowKeysOf` 对重复 id 追加序号，重复时显示两条而不是塌成一条。
+              const rowKey = rowKeys[index] ?? message.id
+              return (
+                <MessageRow
+                  key={rowKey}
+                  rowKey={rowKey}
+                  message={message}
+                  copiedKey={copiedKey}
+                  onCopy={(key, text) => void copyMessage(key, text)}
+                  fallbackCitations={historyCitesRef.current[message.id]}
+                />
+              )
+            })}
 
             {pending ? (
               <p className="sc-taifu-hint">

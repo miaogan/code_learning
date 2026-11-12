@@ -5,6 +5,7 @@ import {
   cappedOf,
   noticeOf,
   partsToView,
+  rowKeysOf,
   textOf,
 } from '../lib/taifuStream'
 
@@ -85,5 +86,24 @@ describe('argsLine', () => {
   it('按 key: value 拼接，只列有值的', () => {
     expect(argsLine({ point: '事件循环', question_id: 'q-1' })).toBe('point: 事件循环 · question_id: q-1')
     expect(argsLine({})).toBe('')
+  })
+})
+
+describe('rowKeysOf', () => {
+  it('id 唯一时原样用作 key', () => {
+    expect(rowKeysOf([{ id: 'a' }, { id: 'b' }])).toEqual(['a', 'b'])
+  })
+
+  it('重复 id 追加序号，保证同一列里没有两个相同的 key', () => {
+    // 服务端 id 撞车时（r83 交付初版每条回答都是 msg_taifu），React key 会重复、
+    // 「已复制」会串台；追加序号让两条都还在，且各自独立。
+    const keys = rowKeysOf([{ id: 'msg' }, { id: 'msg' }, { id: 'other' }, { id: 'msg' }])
+
+    expect(keys).toEqual(['msg', 'msg#2', 'other', 'msg#3'])
+    expect(new Set(keys).size).toBe(keys.length)
+  })
+
+  it('空列表给空数组（空态不渲染任何行）', () => {
+    expect(rowKeysOf([])).toEqual([])
   })
 })

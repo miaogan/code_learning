@@ -403,6 +403,23 @@ def _frames(text: str) -> list[dict[str, Any]]:
     return parsed
 
 
+def test_encoder_gives_each_stream_its_own_message_id() -> None:
+    """逐次唯一的 message id：共用一个常量会让第二条回答覆盖第一条。
+
+    `useChat` 收到新消息是按 id 归位的（`findLastIndex(m => m.id === 新 id)` 命中就 replace），
+    所以 id 撞了不是"显示两条"，而是**第一条被第二条顶掉**；React key 也会重复。
+    """
+
+    first = json.loads(ai_sdk.StreamEncoder().start()[0][len("data: ") :])
+    second = json.loads(ai_sdk.StreamEncoder().start()[0][len("data: ") :])
+
+    assert first["messageId"].startswith("msg_")
+    assert first["messageId"] != second["messageId"]
+    # 显式指定仍然生效：续流 / 重放要复用同一个 id，不能被随机值顶掉。
+    fixed = json.loads(ai_sdk.StreamEncoder("msg_fixed").start()[0][len("data: ") :])
+    assert fixed["messageId"] == "msg_fixed"
+
+
 def test_stream_endpoint_emits_ai_sdk_frames(
     client: TestClient, patch_ai: Any, profile_factory: Any
 ) -> None:
@@ -422,6 +439,22 @@ def test_stream_endpoint_emits_ai_sdk_frames(
     # 模型自述的 `/report` 不进引用：这一轮没有任何工具调用。
     citations = next(item for item in frames if item["type"] == "data-citations")
     assert citations["data"]["items"] == []
+
+
+def test_stream_endpoint_gives_each_reply_a_distinct_message_id(
+    client: TestClient, patch_ai: Any, profile_factory: Any
+) -> None:
+    """连问两次：两条回答必须是两条消息，而不是第二条把第一条替换掉。"""
+
+    repository.insert_profile(profile_factory())
+    patch_ai(lambda _model_cls, _user: {"reply": "先补部署。", "citations": []})
+
+    first = _frames(client.post("/api/taifu/chat/stream", json={"question": "我先补什么"}).text)
+    second = _frames(client.post("/api/taifu/chat/stream", json={"question": "再然后呢"}).text)
+
+    assert first[0]["type"] == "start"
+    assert second[0]["type"] == "start"
+    assert first[0]["messageId"] != second[0]["messageId"]
 
 
 def test_stream_endpoint_short_circuits_without_records(

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 from typing import Any
+from uuid import uuid4
 
 #: 协议版本头：缺了它 `useChat` 会按旧版 text 协议解析，工具卡与 data part 全部丢失。
 STREAM_HEADER = "x-vercel-ai-ui-message-stream"
@@ -23,6 +24,17 @@ STREAM_VERSION = "v1"
 
 #: 流终止标记：必须且只能出现一次。
 DONE_FRAME = "data: [DONE]\n\n"
+
+
+def new_message_id() -> str:
+    """每次请求一个**唯一**的 message id。
+
+    协议里的 `start.messageId` 会成为这条助手消息的 `id`，而 `useChat` 收到新消息时是按
+    id 归位的：`messages.findLastIndex(m => m.id === 新消息.id)` 命中就 **replace**，不命中才
+    追加。若两条回答共用一个常量 id，第二条会原地覆盖第一条 —— 界面上看起来像「回答被吞了 /
+    串到下一条」，`key` 也会撞。所以 id 必须逐次不同（r83 交付后修复的正是这一处）。
+    """
+    return f"msg_{uuid4().hex[:16]}"
 
 
 def frame(payload: dict[str, Any]) -> str:
@@ -33,13 +45,13 @@ def frame(payload: dict[str, Any]) -> str:
 class StreamEncoder:
     """把图的内部事件编码成协议帧。
 
-    有状态的只有一件事：文本块是否已经开了（`text-start` 只能发一次）。
+    有状态的只有两件事：文本块是否已经开了（`text-start` 只能发一次），以及本次流的消息 id。
     其余事件都是无状态映射，所以整个类可以逐事件喂、不需要缓冲。
     """
 
-    def __init__(self, message_id: str = "msg_taifu") -> None:
-        self.message_id = message_id
-        self.text_id = f"text_{message_id}"
+    def __init__(self, message_id: str | None = None) -> None:
+        self.message_id = message_id or new_message_id()
+        self.text_id = f"text_{self.message_id}"
         self._text_open = False
         self._closed = False
 

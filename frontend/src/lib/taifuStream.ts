@@ -162,3 +162,19 @@ export function argsLine(args: Record<string, string>): string {
     .map(([key, value]) => `${key}: ${value}`)
     .join(' · ')
 }
+
+/**
+ * 一列消息的稳定、且**保证唯一**的行 key。
+ *
+ * 服务端的消息 id 本该唯一（r83 起每次回答一个新 id），但它不是前端能控制的前提：
+ * 一旦两条回答撞了 id，`key` 会重复、"已复制"会串台。这里对重复 id 追加序号，
+ * 让渲染与行内状态都按「第几条同 id 消息」区分 —— 出错时是显示两条，而不是塌成一条。
+ */
+export function rowKeysOf(messages: readonly { id: string }[]): string[] {
+  const seen = new Map<string, number>()
+  return messages.map((message) => {
+    const count = (seen.get(message.id) ?? 0) + 1
+    seen.set(message.id, count)
+    return count === 1 ? message.id : `${message.id}#${count}`
+  })
+}

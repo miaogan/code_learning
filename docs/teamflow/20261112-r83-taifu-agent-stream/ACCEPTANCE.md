@@ -116,3 +116,46 @@ RESULT: PASS
   这个概念，`dropped_citations` 恒 0（字段保留以兼容契约）。
 - **历史线程没有工具记录**：`/thread` 只存问答文本，转 `UIMessage[]` 时只造 `text` part，
   刷新后旧回答看不到当轮的工具卡（有意为之：不为可观测性扩表）。
+
+## 7. 交付后修复（2026-11-12）
+
+用户反馈「前端多条回答错乱/重复」。定位到**一个根因 + 一处防御**：
+
+| 项 | 内容 |
+| --- | --- |
+| 根因 | `ai_sdk.StreamEncoder` 的 `message_id` 默认值是常量 `"msg_taifu"`，每次流式回答都往 `start` 帧里写同一个 id |
+| 为什么致命 | `start.messageId` 会成为助手消息的 id，而 `useChat` 收到新消息是**按 id 归位**的：`messages.findLastIndex(m => m.id === 新id)` 命中就 `replaceMessage`、不命中才追加（见 `ai/dist/index.js` 的 `runUpdateMessageJob`）。于是第二问的第二条回答**原地顶掉第一条**——不是「显示两条」，而是「第一条没了」 |
+| 连带症状 | 两处 `key={message.id}` 撞车（React duplicate key），`copiedId === message.id` 让两条的「复制」一起变「已复制」 |
+| 修复 | `ai_sdk.new_message_id()` 生成 `msg_<uuid16>`，`StreamEncoder(message_id=None)` 默认逐次唯一；显式传值仍生效（续流 / 重放要复用同一个 id） |
+| 防御 | `lib/taifuStream.ts` 新增 `rowKeysOf(messages)`：同一列里重复 id 追加序号（`msg` / `msg#2`），组件用它做 React key 与「已复制」的键——退一步说，id 再撞也是「显示两条」，不会塌成一条 |
+
+### 验证
+
+```text
+backend: pytest tests/test_r83_taifu_agent.py -q → 19 passed（新增 2 条）
+backend: pytest -q --junitxml                   → 853 tests / 0 failures / 0 errors / 1 skipped
+backend: ruff check app tests                   → All checks passed
+frontend: vitest run                            → 38 files / 487 tests passed（新增 3 条）
+frontend: typecheck / eslint --max-warnings 0   → 通过
+```
+
+真实浏览器（`node logs/teamflow/20261112-r83-taifu-agent-stream/scripts/check-two-replies.cjs`）：
+
+```text
+PASS 连问两次得到两条独立回答，第一条没有被顶掉
+PASS 复制状态按行隔离，点第一条不影响第二条
+RESULT: PASS
+
+# 负向自检（SAME_ID=1，故意让两次流共用 msg_taifu）
+PASS 负向自检：共用同一 messageId 时第二条顶掉第一条（旧 bug 已复现）
+     实际列表：["第 2 条回答。"]
+RESULT: REPRODUCED
+```
+
+负向自检是这条修复的关键证据：断言在旧行为下**必然失败**，说明它真的在防这件事，而不是碰巧通过。
+
+### 新增两条测试
+
+- `test_encoder_gives_each_stream_its_own_message_id`：两个编码器给出不同 id、前缀是 `msg_`、显式指定仍生效。
+- `test_stream_endpoint_gives_each_reply_a_distinct_message_id`：同一个端点连问两次，两个 `start` 帧的 `messageId` 必须不同（端到端锁住这条契约）。
+- `rowKeysOf` 3 条：唯一 id 原样用、重复 id 追加序号且整列无重复、空列表给空数组。
