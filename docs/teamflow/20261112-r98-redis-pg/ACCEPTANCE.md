@@ -230,6 +230,30 @@ r98 把数据层换成 PG 后，`.github/workflows/ci.yml` 的 backend job 仍�
 | `eval_live.py` 去掉 `DB_PATH` | r98 已删该配置，原代码设置它无效，真跑会连 `backend/.env` 里的开发库（有污染真实数据的风险）。改为同实例独立库 `sc_eval_live_<pid>`，跑完即删 |
 | `eval_harness.py --check` 改真只读 | 原实现 `--check` 仍会重写 `docs/eval/REPORT.md`，「本地处理耗时」的微秒抖动会污染 git diff（本次实测 4 微秒 → 3 微秒） |
 
+失败现场（GitHub API 查到的 #112，即 r98 Redis 那次提交）：
+
+```
+JOB backend   failure
+    FAIL  8 Test
+    skipped 9~12  Offline eval / Question retrieval / Reliability / Live eval
+JOB frontend  success
+```
+
+frontend 绿、backend 只红在 `Test`，且后续四个评测门禁被 skip——与「pytest 连不上库、
+每个用例一条 RuntimeError」完全吻合。同一次里 `Dependency audit`（`pip-audit`）**是过的**，
+说明失败不是新依赖引入漏洞，纯粹是环境缺服务。
+
+修复后 #113 全绿（4 分 16 秒）：
+
+```
+JOB frontend  success   10 步全过（audit / typecheck / lint / test / build / retrieval gate）
+JOB backend   success   13 步全过，含
+                        step 2  Initialize containers      ← service 生效
+                        step 9  Test                       ← 902 项在有 PG 的环境里真跑
+                        step 10~13  四个评测门禁（上一轮被 skip 的全部补跑）
+                        step 26 Stop containers
+```
+
 检索评测从 FTS5 内存库换到真实 PG 后的结果：
 
 ```
