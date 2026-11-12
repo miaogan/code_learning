@@ -28,8 +28,8 @@ cd backend && ./.venv/Scripts/python.exe -m pytest -q
 | 编号 | 标准 | 结果 |
 |---|---|---|
 | AC-1 | 24 张表在 PG 全部建成 | ✅ `init_db()` 后 `pg_tables` 计数 24（27 个 `CREATE TABLE` 中 3 个是同名重定义，FTS5 虚表已移除） |
-| AC-2 | `init_db()` 幂等 | ✅ `test_init_db_adds_columns_idempotently` 比对结构快照，第二次执行逐字不变 |
-| AC-3 | 占位符与 `%` 转义 | ✅ 含 `LIKE '%kw%'` 的检索用例全过（`test_r51_eval_harness`） |
+| AC-2 | `init_db()` 幂等 | ✅ `test_init_db_adds_columns_idempotently`（老库升级路径，结构快照逐字不变）+ r98 收尾实测空库连跑两次：**191 列 / 58 索引完全一致** |
+| AC-3 | 占位符与 `%` 转义 | ✅ 含 `LIKE '%kw%'` 的检索用例全过（`test_r51_eval_harness`）；新增 `test_r98_pg_dialect.py` 8 项，锁住「`?` 与 `%s` 两条路都通」与「翻译幂等」 |
 | AC-4 | 检索语义与旧 LIKE 分支一致 | ✅ `mode == "like"`、`notice == ""`、短查询（2 字）仍能命中 |
 | AC-5 | 存量库补列且不重导 | ✅ `test_r11_data_layer` 14 passed（`sc_test_legacy` 库按 r6 DDL 造表） |
 | AC-6 | 限流窗口跨进程共享 | ✅ `test_window_counts_across_processes`：limit=3 时第 4 次被拒，返回 1–60 秒重试 |
@@ -272,3 +272,40 @@ recall@5 与旧 FTS5 内存库完全一致——**切库没有带来召回回归
 - `pg_trgm` 在无超级用户权限的托管 PG 上会被跳过（只记 WARNING），检索退化为顺序扫描；
 - 迁移脚本没有「增量同步」能力：切换窗口内 SQLite 侧的新写入不会被带走，**必须停服迁移**；
 - 多副本下的真实限流行为没有做压测（本机单实例只能验证「共享同一计数器」这一层）。
+
+## 八、幂等性核对（r98 收尾专项）
+
+用户要求「检查代码和文档的幂等性」。逐层实跑，结论分三类。
+
+### 8.1 确认幂等（实测通过）
+
+| 层 | 验法 | 结果 |
+|---|---|---|
+| `init_db()` 结构 | 空库连跑两次，比对 `information_schema.columns` 与 `pg_indexes` | 191 列 / 58 索引**逐字一致** |
+| 题库种子 | `ensure_seeded()` 连跑两次 + `refresh_from_seed()` 单独跑 | 1284 行不变；`refresh` 改写 **0 行**（库内已与种子逐字段一致时不写 `updated_at`） |
+| 迁移脚本 | 首迁 → 重跑 → 插入验证序列 | 重跑四表各写 0 行、`EXIT=0`；新插入拿到 `run_id=2`（序列已复位） |
+| 并发入队 | `radar_jobs` 的 active 部分唯一索引 + `IntegrityError` 兜底 | 同技术第二个未终态任务被索引拒绝，`create_job()` 转「返回已有 job_id」而非 500 |
+| 读缓存写入 | `SET key value EX ttl` | 覆盖语义天然幂等；`ttl<=0` 时直接不写 |
+| 备份脚本 | 按 `YYYYmmdd-HHMMSS` 命名 + 滚动保留 | 重复执行只产生新文件，不覆盖历史备份 |
+
+### 8.2 查出并修掉的问题
+
+| # | 问题 | 影响 | 处理 |
+|---|---|---|---|
+| 1 | **`to_pg_sql()` 判据过宽**：原为「含 `?` **或** `%` 就翻译」，于是直写 `%s` 的新 SQL 被二次转义成 `%%s`，psycopg 报 `0 placeholders but N parameters` | `db.py` 顶部与 `memory.md` 都写着「新写的 SQL 直接用 `%s`」——**文档教人写必崩的代码** | 判据收紧为「只看有没有 `?`」。两条路都通；额外收益是翻译**变成幂等**（旧判据下翻译两次会得到 `%%%%`，重试/重放路径会踩） |
+| 2 | **改卷名不换卷**：`docker compose up -d` 不因 volumes 卷名变化重建容器 | compose 已写对 `skillcoach-pgdata`，容器仍挂旧卷，PG 无限 `Restarting`（本机实际踩到，日志刷 `initdb: ... is not empty`） | 文档补「必须 `--force-recreate` + `docker inspect` 核挂载」；§6 排障表加一行 |
+| 3 | **`ARCHITECTURE.md` 完全没跟上 r98**：381 行里 0 处提及 PostgreSQL / Redis，仍写「SQLite（`backend/app.db`）、7 张表」 | 架构文档是新人理解系统的第一入口，比代码注释更该准 | 更新持久化选型、取舍 #3、`config.py` 契约、§3.4 标题与目录树；补「r98 换库的三处语义差异」 |
+| 4 | `scripts/backup_db.sh:15` 引用不存在的路径 `20261113-r98-redis-pg` | 按图索骥找不到手册 | 改为 `20261112-r98-redis-pg` |
+
+### 8.3 已知前提（不是 bug，但没写在代码里就会变 bug）
+
+`init_db()` 里有两条**破坏性收敛**，都建立在「单副本 / 单 worker」的前提上：
+
+- `_sweep_stale_radar_jobs()`：把**所有** queued/running 的雷达任务判为 failed（实测：插入 2 条后跑一次 `init_db()`，两条都变 `failed` + 「任务中断，请重新生成」）；
+- `_dedupe_running_profile_jobs()`：同 `(user_id, document_id)` 只留最新一条 running，其余判死。
+
+单副本重启时这是正确的兜底（旧进程的 `asyncio` 任务确实死了）。但**多副本滚动升级**时，新副本一启动就会误伤旧副本正在跑的任务；`uvicorn --reload` 下改一行代码也会废掉正在跑的长任务。
+
+当前部署是单进程（`backend/Dockerfile` 的 `CMD` 无 `--workers`），所以成立。已在两处 docstring 写明前提与改法（多副本时关掉启动清扫、只留读路径的 `radar_sweep_stale_jobs` 按 `radar_job_stale_minutes` 超时清扫，或给 `radar_jobs` 加属主列）。
+
+> 补一句口径：r98 引入 Redis 分布式锁是为了「多副本时共享状态」，但**上图这两处尚未多副本安全**。上多副本前必须先处理这里，否则滚动发布会随机失败正在进行的雷达生成与简历画像任务。

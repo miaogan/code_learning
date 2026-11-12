@@ -73,6 +73,21 @@ initdb: error: directory "/var/lib/postgresql/data" exists but is not empty
 
 （本机实测踩到过；同理，`docker volume rm` 旧卷之前先确认 §3.1 的备份已经拷出来。）
 
+**改卷名 ≠ 换卷**——这是最隐蔽的一步。`docker compose up -d` 是幂等的，但它的「要不要重建容器」
+只比较镜像 / 命令 / 环境变量 / 端口这类字段，**卷挂载的变化不在其列**：compose 文件里把
+`skillcoach-data` 改成 `skillcoach-pgdata` 之后，已存在的容器**不会**被重建，仍然挂在旧卷上，
+于是日志里无限刷同一句 `initdb: ... exists but is not empty`，`docker compose ps` 一直 `Restarting`。
+改完卷名必须显式重建，并核验挂载：
+
+```bash
+docker compose up -d --force-recreate postgres
+docker inspect $(docker compose ps -q postgres) \
+  --format '{{range .Mounts}}{{.Name}} -> {{.Destination}}{{"\n"}}{{end}}'
+# 期望：code_learning_skillcoach-pgdata -> /var/lib/postgresql/data
+```
+
+（同源坑还有 nginx 缓存的 `backend` IP：容器重建后 502，需 `--force-recreate frontend`，见 §6。）
+
 ### 3.1 迁移前：把 app.db 从旧卷里取出来
 
 r98 的 backend 容器**不再挂 `/data`**，所以不能再用 `docker cp` 从容器里捞，直接挂卷取：
@@ -224,6 +239,7 @@ cron（每天 03:10，保留 14 份）：
 | 多副本下限流仍然是 N 倍 | `REDIS_URL` 没配 / 配成了 `memory://` | 看启动日志 `production.config_warning` |
 | 改密后旧设备还能用 | Redis 会话缓存未被清（TTL 60s 内） | 检查 `delete_other_sessions` 是否被调用；缓存 key 前缀为 `sc:sess:*` |
 | PG 起不来：`directory "/var/lib/postgresql/data" exists but is not empty` | 复用了 r97 的 SQLite 卷（里面有 `app.db`） | 确认用的是 `skillcoach-pgdata` 卷；旧卷留作备份/回滚，不要删 |
+| 明明已经改了 compose 的卷名，PG 还是报上一行的错、无限 `Restarting` | `up -d` 不因卷名变化重建已有容器，容器仍挂在旧卷上 | `docker compose up -d --force-recreate postgres`，再用 `docker inspect` 核 `.Mounts[].Name` |
 | `docker compose build` 卡在 pip / npm 下载 | 直连 pypi.org / registry.npmjs.org 掉到几十 kB/s | `PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple NPM_REGISTRY=https://registry.npmmirror.com docker compose build`（两个构建参数默认官方源，不改代码） |
 | 前后端都 healthy，但经 nginx 访问 `/health` 是 502 | nginx 启动时解析了一次 `backend` 的 IP，容器重建后 IP 变了，nginx 仍在用旧地址 | `docker compose up -d --force-recreate frontend`（或 `nginx -s reload`） |
 | `/health` 里 `db` 字段 | 如实反映数据层，r98 起恒为 `postgresql` | 若还是 `sqlite`，说明跑的是旧镜像 |

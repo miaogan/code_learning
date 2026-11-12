@@ -114,7 +114,7 @@
 
 - **数据层口径取代 r10 的「SQLite 落 skillcoach-data 卷」**：`DATABASE_URL` 是唯一数据源，SQLite 已下线，**没有文件库、没有降级路径**。服务名/端口/WEB_PORT 仍是跨需求契约（改任一须同改 `docker-compose.yml` + r98 DEPLOY + README）。
 - **卷拆成两个，不许复用**：PG 用 `skillcoach-pgdata`；r97 的 `skillcoach-data`（内含 `app.db`）保留但不挂载，用途只剩「升级时取数据」与「回滚」。PG 的 `initdb` 只接受空目录，复用旧卷会 `directory exists but is not empty` 直接起不来（本机实测踩到）。
-- **`?` 占位符靠薄适配层翻译**（`db.to_pg_sql()`：`?`→哨兵→`%`转义→哨兵→`%s`，只在带参数时翻译）。新写的 SQL 一律直接用 `%s`，别再扩散 `?`。`row_factory=dict_row` + `prepare_threshold=None`。
+- **`?` 占位符靠薄适配层翻译**（`db.to_pg_sql()`：`?`→哨兵→`%`转义→哨兵→`%s`。**判据只看有没有 `?`**——r98 收尾修正：原判据「含 `?` 或 `%`」会把直写 `%s` 的新 SQL 二次转义成 `%%s`，psycopg 报「0 placeholders but N parameters」，而文档恰好教人这么写）。两条路都可走：用 `?` 时字面量 `%` 自动转义；直写 `%s` 时 `LIKE '%kw%'` 要自己写 `%%kw%%`。同一个文件别混用。`row_factory=dict_row` + `prepare_threshold=None`。
 - **检索**：FTS5 虚表删除，改 `pg_trgm` GIN；`mode` 恒 `like`、`notice` 恒空，与旧 LIKE 分支结果一致。`CREATE EXTENSION` 必须用独立连接（DDL 失败会把当前事务整个 aborted）。
 - **Redis 是加速层不是真值**：限流窗口（Lua ZSET 滑窗，被拒请求也写）、会话缓存 60s、读缓存按前缀失效、分布式锁（Lua 比对持有者释放）。降级三档：未配/`memory://`→进程内；运行期不可达→WARNING + 30s 不重试；生产未配→**拒启**。熔断**只共享错误率样本**，在飞计数保持单副本（共享会让 N 副本共用 32 的额度）。
 - **测试必须独占跑**：四个库 `sc_test` / `_empty` / `_legacy` / `_seed` 共享，多 pytest 进程并行会互相 `TRUNCATE`，表现为大量 error + 极慢。宿主跑测试要 `docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d postgres redis`（主 compose 不发布端口）。

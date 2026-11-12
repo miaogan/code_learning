@@ -2,8 +2,10 @@
 
 r98 起 SQLite 已下线，**没有本地文件库、也没有降级路径**：`DATABASE_URL` 是唯一数据源，
 连接由 `psycopg_pool.ConnectionPool` 统一给出。为了让 2261 行 `repository.py` 的 149 处 `?`
-占位符不必逐行改写，这里保留一个薄适配层（`to_pg_sql()` + `Connection`），
-**新写的 SQL 请直接用 `%s`**，不要让适配层继续扩散。
+占位符不必逐行改写，这里保留一个薄适配层（`to_pg_sql()` + `Connection`）。
+**新写的 SQL 可以直接用 `%s`**（`to_pg_sql()` 只在出现 `?` 时才介入）
+——但此时 SQL 里的 `LIKE '%kw%'` 要自己写成 `%%kw%%`，那是 psycopg 的原生语义；
+用 `?` 则连这层转义都不用管。两条路都通，同一个文件里别混用。
 
 不做迁移框架：只用 CREATE TABLE IF NOT EXISTS + ADD COLUMN IF NOT EXISTS，
 字段变更需在 memory.md 记录一次性升级说明。
@@ -55,10 +57,13 @@ def to_pg_sql(sql: str) -> str:
     - 先把 `?` 换成哨兵、再转义 `%`、最后换回 `%s`。若顺序反了，`%` 转义会把刚插入的
       `%s` 变成 `%%s`（占位符变成字面量），参数个数对不上。
 
-    只在**带参数**时调用：psycopg 无参数 `execute()` 走 simple protocol，不做 `%` 解析，
-    此时转义反而会把 `%%` 原样写进 SQL。
+    **只在 SQL 含 `?` 时翻译**（判据从「含 `?` 或 `%`」收紧到此，r98 补）。原判据会把
+    直接写 `%s` 的新 SQL 二次转义成 `%%s`，psycopg 报「0 placeholders but N parameters」——
+    而 `db.py` 顶部与 `memory.md` 都写着「新写的 SQL 直接用 `%s`」，等于文档教人写必崩的代码。
+    收紧后两条路都通：`?` 走翻译，`%s` 原样透传（此时 SQL 里的 `LIKE '%kw%'` 需自己写 `%%`，
+    那是 psycopg 的原生语义）。无参 SQL 也走这条分支：simple protocol 不解析 `%`。
     """
-    if _PLACEHOLDER not in sql and "%" not in sql:
+    if _PLACEHOLDER not in sql:
         return sql
     return sql.replace(_PLACEHOLDER, _SENTINEL).replace("%", "%%").replace(_SENTINEL, "%s")
 
@@ -688,6 +693,11 @@ def init_db() -> None:
 def _sweep_stale_radar_jobs(conn: Connection) -> None:
     """r67 生成任务在**进程重启后不续跑**：新进程里 queued/running 一定没有活的 `asyncio` 任务，
     直接按 failed + 中文原因落库（AC-4「不会永远停在生成中」的服务端兜底）。对干净库 0 行更新。
+
+    **前提是单副本 / 单 worker**（当前部署形态：Dockerfile 无 `--workers`）。这条清扫不区分
+    属主，多副本滚动升级时新副本一启动就会把旧副本正在跑的任务判死；届时要么关掉这一步、
+    只留读路径的 `radar_sweep_stale_jobs`（按 `radar_job_stale_minutes` 超时清扫），
+    要么给 `radar_jobs` 加属主列后按属主清扫。改部署形态前请先确认这里。
     """
     conn.execute(
         "UPDATE radar_jobs SET status = 'failed', error_message = '任务中断，请重新生成', "
@@ -706,6 +716,10 @@ def _dedupe_running_profile_jobs(conn: Connection) -> None:
     r98：SQLite 用 `rowid` 取「最新一行」，PG 没有 rowid 也没有 `max(ctid)` 聚合，
     改用窗口函数按 `(created_at, id)` 排序取 rn=1 —— 语义与「最后受理的那条」一致且不依赖
     物理行序（VACUUM / 并行写入后 rowid 顺序本来也不可靠）。
+
+    **与 `_sweep_stale_radar_jobs` 同一个前提：单副本**。这条会把同 `(user_id, document_id)`
+    里除最新外的 running 行判死；多副本滚动升级时新副本启动会误伤旧副本正在跑的任务。
+    当前部署是单进程 uvicorn（Dockerfile 无 `--workers`），改形态前先一并处理这两处。
     """
     conn.execute(
         "WITH ranked AS ("

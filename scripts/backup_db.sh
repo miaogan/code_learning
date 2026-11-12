@@ -12,7 +12,7 @@
 # 恢复（先停后端，避免连接占用）：
 #   docker compose stop backend
 #   docker compose exec -T postgres pg_restore -U $POSTGRES_USER -d $POSTGRES_DB --clean --if-exists < backups/app-xxx.dump
-# 具体命令见 docs/teamflow/20261113-r98-redis-pg/DEPLOY.md §6。
+# 具体命令见 docs/teamflow/20261112-r98-redis-pg/DEPLOY.md §6。
 set -eu
 
 cd "$(dirname "$0")/.."

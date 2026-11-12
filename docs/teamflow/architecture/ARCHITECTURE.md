@@ -16,7 +16,8 @@
 | 样式 | 手写 CSS + CSS 变量 token | `src/styles/tokens.css` | DESIGN §0 是写死规格（token / 几何 / 逐组件状态色），CSS 变量最贴近、产物零运行时 |
 | 后端 | Python 3.11+ + FastAPI + uvicorn | `fastapi>=0.110` | 与简历解析（pypdf / python-docx）与 AI 结构化校验（pydantic）天然同栈 |
 | 模型调用 | httpx 异步调用 OpenAI 兼容 `/chat/completions` | `httpx>=0.27` | 单一入口、超时/重试/JSON 兜底集中在一个模块 |
-| 持久化 | SQLite（标准库 `sqlite3`，`backend/app.db`） | 3.x | 7 张表、单用户、零外部服务；手写 SQL 比引 ORM 更轻 |
+| 持久化 | PostgreSQL 16 + psycopg3 连接池（`DATABASE_URL`） | `postgres:16-alpine`、`psycopg[binary]>=3.2` | r98 起取代 SQLite：多副本可共享、真并发写、崩溃不靠文件锁；结构化产物仍以 JSON 文本列存 |
+| 加速层 | Redis 8（`REDIS_URL`，可缺省） | `redis:8-alpine`、`redis>=5` | 限流窗口 / 会话缓存 / 读缓存 / 分布式锁四类「多副本必须共享、丢了能重建」的状态；未配或不可达时全部降级到进程内 |
 | 测试 | pytest + ruff（后端）/ vitest + tsc + eslint（前端） | — | 只需在两处夹具中防回归，不引 E2E 框架（首版无浏览器自动化要求） |
 | CI | GitHub Actions 双 job | — | 与本地命令等价，便于「网关失败即定位」 |
 
@@ -24,7 +25,7 @@
 
 1. **不做 SSR / Next.js**：产品是本地单用户工具，无 SEO、无分享页、无服务端渲染诉求。放弃：SSR、文件路由、RSC 全套。代价：路由表手写 6 条、首屏无 HTML 直出 —— 可接受，因为首屏只等本地 `/health`。
 2. **后端选 Python 而非 Node**：AI 与文档解析两件事都在 Python 生态里更成熟，`pypdf` / `python-docx` 直接解决 AC-1，`pydantic` 直接承担 AC-2 / AC-5 的 schema 校验与「非法 JSON → 一次重试」。放弃：单运行时（全 TS）的部署便利。代价：需要 Node + Python 两套工具链；用根 README 三步（前端 `npm i`、后端 `venv`、`.env`）与 CI 双 job 兜住。
-3. **SQLite 直连、不用 ORM / 迁移框架**：首版仅 `documents / profiles / runs / reports` 4 表，单进程本地库。放弃：SQLModel、alembic。代价：手写 SQL、改字段要自己写升级语句 —— 应对方式是把**结构化产物（画像 / 报告 / 试卷）以 JSON 文本列存**，表结构只保留 id、外键、时间戳与状态，schema 演进上移到应用层 pydantic 校验（见 §3.4）。
+3. **直连 SQL、不用 ORM / 迁移框架**（r98 起数据源是 PostgreSQL，此前是 SQLite）：首版仅 `documents / profiles / runs / reports` 4 表，单进程本地库。放弃：SQLModel、alembic。代价：手写 SQL、改字段要自己写升级语句 —— 应对方式是把**结构化产物（画像 / 报告 / 试卷）以 JSON 文本列存**，表结构只保留 id、外键、时间戳与状态，schema 演进上移到应用层 pydantic 校验（见 §3.4）。r98 换库把这笔代价兑现了一次：149 处 `?` 占位符收敛到 `db.to_pg_sql()` 一层翻译，DDL 全部写成 `IF NOT EXISTS` 形态，于是 `init_db()` 仍然是幂等的（结构快照两次执行逐字一致）。
 4. **样式手写 CSS、不用 Tailwind / CSS-in-JS**：DESIGN §0.7 的 6 处几何（40 按钮 / 24 徽章 / 96 磁贴 / 132 课程卡 / 128 textarea / 64-56 环）是**恰好闭合**的推导，任何 utility 类拼装都会让尺寸漂移。放弃：原子类书写效率。代价：类名集中维护，约定「组件类以 `.sc-` 前缀 + BEM-lite 命名」，新增组件必须复用 token、禁止写裸色值。
 
 ---
@@ -68,7 +69,7 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
 └─ backend/                           # FastAPI 服务
    ├─ requirements.txt                # 运行时 + 测试依赖 *
    ├─ pyproject.toml                  # ruff / pytest 配置（不打包发布）*
-   ├─ .env.example                    # AI_* / DB_PATH / CORS 示例（无真实 key）*
+   ├─ .env.example                    # AI_* / DATABASE_URL / REDIS_URL / CORS 示例（无真实 key）*
    ├─ app/
    │  ├─ __init__.py
    │  ├─ main.py                      # app 工厂、lifespan 建库、CORS、异常处理器、GET /health *
@@ -78,8 +79,7 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
    │  ├─ routers/                     # auth / resume / profile / interview / exam / practice / report / courses / history / timeline *
    │  ├─ services/                    # 业务域分包：ai/ resume/ profile/ interview/ assessment/ report/（+ login_guard.py）*
    │  └─ seed/{courses.json, questions.json}   # 精选清单（人工维护，便于集中换链）*
-   ├─ tests/{test_health.py, test_courses.py, test_resume_guard.py}   # pytest *
-   └─ app.db                          # 运行时生成（gitignore）
+   └─ tests/                          # pytest（r98 起用例连真实 PG，不再有本地库文件）*
 ```
 
 运行日志：`logs/teamflow/<runId>/` 仅 run 期间暂存，run 结束由 host 归档并从项目删除（已 gitignore）。
@@ -110,7 +110,7 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
 | 路径 | 职责 | 已实现 / 待填 |
 | --- | --- | --- |
 | `app/main.py` | app 工厂、CORS（5173/127.0.0.1）、`AppError` → envelope、`GET /health` | ✅ 已实现 |
-| `app/core/config.py` | `Settings`（AI_BASE_URL / AI_API_KEY / AI_MODEL / AI_TIMEOUT_S / DB_PATH / 上传上限） | ✅ |
+| `app/core/config.py` | `Settings`（AI_BASE_URL / AI_API_KEY / AI_MODEL / AI_TIMEOUT_S / DATABASE_URL / REDIS_URL / 连接池与缓存 TTL / 上传上限） | ✅ |
 | `app/core/db.py` | 连接、`init_db()` 建 7 表、`get_connection()` 依赖 | ✅（表结构见 §3.4；r6 增 `questions` / `question_attempts`） |
 | `app/core/errors.py` | 错误码常量 + `AppError` | ✅ |
 | `app/schemas.py` | pydantic v2 模型（Profile 5 维度 / 题目 / 报告 / 课程）；**HTTP 契约唯一真源** | ✅ 齐备；r5 起含 4 项面试设定（`InterviewSettings` / `InterviewSettingsPatch`）、会话与回合（`InterviewRun` / `InterviewTurn` / `InterviewSession`），`RunSummary` / `Report` 增 `interview_settings`；r44 设定扩为 6 键（可选 `direction` / `sub_direction`，空串 = 不限，老 payload 缺键仍合法） |
@@ -155,7 +155,7 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
 
 `code` 闭集（`app/core/errors.py` 常量）：`EMPTY_FILE` `ENCRYPTED_PDF` `FILE_TOO_LARGE` `UNSUPPORTED_TYPE` `PARSE_FAILED` `AI_UNAVAILABLE` `AI_SCHEMA_INVALID` `NOT_IMPLEMENTED` `NOT_FOUND` `VALIDATION_ERROR` `HTTP_ERROR`（其它框架级状态透传）`METHOD_NOT_ALLOWED`（框架级 405 中文 envelope），r23 增 `AUTH_REQUIRED` `AUTH_INVALID` `AUTH_DISABLED` `AUTH_RATE_LIMITED`（HTTP 429，登录失败达阈值后锁定）`PASSWORD_INVALID` `FORBIDDEN` `AI_KEY_REQUIRED` `AI_QUOTA_EXCEEDED` `AI_KEY_STORE_UNAVAILABLE`。**message 一律中文**，且不含文件绝对路径、堆栈、模型端点或 key。
 
-### 3.4 数据模型（SQLite，`backend/app.db`）
+### 3.4 数据模型（PostgreSQL 16，`DATABASE_URL`）
 
 | 表 | 关键列 | 用途 |
 | --- | --- | --- |
@@ -173,6 +173,12 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
 > `user_id TEXT NOT NULL DEFAULT 'default'`；存量行由 `ADD COLUMN ... DEFAULT` 直接回填为 `default`。见 §3.8。
 
 约定：时间为 ISO-8601 UTC 字符串；payload 存 JSON 文本，读写两侧过 pydantic 模型；`init_db()` 只用 `CREATE TABLE IF NOT EXISTS`，字段变更需在 `memory.md` 记录一次性升级说明（不做迁移框架）。
+
+> **r98 换库的三处语义差异**：
+> 1. 自增改 `GENERATED BY DEFAULT AS IDENTITY`（原来 `AUTOINCREMENT`），插入用 `RETURNING` 取回主键（原来 `lastrowid`）；
+> 2. 全文检索从 FTS5 虚表改 `pg_trgm` GIN 索引，检索走 `ILIKE` 单路径（`mode` 恒 `like`、`notice` 恒空），与旧 LIKE 分支结果一致；
+> 3. 升级不再靠 `PRAGMA table_info` 判定补列，改 `ADD COLUMN IF NOT EXISTS`；毫秒时间戳列必须 `BIGINT`（`INTEGER` 会溢出）。
+> 存量数据用 `scripts/migrate_sqlite_to_pg.py` 一次性迁入（幂等、可重跑、序列复位、逐表行数校验）。
 
 #### 3.4.1 `runs.payload` v2（r5 起，面试会话的唯一真相）
 
@@ -345,7 +351,7 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
 | 题库种子 1284 道（2026-11-11 系统架构场景批起） | `backend/app/seed/questions.json`（r6 起退为**唯一导入源**，运行时由 `questions` 表承载；r11 起每次启动幂等导入，r14 起启动同时覆写既有行差异）；素材输入与留痕在 `docs/question-bank-staging/`（`PROVENANCE.md` + `NOTICE-fe-interview.md`），id 前缀口径见 §3.4.2 |
 | pydantic 契约模型（画像 5 维度 / 题目 / 报告 / 课程） | `backend/app/schemas.py` |
 | 后端测试 38 文件（pytest 零网络） | `backend/tests/*.py` |
-| 容器化交付（r10） | `docker-compose.yml`、`backend/Dockerfile`、`frontend/Dockerfile`、`frontend/nginx.conf`、`docker.env.example`、任务夹 `docs/teamflow/20261101-r10-docker-compose-deploy/DEPLOY.md`；`WEB_PORT=8080` 单端口对外、SQLite 落 `skillcoach-data` 卷 |
+| 容器化交付（r10） | `docker-compose.yml`、`backend/Dockerfile`、`frontend/Dockerfile`、`frontend/nginx.conf`、`docker.env.example`、任务夹 `docs/teamflow/20261101-r10-docker-compose-deploy/DEPLOY.md`；`WEB_PORT=8080` 单端口对外、SQLite 落 `skillcoach-data` 卷（**r98 起改为 PG 落 `skillcoach-pgdata` + Redis，见 `docs/teamflow/20261112-r98-redis-pg/DEPLOY.md`**；旧卷保留作迁移来源，不再挂载） |
 | 前端 `package-lock.json` + 已装依赖 | `frontend/package-lock.json`、`frontend/node_modules/` |
 | CI 双 job | `.github/workflows/ci.yml` |
 | 本地工程验证（r43 补记） | `pypdf` 6.21.4 / `python-docx` / `ruff` 均已装，真实 PDF / DOCX 解析与 `python -m ruff check app tests` 可在本机实跑（r42 起纳入每次交付门禁） |
