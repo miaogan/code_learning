@@ -413,7 +413,8 @@ def test_timeline_endpoint_orders_desc_and_validates_limit(
     limited = client.get("/api/timeline?limit=2").json()
     assert [row["ref_id"] for row in limited] == ["run-b", "run-c"]
 
-    for bad in (0, 51):
+    # r93：timeline 上限继承 history.MAX_LIMIT（单一来源，放宽到 200）——越界边界同步上移。
+    for bad in (0, 201):
         response = client.get(f"/api/timeline?limit={bad}")
         assert response.status_code == 422
         assert response.json()["error"]["code"] == VALIDATION_ERROR

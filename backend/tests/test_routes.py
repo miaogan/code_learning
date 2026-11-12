@@ -564,3 +564,15 @@ def test_full_flow_reaches_terminal_report(
     assert history.status_code == 200
     kinds = {row["kind"] for row in history.json()["items"]}
     assert kinds == {"interview", "exam"}
+
+
+def test_history_accepts_heatmap_limit_200(
+    client: TestClient,
+    profile_factory: Callable[..., Any],
+    seed_questions: list[dict[str, Any]],
+) -> None:
+    """r93 回归：热力日历 / 连胜徽章请求 `limit=200`（一整年记录），旧上限 50 会 422。"""
+    _completed_runs(profile_factory, seed_questions)
+    assert client.get("/api/history", params={"limit": 200}).status_code == 200
+    # 上限放宽到 200 后，越界仍要拦（422 → 统一错误 envelope）。
+    assert client.get("/api/history", params={"limit": 201}).status_code == 422

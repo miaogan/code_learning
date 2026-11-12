@@ -23,8 +23,8 @@ router = APIRouter(prefix="/api", tags=["timeline"], dependencies=[Depends(curre
 def get_timeline(
     limit: Annotated[
         int,
-        Query(ge=MIN_LIMIT, le=MAX_LIMIT, description="返回条数（1..50，默认 20）"),
+        Query(ge=MIN_LIMIT, le=MAX_LIMIT, description="返回条数（1..200，默认 20）"),
     ] = DEFAULT_LIMIT,
 ) -> list[TimelineEvent]:
-    """`limit` 越界由 `Query(ge=1, le=50)` 拦下（422 → 统一错误 envelope）。"""
+    """`limit` 越界由 `Query(ge=1, le=MAX_LIMIT)` 拦下（422 → 统一错误 envelope）。"""
     return list_timeline(limit)

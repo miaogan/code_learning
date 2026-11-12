@@ -36,7 +36,7 @@ _NO_KINDS: tuple[str, ...] = ()
 def get_history(
     limit: Annotated[
         int,
-        Query(ge=MIN_LIMIT, le=MAX_LIMIT, description="每页条数（1..50，默认 10）"),
+        Query(ge=MIN_LIMIT, le=MAX_LIMIT, description="每页条数（1..200，默认 10）"),
     ] = DEFAULT_LIMIT,
     page: Annotated[int, Query(ge=1, description="页码，从 1 起")] = 1,
     kind: Annotated[
