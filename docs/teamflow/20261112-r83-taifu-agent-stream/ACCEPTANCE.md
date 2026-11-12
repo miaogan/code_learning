@@ -245,3 +245,57 @@ RESULT: PASS
 ### 回归
 
 同一份浏览器脚本也覆盖了「全部忘掉」（同一套二次确认），并复查了 §7 / §8 的两套断言（多轮回答、空回答提示）仍全 PASS。
+
+## 10. CI 修复：本地绿、CI 红的测试隔离问题（2026-11-12）
+
+从 run 87（r82+r83 那笔提交）起，GitHub CI 的 `backend` 作业连续 4 次红在 `Test` 步骤，而本地全量一直是 854 条 0 失败。
+
+### 10.1 定位
+
+CI 日志要仓库 admin 权限（匿名 API 403），所以换了个更可靠的复现口径：**本地把 `backend/app.db` 移走再跑**。
+
+```text
+有 app.db（日常本地）      → 854 tests / 0 failures
+无 app.db（干净检出 = CI）  → 854 tests / 4 failures
+  FAILURE test_remember_is_capped_and_deduplicated
+  FAILURE test_graph_answers_without_any_tool
+  FAILURE test_graph_cites_only_what_the_tool_actually_read
+  FAILURE test_graph_stops_after_the_tool_round_cap
+  sqlite3.OperationalError: no such table: taifu_memories
+```
+
+四条都在 r83 的新测试文件里，共同点：**碰了库，却没声明 `tmp_db`**。它们靠 `profile_factory` 造内存对象，又直接调 `repository.insert_profile` / `tools.run("remember")` / `graph.run_events`（`finalize` 会写历史）。本地 `backend/app.db` 一直在、表也全，于是悄悄写进开发库还能过；CI 是干净检出，没有库文件、没有表，第一次查询就炸。
+
+这与 §7 修的那条 `UNIQUE constraint failed` 是**同一个病根**：`profile_factory` 只是内存工厂，不提供库。
+
+### 10.2 修法两层
+
+1. **补声明**：四条用例加 `tmp_db`（各自拿到一次性临时库）。
+2. **加结构性护栏**：`tests/conftest.py` 新增 session 级 autouse fixture `_isolate_default_db`，把默认 `DB_PATH` 指到 `tests/.tmp/default-<uuid>.db` 且**不建表**。于是「忘了声明 `tmp_db`」在本地也会立刻 `no such table`，与 CI 完全一致，再也不会出现「本地绿、CI 红」。
+
+负向自检（临时探针，跑完即删）：
+
+```text
+def test_probe_touches_db_without_tmp_db():
+    repository.list_taifu_memories()
+
+→ sqlite3.OperationalError: no such table: taifu_memories   ← 护栏确实咬住了
+```
+
+### 10.3 验证
+
+```text
+无 app.db（模拟 CI）: 854 tests / 0 failures / 1 skipped
+有 app.db（日常）  : 854 tests / 0 failures / 1 skipped
+ruff check app tests : All checks passed
+Python 3.11（CI 版本）建独立 venv 跑：854 tests / 0 failures  ← 排除解释器差异
+```
+
+> 顺带排除了两个常见误判：`langgraph` 本地与 PyPI 最新都是 1.2.20（不是依赖漂移）；
+> 代码里的 `zip(strict=True)`、`asyncio.run` 在 3.11 下同样通过（不是版本语法问题）。
+
+### 10.4 为什么不改 CI
+
+CI 的 `Test` 步骤本身没问题 —— 它正是**唯一能把这类问题照出来**的地方。要改的是测试：
+本地环境不该比 CI「更宽松」（有现成的库、现成的表）。护栏加在 conftest 而不是 workflow，
+这样本地、CI、以及以后任何干净检出都按同一套规则失败。

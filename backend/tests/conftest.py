@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any
@@ -196,6 +197,33 @@ _NEUTRAL_AI_ENV: dict[str, str] = {
     "AI_VISION_BASE_URL": "",
     "AI_VISION_API_KEY": "",
 }
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _isolate_default_db() -> Iterator[None]:
+    """把「默认库」也指到一次性路径：**忘了声明 `tmp_db` 的用例会像 CI 一样失败**。
+
+    本地开发库 `backend/app.db` 一直都在（还带着全量表），任何忘记声明 `tmp_db` 的用例都会
+    悄悄写进去 —— 既污染开发数据，又把「只有干净检出（CI）才红」的隔离问题藏起来：
+    r83 就有 4 条用例这样绿在本地、红在 CI（`no such table: taifu_memories`）。
+
+    这里把 `DB_PATH` 指向一个**还不存在**的文件且不建表：用例一碰库就 `no such table`，
+    与干净检出时的行为完全一致。需要库的用例显式声明 `tmp_db`（它会覆盖本 fixture 的值）。
+    """
+    SCRATCH_DIR.mkdir(exist_ok=True)
+    target = SCRATCH_DIR / f"default-{uuid4().hex}.db"
+    previous = os.environ.get("DB_PATH")
+    os.environ["DB_PATH"] = str(target)
+    get_settings.cache_clear()
+    try:
+        yield
+    finally:
+        if previous is None:
+            os.environ.pop("DB_PATH", None)
+        else:
+            os.environ["DB_PATH"] = previous
+        get_settings.cache_clear()
+        target.unlink(missing_ok=True)
 
 
 @pytest.fixture(autouse=True)

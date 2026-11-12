@@ -265,7 +265,7 @@ def test_tool_refuses_unknown_tool_name() -> None:
     assert "没有这个工具" in result["summary"]
 
 
-def test_remember_is_capped_and_deduplicated() -> None:
+def test_remember_is_capped_and_deduplicated(tmp_db: Any) -> None:
     context = tools.ToolContext(profile=None, report=None, attempts=[], memories=[])
 
     async def _run_all() -> list[dict[str, Any]]:
@@ -331,7 +331,7 @@ async def _events(
     ]
 
 
-def test_graph_answers_without_any_tool(profile_factory: Any) -> None:
+def test_graph_answers_without_any_tool(profile_factory: Any, tmp_db: Any) -> None:
     repository.insert_profile(profile_factory())
     client = _ScriptedClient([_text("先补部署。")])
 
@@ -345,7 +345,9 @@ def test_graph_answers_without_any_tool(profile_factory: Any) -> None:
     assert client.calls == 1
 
 
-def test_graph_cites_only_what_the_tool_actually_read(profile_factory: Any) -> None:
+def test_graph_cites_only_what_the_tool_actually_read(
+    profile_factory: Any, tmp_db: Any
+) -> None:
     repository.insert_profile(profile_factory())
     client = _ScriptedClient(
         [_tool("read_weakness_detail", '{"point":"事件循环"}'), _text("错在微任务顺序。")]
@@ -364,7 +366,9 @@ def test_graph_cites_only_what_the_tool_actually_read(profile_factory: Any) -> N
     assert client.calls == 2
 
 
-def test_graph_stops_after_the_tool_round_cap(profile_factory: Any) -> None:
+def test_graph_stops_after_the_tool_round_cap(
+    profile_factory: Any, tmp_db: Any
+) -> None:
     repository.insert_profile(profile_factory())
     # 模型每轮都要读料：不允许无限循环。
     client = _ScriptedClient([_tool("read_weakness_detail", '{"point":"事件循环"}')] * 5)
