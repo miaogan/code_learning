@@ -40,6 +40,8 @@
 |---|---|
 | `pytest tests/test_r97_production_guard.py` | 11 passed（档位 5 + 告警 3 + 文档开关 2 + 生产就绪 1） |
 | 后端全量 `pytest -q` / `ruff check app tests` | 全绿 / All checks passed |
+| 生产档容器（真实镜像）拒绝启动 | `APP_ENV=production` 无 `COOKIE_SECURE` → `RuntimeError: 生产环境配置不安全，已拒绝启动：COOKIE_SECURE 必须为 true…`，进程退出 |
+| 生产档容器（真实镜像）正常启动 | `/docs` 404、`/redoc` 404、`/openapi.json` 404、`/health` 200；日志两条 `production.config_warning`（SECRET_KEY 空、AI 未就绪） |
 | nginx 配置（真实 TLS 版，非默认 conf） | `nginx -t` successful |
 | 80 端口 | `HTTP/1.1 301 Moved Permanently` |
 | 443 端口 | `200`，响应头含 HSTS / nosniff / Referrer-Policy / X-Frame-Options / Permissions-Policy / CSP（逐条核对） |
@@ -51,8 +53,10 @@
 
 **验证中发现并修掉的问题**：首次用 Git Bash 挂载校验 nginx 配置时，`$PWD` 的 `D:/…` 被
 MSYS 当成路径转换、`docker cp` 的容器内绝对路径也被改写，导致「配置校验通过」实际校验的是
-镜像自带默认 conf（假绿）。改为 `MSYS_NO_PATHCONV=1` + `docker cp` 后才拿到真结果——
-这条已写进本文，避免下次再被同一个坑骗过。
+镜像自带默认 conf（假绿）。改为 `MSYS_NO_PATHCONV=1` + `docker cp` 后才拿到真结果。
+同一坑在验证生产档时又出现一次：`-e DB_PATH=/data/prod.db` 被改写成 `E:/…/data/prod.db`，
+SQLite 报 `unable to open database file`，看起来像应用 bug，实际是 shell 层的路径转换。
+两条都已写进本文，避免下次再被同一个坑骗过。
 
 ## §4 风险与边界
 
