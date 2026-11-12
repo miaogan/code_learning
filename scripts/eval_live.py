@@ -17,11 +17,11 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import hashlib
 import json
 import os
 import sys
-import tempfile
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -39,6 +39,51 @@ TRACE_DIR = ROOT / "docs" / "eval" / "traces"
 
 CHECK_MIN_SCHEMA = 0.90
 CHECK_EXPECTED_CASES = 30
+
+
+@contextlib.contextmanager
+def _temp_database():
+    """真跑用的独立库：跑完即删，绝不写开发库。
+
+    r98 前这里用临时 SQLite 文件（`DB_PATH`）；SQLite 下线后改成「同一实例上的
+    独立库」。**只改 `DATABASE_URL` 而不隔离库**会让评测数据混进真实账号的数据里，
+    所以这里建库 / 建表 / 删除一条龙。
+    """
+    from urllib.parse import urlparse
+
+    import psycopg
+    from app.core.config import get_settings
+    from app.core.db import close_pool, init_db
+
+    base = os.environ.get("EVAL_DATABASE_URL") or os.environ.get("DATABASE_URL")
+    if not base:
+        raise RuntimeError(
+            "真跑需要 PostgreSQL：请设置 EVAL_DATABASE_URL 或 DATABASE_URL"
+        )
+    parsed = urlparse(base)
+    name = "sc_eval_live_" + str(os.getpid())
+    admin = parsed._replace(path="/postgres").geturl()
+    dsn = parsed._replace(path="/" + name).geturl()
+    with psycopg.connect(admin, autocommit=True, connect_timeout=5) as conn:
+        conn.execute('DROP DATABASE IF EXISTS "' + name + '" WITH (FORCE)')
+        conn.execute('CREATE DATABASE "' + name + '"')
+
+    previous = os.environ.get("DATABASE_URL")
+    os.environ["DATABASE_URL"] = dsn
+    get_settings.cache_clear()
+    close_pool()
+    try:
+        init_db()
+        yield dsn
+    finally:
+        close_pool()
+        if previous is None:
+            os.environ.pop("DATABASE_URL", None)
+        else:
+            os.environ["DATABASE_URL"] = previous
+        get_settings.cache_clear()
+        with psycopg.connect(admin, autocommit=True, connect_timeout=5) as conn:
+            conn.execute('DROP DATABASE IF EXISTS "' + name + '" WITH (FORCE)')
 
 
 def _load_golden() -> tuple[dict[str, Any], str]:
@@ -292,14 +337,8 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     if run_live:
-        # 真跑把日志写到临时库，绝不污染开发库；DB_PATH 必须在读取配置前设置。
-        with tempfile.TemporaryDirectory(prefix="r54-live-") as tmp:
-            os.environ["DB_PATH"] = str(Path(tmp) / "eval_live.db")
-            from app.core.config import get_settings
-            from app.core.db import init_db
-
-            get_settings.cache_clear()
-            init_db()
+        # 真跑把日志写进独立库，跑完即删，绝不污染开发库。
+        with _temp_database():
             lines = asyncio.run(_run_live_cases(golden, config, limit, system))
     else:
         lines = _dry_run_lines(golden, config, limit)

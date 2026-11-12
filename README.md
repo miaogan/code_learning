@@ -97,7 +97,7 @@ docker compose ps        # backend 的 STATUS 应带 (healthy)
 
 | 位置 | 命令 | 期望 |
 | --- | --- | --- |
-| `backend/` | `python -m pytest -q` | 全部通过（AI 全链路注入 `FakeAI`，**零网络**） |
+| `backend/` | `python -m pytest -q` | 全部通过（AI 全链路注入 `FakeAI`，**零网络**）。**前置**：需要可用的 PostgreSQL（默认 `127.0.0.1:5433`），先 `docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d postgres redis` |
 | `backend/` | `python -m ruff check app tests` | All checks passed |
 | `frontend/` | `npm run typecheck && npm run lint && npm test && npm run build` | 无错误，生成 `frontend/dist/` |
 | `backend/` | `pip-audit -r requirements.txt` | `No known vulnerabilities found` |
@@ -105,21 +105,21 @@ docker compose ps        # backend 的 STATUS 应带 (healthy)
 | 根 | `curl -sS http://127.0.0.1:8000/health` | `{"status":"ok",...}` |
 | 根 | `grep -riE "sk-\|api_key\|AI_API_KEY" frontend/src frontend/dist \|\| echo NO_KEY_LEAK` | `NO_KEY_LEAK`（AC-8） |
 
-CI 双 job 已在 [GitHub Actions](https://github.com/miaogan/code_learning/actions) 实跑（#27 起连续通过）。工作流覆盖类型检查 / lint / 测试 / 构建、题库字节门禁、5 个离线评测门禁，以及前后端依赖漏洞审计（`pip-audit` 对 `requirements.txt`，`npm audit --omit=dev` 只扫进构建产物的生产依赖，阈值 high）。依赖版本漂移由 [Dependabot](./.github/dependabot.yml) 每周提 PR（pip / npm / github-actions 三路）。已知未修的 2 条 moderate 属 `react-router` 6.x（`GHSA-wrjc-x8rr-h8h6` 开放重定向），修复要求升到 7.x（破坏性路由 API 变更），故留在升级批次里单独验证。
+CI 双 job 跑在 [GitHub Actions](https://github.com/miaogan/code_learning/actions)。工作流覆盖类型检查 / lint / 测试 / 构建、题库字节门禁、5 个离线评测门禁，以及前后端依赖漏洞审计（`pip-audit` 对 `requirements.txt`，`npm audit --omit=dev` 只扫进构建产物的生产依赖，阈值 high）。r98 起 backend job **自带 `postgres:16-alpine` + `redis:8-alpine` 服务容器**（healthcheck 通过才开跑）——SQLite 下线后测试与检索评测都连真库，CI 不再有「没有数据库的测试」这种假绿。依赖版本漂移由 [Dependabot](./.github/dependabot.yml) 每周提 PR（pip / npm / github-actions 三路）。已知未修的 2 条 moderate 属 `react-router` 6.x（`GHSA-wrjc-x8rr-h8h6` 开放重定向），修复要求升到 7.x（破坏性路由 API 变更），故留在升级批次里单独验证。
 
 评测与检索证据（零网络、可复跑）：
 
 ```bash
-python -X utf8 scripts/eval_harness.py --check              # 30 例金标集回归门禁 → REPORT.md
-node scripts/eval_retrieval.mjs --check                     # 教程侧 BM25 召回 → RETRIEVAL-REPORT.md
-python -X utf8 scripts/eval_question_retrieval.py --check   # 题目侧 FTS5 召回 → QUESTION-RETRIEVAL-REPORT.md
+python -X utf8 scripts/eval_harness.py --check              # 30 例金标集回归门禁（只读，不写 REPORT.md）
+node scripts/eval_retrieval.mjs --check                     # 教程侧 BM25 召回门禁（只读）
+python -X utf8 scripts/eval_question_retrieval.py --check   # 题目侧 PG 检索召回门禁（只读，需 PG）
 python -X utf8 scripts/eval_reliability.py                  # 故障注入 → RELIABILITY-REPORT.md
-python -X utf8 scripts/benchmark.py                         # 并发写锁 / 导入 / 检索 → PERF-REPORT.md
+python -X utf8 scripts/benchmark.py                         # 并发写锁 / 导入 / 检索 → PERF-REPORT.md（r98 前口径，见下）
 python -X utf8 scripts/seed_eval_demo.py --dry-run          # /eval 看板合成演示数据（不写库）
 python -X utf8 scripts/eval_live.py --check                 # 在线评测脚手架 dry-run 门禁（零网络 / 零 Key）
 ```
 
-> 带 `--check` 的是只读 CI 门禁，不带的是会重写对应报告的生成命令；`benchmark.py` 依赖本机磁盘与 CPU，**刻意不进 CI**（跨机器分位不稳定会导致 flaky）。所有指标来自合成数据 / 同源标注 / 模拟故障，只用于回归检测与实现可用性证明，不代表模型能力或生产 QPS；口径与限制见 `docs/teamflow/20261109-r51-resume-highlight-engineering/TECHNICAL.md §6–§8`。
+> 带 `--check` 的是只读 CI 门禁（**不写任何文件**），不带的是会重写对应报告的生成命令；`benchmark.py` 依赖本机磁盘与 CPU，**刻意不进 CI**（跨机器分位不稳定会导致 flaky），且它压的是**临时 SQLite 库**——r98 换 PG 后这条写锁路径已不存在，数字只能与历史版本纵向比对，不代表当前数据层性能，待改写为 PG 基准。所有指标来自合成数据 / 同源标注 / 模拟故障，只用于回归检测与实现可用性证明，不代表模型能力或生产 QPS；口径与限制见 `docs/teamflow/20261109-r51-resume-highlight-engineering/TECHNICAL.md §6–§8`。
 >
 > **在线质量评测轨道**：`scripts/eval_live.py` 默认 dry-run，只有 `--check` 进 CI。真跑需
 > `AI_LIVE=1 python -X utf8 scripts/eval_live.py --live`（消耗第三方配额、不进 CI），

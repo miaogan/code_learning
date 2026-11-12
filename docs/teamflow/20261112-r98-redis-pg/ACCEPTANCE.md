@@ -40,6 +40,7 @@ cd backend && ./.venv/Scripts/python.exe -m pytest -q
 | AC-11 | 生产档无 `REDIS_URL` 拒启 | ✅ `test_missing_redis_blocks_production_startup` |
 | AC-12 | 迁移脚本幂等 + 行数校验 + 序列复位 | ✅ 六场景全部实跑，见下节 |
 | AC-13 | 全量测试 + ruff | ✅ 见「执行快照」 |
+| AC-14 | CI 能跑通换库后的测试与门禁 | ✅ backend job 自带 PG/Redis service；检索评测改为直连 PG，recall@5 与旧值一致（见第六节） |
 
 ## 三、迁移脚本实测
 
@@ -214,7 +215,34 @@ $ redis-cli --scan --pattern '*'      # → sc:sess:8698e497... / sc:rl:api:172.
 `test_r98_redis.py` 的 11 项也在同一个 v8.10.3 实例上全过。这正是「Redis 只存可重建状态」
 这条设计的实际收益——换版本不需要迁移任何数据。
 
-## 六、未覆盖 / 已知边界
+## 六、CI 环境对齐（r98 补）
+
+r98 把数据层换成 PG 后，`.github/workflows/ci.yml` 的 backend job 仍在裸
+`ubuntu-latest` 上跑测试——没有 PG 实例，902 个用例**全部报错**
+（每个用例一条 `RuntimeError: 测试需要 PostgreSQL，但连不上 …`，来自
+`conftest._ensure_database_exists` 的显式失败，不是静默跳过）。
+
+| 改动 | 说明 |
+|---|---|
+| backend job 加 `services` | `postgres:16-alpine`（映射 5433）+ `redis:8-alpine`（映射 6380），都带 healthcheck，Actions 自动等待就绪 |
+| 显式 DSN | `TEST_DATABASE_URL` / `EVAL_DATABASE_URL` / `REDIS_TEST_URL` 写进 job `env`，不依赖「端口恰好相同」的巧合 |
+| 检索评测改直连 PG | `scripts/eval_question_retrieval.py` 原先在**内存 SQLite** 上重建 FTS5 虚表来评测，而 r98 已删除该虚表——门禁评的是一条死代码。改为直连 PG、直接调 `repository.search_questions()` |
+| `eval_live.py` 去掉 `DB_PATH` | r98 已删该配置，原代码设置它无效，真跑会连 `backend/.env` 里的开发库（有污染真实数据的风险）。改为同实例独立库 `sc_eval_live_<pid>`，跑完即删 |
+| `eval_harness.py --check` 改真只读 | 原实现 `--check` 仍会重写 `docs/eval/REPORT.md`，「本地处理耗时」的微秒抖动会污染 git diff（本次实测 4 微秒 → 3 微秒） |
+
+检索评测从 FTS5 内存库换到真实 PG 后的结果：
+
+```
+评测库    : postgresql://postgres@127.0.0.1:5433/sc_eval（题库 1284 道）
+样本量 n  : 20（覆盖 8 个方向）
+recall@5  : 100.0%（20/20）
+检索路径  : like 20/20
+```
+
+recall@5 与旧 FTS5 内存库完全一致——**切库没有带来召回回归**，这也顺便证明了
+`ILIKE` 单路径与旧双路径在标注集上的等价性。
+
+## 七、未覆盖 / 已知边界
 
 - Let's Encrypt 的证书脚本、nginx 配置都是 r97 的产物，本轮未改，也未重新验证；
 - `pg_trgm` 在无超级用户权限的托管 PG 上会被跳过（只记 WARNING），检索退化为顺序扫描；

@@ -1,12 +1,15 @@
-"""题目侧 FTS5 端到端召回评估（零网络、零 FastAPI 依赖，纯标准库）。
+"""题目侧检索召回评估（r98：直连 PostgreSQL，跑生产同一条 SQL）。
 
 诚实边界：
-- 评估对象是 SQLite FTS5 trigram 关键词检索，**不是向量检索 / RAG**；
-  全程无 embedding、无向量库、无大模型生成。
+- 评估对象是 `repository.search_questions()` 的**真实执行结果** —— PG 的
+  `prompt ILIKE ? OR explanation ILIKE ?` 子串匹配（`pg_trgm` GIN 索引加速），
+  **不是向量检索 / RAG**；全程无 embedding、无向量库、无大模型生成。
+- r98 之前这里用内存 SQLite 的 FTS5 trigram 虚表复现检索。SQLite 下线后那张虚表
+  已不存在，继续评它等于评一条死代码，故改为直连真库、直接调生产函数。
+- 需要可用的 PostgreSQL 实例（`EVAL_DATABASE_URL` > `DATABASE_URL` > 本地默认）。
+  连不上即**失败退出 2**，绝不静默跳过：「门禁没跑」被当成「门禁通过」是最坏的失败模式。
 - 标注 query 由题库题干关键词启发写成，存在标注泄漏风险，
   仅用于 CI 回归检测，不是能力宣传；数据全部为合成 / 题库启发标注。
-- 在内存库重建与生产等价的 question_search 虚表，MATCH 表达式与
-  repository.search_questions() 完全一致，短查询降级 LIKE。
 
 格式化口径（遵守 ruff）：不用 f-string、不用 % 格式化；普通字符串用
 str.format() / format() 内置 / 字符串拼接；日志走 logging 的 %s 占位，
@@ -23,12 +26,24 @@ import argparse
 import json
 import logging
 import math
-import sqlite3
+import os
+import re
+import sys
 from pathlib import Path
+from urllib.parse import urlparse
+
+import psycopg
 
 ROOT = Path(__file__).resolve().parents[1]
+# 从仓库根或 backend/ 下运行都能导入 app 包（CI 的 working-directory 是 backend）。
+if str(ROOT / "backend") not in sys.path:
+    sys.path.insert(0, str(ROOT / "backend"))
+
+from app.core import repository
+from app.core.config import get_settings
+from app.core.db import close_pool, init_db
+
 GOLD = ROOT / "docs" / "eval" / "question-retrieval-gold.json"
-QUESTIONS = ROOT / "backend" / "app" / "seed" / "questions.json"
 REPORT = ROOT / "docs" / "eval" / "QUESTION-RETRIEVAL-REPORT.md"
 
 #: --check 门禁阈值与统计常量（顶层常量，便于调整）。
@@ -37,17 +52,11 @@ WILSON_Z = 1.96
 TOP_K = 5
 LOGGER = logging.getLogger("eval_question_retrieval")
 
-#: 与 backend/app/core/db.py 的 R51_FTS_SCHEMA 逐字等价。
-FTS_SCHEMA = """
-CREATE VIRTUAL TABLE IF NOT EXISTS question_search USING fts5(
-    question_id UNINDEXED,
-    prompt,
-    explanation,
-    direction UNINDEXED,
-    sub_direction UNINDEXED,
-    tokenize = 'trigram'
-);
-"""
+#: 与 `backend/.env.example` / `backend/tests/conftest.py` 保持同一口径的默认实例。
+DEFAULT_DSN = "postgresql://postgres:postgres@127.0.0.1:5433/sc_eval"
+
+#: 库名只允许安全字符：它会被拼进 DDL（标识符不能用占位符）。
+_SAFE_DB_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 def pct(value):
@@ -67,9 +76,7 @@ def wilson(successes, total):
     denom = 1 + z2 / total
     center = (p + z2 / (2 * total)) / denom
     margin = (
-        WILSON_Z
-        * math.sqrt(p * (1 - p) / total + z2 / (4 * total**2))
-        / denom
+        WILSON_Z * math.sqrt(p * (1 - p) / total + z2 / (4 * total**2)) / denom
     )
     return (
         round(max(0.0, center - margin), 4),
@@ -77,91 +84,95 @@ def wilson(successes, total):
     )
 
 
-def load_questions(path):
-    data = json.loads(path.read_text(encoding="utf-8"))
-    return [
-        (
-            str(q["id"]),
-            str(q.get("prompt") or ""),
-            str(q.get("explanation") or ""),
-            str(q.get("direction") or ""),
-            str(q.get("sub_direction") or ""),
-        )
-        for q in data
-    ]
+def eval_dsn():
+    """评测库地址：`EVAL_DATABASE_URL` > `DATABASE_URL` > 本地 compose 默认值。"""
+    return (
+        os.environ.get("EVAL_DATABASE_URL")
+        or os.environ.get("DATABASE_URL")
+        or DEFAULT_DSN
+    )
 
 
-def build_index(rows):
-    """内存库重建生产等价索引；FTS5 / trigram 缺失时明确抛错，绝不静默通过。"""
-    conn = sqlite3.connect(":memory:")
-    conn.row_factory = sqlite3.Row
-    probe = conn.execute(
-        "SELECT sqlite_compileoption_used('ENABLE_FTS5') AS enabled"
-    ).fetchone()
-    if not probe or not probe["enabled"]:
-        conn.close()
-        raise RuntimeError(
-            "本机 SQLite 未编译 FTS5（ENABLE_FTS5 缺失），无法重建"
-            " question_search 虚表，评估明确失败"
-        )
+def redact(dsn):
+    """去掉口令后的 DSN，用于报告与日志（评测记录要能公开）。"""
+    parsed = urlparse(dsn)
+    user = parsed.username or ""
+    host = parsed.hostname or ""
+    port = ":" + str(parsed.port) if parsed.port else ""
+    auth = user + "@" if user else ""
+    return parsed._replace(netloc=auth + host + port).geturl()
+
+
+def ensure_database(dsn):
+    """库不存在则创建；连不上就抛中文错误，不静默降级。"""
+    parsed = urlparse(dsn)
+    name = parsed.path.lstrip("/")
+    if not _SAFE_DB_NAME.match(name):
+        raise RuntimeError("评测库名不合法：" + repr(name) + "（只允许字母、数字、下划线）")
+    admin = parsed._replace(path="/postgres").geturl()
     try:
-        conn.execute(FTS_SCHEMA)
-    except sqlite3.OperationalError as exc:
-        conn.close()
+        with psycopg.connect(admin, autocommit=True, connect_timeout=5) as conn:
+            found = conn.execute(
+                "SELECT 1 FROM pg_database WHERE datname = %s", (name,)
+            ).fetchone()
+            if not found:
+                conn.execute('CREATE DATABASE "' + name + '"')
+    except psycopg.OperationalError as exc:
         raise RuntimeError(
-            "本机 SQLite 不支持 fts5 trigram tokenizer，评估明确失败：" + str(exc)
+            "题目检索评测需要 PostgreSQL，但连不上 "
+            + redact(admin)
+            + "（"
+            + type(exc).__name__
+            + "）。\n请先启动 docker compose -f docker-compose.yml "
+            "-f docker-compose.dev.yml up -d postgres，"
+            "或用 EVAL_DATABASE_URL 指向一个可用实例。"
         ) from exc
-    conn.execute(
-        "CREATE TABLE questions ("
-        "id TEXT PRIMARY KEY, prompt TEXT, explanation TEXT, "
-        "direction TEXT, sub_direction TEXT)"
-    )
-    conn.executemany(
-        "INSERT INTO questions "
-        "(id, prompt, explanation, direction, sub_direction) VALUES (?, ?, ?, ?, ?)",
-        rows,
-    )
-    conn.executemany(
-        "INSERT INTO question_search "
-        "(question_id, prompt, explanation, direction, sub_direction) "
-        "VALUES (?, ?, ?, ?, ?)",
-        rows,
-    )
-    conn.commit()
-    return conn
 
 
-def search(conn, needle):
-    """复现 repository.search_questions()：长查询 FTS5 MATCH，短查询降级 LIKE。
+def prepare(dsn):
+    """把评测库清成「空 schema」后建表灌种。
 
-    MATCH 表达式与生产一致：把 needle 用双引号包成短语，内部双引号翻倍转义。
-    等价于以默认参数调用（direction/sub_direction 为空，不启用方向硬过滤）。
+    每次重建而非复用：题库或建表语句一改，旧表残留会让评测数字失真，
+    而这类失真恰恰是回归门禁最不该有的东西。`pg_trgm` 扩展由 `init_db()` 重新创建。
     """
-    if len(needle) >= 3:
-        match = '"' + needle.replace('"', '""') + '"'
-        rows = conn.execute(
-            "SELECT question_id FROM question_search "
-            "WHERE question_search MATCH ? "
-            "ORDER BY bm25(question_search) ASC LIMIT ?",
-            (match, TOP_K),
-        ).fetchall()
-        return [str(r["question_id"]) for r in rows], "fts5"
-    like = "%" + needle + "%"
-    rows = conn.execute(
-        "SELECT id FROM questions "
-        "WHERE (prompt LIKE ? OR explanation LIKE ?) ORDER BY id LIMIT ?",
-        (like, like, TOP_K),
-    ).fetchall()
-    return [str(r["id"]) for r in rows], "like"
+    ensure_database(dsn)
+    with psycopg.connect(dsn, autocommit=True) as conn:
+        conn.execute("DROP SCHEMA public CASCADE")
+        conn.execute("CREATE SCHEMA public")
+    os.environ["DATABASE_URL"] = dsn
+    get_settings.cache_clear()
+    close_pool()
+    init_db()
+    from app.services.assessment import question_bank
+
+    question_bank.ensure_seeded()
+    close_pool()
 
 
-def evaluate(gold_path, questions_path):
+def search(needle):
+    """直接调生产检索函数，不在评测里重写 SQL —— 评的就是线上那条语句。"""
+    result = repository.search_questions(needle, limit=TOP_K)
+    return (
+        [str(item["question_id"]) for item in result["items"]],
+        str(result["mode"]),
+    )
+
+
+def known_question_ids():
+    from app.core.db import connection
+
+    with connection() as conn:
+        rows = conn.execute("SELECT id FROM questions").fetchall()
+    return {str(row["id"]) for row in rows}
+
+
+def evaluate(gold_path):
     gold = json.loads(gold_path.read_text(encoding="utf-8"))
-    rows = load_questions(questions_path)
-    known_ids = {r[0] for r in rows}
-    conn = build_index(rows)
-    per_case = []
+    dsn = eval_dsn()
+    prepare(dsn)
     try:
+        known_ids = known_question_ids()
+        per_case = []
         for case in gold["cases"]:
             expected = [str(x) for x in case["expected_question_ids"]]
             missing = [x for x in expected if x not in known_ids]
@@ -172,7 +183,7 @@ def evaluate(gold_path, questions_path):
                     )
                 )
             needle = str(case["query"]).strip()
-            returned, mode = search(conn, needle)
+            returned, mode = search(needle)
             per_case.append(
                 {
                     "id": case["id"],
@@ -185,14 +196,15 @@ def evaluate(gold_path, questions_path):
                 }
             )
     finally:
-        conn.close()
+        close_pool()
 
     n = len(per_case)
     hits = sum(1 for c in per_case if c["hit"])
     empty = sum(1 for c in per_case if not c["returned"])
-    fts5_path = sum(1 for c in per_case if c["mode"] == "fts5")
-    fts5_hit = sum(1 for c in per_case if c["mode"] == "fts5" and c["hit"])
     lower, upper = wilson(hits, n)
+    modes = {}
+    for case in per_case:
+        modes[case["mode"]] = modes.get(case["mode"], 0) + 1
     return {
         "version": gold.get("version", "v1"),
         "created_at": gold.get("created_at", "-"),
@@ -201,10 +213,9 @@ def evaluate(gold_path, questions_path):
         "recall": hits / n if n else 0.0,
         "empty": empty,
         "empty_rate": empty / n if n else 0.0,
-        "fts5_path": fts5_path,
-        "fts5_hit": fts5_hit,
-        "fts5_hit_share": fts5_hit / n if n else 0.0,
-        "like_path": n - fts5_path,
+        "modes": modes,
+        "question_count": len(known_ids),
+        "dsn": redact(dsn),
         "lower": lower,
         "upper": upper,
         "directions": len({c["direction"] for c in per_case}),
@@ -214,10 +225,14 @@ def evaluate(gold_path, questions_path):
 
 def build_stdout(m, check_mode):
     bar = "-" * 64
+    modes = " / ".join(
+        name + " " + frac(count, m["n"]) for name, count in sorted(m["modes"].items())
+    )
     lines = [
         bar,
-        " 题目侧 FTS5 检索召回评估摘要（关键词检索，非向量检索 / RAG）",
+        " 题目侧检索召回评估摘要（PG ILIKE 关键词检索，非向量检索 / RAG）",
         bar,
+        " 评测库    : {}（题库 {} 道）".format(m["dsn"], m["question_count"]),
         " 标注数据  : docs/eval/question-retrieval-gold.json ({}, {})".format(
             m["version"], m["created_at"]
         ),
@@ -226,12 +241,7 @@ def build_stdout(m, check_mode):
         " 无命中率  : {}（{}，top-5 返回为空）".format(
             pct(m["empty_rate"]), frac(m["empty"], m["n"])
         ),
-        " FTS5 命中占比: {}（{}，走 FTS5 且命中期望）".format(
-            pct(m["fts5_hit_share"]), frac(m["fts5_hit"], m["n"])
-        ),
-        " 路径分布  : fts5 {} / like {}".format(
-            frac(m["fts5_path"], m["n"]), frac(m["like_path"], m["n"])
-        ),
+        f" 检索路径  : {modes}",
         " recall@5 Wilson 95% (z=1.96): [{:.4f}, {:.4f}] = [{}, {}]".format(
             m["lower"], m["upper"], pct(m["lower"]), pct(m["upper"])
         ),
@@ -257,7 +267,7 @@ def gate(m):
 
 def render(m):
     L = []
-    L.append("# 题目侧 FTS5 检索召回评估报告")
+    L.append("# 题目侧检索召回评估报告")
     L.append("")
     L.append(
         "> 生成命令：`python -X utf8 scripts/eval_question_retrieval.py` ｜ "
@@ -267,33 +277,30 @@ def render(m):
     L.append(">")
     L.append(
         "> 本报告由 `scripts/eval_question_retrieval.py` 真实运行输出生成，"
-        "所有数字来自本次内存库 FTS5 检索的实测结果，非手写编造。"
+        "所有数字来自本次**直连 PostgreSQL** 调用 `repository.search_questions()` "
+        "的实测结果，非手写编造。"
     )
-    L.append(
-        "> 数据全部为合成 / 题库启发标注，仅用于回归检测，不是能力宣传。"
-    )
+    L.append("> 数据全部为合成 / 题库启发标注，仅用于回归检测，不是能力宣传。")
     L.append("")
     L.append("## 口径说明")
     L.append("")
     L.append(
-        "- 评估对象：SQLite `question_search` FTS5 trigram 虚表上的题目关键词召回。"
+        "- 评估对象：`repository.search_questions()` 的真实执行结果 —— "
+        "`prompt ILIKE ? OR explanation ILIKE ?` 子串匹配（`pg_trgm` GIN 索引加速）。"
     )
     L.append(
         "- **这是关键词检索，不是向量检索 / RAG**：全程无 embedding、无向量库、"
-        "无大模型生成；MATCH 是短语匹配，返回题目 id 作为引用锚点，不参与任何文本生成。"
+        "无大模型生成；返回题目 id 作为引用锚点，不参与任何文本生成。"
     )
     L.append(
-        "- 复现方式：在内存库从 `backend/app/seed/questions.json` 读题目，"
-        "建 `questions` 表与 `question_search` FTS5 trigram 虚表，"
-        "灌入 prompt / explanation / direction / sub_direction。"
+        "- 复现方式：脚本在 `{}` 上重建 schema、执行 `init_db()` 建表、"
+        "由 `question_bank.ensure_seeded()` 灌入 `backend/app/seed/questions.json` "
+        "（本次 {} 道），再逐条调用生产检索函数。".format(
+            m["dsn"], m["question_count"]
+        )
     )
     L.append(
-        "- 检索逻辑与 `repository.search_questions()` 完全一致："
-        "把 needle 用双引号包成短语做 FTS5 MATCH（内部双引号翻倍转义），"
-        "按 bm25 升序取 top-5；query 长度 < 3 时降级 LIKE。"
-    )
-    L.append(
-        "- 不启用方向硬过滤（等价于以默认参数调用 search_questions），"
+        "- 不启用方向硬过滤（等价于以默认参数调用 `search_questions`），"
         "case 的 direction 仅作标注元信息与方向覆盖统计。"
     )
     L.append("- 指标定义：")
@@ -303,9 +310,6 @@ def render(m):
     L.append(
         "  - **无命中率** = top-5 返回为空（未召回任何题目）的组数 / n；"
         "未命中期望 = 1 - recall@5。"
-    )
-    L.append(
-        "  - **FTS5 命中占比** = 走 FTS5 路径且命中期望的组数 / n。"
     )
     L.append(
         "  - **Wilson 95% 区间** = 对 recall@5 的小样本比例区间（z=1.96）。"
@@ -322,9 +326,8 @@ def render(m):
     L.append("")
     L.append(
         "- 标注集由题目关键词启发写成（query 取自题干连续中文子串或 2 字概念词），"
-        "**存在标注泄漏风险**；recall@5 高分只能证明「FTS5 索引重建、"
-        "MATCH 转义与 LIKE 降级逻辑未回归、引用 id 有效」，"
-        "不能证明对真实用户自由输入的泛化能力。"
+        "**存在标注泄漏风险**；recall@5 高分只能证明「检索 SQL、"
+        "排序与分页逻辑未回归、引用 id 有效」，不能证明对真实用户自由输入的泛化能力。"
     )
     L.append(
         "- 本评估只用于 CI 回归检测，不是能力宣传；数据全部为合成 / 题库启发标注。"
@@ -334,8 +337,7 @@ def render(m):
         "扩充到 >=100 组真实用户查询后再更新结论。"
     )
     L.append(
-        "- 本评估只覆盖题目侧 FTS5 关键词召回，"
-        "不含向量检索 / RAG / RRF 融合后的排序。"
+        "- 本评估只覆盖题目侧关键词召回，不含向量检索 / RAG / RRF 融合后的排序。"
     )
     L.append("")
     L.append("## 生成命令")
@@ -348,15 +350,15 @@ def render(m):
     L.append("```")
     L.append("")
     L.append(
-        "- 默认模式：重建内存索引、跑全部标注、打印摘要并生成/覆写本报告，退出 0。"
+        "- 默认模式：重建评测库、跑全部标注、打印摘要并生成/覆写本报告，退出 0。"
     )
     L.append(
         "- `--check`：只读，只算指标并打印，绝不写任何文件；"
         "门禁 recall@5 >= 70%，满足退出 0，否则打印中文失败原因并退出 1。"
     )
     L.append(
-        "- 仅依赖 Python 标准库（sqlite3 / json / math / pathlib / argparse），"
-        "零网络、零 FastAPI 依赖；本机 SQLite 缺 FTS5 或 trigram 时明确失败退出 2。"
+        "- 依赖 PostgreSQL（`EVAL_DATABASE_URL` / `DATABASE_URL`，默认本地 5433）"
+        "与 `backend/requirements.txt`；连不上时明确失败退出 2。"
     )
     L.append("")
     L.append("## 样本量与指标")
@@ -376,11 +378,6 @@ def render(m):
     L.append(
         "| 无命中率 | {}（{}） | top-5 返回为空的组数 / n |".format(
             pct(m["empty_rate"]), frac(m["empty"], m["n"])
-        )
-    )
-    L.append(
-        "| FTS5 命中占比 | {}（{}） | 走 FTS5 路径且命中期望的组数 / n |".format(
-            pct(m["fts5_hit_share"]), frac(m["fts5_hit"], m["n"])
         )
     )
     L.append(
@@ -415,21 +412,19 @@ def render(m):
         "随附 Wilson 区间以反映估计的不确定性。".format(m["n"])
     )
     L.append("")
-    L.append("## 检索路径分布（FTS5 / LIKE 降级）")
+    L.append("## 检索路径分布")
     L.append("")
     L.append(
-        "- FTS5 MATCH 路径：{} 组，其中命中期望 {} 组。".format(
-            m["fts5_path"], m["fts5_hit"]
-        )
+        "- r98 起检索只剩一条路径（SQLite FTS5 虚表已删除）："
+        "`prompt` / `explanation` 的 `ILIKE` 子串匹配，由 `pg_trgm` GIN 索引加速。"
     )
     L.append(
-        "- 短查询降级 LIKE 路径：{} 组（query 长度 < 3，"
-        "按 id 排序、无 bm25 相关性排序，是已知局限）。".format(m["like_path"])
-    )
-    L.append(
-        "- 本标注集 {} 组中 {} 组走 FTS5、{} 组走 LIKE，"
-        "两条路径均实测覆盖。".format(
-            m["n"], m["fts5_path"], m["like_path"]
+        "- 本次实测：{}。`search_questions()` 的 `mode` 恒为 `like`、"
+        "`notice` 恒为空，前端不会再看到「未启用全文索引」的提示。".format(
+            " / ".join(
+                name + " " + frac(count, m["n"])
+                for name, count in sorted(m["modes"].items())
+            )
         )
     )
     L.append("")
@@ -464,8 +459,7 @@ def render(m):
         "`—` 表示未返回任何题目。"
     )
     L.append(
-        "> 「是否命中」为「命中」当且仅当至少一个返回 id 属于期望集合；"
-        "检索路径 `fts5` 表示走 FTS5 MATCH，`like` 表示短查询降级。"
+        "> 「是否命中」为「命中」当且仅当至少一个返回 id 属于期望集合。"
     )
     L.append("")
     return "\n".join(L)
@@ -474,10 +468,9 @@ def render(m):
 def main(argv=None):
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     parser = argparse.ArgumentParser(
-        description="题目侧 FTS5 检索召回评估（零网络、纯标准库）"
+        description="题目侧检索召回评估（直连 PostgreSQL，跑生产同一条 SQL）"
     )
     parser.add_argument("--gold", default=str(GOLD), help="金标集 JSON 路径")
-    parser.add_argument("--questions", default=str(QUESTIONS), help="题库 JSON 路径")
     parser.add_argument("--report", default=str(REPORT), help="Markdown 报告输出路径")
     parser.add_argument(
         "--check", action="store_true", help="CI 门禁：只读，不写任何文件"
@@ -485,8 +478,8 @@ def main(argv=None):
     args = parser.parse_args(argv)
 
     try:
-        m = evaluate(Path(args.gold).resolve(), Path(args.questions).resolve())
-    except (OSError, ValueError, KeyError, RuntimeError, sqlite3.Error) as exc:
+        m = evaluate(Path(args.gold).resolve())
+    except (OSError, ValueError, KeyError, RuntimeError, psycopg.Error) as exc:
         LOGGER.error("题目侧检索评估运行失败：%s", exc)
         return 2
 

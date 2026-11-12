@@ -26,11 +26,12 @@ from __future__ import annotations
 import argparse
 import math
 import random
-import sqlite3
 import sys
 from collections import Counter
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+
+import psycopg
 
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
@@ -241,16 +242,16 @@ def main(argv=None):
         print_summary(rows, args.days, dry_run=True)
         print(
             "提示：以上均为合成数据，未连接/写入任何数据库；仅用于演示 / 回归检测，"
-            "不是能力宣传。真正写入请设置 DB_PATH 指向独立库后去掉 --dry-run。"
+            "不是能力宣传。真正写入请把 DATABASE_URL 指向独立库后去掉 --dry-run。"
         )
         return 0
 
     repo = load_repository()
     try:
         removed = write_rows(repo, rows)
-    except sqlite3.Error as exc:
+    except psycopg.Error as exc:
         print(
-            "写入失败：请确认 DB_PATH 指向已初始化 ai_call_logs 表的库"
+            "写入失败：请确认 DATABASE_URL 指向已初始化 ai_call_logs 表的 PostgreSQL"
             "（可先启动后端建表）。原始错误：" + str(exc),
             file=sys.stderr,
         )

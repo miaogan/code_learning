@@ -264,12 +264,17 @@ def main(argv: list[str] | None = None) -> int:
     golden_path = Path(args.golden).resolve()
     metrics = evaluate(golden_path)
     report_path = Path(args.report).resolve()
-    report_path.parent.mkdir(parents=True, exist_ok=True)
-    report_path.write_text(render(metrics, golden_path), encoding="utf-8")
-    print(
-        f"报告已生成：{report_path}（{metrics['case_count']} 例，"
-        f"schema {_percent(metrics['schema_pass_rate'])}，micro-F1 {_percent(metrics['field_f1'])}）"
-    )
+    if args.check:
+        # `--check` 是只读门禁：写报告会把「本地处理耗时」的抖动带进 git diff，
+        # CI 上更不该产生工作区改动（与 eval_question_retrieval.py 同一口径）。
+        print(" --check 只读模式：未写入任何文件")
+    else:
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(render(metrics, golden_path), encoding="utf-8")
+        print(
+            f"报告已生成：{report_path}（{metrics['case_count']} 例，"
+            f"schema {_percent(metrics['schema_pass_rate'])}，micro-F1 {_percent(metrics['field_f1'])}）"
+        )
 
     if args.write_baseline:
         baseline_path = Path(args.baseline).resolve()

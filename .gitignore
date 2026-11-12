@@ -40,6 +40,9 @@ backend/.test-scaffold.db
 backend/tests/.tmp/
 # pytest 在仓库根的临时目录（tmp_path 工厂，形如 pytest-of-user/）
 pytest-of-*/
+# 在 backend/ 下跑 pip-audit / pip install 时，pip 会在 cwd 建 `tmpXXXXXXXX/`
+# 隔离环境（里面是整份 site-packages，23MB 级）；这类目录绝不能进仓库。
+backend/tmp[a-z0-9]*/
 
 # 密钥（示例文件保留）
 .env

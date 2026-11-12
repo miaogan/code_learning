@@ -47,6 +47,39 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    # r98 起数据层只有 PostgreSQL（无 SQLite 兜底），测试与部分评测脚本都连真库，
+    # 所以 CI 必须自带实例。端口映射到 5433 / 6380 与 `backend/.env.example`、
+    # conftest 的默认 DSN 一致；下面的 env 再显式写一遍，不依赖「端口恰好相同」。
+    # services 的健康检查由 Actions 自动等待，healthcheck 不通过则 job 直接失败。
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      redis:
+        image: redis:8-alpine
+        ports:
+          - 6380:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      # 测试基座会按这个 DSN 自动建库（sc_test / _empty / _legacy / _seed）。
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5433/sc_test
+      EVAL_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5433/sc_eval
+      # `test_r98_redis.py` 连真实实例验证共享窗口 / 缓存 / 锁；连不上会 skip，
+      # 这里给上地址是为了让这几个用例在 CI 里真的跑起来。
+      REDIS_TEST_URL: redis://127.0.0.1:6380/0
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

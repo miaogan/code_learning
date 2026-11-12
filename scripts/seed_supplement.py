@@ -1,12 +1,21 @@
-# -*- coding: utf-8 -*-
 """一次性脚本：向 code_learning 的 questions 表补充「基础语法/基础功底」类题目。
+
+.. deprecated:: r98
+   SQLite 已下线（`backend/app.db` 不再存在），本脚本**已不可运行**，仅作历史留存。
+   题库的唯一来源是 `backend/app/seed/questions.json`（由 `question_bank.ensure_seeded()`
+   幂等导入 PG）；要加题请改该文件，并用
+   `python -X utf8 -m app.services.assessment.question_merge --check` 验证字节一致。
+
 可重复执行：已存在的 id 会跳过。运行: python scripts/seed_supplement.py
 """
-import sqlite3, json, os, datetime
+import datetime
+import json
+import os
+import sqlite3
 
 DB = os.path.join(os.path.dirname(__file__), "..", "backend", "app.db")
 
-NOW = datetime.datetime.now(datetime.timezone.utc).isoformat()
+NOW = datetime.datetime.now(datetime.UTC).isoformat()
 
 def make(qid, direction, language, kind, difficulty, essentiality, prompt, opts, ans, explanation):
     options = [{"key": k, "text": t} for k, t in opts]
