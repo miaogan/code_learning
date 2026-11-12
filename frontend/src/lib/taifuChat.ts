@@ -18,6 +18,16 @@ export const TAIFU_SAMPLES: string[] = [
   '我的项目怎么讲成面试官能追问的证据？',
 ]
 
+/**
+ * 二次确认的两态文案：**必须等长**（4 字 ↔ 4 字）。
+ *
+ * 页脚是「一段说明 + 行内按钮」，文案一长就换行、页脚从 1 行变 2 行，整块内容会上下跳
+ * （r83 实测位移 16px、按钮横向移动 288px）。所以两态字数必须一样，`taifuChat.test.ts`
+ * 用 `toHaveLength` 把它钉住 —— 以后想改文案，得先想清楚会不会把布局顶歪。
+ */
+export const CLEAR_LABELS = { idle: '清空对话', armed: '确认清空' } as const
+export const FORGET_LABELS = { idle: '全部忘掉', armed: '确认忘掉' } as const
+
 /** 压平空白 + 截断：换行会破坏「一句话问题」的形态，统一压成单空格。 */
 export function clampQuestion(raw: string): string {
   const flat = raw.replace(/\s+/g, ' ').trim()

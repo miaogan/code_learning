@@ -10412,6 +10412,9 @@ a.sc-radar-name--link:hover .sc-radar-ext {
   color: var(--accent);
   font-family: var(--font-sans);
   font-size: var(--fs-meta);
+  /* 二次确认的文案一变长就换行的话，页脚会从 1 行变 2 行、整块内容上下跳（r83 修复）。
+     文案本身已按等长改写，这里再兜一层：一行放不下时宁可挤文本，也不让按钮折行。 */
+  white-space: nowrap;
   cursor: pointer;
 }
 

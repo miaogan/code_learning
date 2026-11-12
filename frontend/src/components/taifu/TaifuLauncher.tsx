@@ -13,6 +13,8 @@ import { API_BASE, ApiError, api } from '../../api/client'
 import type { TaifuCitation, TaifuFocus, TaifuMemoryItem } from '../../api/types'
 import { onTaifuAsk } from '../../lib/taifuBridge'
 import {
+  CLEAR_LABELS,
+  FORGET_LABELS,
   TAIFU_QUESTION_MAX,
   TAIFU_SAMPLES,
   canSend,
@@ -41,6 +43,8 @@ import {
 const DRAG_THRESHOLD = 5
 const NUDGE_STEP = 8
 const NUDGE_STEP_FAST = 24
+/** 二次确认的自动撤销时间：一直「武装」着，用户过一会儿再点一下就把对话清了。 */
+const DISARM_MS = 4000
 
 const PAGE_LABEL: Record<string, string> = {
   '/': '投卷',
@@ -588,6 +592,20 @@ export function TaifuLauncher({ userId }: TaifuLauncherProps) {
     if (memories !== null) void loadMemories()
   }, [lastMemoriesAdded, memories, loadMemories])
 
+  // 二次确认要自己撤销：按钮一直「武装」着，用户过一会儿再点一下就真清了。
+  // 撤销时文案按**等长**换回（4 字 ↔ 4 字），否则页脚从 1 行变 2 行，整块内容会上下来回跳。
+  useEffect(() => {
+    if (!clearArmed) return
+    const timer = window.setTimeout(() => setClearArmed(false), DISARM_MS)
+    return () => window.clearTimeout(timer)
+  }, [clearArmed])
+
+  useEffect(() => {
+    if (!forgetArmed) return
+    const timer = window.setTimeout(() => setForgetArmed(false), DISARM_MS)
+    return () => window.clearTimeout(timer)
+  }, [forgetArmed])
+
   const clearThread = useCallback(async () => {
     if (!clearArmed) {
       setClearArmed(true)
@@ -930,7 +948,7 @@ export function TaifuLauncher({ userId }: TaifuLauncherProps) {
                       onClick={() => void forgetAll()}
                       disabled={forgetting}
                     >
-                      {forgetArmed ? '再点一次全部忘掉' : '全部忘掉'}
+                      {forgetArmed ? FORGET_LABELS.armed : FORGET_LABELS.idle}
                     </button>
                   </>
                 )
@@ -967,7 +985,7 @@ export function TaifuLauncher({ userId }: TaifuLauncherProps) {
                 onClick={() => void clearThread()}
                 disabled={clearing}
               >
-                {clearArmed ? '再点一次清空' : '清空对话'}
+                {clearArmed ? CLEAR_LABELS.armed : CLEAR_LABELS.idle}
               </button>
             ) : null}
           </p>

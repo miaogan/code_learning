@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  CLEAR_LABELS,
+  FORGET_LABELS,
   TAIFU_QUESTION_MAX,
   canSend,
   clampQuestion,
@@ -86,5 +88,18 @@ describe('r82 回答渲染：列表与行内加粗', () => {
     ])
     expect(splitBold('**没闭合')).toEqual([{ text: '**没闭合', bold: false }])
     expect(splitBold('')).toEqual([])
+  })
+})
+
+describe('二次确认文案', () => {
+  it('两态等长：页脚是行内按钮，字数一变就换行、面板上下跳（r83 实测位移 16px）', () => {
+    expect(CLEAR_LABELS.idle).toHaveLength(CLEAR_LABELS.armed.length)
+    expect(FORGET_LABELS.idle).toHaveLength(FORGET_LABELS.armed.length)
+  })
+
+  it('文案本身不含空白，不会把按钮顶成两行', () => {
+    for (const label of [CLEAR_LABELS.idle, CLEAR_LABELS.armed, FORGET_LABELS.idle, FORGET_LABELS.armed]) {
+      expect(label).not.toMatch(/\s/)
+    }
   })
 })
