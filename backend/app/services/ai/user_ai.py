@@ -11,8 +11,11 @@ Key 加密：Fernet（`cryptography`），主密钥由 `SECRET_KEY` 经 SHA-256 
 
 import base64
 import hashlib
+import ipaddress
+import socket
 from datetime import UTC, datetime
 from typing import Any, Literal
+from urllib.parse import urlparse
 
 from cryptography.fernet import Fernet, InvalidToken
 
@@ -38,6 +41,69 @@ Capability = Literal["full", "light", "none"]
 Level = Literal["light", "heavy"]
 
 _MISSING_USER_KEY = "尚未填写你自己的 API Key，请先在设置页配置"
+_SSRF_MESSAGE = "API 地址不允许指向本机、内网或云元数据地址"
+
+#: 这些名字即使 DNS 解析失败也不该放行（元数据服务常用别名）。
+_PRIVATE_HOST_HINTS = frozenset(
+    {"localhost", "metadata", "metadata.google.internal", "instance-data"}
+)
+
+
+def _is_blocked_address(address: str) -> bool:
+    """判定解析结果是否落在不可出网的地址段。"""
+    addr = ipaddress.ip_address(address.split("%", 1)[0])
+    return (
+        not addr.is_global
+        or addr.is_loopback
+        or addr.is_private
+        or addr.is_link_local
+        or addr.is_reserved
+        or addr.is_multicast
+        or addr.is_unspecified
+    )
+
+
+def validate_public_base_url(base_url: str) -> str:
+    """用户自带 AI 端点只能指向公网地址（防 SSRF 打内网 / 云元数据）。
+
+    r99：实测 `/api/me/ai/test` 会拿表单里的 `base_url` 直接发 POST，可探测内网端口；
+    而该端点**不经过** `normalize_ai_settings`，所以两个入口都必须调用本函数：
+    保存设置（`PUT /api/me/ai`）与测试连接（`POST /api/me/ai/test`）。
+
+    校验在 DNS 解析**之后**做，能挡住 localhost、十进制/简写 IP、`*.nip.io` 一类
+    把域名解析回 127.0.0.1 的绕过。解析失败时放行：连 DNS 都解析不了，后续请求同样
+    发不出去，不构成 SSRF；同时也让 `api.example.test` 这类离线测试桩保持可用。
+
+    残留风险：DNS rebinding（校验时返回公网 IP、真正请求时换成内网 IP）。彻底消除需要
+    在 httpx 层把已校验的 IP 钉进连接，本部署是单副本演示机，暂不引入该复杂度；
+    配合 `ai_test_timeout_s` 与按 IP 限流，可把探测速度与收益压到很低。
+    """
+    parsed = urlparse(base_url)
+    if parsed.scheme not in ("http", "https"):
+        raise AppError(VALIDATION_ERROR, "API 地址必须以 http:// 或 https:// 开头", status=422)
+    host = (parsed.hostname or "").strip().rstrip(".").lower()
+    if not host:
+        raise AppError(VALIDATION_ERROR, "API 地址缺少主机名", status=422)
+    if host in _PRIVATE_HOST_HINTS:
+        raise AppError(VALIDATION_ERROR, _SSRF_MESSAGE, status=422)
+    try:
+        port = parsed.port
+    except ValueError:
+        port = None
+    try:
+        infos = socket.getaddrinfo(
+            host, port or (443 if parsed.scheme == "https" else 80), type=socket.SOCK_STREAM
+        )
+    except (socket.gaierror, OSError, ValueError):
+        return base_url
+    for info in infos:
+        try:
+            blocked = _is_blocked_address(info[4][0])
+        except ValueError:
+            continue
+        if blocked:
+            raise AppError(VALIDATION_ERROR, _SSRF_MESSAGE, status=422)
+    return base_url
 
 
 def _fernet() -> Fernet | None:
@@ -173,11 +239,9 @@ def normalize_ai_settings(
     *, base_url: str, model: str, api_key: str, json_mode: str
 ) -> tuple[str, str, str]:
     """校验并归一保存的 AI 设置；返回 `(base_url, model, json_mode)`，Key 由调用方加密。"""
-    base_url = (base_url or "").strip().rstrip("/")
+    base_url = validate_public_base_url((base_url or "").strip().rstrip("/"))
     model = (model or "").strip()
     json_mode = (json_mode or DEFAULT_JSON_MODE).strip()
-    if not base_url.startswith(("http://", "https://")):
-        raise AppError(VALIDATION_ERROR, "API 地址必须以 http:// 或 https:// 开头", status=422)
     if not model:
         raise AppError(VALIDATION_ERROR, "请填写模型名称", status=422)
     if json_mode not in JSON_MODES:
@@ -194,17 +258,23 @@ async def test_connection(
     stored_key: str,
 ) -> tuple[bool, str]:
     """设置页「测试连接」：优先用表单里填的 Key，其次用已保存的 Key；失败返回中文原因。"""
+    # 本端点不经过 normalize_ai_settings，必须在这里独立校验，否则「保存被挡、测试照打」。
+    # 这里吞掉 AppError 转成 ok=false，保持 AiTestResult 的响应契约不变。
+    try:
+        base_url = validate_public_base_url((base_url or "").strip().rstrip("/"))
+    except AppError as exc:
+        return False, exc.message
     raw_key = (api_key or "").strip() or decrypt_key(stored_key)
     if not (base_url and model and raw_key):
         return False, "请先填写 API 地址、模型名称与 API Key"
     settings = get_settings()
     runtime = AiRuntime(
         provider="user",
-        base_url=base_url.strip().rstrip("/"),
+        base_url=base_url,
         model=model.strip(),
         api_key=raw_key,
         json_mode=json_mode if json_mode in JSON_MODES else DEFAULT_JSON_MODE,
-        timeout_s=settings.ai_timeout_s,
+        timeout_s=min(settings.ai_timeout_s, settings.ai_test_timeout_s),
         max_retries=0,
         ready=True,
     )

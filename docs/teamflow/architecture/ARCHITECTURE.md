@@ -14,7 +14,7 @@
 | 前端 | React 18 + Vite 5 + TypeScript 5 | `react ^18.3`、`vite ^5.4`、`typescript ^5.5` | 6 页线性向导、无 SSR 需求，Vite 冷启动最快、心智负担最低 |
 | 路由 | react-router-dom v6 | `^6.26` | 6 条静态路由 + NavLink 步骤态，无需文件路由 |
 | 样式 | 手写 CSS + CSS 变量 token | `src/styles/tokens.css` | DESIGN §0 是写死规格（token / 几何 / 逐组件状态色），CSS 变量最贴近、产物零运行时 |
-| 后端 | Python 3.11+ + FastAPI + uvicorn | `fastapi>=0.110` | 与简历解析（pypdf / python-docx）与 AI 结构化校验（pydantic）天然同栈 |
+| 后端 | Python 3.13 + FastAPI + uvicorn（CI 与 `backend/Dockerfile` 同版；3.11 亦兼容） | `fastapi>=0.110` | 与简历解析（pypdf / python-docx）与 AI 结构化校验（pydantic）天然同栈 |
 | 模型调用 | httpx 异步调用 OpenAI 兼容 `/chat/completions` | `httpx>=0.27` | 单一入口、超时/重试/JSON 兜底集中在一个模块 |
 | 持久化 | PostgreSQL 16 + psycopg3 连接池（`DATABASE_URL`） | `postgres:16-alpine`、`psycopg[binary]>=3.2` | r98 起取代 SQLite：多副本可共享、真并发写、崩溃不靠文件锁；结构化产物仍以 JSON 文本列存 |
 | 加速层 | Redis 8（`REDIS_URL`，可缺省） | `redis:8-alpine`、`redis>=5` | 限流窗口 / 会话缓存 / 读缓存 / 分布式锁四类「多副本必须共享、丢了能重建」的状态；未配或不可达时全部降级到进程内 |
@@ -313,7 +313,7 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
 | Lint | `.venv/Scripts/python -m ruff check app tests` |
 | 探活 | `curl http://127.0.0.1:8000/health` → `{"status":"ok",...}` |
 
-**CI（`.github/workflows/ci.yml`）**：`frontend` job（node 22，`npm ci` → typecheck → lint → test → build）；`backend` job（python 3.11，pip 缓存，`ruff check` → `pytest -q`）。两个 job 独立，任一失败即红；无部署步骤（首版本地运行）。密钥只经 `.env`，CI 中不注入真实 key，测试用 `AI_API_KEY` 缺失路径验证「中文提示而非 500」。
+**CI（`.github/workflows/ci.yml`）**：`frontend` job（node 22，`npm ci` → typecheck → lint → test → build）；`backend` job（python 3.13，与 `backend/Dockerfile` 的 `python:3.13-slim` 同版，pip 缓存，`ruff check` → `pytest -q`）。两个 job 独立，任一失败即红；无部署步骤（首版本地运行）。密钥只经 `.env`，CI 中不注入真实 key，测试用 `AI_API_KEY` 缺失路径验证「中文提示而非 500」。
 
 ---
 
@@ -351,7 +351,7 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
 | 题库种子 1284 道（2026-11-11 系统架构场景批起） | `backend/app/seed/questions.json`（r6 起退为**唯一导入源**，运行时由 `questions` 表承载；r11 起每次启动幂等导入，r14 起启动同时覆写既有行差异）；素材输入与留痕在 `docs/question-bank-staging/`（`PROVENANCE.md` + `NOTICE-fe-interview.md`），id 前缀口径见 §3.4.2 |
 | pydantic 契约模型（画像 5 维度 / 题目 / 报告 / 课程） | `backend/app/schemas.py` |
 | 后端测试 38 文件（pytest 零网络） | `backend/tests/*.py` |
-| 容器化交付（r10） | `docker-compose.yml`、`backend/Dockerfile`、`frontend/Dockerfile`、`frontend/nginx.conf`、`docker.env.example`、任务夹 `docs/teamflow/20261101-r10-docker-compose-deploy/DEPLOY.md`；`WEB_PORT=8080` 单端口对外、SQLite 落 `skillcoach-data` 卷（**r98 起改为 PG 落 `skillcoach-pgdata` + Redis，见 `docs/teamflow/20261112-r98-redis-pg/DEPLOY.md`**；旧卷保留作迁移来源，不再挂载） |
+| 容器化交付（r10） | `docker-compose.yml`、`backend/Dockerfile`、`frontend/Dockerfile`、`frontend/nginx.conf`、`docker.env.example`、任务夹 `docs/teamflow/20261101-r10-docker-compose-deploy/DEPLOY.md`；`WEB_PORT=127.0.0.1:8080`（默认只绑回环）单端口对外、SQLite 落 `skillcoach-data` 卷（**r98 起改为 PG 落 `skillcoach-pgdata` + Redis，见 `docs/teamflow/20261112-r98-redis-pg/DEPLOY.md`**；旧卷保留作迁移来源，不再挂载） |
 | 前端 `package-lock.json` + 已装依赖 | `frontend/package-lock.json`、`frontend/node_modules/` |
 | CI 双 job | `.github/workflows/ci.yml` |
 | 本地工程验证（r43 补记） | `pypdf` 6.21.4 / `python-docx` / `ruff` 均已装，真实 PDF / DOCX 解析与 `python -m ruff check app tests` 可在本机实跑（r42 起纳入每次交付门禁） |

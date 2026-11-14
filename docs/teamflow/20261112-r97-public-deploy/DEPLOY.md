@@ -15,7 +15,7 @@
 | 响应头 | 无 | HSTS / nosniff / Referrer / Frame / Permissions / CSP |
 | 接口清单 | /docs、/openapi.json 公开 | 生产档直接不挂载（404） |
 | 配置 | 生产/开发不分 | `APP_ENV=production` 启动前校验，不安全就**拒绝启动** |
-| 运维 | 无 | 证书签发/续期脚本、数据卷在线备份脚本 |
+| 运维 | 无 | 证书签发/续期脚本、PG 逻辑备份脚本（r98 起不再是 SQLite 数据卷拷贝） |
 
 应用层本来就有：scrypt 口令、会话只存 SHA-256 摘要、HttpOnly+SameSite Cookie、同源写请求校验、
 按 IP 限流、在飞请求熔断、登录失败锁定。**这些不需要额外做，但不要在 deploy.env 里把它们关掉。**
@@ -40,8 +40,10 @@ chmod 600 backend/.env
 
 # ② compose 层变量（端口与域名，不含任何 Key）
 cp deploy.env.example deploy.env
-#   必改：PUBLIC_DOMAIN=<你的域名>、ACME_EMAIL=<你的邮箱>
+#   必改：PUBLIC_DOMAIN=<你的域名>、ACME_EMAIL=<你的邮箱>、POSTGRES_PASSWORD=<强口令>
 #   保留 WEB_PORT=127.0.0.1:8080（只绑回环，供本机排障）
+#   POSTGRES_PASSWORD 由 compose 同时拼给 postgres 服务与后端 DATABASE_URL，
+#   是唯一生效的口令来源（backend/.env 里那行 DATABASE_URL 会被 compose 覆盖）。
 
 # ③ 证书与备份目录（compose 会挂载它们）
 mkdir -p certs certbot/www backups
@@ -67,6 +69,10 @@ docker compose exec backend python -m app.admin_cli create-user \
 而 `cert.sh init` 需要 80 端口空闲——所以顺序是「签证书 → 起栈」，不是反过来。
 已有证书的机器跳过 3.1，直接 3.2。
 
+全新部署无需手工建表：backend 启动时 `init_db()` 会建表并幂等导入题库种子。
+从 r97（SQLite）升级的机器才需要迁移，步骤见
+[r98 迁移手册](../20261112-r98-redis-pg/DEPLOY.md) §3，**不要**把旧 `app.db` 直接拷进容器。
+
 ## 4. 上线验收（逐条打勾，别跳）
 
 ```bash
@@ -88,14 +94,21 @@ curl -s https://<域名>/health                     # 期望 {"status":"ok",...}
 
 **备份（强烈建议 cron，每天一次）**
 
+r98 起数据层是 PostgreSQL，脚本改为 `pg_dump -Fc` 一致性逻辑备份（不再是 r97 的
+SQLite `app.db` 在线拷贝）：产出 `backups/app-<时间戳>.dump`，并用 `pg_restore -l`
+自检归档可读。**照 r97 旧命令去 `docker cp app.db` 是无效备份**——backend 容器已不挂 `/data`。
+
 ```bash
-./scripts/backup_db.sh                 # → backups/app-<时间戳>.db，自检 quick_check
+./scripts/backup_db.sh                 # → backups/app-<时间戳>.dump + pg_restore -l 自检
 # crontab -e
-# 20 4 * * * cd /srv/code_learning && KEEP=14 ./scripts/backup_db.sh >> backups/backup.log 2>&1
+# 10 3 * * * cd /srv/code_learning && KEEP=14 ./scripts/backup_db.sh >> backups/backup.log 2>&1
 ```
 
-恢复：`docker compose stop backend` → `docker cp backups/app-xxx.db <容器>:/data/app.db`
+恢复：`docker compose stop backend` →
+`docker compose exec -T postgres pg_restore -U postgres -d sc_app --clean --if-exists < backups/app-xxx.dump`
 → `docker compose start backend`。**恢复前先把当前库另存一份**，别在唯一副本上操作。
+只恢复单表用 `pg_restore --table=<表名> --data-only`；完整命令见
+[r98 运维手册](../20261112-r98-redis-pg/DEPLOY.md) §5。Redis 只存可重建的限流 / 缓存 / 锁，不需要备份。
 
 **证书续期（Let's Encrypt 90 天）**
 
@@ -119,7 +132,7 @@ curl -s https://<域名>/health
 
 | 现象 | 大概率原因 | 处理 |
 |---|---|---|
-| 后端容器反复重启，日志有「生产环境配置不安全，已拒绝启动」 | `backend/.env` 还是开发值 | 按日志点名的项改：`COOKIE_SECURE=true`、`CORS_ORIGINS=https://域名` |
+| 后端容器反复重启，日志有「生产环境配置不安全，已拒绝启动」 | `backend/.env` 还是开发值 | 按日志点名的项改：**拒绝启动只拦 4 类**（`COOKIE_SECURE=false`、`CORS_ORIGINS` 含 `*` 或为空、`REDIS_URL` 为空）；`CORS_ORIGINS` 仍是 `http://localhost` 只产生 `production.config_warning`，不会拒启，但公网必须改成 https 域名否则写请求 403 |
 | 页面能打开，登录「成功」但立刻掉线 | Cookie 没下发（http 访问 / Secure 不匹配）或 CORS 不含当前域名 | 确认走 https；`CORS_ORIGINS` 与地址栏域名逐字一致（含 www 与否） |
 | 写操作 403「请求来源不被允许」 | 域名换了没改 CORS | 补 `CORS_ORIGINS` 并重启 backend |
 | 上传报 413 | nginx `client_max_body_size` 小于应用上限 | 保持 nginx 20m > `MAX_UPLOAD_MB=10`，不要只改一侧 |
@@ -132,6 +145,9 @@ curl -s https://<域名>/health
 
 - [ ] `backend/.env` 权限 600，且没有第二份副本散落在仓库/聊天记录里；
 - [ ] `SECRET_KEY` 已设置（用户自带 Key 才会加密存储）；
+- [ ] `deploy.env` 的 `POSTGRES_PASSWORD` 已换成强口令——启动期告警只识别
+      `postgres:postgres` 这一种示例口令，换成别的示例串不会告警；
+- [ ] 备份产物是 `.dump`（`pg_dump -Fc`）而非 `.db`，且 `./scripts/backup_db.sh` 进 cron；
 - [ ] `RATE_LIMIT_ENABLED`、`BREAKER_ENABLED` 保持 true；
 - [ ] 账号只有该有的人有（`admin_cli list`），离职/试用结束及时 `disable`；
 - [ ] `backups/` 与 `certs/` 不进 git、不进静态目录、备份文件按需加密后异地存一份；
@@ -139,7 +155,7 @@ curl -s https://<域名>/health
 
 ## 8. 已知边界（不是 bug，是当前形态）
 
-- **单副本**：SQLite + 单进程 uvicorn，不支持多实例横向扩展；要扩容先换 Postgres 与任务队列；
+- **单副本**：r98 起数据层已是 PostgreSQL + Redis（共享限流 / 会话缓存 / 分布式锁），但线上仍是**单副本 uvicorn**；多副本部署与滚动升级未实跑验证，扩容前先做一轮；
 - **无 WAF / 无 CDN**：常见扫描与暴力破解靠限流 + 登录锁定挡住，不挡 DDoS；
 - **无审计日志导出**：`ai_call_logs` 只用于配额与排障，没有面向合规的导出；
 - **备份在本机**：脚本只保证「有一份可用的库」，异地容灾要自己接对象存储。

@@ -198,6 +198,23 @@ docker exec code_learning-redis-1 redis-cli --scan --pattern 'sc:*'   # 应出�
 真正要留意的只有一处——如果两副本滚动升级，中间会短暂出现「一半连 7、一半连 8」，
 共享 key 的结构（ZSET 成员、string 值）在两版之间是兼容的，但**别在此期间改 key 格式**。
 
+### Redis 内存上限（让 allkeys-lru 真正有触发点）
+
+`--maxmemory-policy allkeys-lru` 只在内存触到 `maxmemory` 时才淘汰；
+**只写策略不设上限＝策略永不生效**，公网长期运行下缓存可无限涨，最后撞容器/宿主 OOM。
+compose 默认 `--maxmemory 128mb`（2C4G 单机口径），按机器规格用 `REDIS_MAXMEMORY`
+覆盖（`deploy.env` / 根 `.env` / 宿主 shell 均可）。
+
+```bash
+docker compose up -d --force-recreate redis       # 改完 command 必须重建容器
+docker exec code_learning-redis-1 redis-cli CONFIG GET maxmemory
+docker exec code_learning-redis-1 redis-cli INFO memory | grep -E 'used_memory_human|maxmemory_human|maxmemory_policy'
+```
+
+缓存里只有可重建的限流窗口 / 会话 / 读缓存，淘汰命中不会 503，最坏是回源一次数据库。
+若 `used_memory` 长期贴着上限且 `evicted_keys` 猛涨，该调大 `REDIS_MAXMEMORY`
+或缩短 `READ_CACHE_TTL_S`，**而不是关掉上限**。
+
 ---
 
 ## 5. 备份与恢复

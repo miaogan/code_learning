@@ -1,6 +1,19 @@
 # TeamFlow 运行日志（插件自有产物，非交付物；host 提交时另有 pathspec 强制排除）
 logs/teamflow/
 
+# 公网部署运行时产物：日志、CD 状态/锁、手工冻结开关、一次性运维脚本。
+# 这些只存在于服务器 ~/skillcoach/，绝不能进版本库（含库名、行数、口令路径线索）。
+/logs/*.log
+/logs/deploy-state
+/logs/deploy.lock.fd
+/logs/demo-account.txt
+/deploy.freeze
+/verify_public.py
+/harden-perms.sh
+/restore-drill.sh
+/rotate-pg-password.sh
+/bootstrap.sh
+
 # 前端：依赖、构建产物、缓存
 # .pnpm-store/ 必须忽略：其 v11/projects/*/node_modules 与项目目录存在链接关系，
 # 曾被 rm -rf 遍历导致 frontend/ 源码被误删（2026-10-31 事故）

@@ -15,6 +15,10 @@
 # 具体命令见 docs/teamflow/20261112-r98-redis-pg/DEPLOY.md §6。
 set -eu
 
+# 备份里是完整的用户表（含口令哈希、加密后的 AI Key），默认 umask 022/002 会写出
+# 664/644 让同机其他账号可读。脚本一开头就收紧，保证 dump 从创建那一刻起就是 600。
+umask 077
+
 cd "$(dirname "$0")/.."
 
 KEEP="${KEEP:-14}"
@@ -54,8 +58,11 @@ echo "→ 已写出：$DEST/$NAME（$(du -h "$DEST/$NAME" | cut -f1)）"
 
 # 立刻自检：备份不可用比没有备份更危险（会在恢复当天才发现）。
 # plain 格式用 `psql -f /dev/null` 无法校验语法，这里只对 custom 格式做 `pg_restore -l`。
+# 从 stdin 读归档时**不要写 `-`**：pg_restore 会把位置参数 `-` 当成文件名
+# （PG16 实测报 `could not open input file "-"`），省略位置参数才是「读 stdin」。
+# 少了这个自检曾让每次备份都误报失败、cron 天天红，而 .dump 其实是完好的。
 if [ "$FORMAT" != "plain" ]; then
-  if $COMPOSE exec -T postgres pg_restore -l - < "$DEST/$NAME" > /dev/null 2>&1; then
+  if $COMPOSE exec -T postgres pg_restore -l < "$DEST/$NAME" > /dev/null 2>&1; then
     echo "→ 自检通过：pg_restore -l 能读出目录（归档结构完整）"
   else
     echo "备份自检失败：pg_restore 读不出归档" >&2

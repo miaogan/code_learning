@@ -77,7 +77,7 @@ docker compose up -d --build
 docker compose ps        # backend 的 STATUS 应带 (healthy)
 ```
 
-- **换端口**：把 `docker.env.example` 复制成仓库根 `.env`，改 `WEB_PORT=8080`，再 `docker compose up -d`。
+- **换端口**：把 `docker.env.example` 复制成仓库根 `.env`，改 `WEB_PORT=127.0.0.1:8099`（格式是 `[绑定地址:]端口`，**不要只写端口号**，那会绑 `0.0.0.0`），再 `docker compose up -d`。默认 `127.0.0.1:8080` 只绑回环。
 - **从 SQLite 升级**（r97 → r98）：停机 → 备份 `app.db` → 起 PG 建表 → `scripts/migrate_sqlite_to_pg.py` 迁移（幂等可重跑，带行数校验与序列复位），命令见 [r98 迁移手册](./docs/teamflow/20261112-r98-redis-pg/DEPLOY.md)。
 - **备份**：`./scripts/backup_db.sh`（`pg_dump -Fc` + `pg_restore -l` 自检 + 滚动保留），建议进 cron。
 - **建号（r23）**：`docker compose exec backend python -m app.admin_cli create-user --email me@example.com --mode own`（容器内执行，数据落在同名卷）。
@@ -183,4 +183,4 @@ docs/teamflow/   架构总览、产品记忆、每需求一个任务夹
 
 - **第三方题库素材**：`backend/app/seed/questions.json` 中 `source = "fe-interview"` 的 20 道题改写自 [haizlin/fe-interview](https://github.com/haizlin/fe-interview)（MIT），上游链接、改写说明与许可全文见 [NOTICE-fe-interview.md](./docs/question-bank-staging/NOTICE-fe-interview.md)；其余素材为自建，来源留痕见 [PROVENANCE.md](./docs/question-bank-staging/PROVENANCE.md)。
 - **依赖许可**：后端依赖闭包内仅 `certifi` 为 MPL-2.0（文件级弱 copyleft，未修改其源码即不产生源码开放义务），其余为 MIT / BSD / Apache-2.0 / PSF；前端生产依赖闭包全部 MIT。**没有** GPL / AGPL / SSPL / EUPL 依赖，也无 vendored 第三方源码、字体或图标打包。
-- **镜像与系统包**：容器基础镜像（`python:3.11-slim` / `nginx:alpine`）自带系统包按各自许可证随镜像分发，本项目未修改这些包。
+- **镜像与系统包**：容器基础镜像（`python:3.13-slim` / `nginx:alpine`）自带系统包按各自许可证随镜像分发，本项目未修改这些包。

@@ -156,6 +156,10 @@ class Settings(BaseSettings):
     ai_model: str = "gpt-4o-mini"
     ai_timeout_s: float = UNIFIED_AI_TIMEOUT_S
     ai_max_retries: int = 1
+    #: 「测试连接」与用户自带端点的独立超时（秒）。AI_TIMEOUT_S=600 是给长任务用的，
+    #: 拿去做连通性探测会让一次失败请求挂住十分钟，可被用来耗尽 100 条连接池。
+    #: 该值同时是 SSRF 探测的时间上限，不要调大。
+    ai_test_timeout_s: float = 8.0
 
     # --- AI 供应商档位（r9：`AI_PROVIDER` 空＝legacy） --------------------------
     #: 空＝legacy（直读上面的全局四项）；`deepseek` / `lmstudio` 时只读该档。

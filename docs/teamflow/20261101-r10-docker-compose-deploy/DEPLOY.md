@@ -1,6 +1,6 @@
 # DEPLOY · SkillCoach 容器化部署与运维（r10）
 
-> 服务形态：`浏览器 → frontend(nginx:80，宿主 ${WEB_PORT:-8080}) → /api、/health → backend:8000（仅容器内网）`
+> 服务形态：`浏览器 → frontend(nginx:80，宿主 ${WEB_PORT:-127.0.0.1:8080}，默认只绑回环) → /api、/health → backend:8000（仅容器内网）`
 > 本页面向「部署 / 排障 / 切换模型档位」；首次启动的最短路径也在这里，README 只放三步摘要。
 
 ## 0. 契约单源（改任一项必须三处同改）
@@ -9,7 +9,7 @@
 | --- | --- | --- |
 | 服务名 | `backend` / `frontend` | `docker-compose.yml`、`frontend/nginx.conf`（`proxy_pass http://backend:8000`）、本页、`README.md` |
 | 后端端口 | `8000`（**不发布到宿主**） | `backend/Dockerfile`（`EXPOSE`/`CMD`）、`frontend/nginx.conf`、`docker-compose.yml`（command + healthcheck） |
-| 宿主端口 | `${WEB_PORT:-8080}` | `docker-compose.yml`、本页、`README.md` |
+| 宿主端口 | `${WEB_PORT:-127.0.0.1:8080}`（格式 `[绑定地址:]端口`，换端口时别丢绑定地址） | `docker-compose.yml`、本页、`README.md` |
 | 数据卷 | `skillcoach-data:/data`（实际卷名 `<项目名>_skillcoach-data`，本仓库 = `code_learning_skillcoach-data`） | `docker-compose.yml`、本页 |
 | 配置来源 | `backend/.env`（compose 用 `env_file` **引用**，`required:false`） | `docker-compose.yml`、`docker.env.example`、本页 |
 | 健康探针 | `GET /health`（python urllib，slim 无 curl） | `backend/Dockerfile` 的 `HEALTHCHECK` 与 `docker-compose.yml` 的 `healthcheck`（命令逐字相同，仅 interval/start_period/retries 可不同） |
@@ -24,7 +24,8 @@
 copy docker.env.example backend\.env       # macOS/Linux: cp docker.env.example backend/.env
 #    已有 backend/.env：只手工补 AI_DEEPSEEK_API_KEY / AI_PROVIDER 两个键，**别覆盖原文件**
 #    其余后端键（上传上限、legacy 三件套、AI_LMSTUDIO_*）以 backend/.env.example 为唯一出处
-#    想换宿主端口：把 docker.env.example 复制成仓库根 .env，改 WEB_PORT=8080
+#    想换宿主端口：把 docker.env.example 复制成仓库根 .env，改 WEB_PORT=127.0.0.1:8099
+#    （必须带绑定地址；只写 8099 会绑 0.0.0.0，明文口暴露到局域网/公网）
 
 # 2) 构建并启动（首次约数分钟，后面走层缓存）
 docker compose up -d --build
@@ -146,7 +147,7 @@ docker compose restart backend
 | 页面打开但接口全 502（backend 明明在跑） | nginx 在**配置加载时**解析 `backend` 的 Docker DNS 并缓存；backend 被单独 recreate 换了 IP | `docker compose restart frontend` 刷新解析。（**不要**把 `proxy_pass` 改成变量——会破坏 URI 前缀语义） |
 | backend 一直 `(health)` 起不来 / 日志里 `sqlite3.OperationalError: unable to open database file`（EACCES） | `/data` 属主不对：镜像里 `chown` 必须在 `USER app` **之前**，命名卷首次挂载继承该属主 | 先看 `docker compose logs backend`；旧卷修属主：`docker compose run --rm -u root backend chown -R app:app /data && docker compose restart backend`。**不要** `chmod 777`，也**不要**改成 root 运行 |
 | frontend 起不来 / 整栈卡在 `backend: waiting` | `depends_on: service_healthy` 门控：backend 探针没过，前端就不会启动 | 先修 backend（上方两行），`docker compose ps` 见 healthy 后前端自动起 |
-| 端口被占（8080 已有服务）/ `Bind for 0.0.0.0:8080 failed` | 宿主 8080 冲突（本机常见 8000 是本地 uvicorn、5432 是 ldt-postgres，故 backend 不发布端口） | 改 `WEB_PORT`（根 `.env` 或环境变量），如 `WEB_PORT=8081 docker compose up -d`，再访问 `http://127.0.0.1:8081` |
+| 端口被占（8080 已有服务）/ `Bind for 127.0.0.1:8080 failed` | 宿主 8080 冲突（本机常见 8000 是本地 uvicorn、5432 是 ldt-postgres，故 backend 不发布端口） | 改 `WEB_PORT`（根 `.env` 或环境变量），如 `WEB_PORT=127.0.0.1:8081 docker compose up -d`，再访问 `http://127.0.0.1:8081` |
 | 上传 10–20MB 文件返回 **HTML 413** 而不是 JSON envelope | 双层上限：`frontend/nginx.conf` 的 `client_max_body_size 20m` 必须**严格大于**应用侧 `MAX_UPLOAD_MB=10`；nginx 先拦就会返回 HTML | 保持 nginx > 应用（默认 20m > 10m 即正确）；调应用上限时同步调 nginx，改完 `docker compose up -d --build frontend` |
 | AI 请求约 60s 后 504（`upstream timed out`） | 反代超时被改回 nginx 默认 60s；r9 lmstudio 单次画像实测 201–224s | 恢复 `/api`、`/health` 的 `proxy_read_timeout` / `proxy_send_timeout` 为 `1300s`，重建 frontend |
 | `ai_configured=false` | `backend/.env` 没 Key，或改了 `.env` 没重建容器（env_file 只在 create 时读） | 填 Key → `docker compose up -d --force-recreate backend` |

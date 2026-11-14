@@ -9,6 +9,7 @@
 - 品牌与路线（2026-11-10 · r56 落定）：当前产品名「逃跑计划 / Escape Plan」，定位是**外包工程师的跃迁工作台**，主攻 **AI 应用 / Agent 后端**。品牌文案唯一来源 `frontend/src/lib/brand.ts`；叙事遵循「真实经历盘点 → 能力验证 → 项目证据补强」。ACP 只是知识补充，不将刷题、模拟评测或 dry-run 包装成生产经验或录用保证。历史任务夹、存储键、Cookie、路由、Docker 卷名保留旧标识以确保兼容，不做全局机械替换。下阶段方向是「目标岗位差距 + 项目工程证据 + 面试表达」的跃迁档案，**本轮未实现该看板**。
 
 - 技术栈基线：Web 应用 = React + Vite（TypeScript）前端 / Python FastAPI 后端；AI 能力统一由服务端调用模型 API，Key 只经服务端 `.env` 注入，前端源码与构建产物中不得出现 Key。
+- BYOK 厂商预设约定（2026-11-14）：设置页「模型服务商」下拉的闭集单点在 `frontend/src/lib/aiProviders.ts`（8 家国内厂商 + 自定义，**默认 DeepSeek**）。它只是填表助手：选中后填 `base_url` / 常用模型名，两输入框始终可编辑（模型名以厂商控制台为准），手改地址会反查并回落「自定义」；**HTTP 契约 `AiSettingsRequest` 四件套与后端零改动**，已存配置原样保留。「当前状态」卡片由 `providerLabelOf` 展示真实厂商。已知待拍板：服务端 r9 档 `AI_DEEPSEEK_MODEL` 示例与 `Settings.ai_deepseek_model` 默认值仍是 `deepseek-chat`，DeepSeek 官方文档现行名为 `deepseek-flash` / `deepseek-v4-pro`；切换会改变内置 Key 链路的模型，需产品确认后再动。
 - 数据落盘基线：首版用本地 SQLite 单库（`backend/app.db`），不引入外部数据库与云存储；**题库自 r6 起由 SQLite 的 `questions` 表承载（`backend/app/seed/questions.json` 退为唯一导入源，幂等导入不覆盖已有行）**，课程清单仍以服务端 JSON 文件维护。
 - 文档基线：每个需求一个不可变任务夹 `docs/teamflow/<yyyyMMdd-rN-slug>/`，跨需求约定与待办只写 `docs/teamflow/memory.md`。
 - 模块边界（2026-10-31 脚手架落定）：`frontend/` 只经 `src/api/client.ts` 出网（页面不直接 fetch）；`backend/` 路由层只做参数与错误映射，业务在 `app/services/`；画像 / 试卷 / 报告等结构化产物以 JSON 文本列入库，校验交给 pydantic（`app/schemas.py`）。
@@ -112,7 +113,7 @@
 
 ## 数据层换成 PostgreSQL + Redis（r98）
 
-- **数据层口径取代 r10 的「SQLite 落 skillcoach-data 卷」**：`DATABASE_URL` 是唯一数据源，SQLite 已下线，**没有文件库、没有降级路径**。服务名/端口/WEB_PORT 仍是跨需求契约（改任一须同改 `docker-compose.yml` + r98 DEPLOY + README）。
+- **数据层口径取代 r10 的「SQLite 落 skillcoach-data 卷」**：`DATABASE_URL` 是唯一数据源，SQLite 已下线，**没有文件库、没有降级路径**。服务名/端口/WEB_PORT 仍是跨需求契约（改任一须同改 `docker-compose.yml` + r98 DEPLOY + README）。2026-11-13 口径收紧：`WEB_PORT` 默认值由 `8080` 改为 `127.0.0.1:8080`（格式 `[绑定地址:]端口`，只写端口＝绑 0.0.0.0），`scripts/tunnel.sh` 取端口时按最后一个冒号切分；Redis 补 `--maxmemory ${REDIS_MAXMEMORY:-128mb}`（无上限时 allkeys-lru 不触发）；CI Python 3.11→3.13 与容器镜像对齐。
 - **卷拆成两个，不许复用**：PG 用 `skillcoach-pgdata`；r97 的 `skillcoach-data`（内含 `app.db`）保留但不挂载，用途只剩「升级时取数据」与「回滚」。PG 的 `initdb` 只接受空目录，复用旧卷会 `directory exists but is not empty` 直接起不来（本机实测踩到）。
 - **`?` 占位符靠薄适配层翻译**（`db.to_pg_sql()`：`?`→哨兵→`%`转义→哨兵→`%s`。**判据只看有没有 `?`**——r98 收尾修正：原判据「含 `?` 或 `%`」会把直写 `%s` 的新 SQL 二次转义成 `%%s`，psycopg 报「0 placeholders but N parameters」，而文档恰好教人这么写）。两条路都可走：用 `?` 时字面量 `%` 自动转义；直写 `%s` 时 `LIKE '%kw%'` 要自己写 `%%kw%%`。同一个文件别混用。`row_factory=dict_row` + `prepare_threshold=None`。
 - **检索**：FTS5 虚表删除，改 `pg_trgm` GIN；`mode` 恒 `like`、`notice` 恒空，与旧 LIKE 分支结果一致。`CREATE EXTENSION` 必须用独立连接（DDL 失败会把当前事务整个 aborted）。

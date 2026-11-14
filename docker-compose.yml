@@ -5,7 +5,7 @@
 #   backend  = FastAPI 非 root（不发布宿主端口，只在 compose 内网暴露 8000）
 #
 # 契约单源：docs/teamflow/memory.md「容器化交付约定」——服务名 backend/frontend/postgres/redis、
-# 后端端口 8000、命名卷 skillcoach-data（PG 数据）、宿主端口 ${WEB_PORT:-8080}。
+# 后端端口 8000、命名卷 skillcoach-pgdata（PG 数据）、宿主端口 ${WEB_PORT:-127.0.0.1:8080}。
 # 改任一项必须三处同改：本文件 + 本夹 DEPLOY.md + README.md。
 #
 # 硬禁令：本文件不得出现任何 Key；environment 里不得出现 AI_PROVIDER
@@ -47,7 +47,9 @@ services:
     restart: unless-stopped
     # `--save ''` 关闭 RDB 落盘：Redis 里只有限流窗口、会话缓存、读缓存这类**可重建**状态，
     # 丢了大不了重新计数/回源，落盘反而引入「快照期间 fork 抖动」和一份需要单独备份的文件。
-    command: ['redis-server', '--save', '', '--appendonly', 'no', '--maxmemory-policy', 'allkeys-lru']
+    # `--maxmemory` 必须同时给上限：只写 allkeys-lru 而不设上限时淘汰策略**永不触发**，
+    # 公网长期运行下缓存可无限涨。2C4G 单机默认 128mb，按机器规格用 REDIS_MAXMEMORY 覆盖。
+    command: ['redis-server', '--save', '', '--appendonly', 'no', '--maxmemory-policy', 'allkeys-lru', '--maxmemory', '${REDIS_MAXMEMORY:-128mb}']
     healthcheck:
       test: ['CMD', 'redis-cli', 'ping']
       interval: 10s
@@ -116,7 +118,10 @@ services:
         NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org}
     restart: unless-stopped
     ports:
-      - '${WEB_PORT:-8080}:80'
+      # 默认只绑回环：不带任何配置直接 `up -d` 也不会把明文 8080 暴露到局域网/公网。
+      # 换端口请写全 `127.0.0.1:8099`；只写 `8099` 会退化为 `0.0.0.0:8099`。
+      # 公网部署由 deploy.env 提供同格式的值，叠加 prod 层后对外只剩 80/443。
+      - '${WEB_PORT:-127.0.0.1:8080}:80'
     # r23：nginx 层 Basic Auth 已撤掉（鉴权改由应用登录态承担），故不再挂载 frontend/.htpasswd。
     # 如需回滚到 r21 的公网 Basic Auth，恢复 nginx.conf 的 auth_basic 两行，并加回：
     #   volumes: [./frontend/.htpasswd:/etc/nginx/.htpasswd:ro]
