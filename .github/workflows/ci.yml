@@ -21,7 +21,7 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -83,7 +83,7 @@ jobs:
       # 这里给上地址是为了让这几个用例在 CI 里真的跑起来。
       REDIS_TEST_URL: redis://127.0.0.1:6380/0
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
         with:
           # 与 backend/Dockerfile 的 python:3.13-slim 对齐：CI 与生产同版，
