@@ -106,21 +106,59 @@ if ! COMPOSE="$COMPOSE_STR" ./scripts/backup_db.sh >>"$LOG" 2>&1; then
   exit 1
 fi
 
+# 2026-11-14 20:05 生产事故根因，勿删：
+#   脚本顶部 `umask 077` 本意是让 logs/deploy.log、deploy-state 落盘即 600，
+#   但 `git checkout --force` 会 unlink + recreate 被改动的跟踪文件 —— 新文件
+#   变成 600、新目录变成 700。Dockerfile 的 `COPY app/ ./app/` 把这个权限原样
+#   带进镜像，而 backend 以 `USER app`(10001) 运行，于是 `import app.main` 撞
+#   PermissionError → 容器 unhealthy → up 失败 → 部署失败。更糟的是回滚走同一条
+#   checkout 路径，同样修不好，服务会一直停在 Restarting 崩溃循环（实测 /health 504）。
+#   只在「日志/状态文件」上要 077，checkout 必须单独降回 022。
+checkout_tree() {
+  local target="$1"
+  ( umask 022; git checkout --detach --force "$target" ) >>"$LOG" 2>&1 || return 1
+  # 双保险：把历史遗留的 600/700 跟踪文件也拉回可读。go+rX 只补读与执行，
+  # 不补写（避免 group 可写脚本 = RCE），且只作用于 git 跟踪文件 —— 被
+  # .gitignore 忽略的 deploy.env / backend/.env / certs / logs / backups 一律不动。
+  git ls-files -z | xargs -0 -r chmod go+rX || return 1
+  # git 从 100644 改到 100755 时只在原有权限上补 x（664 -> 775，group 可写）。
+  # 部署脚本若能被同组用户改写等于 RCE，所以每次部署统一收敛到 755。
+  chmod 755 "$ROOT"/scripts/*.sh
+}
+
 fail_rollback() {
   log "!! 部署失败，回滚到 $PREV_SHA"
-  git checkout --detach --force "$PREV_SHA" >>"$LOG" 2>&1 || true
+  checkout_tree "$PREV_SHA" || true
   "${COMPOSE[@]}" build >>"$LOG" 2>&1 || true
   "${COMPOSE[@]}" up -d --no-build >>"$LOG" 2>&1 || true
-  log "回滚完成，请检查 logs/deploy.log 与容器状态"
+  # 20:05 那次打印了「回滚完成」却是假成功：权限问题让回滚后的 backend 同样起不来。
+  # 因此回滚后必须复核 /health，没恢复就明确喊人工介入，不再报「完成」。
+  rb_ok=0
+  for _ in $(seq 1 20); do
+    if [ "$(curl -sk -o /dev/null -w '%{http_code}' https://127.0.0.1/health || true)" = "200" ]; then
+      rb_ok=1
+      break
+    fi
+    sleep 3
+  done
+  if [ "$rb_ok" -eq 1 ]; then
+    log "回滚完成且 /health 已恢复 200"
+  else
+    log "!! 回滚后 /health 仍未恢复，需人工介入：docker compose logs backend"
+  fi
   exit 1
 }
 
 log "→ checkout $SHA（ignored 运行时文件不动）"
-git checkout --detach --force "$SHA" >>"$LOG" 2>&1 || fail_rollback
+checkout_tree "$SHA" || fail_rollback
 
-# git 从 100644 改到 100755 时只在原有权限上补 x（664 -> 775，group 可写）。
-# 部署脚本若能被同组用户改写等于 RCE，所以每次部署统一收敛到 755。
-chmod 755 "$ROOT"/scripts/*.sh
+# 构建前断言：构建上下文里只要还有「非 other-readable」的业务文件，COPY 进镜像后
+# USER app 必然读不到。宁可在 up 之前拒绝，也不要再等 90s 健康检查才发现。
+bad_file="$(find backend/app -type f ! -perm -o+r -print -quit)"
+if [ -n "$bad_file" ]; then
+  log "!! 构建上下文存在仅 owner 可读的文件（umask 回归？）：$bad_file"
+  fail_rollback
+fi
 
 # 先 build 再一次性切换：2 核 4G 构建前端约 1.5 分钟，期间旧容器仍在服务。
 log "→ 构建镜像（服务不停）"

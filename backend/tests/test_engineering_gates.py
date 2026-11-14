@@ -1396,4 +1396,29 @@ def test_r12_source_not_in_http_contract() -> None:
             assert token not in text, f"{label} 出现来源枚举值 {token!r}：契约不得为素材来源改版"
 
 
+def test_r100_deploy_checkout_must_not_inherit_umask_077() -> None:
+    """CD 脚本的 checkout 必须降回 umask 022，并归一跟踪文件权限（生产事故回归）。
+
+    2026-11-14 20:05：脚本顶层 `umask 077`（本意只护日志/状态文件）让
+    `git checkout --force` 重建的 `ai.py` 变成 600；Dockerfile 的 `COPY app/ ./app/`
+    把权限原样带进镜像，backend 以 `USER app`(10001) 运行 → PermissionError →
+    容器 unhealthy → 部署失败。回滚走同一条 checkout 路径也修不好，公网 /health 504。
+    这条门禁把修复钉在 CI 里：本地全绿不代表服务器能起，权限链必须有静态约束。
+    """
+    script = (REPO_ROOT / "scripts" / "deploy-from-ci.sh").read_text(encoding="utf-8")
+
+    assert re.search(r"\(\s*umask\s+022\s*;\s*git checkout --detach --force", script), (
+        "checkout 必须在 `umask 022` 子 shell 内执行，否则跟踪文件会被顶层 umask 077 写成 600"
+    )
+    assert "git ls-files -z | xargs -0 -r chmod go+rX" in script, (
+        "缺少跟踪文件权限归一兜底：历史遗留的 600/700 也必须能自愈"
+    )
+    assert script.count("git checkout --detach --force") == 1, (
+        "只保留 checkout_tree 一个切换入口；回滚复用它，避免再出现绕过修复的裸 checkout"
+    )
+    assert 'checkout_tree "$PREV_SHA"' in script, "回滚必须复用 checkout_tree"
+    assert "-perm -o+r" in script, "构建前需断言构建上下文可读，早于 up 阶段失败"
+    assert "rb_ok" in script, "回滚后必须复核 /health，不能无条件打印「回滚完成」"
+
+
 

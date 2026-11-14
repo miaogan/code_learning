@@ -182,3 +182,26 @@ python logs/teamflow/ip-deploy/cd_status.py
 `master` 从当前生产 HEAD 创建（本地老 `master` 快进 142 个提交），与 `dev` 同起点。默认分支切换与 `master` 保护规则需在 GitHub 网页操作（本机无 admin token）；**GitHub 不允许删除默认分支**，所以必须先把默认分支挪到 `master`，才能删掉 `feat/dev-skill-coach`。
 
 历史 `docs/teamflow/*` 验收文档里的旧分支名是当时的事实记录，保持原样不改写。
+
+## 13. 事故复盘：`umask 077` 让部署把后端打死（2026-11-14 20:05）
+
+**现象**：`dev` 推上 `dc87512 fix(ai): 修复 BYOK 测试连接把有效 Key 误报为无效` 后，自动部署失败并回滚；但回滚后 `backend` 一直 `Restarting (1)`，公网 `/health` 504，前端静态页能开、所有 API 挂。回滚日志却打印了「回滚完成」。
+
+**根因链**（缺一环都不会出事，所以之前 6 次部署全绿）：
+
+1. `deploy-from-ci.sh` 顶层 `umask 077` —— 本意只让 `logs/deploy.log` 与 `deploy-state` 落盘即 600。
+2. 前 6 次部署改的都是文档 / 前端 / 脚本，**没有改过 `backend/app/**/*.py`**。`dc87512` 是第一个改 `ai.py` 的部署。
+3. `git checkout --detach --force` 会 unlink + recreate 被改动的跟踪文件，新文件继承 `umask 077` → `ai.py` 变 `600`，新目录变 `700`（实测 16 个跟踪文件权限异常）。
+4. `backend/Dockerfile` 的 `COPY app/ ./app/` 把 mode 原样带进镜像，而 `USER app`(uid 10001) 是非 root。
+5. `import app.main` → `PermissionError: [Errno 13] ... '/app/app/services/ai/ai.py'` → 容器 unhealthy → `depends_on: backend: service_healthy` 让 `up -d` 直接失败。
+6. **回滚走同一条裸 checkout 路径**，把 `ai.py` 又写成 600，于是「回滚完成」是假成功，服务起不来。
+
+**修复**（`scripts/deploy-from-ci.sh`）：
+
+- 新增 `checkout_tree()`：checkout 放在 `( umask 022; git checkout ... )` 子 shell 里；随后 `git ls-files -z | xargs -0 -r chmod go+rX` 兜底归一历史遗留的 600/700（只加读/执行、不加写，且只碰跟踪文件，`.env` / `certs` / `logs` / `backups` 不动）；`chmod 755 scripts/*.sh` 收敛脚本。
+- 正常部署与**回滚**共用 `checkout_tree`，不再有第二条绕开修复的路径。
+- 构建前断言 `find backend/app -type f ! -perm -o+r`，有不可读文件就在 `up` 之前拒绝，不必等 90s 健康检查。
+- 回滚后复核 `/health` 20 次，没恢复就明确喊人工介入，不再无条件打印「完成」。
+- `backend/tests/test_engineering_gates.py::test_r100_deploy_checkout_must_not_inherit_umask_077` 把上述约束钉进 CI 静态门禁。
+
+**教训**：`umask` 是进程级全局状态，设了「日志保密」就会顺带影响同一脚本里所有新建文件——包括随后要进 Docker 构建上下文的源码。凡是「先 checkout 再 build」的部署脚本，权限必须显式归一，且不能只靠本地门禁：本地文件是 644、服务器 checkout 后变 600，这个差异只在生产出现。
