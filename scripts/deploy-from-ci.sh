@@ -56,14 +56,22 @@ fi
 
 # 实测踩坑：push 刚完成就 fetch，可能「对象已下载但 FETCH_HEAD 仍指向上一版」，
 # 于是 SHA 守卫误拒。这里最多重试 3 次（间隔 3s），覆盖 GitHub 的传播窗口。
+# 校验目标 commit 属于本分支历史。
+# 千万别写成 `git rev-list | grep -q`：grep -q 命中即退出，上游吃 SIGPIPE(141)，
+# 在 `set -o pipefail` 下整条管道被判失败，会把合法 SHA 误拒（实测 RC=141）。
+sha_on_branch() {
+  git cat-file -e "$SHA^{commit}" 2>/dev/null || return 1
+  git merge-base --is-ancestor "$SHA" FETCH_HEAD 2>/dev/null
+}
+
+# push 刚完成就 fetch 时，远端指针可能短暂滞后；最多重试 3 次覆盖这个窗口。
 log "→ fetch origin/$BRANCH（最多 3 次，等远端指针追上）"
 fetched=0
 for attempt in 1 2 3; do
   if git fetch --quiet --depth=50 origin "$BRANCH" >>"$LOG" 2>&1; then
     fetched=1
   fi
-  if git cat-file -e "$SHA^{commit}" 2>/dev/null &&
-    git rev-list -n 50 FETCH_HEAD 2>/dev/null | grep -qx "$SHA"; then
+  if sha_on_branch; then
     break
   fi
   if [ "$attempt" -lt 3 ]; then
@@ -79,8 +87,8 @@ if ! git cat-file -e "$SHA^{commit}" 2>/dev/null; then
   log "目标 commit 不在本地对象库，拒绝部署：$SHA"
   exit 1
 fi
-if ! git rev-list -n 50 FETCH_HEAD 2>/dev/null | grep -qx "$SHA"; then
-  log "目标 commit 不在 origin/$BRANCH 最近 50 次提交内（已重试 3 次），拒绝部署：$SHA"
+if ! sha_on_branch; then
+  log "目标 commit 不在 origin/$BRANCH 历史上（已重试 3 次），拒绝部署：$SHA"
   exit 1
 fi
 
