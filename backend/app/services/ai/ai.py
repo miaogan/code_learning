@@ -38,6 +38,32 @@ _RESPONSE_FORMAT_BY_MODE: dict[str, dict[str, Any] | None] = {
 #: `ready=False` 且 `reason` 缺省时的兜底文案（配置错一律 503 + 中文说明，绝不 500）。
 _UNCONFIGURED_REASON = "AI 服务尚未配置，请检查 backend/.env 后重启服务"
 
+#: 「测试连接」的探测语（2026-11-14 实测修复）。
+#: DeepSeek / OpenAI 在 `response_format={"type":"json_object"}` 下要求消息里出现 "json"
+#: 字样，否则直接 400：`Prompt must contain the word 'json' in some form`。
+#: 旧的「请只回复 OK」不带该字样，导致 Key 完全正确也报「被拒绝」，看起来像 Key 填错了。
+#: 两处都写成小写 json，让 `json_object` 与 `none` 两种模式都能一次通过。
+PING_SYSTEM = "你是 API 连通性检测助手。请只输出一个 json 对象，不要其它内容。"
+PING_USER = '请只回复这个 json 对象：{"ok": true}'
+
+
+def _rejected_message(runtime: AiRuntime, status_code: int) -> str:
+    """上游 4xx 的中文归因（单一出处；`_request` 与流式路径共用）。
+
+    旧文案对所有 4xx 一律说「请检查 API Key 与额度」，把 400 参数错误也甩给 Key，
+    用户会反复怀疑自己的 Key。这里按状态码分流，文案仍不含端点 / Key 值 / 堆栈。
+    """
+    owner = (
+        "你在设置页填写的 API Key" if runtime.provider == "user" else "服务端配置的 API Key"
+    )
+    if status_code in (401, 403):
+        return f"API Key 无效或没有权限，请检查{owner}"
+    if status_code in (402, 429):
+        return "账户额度不足或调用过于频繁，请稍后再试"
+    if status_code == 400:
+        return "请求参数不被模型接受，请检查模型名、API 地址与 JSON 模式"
+    return f"AI 调用被拒绝，请检查{owner}与额度"
+
 
 def _persist_call_log(
     runtime: AiRuntime,
@@ -250,8 +276,12 @@ class AIClient:
         ) from last_error
 
     async def ping(self) -> None:
-        """最小连通性探测（设置页「测试连接」）：只验证端点 / Key / 模型可用。"""
-        await self._chat("你是 API 连通性检测助手。", "请只回复 OK 两个字母。")
+        """最小连通性探测（设置页「测试连接」）：只验证端点 / Key / 模型可用。
+
+        探测语取模块常量，必须自带 `json` 字样 —— 详见 `PING_SYSTEM` 的注释，
+        否则上游的 `json_object` 模式会直接 400，把好 Key 报成坏 Key。
+        """
+        await self._chat(PING_SYSTEM, PING_USER)
 
     async def stream_chat(
         self,
@@ -510,12 +540,12 @@ class AIClient:
                 status_code=response.status_code,
                 prompt_chars=prompt_chars,
             )
-            message = (
-                "AI 调用被拒绝，请检查你在设置页填写的 API Key 与额度"
-                if runtime.provider == "user"
-                else "AI 调用被拒绝，请检查服务端账号与额度"
+            raise AppError(
+                AI_UNAVAILABLE,
+                _rejected_message(runtime, response.status_code),
+                status=502,
+                retryable=False,
             )
-            raise AppError(AI_UNAVAILABLE, message, status=502, retryable=False)
         logger.info(
             "ai.response provider=%s model=%s status=%s elapsed_ms=%s",
             runtime.provider,
@@ -637,12 +667,12 @@ def _raise_for_status(
         status_code=status_code,
         prompt_chars=prompt_chars,
     )
-    message = (
-        "AI 调用被拒绝，请检查你在设置页填写的 API Key 与额度"
-        if runtime.provider == "user"
-        else "AI 调用被拒绝，请检查服务端账号与额度"
+    raise AppError(
+        AI_UNAVAILABLE,
+        _rejected_message(runtime, status_code),
+        status=502,
+        retryable=False,
     )
-    raise AppError(AI_UNAVAILABLE, message, status=502, retryable=False)
 
 
 def _message_of(
