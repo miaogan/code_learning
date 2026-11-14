@@ -114,6 +114,31 @@ jobs:
       - name: Live eval dry-run gate
         run: python -X utf8 ../scripts/eval_live.py --check
 
+  # 版本门禁：只在「准备合入 master」的发版 PR 上跑。
+  # 不判断代码质量（frontend / backend 负责），只判断这一批代码有没有资格作为
+  # 正式版本进受保护主干：来源分支、版本号、CHANGELOG、tag 指向、版本递增。
+  # 要让它真正拦住合并，需在 Settings → Branches → master 的 Required status checks
+  # 里把 `Release gate` 加进去（与 frontend / backend 并列）。规则见
+  # docs/teamflow/20261114-cicd/RELEASE.md。
+  release-gate:
+    name: Release gate
+    if: github.event_name == 'pull_request' && github.base_ref == 'master'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Fetch dev history and tags
+        run: |
+          git fetch --quiet --tags --force origin
+          git fetch --quiet origin '+refs/heads/dev:refs/remotes/origin/dev'
+      - name: Validate release PR
+        env:
+          PR_HEAD_REF: ${{ github.head_ref }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: bash scripts/release-gate.sh
+
   # CD：只有两个门禁 job 全绿、且是部署分支的 push 才触发。
   # 走「受限 deploy key + 固定 known_hosts」：服务器 authorized_keys 用
   # `restrict,command=` 把该 key 钉死到 scripts/deploy-from-ci.sh，客户端命令

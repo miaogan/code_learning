@@ -129,7 +129,8 @@ python -X utf8 scripts/eval_live.py --check                 # 在线评测脚手
 
 ## 分支、交付与回滚
 
-- **分支模型**：`master` 是受保护的默认主干，`dev` 是日常开发与自动部署分支（push 到 `dev` 经 CI 双门禁后自动部署生产）。历史需求改动曾从基线 `32487b4` 起在 `feat/dev-skill-coach` 上完成，该分支已停用。
+- **分支模型**：`master` 是受保护的发布存档主干（只接收已验收的版本批次，不部署），`dev` 是日常开发与**唯一自动部署**分支（push 到 `dev` 经 CI 双门禁后自动部署生产）。生产实际运行 `dev` 的 HEAD。历史需求改动曾从基线 `32487b4` 起在 `feat/dev-skill-coach` 上完成，该分支已删除。
+- **版本发布**：`master` 不直接开发、不直接合入；每个版本批次走 `vX.Y.Z` tag → `release/vX.Y.Z` 临时分支 → PR → `master`（合并后删临时分支，稳态只留两条分支）。版本号规则、准入清单与操作步骤见 [`docs/teamflow/20261114-cicd/RELEASE.md`](docs/teamflow/20261114-cicd/RELEASE.md)，版本内容见 [`CHANGELOG.md`](CHANGELOG.md)。
 - **提交**：开发期间不留中间提交，也**不由 Agent 提交或合并**；验收通过后由流水线一次性提交（代码 + `docs/teamflow/` 任务夹一起入库，`?? docs/` 不会漏）。
 - **回滚到基线（改动整体可撤销）**：
 
