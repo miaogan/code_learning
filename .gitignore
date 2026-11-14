@@ -18,6 +18,7 @@ logs/teamflow/
 # 既消掉 git status 噪音，也避免误用 git clean 删掉备份日志 / 演示账号凭据。
 /logs/
 /*.tgz
+/*.tar.gz
 
 # 前端：依赖、构建产物、缓存
 # .pnpm-store/ 必须忽略：其 v11/projects/*/node_modules 与项目目录存在链接关系，

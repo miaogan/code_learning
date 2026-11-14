@@ -84,3 +84,33 @@ deploy job 带「Secrets 未配置就跳过」守卫，所以可以**先推代�
 - `cyz` 在 docker 组 ≡ root（架构性，与本方案无关，仍未根治）。
 - 22 端口公网开放；已禁用口令登录，但建议后续评估 fail2ban 与 `PermitRootLogin no`。
 - 部署会短暂重建容器（秒级），不是严格零停机；要做零停机需引入双副本 + 负载均衡，当前单 worker 架构不支持。
+
+## 9. 落地与演练记录（2026-11-14）
+
+**已完成的准备**
+
+- 本地提交并推送 5 个 commit：`2e85503`（同步 r99 生产修复 + CD 链路）→ `7ae7f9c`（脚本可执行位）→ `a35ca16`（忽略 logs/ 与上传包）→ `3cbbe9f`（fetch 重试）→ `a975a59`（SHA 校验修正）。
+- B 组前端 BYOK 预设 3 个文件保持本地未提交，未进生产。
+- 服务器全量备份 `~/skillcoach-backup-20261114-171139.tgz`（600、6.0 MB、766 项，含 `certs/privkey.pem`）。普通 `tar` 会因 certbot 以 root 创建的证书文件报权限拒绝，改用 `docker run -v /home/cyz:/home/cyz alpine` 以容器内 root 打包后 `chown` 回 cyz。
+- `~/skillcoach` 已迁成 git 工作树，`checkout -f` 未触碰任何 ignored 运行时文件；证书、cron、600 权限配置全部保留。
+- 受限 key 实测：传 `id; cat /etc/passwd` 被脚本拒绝（`RC=1`），拿不到 shell；传合法形状的 SHA 也被按规则拒绝。
+
+**真实部署演练**：用受限 key 手工发 `deploy a975a596...`（等价于 Actions 会发的命令），`DEPLOY_RC=0`：
+
+```
+17:18:15 fetch → 17:18:15 DB 备份 → 17:18:16 checkout
+17:18:16 构建镜像（86s，旧容器照常服务）
+17:19:42 一次性切换 → 17:19:49 健康检查 → 17:19:52 完成
+7ae7f9c -> a975a596
+```
+
+部署后服务器侧 44/44、国内客户端直连 44/44，`logs/deploy.log` 与 `deploy-state` 均 600，四容器 healthy，证书与两条 cron 完好。
+
+**过程中修掉的两个真 bug**（都不是配置问题，是脚本逻辑问题）：
+
+1. `git rev-list -n 50 FETCH_HEAD | grep -qx "$SHA"` 在 `set -o pipefail` 下：grep 命中即退出，上游 `git rev-list` 吃 SIGPIPE 返回 141，整条管道被判失败，**把合法 SHA 误拒**。服务器实测 `OLD_PIPE_RC=141` 复现。改成 `git merge-base --is-ancestor "$SHA" FETCH_HEAD`（无管道，合法 SHA 返回 0、不存在返回 128）。
+2. `chmod +x scripts/*.sh` 在原有 664 上只补 x 得到 **775（group 可写）**，部署脚本可被同组用户改写。改为每次 checkout 后 `chmod 755 scripts/*.sh` 统一收敛。
+
+另外 `git add` 在 Windows 上把 shell 脚本记成 `100644`，迁移后 `checkout -f` 会重置 x bit，导致证书/备份 cron 与受限 key 全部失效；已用 `git update-index --chmod=+x scripts/*.sh` 修为 `100755`。
+
+**唯一剩余的用户动作**：在 GitHub 仓库 Settings → Secrets and variables → Actions 里填 `DEPLOY_SSH_KEY` / `DEPLOY_HOST` / `DEPLOY_USER`。填完后，下一次 push 到 `feat/dev-skill-coach` 就会由 Actions 自动触发部署；在此之前 deploy job 会明确打印「Secrets 未配置，跳过部署」并以成功退出。

@@ -116,6 +116,10 @@ fail_rollback() {
 log "→ checkout $SHA（ignored 运行时文件不动）"
 git checkout --detach --force "$SHA" >>"$LOG" 2>&1 || fail_rollback
 
+# git 从 100644 改到 100755 时只在原有权限上补 x（664 -> 775，group 可写）。
+# 部署脚本若能被同组用户改写等于 RCE，所以每次部署统一收敛到 755。
+chmod 755 "$ROOT"/scripts/*.sh
+
 # 先 build 再一次性切换：2 核 4G 构建前端约 1.5 分钟，期间旧容器仍在服务。
 log "→ 构建镜像（服务不停）"
 "${COMPOSE[@]}" build >>"$LOG" 2>&1 || fail_rollback
