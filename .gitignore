@@ -14,6 +14,11 @@ logs/teamflow/
 /rotate-pg-password.sh
 /bootstrap.sh
 
+# 服务器 ~/skillcoach/ 的整个运行时目录与一次性上传包：整目录忽略，
+# 既消掉 git status 噪音，也避免误用 git clean 删掉备份日志 / 演示账号凭据。
+/logs/
+/*.tgz
+
 # 前端：依赖、构建产物、缓存
 # .pnpm-store/ 必须忽略：其 v11/projects/*/node_modules 与项目目录存在链接关系，
 # 曾被 rm -rf 遍历导致 frontend/ 源码被误删（2026-10-31 事故）
