@@ -70,7 +70,7 @@ deploy job 带「Secrets 未配置就跳过」守卫，所以可以**先推代�
 落地前发现本地工作树有 26 个改动、远端 HEAD 与本地 HEAD 相同，但服务器跑的是含 r99 修复的 tar 包。分组原则：
 
 - **A 组（必须推）**：r99 SSRF 修复、IP 证书脚本、nginx 规则、CI 版本对齐、compose/env 示例、备份脚本、验收报告，以及本次新增的 CD 文件。这些服务器已在跑，不推就会在第一次自动部署时被 checkout 回旧版。
-- **B 组（本次不推）**：`frontend/src/pages/SettingsPage.tsx` 的改动与新增 `frontend/src/lib/aiProviders.ts`、`frontend/src/test/aiProviders.test.ts`（BYOK 国内厂商预设）。服务器上 `SettingsPage.tsx` 的 `aiProviders` 引用数为 0，证实是**尚未部署、未随本次验收的新功能**。保持本地未提交，等单独验证后再走一次 CD。
+- **B 组（首轮暂缓，验证后已上线）**：`frontend/src/pages/SettingsPage.tsx` 的改动与新增 `frontend/src/lib/aiProviders.ts`、`frontend/src/test/aiProviders.test.ts`（BYOK 国内厂商预设）。首轮为避免把未随验收的新功能混进 CD 首演而暂缓；随后补齐本地门禁并核对 `docs/teamflow/memory.md` 的 BYOK 约定登记，确认是已落定的产品约定后，按同一条 CD 链路提交部署。**事后看这个暂缓偏保守**：判断依据应是门禁结果，不是「服务器上没出现过」。详见 §9。
 
 ## 7. 排障
 
@@ -90,7 +90,7 @@ deploy job 带「Secrets 未配置就跳过」守卫，所以可以**先推代�
 **已完成的准备**
 
 - 本地提交并推送 5 个 commit：`2e85503`（同步 r99 生产修复 + CD 链路）→ `7ae7f9c`（脚本可执行位）→ `a35ca16`（忽略 logs/ 与上传包）→ `3cbbe9f`（fetch 重试）→ `a975a59`（SHA 校验修正）。
-- B 组前端 BYOK 预设 3 个文件保持本地未提交，未进生产。
+- B 组前端 BYOK 预设 3 个文件首轮暂缓；**随后已验证并上线**（见下方「B 组上线」）。
 - 服务器全量备份 `~/skillcoach-backup-20261114-171139.tgz`（600、6.0 MB、766 项，含 `certs/privkey.pem`）。普通 `tar` 会因 certbot 以 root 创建的证书文件报权限拒绝，改用 `docker run -v /home/cyz:/home/cyz alpine` 以容器内 root 打包后 `chown` 回 cyz。
 - `~/skillcoach` 已迁成 git 工作树，`checkout -f` 未触碰任何 ignored 运行时文件；证书、cron、600 权限配置全部保留。
 - 受限 key 实测：传 `id; cat /etc/passwd` 被脚本拒绝（`RC=1`），拿不到 shell；传合法形状的 SHA 也被按规则拒绝。
@@ -114,3 +114,14 @@ deploy job 带「Secrets 未配置就跳过」守卫，所以可以**先推代�
 另外 `git add` 在 Windows 上把 shell 脚本记成 `100644`，迁移后 `checkout -f` 会重置 x bit，导致证书/备份 cron 与受限 key 全部失效；已用 `git update-index --chmod=+x scripts/*.sh` 修为 `100755`。
 
 **唯一剩余的用户动作**：在 GitHub 仓库 Settings → Secrets and variables → Actions 里填 `DEPLOY_SSH_KEY` / `DEPLOY_HOST` / `DEPLOY_USER`。填完后，下一次 push 到 `feat/dev-skill-coach` 就会由 Actions 自动触发部署；在此之前 deploy job 会明确打印「Secrets 未配置，跳过部署」并以成功退出。
+
+## 10. B 组 BYOK 厂商预设上线（用户质疑后的修正）
+
+用户指出「这个应该在本地验证了」。复核后**撤回暂缓判断**：判断依据应是门禁结果，不是「服务器上没出现过」。
+
+- 代码性质：`frontend/src/lib/aiProviders.ts` 是纯函数填表助手（8 家国内厂商 + 自定义，默认 DeepSeek），`aiProviders.test.ts` 有 9 项单测，`SettingsPage.tsx` 增加服务商下拉、填写提示与状态卡厂商展示；HTTP 契约 `AiSettingsRequest` 四件套与后端零改动。
+- `docs/teamflow/memory.md` 已有「BYOK 厂商预设约定（2026-11-14）」登记，是落定的产品约定而非在途草稿，代码中无 TODO / 半成品。
+- 本地门禁实测：`npm run typecheck` RC=0、`npm run lint` RC=0、`npm test` **42 文件 / 556 测试全过**、`npm run build` 成功（316 模块，gzip JS 298.86 KiB / CSS 25.68 KiB）。
+- 按同一条 CD 链路提交并部署，部署后复验 44 项。
+
+**遗留待拍板（不阻塞上线）**：`docs/teamflow/memory.md` 记录服务端 r9 档 `AI_DEEPSEEK_MODEL` 示例与 `Settings.ai_deepseek_model` 默认值仍是 `deepseek-chat`，而前端预设给 `deepseek-flash`。两者作用域不同（前端预设只填 BYOK 表单且可编辑；服务端默认只影响内置 Key 链路），当前 `AI_DEEPSEEK_API_KEY` 为空，无实际影响。真要统一需产品确认后单独改，不要借 CD 顺手改。

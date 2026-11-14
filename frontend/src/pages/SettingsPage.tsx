@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { ApiError, api } from '../api/client'
 import type { AiCapability, JsonMode, KeyMode } from '../api/types'
@@ -7,8 +7,19 @@ import { Card } from '../components/ui/Card'
 import { ConfirmModal } from '../components/ui/ConfirmModal'
 import { InlineError } from '../components/ui/InlineError'
 import { Select } from '../components/ui/Select'
+import {
+  CUSTOM_PROVIDER_ID,
+  initialProviderValues,
+  presetById,
+  presetNoteOf,
+  providerIdOf,
+  providerLabelOf,
+  providerOptions,
+} from '../lib/aiProviders'
 import { applyMe, useAuth } from '../state/auth'
 import { dismissKeyRequired } from '../state/aiGate'
+
+const PROVIDER_OPTIONS = providerOptions()
 
 const CAPABILITY_TEXT: Record<AiCapability, string> = {
   full: '全部 AI 能力可用（含召对、医案等高消耗场景）',
@@ -27,10 +38,26 @@ const KEY_MODE_TEXT: Record<KeyMode, string> = {
  */
 export default function SettingsPage() {
   const { me } = useAuth()
-  const [baseUrl, setBaseUrl] = useState(me?.ai_base_url ?? '')
-  const [model, setModel] = useState(me?.ai_model ?? '')
+  // 空配置默认 DeepSeek；已有配置原样保留，并按地址反查它属于哪家（认不出就是自定义）。
+  const [seed] = useState(() =>
+    initialProviderValues(me?.ai_base_url ?? '', me?.ai_model ?? ''),
+  )
+  const [providerId, setProviderId] = useState(seed.providerId)
+  const [baseUrl, setBaseUrl] = useState(seed.baseUrl)
+  const [model, setModel] = useState(seed.model)
   const [apiKey, setApiKey] = useState('')
   const [jsonMode, setJsonMode] = useState<JsonMode>(me?.ai_json_mode ?? 'json_object')
+  /** 登录态可能晚于首屏到达：只补一次真实配置，之后绝不覆盖用户正在编辑的表单。 */
+  const synced = useRef(false)
+  useEffect(() => {
+    if (me === null || synced.current) return
+    synced.current = true
+    const next = initialProviderValues(me.ai_base_url, me.ai_model)
+    setProviderId(next.providerId)
+    setBaseUrl(next.baseUrl)
+    setModel(next.model)
+    setJsonMode(me.ai_json_mode || 'json_object')
+  }, [me])
   const [aiBusy, setAiBusy] = useState<'test' | 'save' | 'clear' | null>(null)
   const [aiError, setAiError] = useState<string | null>(null)
   const [aiNotice, setAiNotice] = useState<string | null>(null)
@@ -50,6 +77,24 @@ export default function SettingsPage() {
     model: model.trim(),
     api_key: apiKey.trim(),
     json_mode: jsonMode,
+  }
+
+  /** 选厂商＝填入该厂商的地址与常用模型；选「自定义」只保留现值，不擅自清空。 */
+  const changeProvider = (next: string) => {
+    setProviderId(next)
+    setAiError(null)
+    setAiNotice(null)
+    if (next === CUSTOM_PROVIDER_ID) return
+    const preset = presetById(next)
+    if (preset === null) return
+    setBaseUrl(preset.baseUrl)
+    setModel(preset.model)
+  }
+
+  /** 手改地址后让下拉如实反映：命中预设就显示该厂商，否则回落到「自定义」。 */
+  const changeBaseUrl = (next: string) => {
+    setBaseUrl(next)
+    setProviderId(providerIdOf(next))
   }
 
   const testConnection = async () => {
@@ -141,6 +186,12 @@ export default function SettingsPage() {
             <dd>{CAPABILITY_TEXT[me.ai_capability]}</dd>
             <dt>Key 来源</dt>
             <dd>{KEY_MODE_TEXT[me.key_mode]}</dd>
+            {me.ai_base_url ? (
+              <>
+                <dt>服务商</dt>
+                <dd>{providerLabelOf(me.ai_base_url)}</dd>
+              </>
+            ) : null}
             <dt>当前 Key</dt>
             <dd className="sc-mono">{me.ai_masked_key || '未配置'}</dd>
             {me.key_mode === 'shared' ? (
@@ -172,14 +223,31 @@ export default function SettingsPage() {
           <h2 className="sc-settings-title">我的 AI Key</h2>
           <form className="sc-form" onSubmit={saveAi}>
             <label className="sc-field">
+              <span className="sc-field-label">模型服务商</span>
+              <Select
+                ariaLabel="模型服务商"
+                value={providerId}
+                options={PROVIDER_OPTIONS}
+                disabled={aiBusy !== null}
+                onChange={changeProvider}
+              />
+              <span className="sc-field-hint">
+                默认 DeepSeek。选中后自动填入该厂商的 API 地址与常用模型，两项都能手动改；
+                厂商提供的模型名更新较快，请以控制台为准。Key 需到所选厂商的控制台申请。
+              </span>
+            </label>
+            <label className="sc-field">
               <span className="sc-field-label">Base URL</span>
               <input
                 type="url"
                 value={baseUrl}
                 disabled={aiBusy !== null}
-                onChange={(event) => setBaseUrl(event.target.value)}
-                placeholder="https://api.example.com/v1"
+                onChange={(event) => changeBaseUrl(event.target.value)}
+                placeholder="https://api.deepseek.com/v1"
               />
+              <span className="sc-field-hint">
+                须为该厂商的 OpenAI 兼容地址（服务端会自动补 /chat/completions）；自己填地址时下拉会显示「自定义」。
+              </span>
             </label>
             <label className="sc-field">
               <span className="sc-field-label">模型</span>
@@ -188,9 +256,12 @@ export default function SettingsPage() {
                 value={model}
                 disabled={aiBusy !== null}
                 onChange={(event) => setModel(event.target.value)}
-                placeholder="例如 gpt-4o-mini"
+                placeholder="例如 deepseek-flash"
               />
             </label>
+            {presetNoteOf(providerId) !== '' ? (
+              <p className="sc-field-hint">{presetNoteOf(providerId)}</p>
+            ) : null}
             <label className="sc-field">
               <span className="sc-field-label">API Key</span>
               <input
