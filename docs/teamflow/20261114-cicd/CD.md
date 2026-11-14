@@ -8,7 +8,7 @@
 
 | 已具备 | 实测 |
 |---|---|
-| 代码托管 | GitHub `miaogan/code_learning`，**public**，默认分支 `feat/dev-skill-coach`（仓库无 `main`） |
+| 代码托管 | GitHub `miaogan/code_learning`，**public**；`master` 为受保护默认主干、`dev` 为唯一自动部署分支（原 `feat/dev-skill-coach`，2026-11-14 整理） |
 | CI 门禁 | 前端 5 步、后端 8 步，自带 PG16 + Redis 8 services，含 `pip-audit`、题库字节门禁、4 个离线评测门禁 |
 | 服务器 | git 2.43；`https://github.com` 返回 200、`ssh.github.com:443` 可达；磁盘可用 49G；已有约 1GB 构建缓存 |
 | 权限形态 | 纯用户态（cyz + docker 组 + 用户 crontab），全程不需要 sudo |
@@ -43,7 +43,7 @@ deploy job 带「Secrets 未配置就跳过」守卫，所以可以**先推代�
 ## 4. 一次性服务器配置
 
 1. 全量备份：`tar czf ~/skillcoach-backup-<ts>.tgz -C ~ skillcoach`（含所有 ignored 运行时文件）。
-2. 把 `~/skillcoach` 无损转成 git 工作树：`git init` → `git remote add origin https://github.com/miaogan/code_learning.git` → `git fetch --depth=50 origin feat/dev-skill-coach` → `git checkout -f -B feat/dev-skill-coach FETCH_HEAD`。`checkout -f` 只覆盖被跟踪文件，`deploy.env` / `backend/.env` / `certs/` / `backups/` / `logs/` 全部保留。
+2. 把 `~/skillcoach` 无损转成 git 工作树：`git init` → `git remote add origin https://github.com/miaogan/code_learning.git` → `git fetch --depth=50 origin dev` → `git checkout -f -B dev FETCH_HEAD`。`checkout -f` 只覆盖被跟踪文件，`deploy.env` / `backend/.env` / `certs/` / `backups/` / `logs/` 全部保留。
 3. 公钥追加到 `~/.ssh/authorized_keys`，前缀 `restrict,command="/home/cyz/skillcoach/scripts/deploy-from-ci.sh"`，权限保持 600。
 4. `chmod +x scripts/deploy-from-ci.sh`；确认 `logs/` 700、`deploy.env` 与 `backend/.env` 600。
 5. 手工冒烟：`ssh ... "deploy <当前 HEAD sha>"`，正常应打印「已是目标版本，跳过」；再改一个无害文件跑真实演练，验证回滚链路。
@@ -53,7 +53,7 @@ deploy job 带「Secrets 未配置就跳过」守卫，所以可以**先推代�
 | 护栏 | 实现 |
 |---|---|
 | 命令形状 | 只接受 `deploy <40 位小写 hex>`，从 `SSH_ORIGINAL_COMMAND` 解析 |
-| SHA 边界 | 必须存在于对象库，且在 `origin/feat/dev-skill-coach` 最近 50 次提交内 |
+| SHA 边界 | 必须存在于对象库，且在 `origin/dev` 最近 50 次提交内 |
 | 并发 | `flock -n`，重叠部署直接跳过而不是互相踩 |
 | 冻结窗口 | 存在 `~/skillcoach/deploy.freeze` 时拒绝部署（面试期间用） |
 | 数据安全 | 切换前跑 `scripts/backup_db.sh`，备份失败即中止，服务不动 |
@@ -163,3 +163,22 @@ python logs/teamflow/ip-deploy/cd_status.py
 结论必须是 `[OK]` 而不是 `[!!]`；`[!!]` 表示「代码已上线但不是这次 CI 部署的」。
 
 **三个会骗人的绿色信号**：run 级绿勾、Environments / Deployments 的 `success` 标记（由 `environment: production` 自动生成，与服务器无关）、以及跳过守卫本身 `exit 0`。详见 `logs/teamflow/ip-deploy/CD-OBSERVE.md`。
+
+## 12. 分支模型整理（2026-11-14）
+
+用户拍板：`master` = 受保护的默认主干，`dev` = 日常开发 + 唯一自动部署分支；其余分支清空。
+
+| 改动 | 文件 |
+|---|---|
+| `on.push.branches: [master, dev]`（去掉 `main` 与 `feat/**`，否则改名后 CI 不触发） | `.github/workflows/ci.yml` |
+| deploy job 的 `if` 改为 `refs/heads/dev` | 同上 |
+| `BRANCH="dev"` | `scripts/deploy-from-ci.sh` |
+| CI badge 指向 `master`，分支章节改写 | `README.md` |
+| 三个 update 块加 `target-branch: dev`，依赖 PR 不再打到受保护的 `master` | `.github/dependabot.yml` |
+| 观测分支改为 `dev` | `logs/teamflow/ip-deploy/cd_status.py`（ignored） |
+
+**迁移顺序（关键：不能让服务器脚本断链）**：服务器 `deploy-from-ci.sh` 的 `BRANCH` 是硬编码的，必须先通过一次部署把新脚本拉下来，之后才能 fetch `dev`。做法是让 `feat/dev-skill-coach` 与新建的 `dev` **指向同一个改造 commit**：先推 `feat`（此时 workflow 已不监听它，不会触发 CI），保证服务器上的旧脚本仍能 fetch 到目标 SHA；再推 `dev` 触发部署，服务器 checkout 新 commit 后脚本即变成 `BRANCH=dev`。顺序颠倒的话，旧脚本 fetch 不到目标 SHA，会被 `sha_on_branch` 拒绝、deploy job 变红。
+
+`master` 从当前生产 HEAD 创建（本地老 `master` 快进 142 个提交），与 `dev` 同起点。默认分支切换与 `master` 保护规则需在 GitHub 网页操作（本机无 admin token）；**GitHub 不允许删除默认分支**，所以必须先把默认分支挪到 `master`，才能删掉 `feat/dev-skill-coach`。
+
+历史 `docs/teamflow/*` 验收文档里的旧分支名是当时的事实记录，保持原样不改写。

@@ -22,7 +22,9 @@ LOG="$ROOT/logs/deploy.log"
 STATE="$ROOT/logs/deploy-state"
 LOCK="$ROOT/logs/deploy.lock.fd"
 FREEZE="$ROOT/deploy.freeze"
-BRANCH="feat/dev-skill-coach"
+# 唯一自动部署分支。改分支名必须同时改 .github/workflows/ci.yml 的 push branches
+# 与 deploy job 的 if，否则服务器 fetch 不到目标 SHA，部署会被 sha_on_branch 拒绝。
+BRANCH="dev"
 COMPOSE=(docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file deploy.env)
 COMPOSE_STR="docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file deploy.env"
 

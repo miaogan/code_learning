@@ -1,8 +1,10 @@
 name: CI
 
+# 分支模型：master = 受保护的默认主干，dev = 日常开发 + 唯一自动部署分支。
+# 推 master 只跑双门禁（deploy job 会被 if 跳过）；推 dev 才触发生产部署。
 on:
   push:
-    branches: [main, 'feat/**']
+    branches: [master, dev]
   pull_request:
 
 permissions:
@@ -120,7 +122,7 @@ jobs:
   deploy:
     name: Deploy to public IP server
     needs: [frontend, backend]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/feat/dev-skill-coach'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
     runs-on: ubuntu-latest
     environment: production
     steps:

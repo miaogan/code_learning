@@ -1,6 +1,6 @@
 # 逃跑计划 · 外包工程师的跃迁工作台
 
-[![CI](https://github.com/miaogan/code_learning/actions/workflows/ci.yml/badge.svg?branch=feat/dev-skill-coach)](https://github.com/miaogan/code_learning/actions/workflows/ci.yml?query=branch%3Afeat%2Fdev-skill-coach)
+[![CI](https://github.com/miaogan/code_learning/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/miaogan/code_learning/actions/workflows/ci.yml?query=branch%3Amaster)
 
 **从外包交付到更高平台，不靠一句“我想进大厂”，靠可验证的能力证据。**
 当前主线是 **AI 应用 / Agent 后端**：盘点简历与项目证据，用模拟面试和 ACP／工程题验证能力，把短板转为学习、项目补强和表达动作。
@@ -129,7 +129,7 @@ python -X utf8 scripts/eval_live.py --check                 # 在线评测脚手
 
 ## 分支、交付与回滚
 
-- **分支**：`feat/dev-skill-coach`，从基线提交 `32487b4` 起，本需求全部改动都在此分支上。
+- **分支模型**：`master` 是受保护的默认主干，`dev` 是日常开发与自动部署分支（push 到 `dev` 经 CI 双门禁后自动部署生产）。历史需求改动曾从基线 `32487b4` 起在 `feat/dev-skill-coach` 上完成，该分支已停用。
 - **提交**：开发期间不留中间提交，也**不由 Agent 提交或合并**；验收通过后由流水线一次性提交（代码 + `docs/teamflow/` 任务夹一起入库，`?? docs/` 不会漏）。
 - **回滚到基线（改动整体可撤销）**：
 

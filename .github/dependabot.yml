@@ -1,8 +1,11 @@
 version: 2
 updates:
+  # 所有依赖 PR 都打到 dev（受保护主干 master 只接受从 dev 走人工评审的合并）。
+  # 仍会按需创建临时 dependabot/* 分支与 PR；清理远端分支不等于禁用依赖更新。
   # 后端运行时 + 测试依赖（requirements.txt 未钉版本，靠这条每周收安全更新）
   - package-ecosystem: pip
     directory: /backend
+    target-branch: dev
     schedule:
       interval: weekly
       time: '03:00'
@@ -20,6 +23,7 @@ updates:
   # 前端依赖（React / Vite / vitest 等）
   - package-ecosystem: npm
     directory: /frontend
+    target-branch: dev
     schedule:
       interval: weekly
       time: '03:00'
@@ -36,6 +40,7 @@ updates:
   # CI 里的 actions/checkout、setup-node、setup-python 等
   - package-ecosystem: github-actions
     directory: /
+    target-branch: dev
     schedule:
       interval: weekly
       time: '03:00'
