@@ -82,7 +82,7 @@ jobs:
       REDIS_TEST_URL: redis://127.0.0.1:6380/0
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           # 与 backend/Dockerfile 的 python:3.13-slim 对齐：CI 与生产同版，
           # 避免「CI 3.11 绿、容器 3.13 才暴露依赖差异」。本机 3.13.14 全量 910 用例已验。
