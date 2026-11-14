@@ -113,7 +113,7 @@ deploy job 带「Secrets 未配置就跳过」守卫，所以可以**先推代�
 
 另外 `git add` 在 Windows 上把 shell 脚本记成 `100644`，迁移后 `checkout -f` 会重置 x bit，导致证书/备份 cron 与受限 key 全部失效；已用 `git update-index --chmod=+x scripts/*.sh` 修为 `100755`。
 
-**Secrets 已于 2026-11-14 18:13 由用户配置完成**：`DEPLOY_SSH_KEY` / `DEPLOY_HOST=43.166.23.144` / `DEPLOY_USER=cyz`。在此之前三次 push 的 deploy job 都是「Secrets 未配置，跳过部署」的**假绿**（run success、job 4 秒、step 0 秒），服务器上跑的是手工 `deploy <sha>` 的结果；配置完成后由一次文档提交触发首次真实自动部署，验收方法见 §11。
+**Secrets 已于 2026-11-14 18:13 由用户配置完成**：`DEPLOY_SSH_KEY` / `DEPLOY_HOST=43.166.23.144` / `DEPLOY_USER=cyz`。在此之前三次 push 的 deploy job 都是「Secrets 未配置，跳过部署」的**假绿**（run success、job 4 秒、step 0 秒），服务器上跑的是手工 `deploy <sha>` 的结果；配置完成后由一次文档提交触发首次真实自动部署并成功，**验收结果见 §11**。
 
 **专用账号评估结论（同日，已放弃）**：曾评估把 `DEPLOY_USER` 换成零特权账号 `cddeploy`（零特权账号 + 单条精确 sudoers 桥接，脚本在 `logs/teamflow/ip-deploy/setup-cd-user.sh`，**从未执行**）。因部署脚本最终仍须以 `cyz` 身份运行、而 `cyz` 在 `docker` 组 ≡ root，换账号不降低提权上限，也不消除「GitHub Secrets 里放着一把能登录服务器的私钥」这个前提，收益不抵改动成本。用户决定维持 `cyz` + `restrict,command=`，服务器上未执行的脚本已删除。真正根除该风险的是服务器轮询拉模式（§2），留待后续架构变更。
 
@@ -128,16 +128,31 @@ deploy job 带「Secrets 未配置就跳过」守卫，所以可以**先推代�
 
 **遗留待拍板（不阻塞上线）**：`docs/teamflow/memory.md` 记录服务端 r9 档 `AI_DEEPSEEK_MODEL` 示例与 `Settings.ai_deepseek_model` 默认值仍是 `deepseek-chat`，而前端预设给 `deepseek-flash`。两者作用域不同（前端预设只填 BYOK 表单且可编辑；服务端默认只影响内置 Key 链路），当前 `AI_DEEPSEEK_API_KEY` 为空，无实际影响。真要统一需产品确认后单独改，不要借 CD 顺手改。
 
-## 11. 首次真实自动部署的验收方法
+## 11. 首次真实自动部署验收（2026-11-14 18:18）
 
-填完 Secrets 不等于链路已验证——只有一次真实 push 才能证明。验收看四处，缺一不可：
+纯文档提交 `27d25be` 触发，三个 Secrets 首次生效：
+
+| 项 | 实测 |
+|---|---|
+| run `#43584451758` | success；`frontend` 36s / `backend` 156s / `Deploy to public IP server` 8s |
+| `Deploy over SSH` step | `10:18:46Z → 10:18:51Z`（5 秒） |
+| 服务器 `logs/deploy-state` | `2026-11-14T18:18:51+08:00 27d25be2…`，恰好是 step 结束时刻 |
+| 服务器 `git rev-parse HEAD` | `27d25be2…`（从 `bc9dd77` 推进） |
+| `logs/deploy.log` | 第 4 条「完成：bc9dd770… -> 27d25be2…」，含备份 / checkout / build / 切换 / 健康检查 |
+| 公网 | `/health` 200、`/docs` 404、TLS 1.3、证书 SAN 正确、四容器 healthy |
+
+**8 秒不是跳过**：这次只改文档，Docker 构建全命中缓存（`deploy.log` 里全是 `DONE 0.0s`）。早期把「≥15 / 30 秒」当真部署门槛是错的，曾据此把这次成功误判成假绿；观测脚本已修正为用 `deploy-state` 的 SHA + 时间戳归因。
+
+验收看四处，缺一不可：
 
 | # | 检查 | 通过标准 |
 |---|---|---|
-| 1 | Actions run 的 `Deploy to public IP server` job | success，且**耗时 30–90 秒**（4 秒 = 仍是跳过守卫） |
-| 2 | `Deploy over SSH` step 日志 | 不出现「CD secrets 未配置，跳过部署」；能看到 SSH 连上服务器并等待构建 |
-| 3 | 服务器 `~/skillcoach/logs/deploy-state` | SHA == 本次 push 的 SHA，时间**晚于** deploy job 启动时间 |
+| 1 | 服务器 `logs/deploy-state` | **SHA == 本次 push 的 SHA，且时间戳落在 deploy job `started_at ~ completed_at` 窗口内**。这是核心判据：跳过守卫根本不写这个文件 |
+| 2 | 服务器 `git rev-parse HEAD` | == 本次 push 的 SHA |
+| 3 | `logs/deploy.log` | 出现「完成：PREV -> SHA」的完整链路 |
 | 4 | 公网 | `/health` 200、`/docs` 404、证书可信、四容器 healthy |
+
+**不要用 deploy job 时长判断**：缓存命中时真部署只要 5 秒，前端改动时可能 86 秒，时长取决于构建缓存，与「是否部署」无关。
 
 一键交叉比对（本地只读脚本，在 ignored 目录，不触发 CI）：
 
@@ -145,6 +160,6 @@ deploy job 带「Secrets 未配置就跳过」守卫，所以可以**先推代�
 python logs/teamflow/ip-deploy/cd_status.py
 ```
 
-结论必须是 `[OK]` 而不是 `[!!]`。`[!!]` 表示「代码已上线但不是这次 CI 部署的」——即假绿。
+结论必须是 `[OK]` 而不是 `[!!]`；`[!!]` 表示「代码已上线但不是这次 CI 部署的」。
 
-**三个会骗人的绿色信号**：run 级绿勾、 Environments / Deployments 的 `success` 标记（由 `environment: production` 自动生成，与服务器无关）、以及跳过守卫本身 `exit 0`。详见 `logs/teamflow/ip-deploy/CD-OBSERVE.md`。
+**三个会骗人的绿色信号**：run 级绿勾、Environments / Deployments 的 `success` 标记（由 `environment: production` 自动生成，与服务器无关）、以及跳过守卫本身 `exit 0`。详见 `logs/teamflow/ip-deploy/CD-OBSERVE.md`。
