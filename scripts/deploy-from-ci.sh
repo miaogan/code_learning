@@ -54,18 +54,33 @@ if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   exit 1
 fi
 
-log "→ fetch origin/$BRANCH"
-if ! git fetch --quiet --depth=50 origin "$BRANCH" >>"$LOG" 2>&1; then
+# 实测踩坑：push 刚完成就 fetch，可能「对象已下载但 FETCH_HEAD 仍指向上一版」，
+# 于是 SHA 守卫误拒。这里最多重试 3 次（间隔 3s），覆盖 GitHub 的传播窗口。
+log "→ fetch origin/$BRANCH（最多 3 次，等远端指针追上）"
+fetched=0
+for attempt in 1 2 3; do
+  if git fetch --quiet --depth=50 origin "$BRANCH" >>"$LOG" 2>&1; then
+    fetched=1
+  fi
+  if git cat-file -e "$SHA^{commit}" 2>/dev/null &&
+    git rev-list -n 50 FETCH_HEAD 2>/dev/null | grep -qx "$SHA"; then
+    break
+  fi
+  if [ "$attempt" -lt 3 ]; then
+    log "第 $attempt 次 fetch 后指针尚未追上 $SHA，3s 后重试"
+    sleep 3
+  fi
+done
+if [ "$fetched" -ne 1 ]; then
   log "git fetch 失败，部署中止（服务未改动）"
   exit 1
 fi
-
 if ! git cat-file -e "$SHA^{commit}" 2>/dev/null; then
   log "目标 commit 不在本地对象库，拒绝部署：$SHA"
   exit 1
 fi
-if ! git rev-list -n 50 FETCH_HEAD | grep -qx "$SHA"; then
-  log "目标 commit 不在 origin/$BRANCH 最近 50 次提交内，拒绝部署：$SHA"
+if ! git rev-list -n 50 FETCH_HEAD 2>/dev/null | grep -qx "$SHA"; then
+  log "目标 commit 不在 origin/$BRANCH 最近 50 次提交内（已重试 3 次），拒绝部署：$SHA"
   exit 1
 fi
 
