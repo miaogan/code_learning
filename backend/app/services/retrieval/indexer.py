@@ -82,7 +82,17 @@ def _question_chunk_rows(runtime: EmbedderRuntime) -> list[dict[str, Any]]:
     rows = repository.question_chunk_rows()
     built: list[dict[str, Any]] = []
     contents: list[str] = []
+    seen: set[str] = set()
     for row in rows:
+        # 题库允许历史脏数据存在重复 id 行（生产实测 64 对，ctid 显示是早期迁移重复导入，
+        # 内容完全相同）。chunk 以 `question:<id>` 为主键，重复会让「写入条数」虚高、
+        # 而库里按唯一约束只留一行 —— 这里显式去重（先到先得），并如实记 warning，
+        # 避免出现「written 1348 / stored 1284」这种对不上的数字。
+        question_id = str(row["id"])
+        if question_id in seen:
+            logger.warning("rag.indexer.duplicate_question id=%s skipped", question_id)
+            continue
+        seen.add(question_id)
         prompt = str(row["prompt"] or "").strip()
         explanation = str(row["explanation"] or "").strip()
         content = (prompt + "\n\n" + explanation).strip()[:MAX_CHUNK_CHARS]

@@ -272,3 +272,27 @@ def test_dim_change_wipes_and_rebuilds_column(legacy_db_dsn, neutral_ai_env, mon
     # 收尾：把配置还原成默认，避免污染同进程后续用例的 get_settings 快照。
     monkeypatch.delenv("AI_EMBED_DIM", raising=False)
     get_settings.cache_clear()
+
+
+def test_duplicate_question_ids_are_deduped(tmp_db, monkeypatch):
+    """题库历史脏数据（重复 id 行）不得让「写入条数」虚高：chunk 按 id 先到先得。
+
+    生产实测过 CTE 之外的现象：questions 表存在 64 对重复行（早期迁移重复导入），
+    `INSERT ... ON CONFLICT(id)` 会静默合并，导致 rebuild 报 written 1348 / stored 1284。
+    索引器显式去重后两个数字必须一致。
+    """
+    from app.core import repository as repo
+
+    real_rows = repo.question_chunk_rows()
+
+    def _rows_with_dup():
+        base = real_rows[0] if real_rows else {
+            "id": "dup-1", "direction": "backend", "sub_direction": "",
+            "prompt": "重复题", "explanation": "",
+        }
+        return [dict(base), dict(base), {**base, "id": "dup-2", "prompt": "另一道题"}]
+
+    monkeypatch.setattr(repo, "question_chunk_rows", _rows_with_dup)
+    result = indexer.rebuild_question_index()
+    assert result["written"] == 2, "重复 id 必须只写一次"
+    assert result["question_chunks"] == 2
