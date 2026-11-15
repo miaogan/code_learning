@@ -21,6 +21,7 @@ from typing import Any
 from app.core import repository
 from app.core.db import rag_embedding_mode
 from app.core.errors import AI_UNAVAILABLE, AppError
+from app.services.retrieval import tutorial_seed
 from app.services.retrieval.chunking import split_tutorial_blocks
 from app.services.retrieval.embeddings import EmbedderRuntime, resolve_embedder
 
@@ -231,3 +232,27 @@ def index_status() -> dict[str, Any]:
         "embedder_kind": runtime.kind,
         "notice": notice,
     }
+
+
+def ensure_tutorials_indexed(runtime: EmbedderRuntime | None = None) -> dict[str, Any] | None:
+    """启动时补齐教程索引：**只在教程 chunk 为 0 时**灌种子（幂等、不覆盖用户推送）。
+
+    为什么不无条件重灌：远程 embedding 下 165 个小节要几十秒，每次启动都跑既慢又浪费；
+    教程内容有变化时走两条明确路径——前端点「推送教程正文」，或删掉 tutorial chunk 后重启。
+    `ingest_tutorial_chunks` 本身是「整份替换」，所以「0 条才灌」不会留下半份索引。
+    """
+    items = tutorial_seed.load_items()
+    if not items:
+        return None
+    counts = repository.rag_chunk_counts()
+    existing = counts.get("tutorial", 0)
+    if existing > 0:
+        return {
+            "skipped": True,
+            "tutorial_chunks": existing,
+            "chunk_count": counts["total"],
+        }
+    logger.info("rag.tutorial_seed.ingest items=%d", len(items))
+    summary = ingest_tutorial_chunks(items, runtime)
+    summary["skipped"] = False
+    return summary

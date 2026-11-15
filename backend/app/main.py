@@ -4,6 +4,7 @@
 都带该 id，排查时按 id 过滤即可拿到完整时间线（见 `observability.py`）。
 """
 
+import asyncio
 import logging
 import time
 from collections.abc import AsyncIterator
@@ -63,6 +64,7 @@ from app.schemas import HealthResponse
 from app.services import radar as radar_service, rate_limit
 from app.services.ai.ai import close_ai_pool
 from app.services.assessment import question_bank
+from app.services.retrieval import indexer as rag_indexer
 
 APP_VERSION = "0.1.0"
 
@@ -114,13 +116,36 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     repository.rebuild_question_search()
     # r67：应用内定时采集（`RADAR_SCHEDULE=inapp` 才起，其余模式完全由手动按钮驱动）。
     radar_service.start_scheduler()
+    # r105：教程语料已导出成种子，启动时**后台**补齐教程索引（远程 embedding 下要几十秒，
+    # 不能阻塞启动；索引已存在时只做一次 count 查询即返回）。
+    tutorial_task: asyncio.Task[None] | None = None
+    if get_settings().rag_seed_tutorials:
+        tutorial_task = asyncio.create_task(_ensure_tutorial_index())
     yield
     # 关停顺序：先停调度器（避免 task 在连接池关闭后仍在跑），再释放 AI 连接池，
     # 最后关 DB 池与 Redis 客户端 —— 反过来的话调度器最后一轮写入会撞上已关闭的池。
     await radar_service.stop_scheduler()
+    # 教程摄取在单个事务里「整份替换」，取消即回滚，下次启动会重试；不等它是为了让关停快。
+    if tutorial_task is not None:
+        tutorial_task.cancel()
     await close_ai_pool()
     close_pool()
     redis_cache.reset_client()
+
+
+async def _ensure_tutorial_index() -> None:
+    """后台补齐教程索引：任何失败只记日志，绝不影响服务可用性。"""
+    try:
+        summary = await asyncio.to_thread(rag_indexer.ensure_tutorials_indexed)
+    except Exception as exc:  # embedding 不可达 / 种子损坏：服务照常跑，考工页可手动重建
+        logger.warning("rag.tutorial_seed.failed error=%s", type(exc).__name__)
+        return
+    if summary is not None:
+        logger.info(
+            "rag.tutorial_seed.done skipped=%s tutorial_chunks=%s",
+            summary.get("skipped"),
+            summary.get("tutorial_chunks"),
+        )
 
 
 def create_app() -> FastAPI:

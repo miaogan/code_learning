@@ -43,6 +43,9 @@ jobs:
         run: npm run build
       - name: Retrieval eval gate
         run: node ../scripts/eval_retrieval.mjs --check
+      # r105：教程语料导出的种子必须与前端源一致（改了教程却没重新导出 → 这里红）
+      - name: Tutorial seed freshness
+        run: node ../scripts/export_tutorials.mjs --check
 
   backend:
     runs-on: ubuntu-latest

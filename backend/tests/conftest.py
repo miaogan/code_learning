@@ -215,6 +215,9 @@ _NEUTRAL_AI_ENV: dict[str, str] = {
     "AI_EMBED_MODEL": "",
     "AI_EMBED_BASE_URL": "",
     "AI_EMBED_API_KEY": "",
+    # r105：启动时的教程种子摄取会与用例里的 chunk 计数断言抢写（后台任务在用例中途插行），
+    # 测试里一律关闭；`ensure_tutorials_indexed()` 由专门用例直接调用。
+    "RAG_SEED_TUTORIALS": "false",
 }
 
 
