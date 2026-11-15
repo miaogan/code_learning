@@ -43,13 +43,16 @@ from app.routers import (
     coach,
     courses,
     eval as eval_router,
+    evidence,
     exam,
     history,
     interview,
+    jobs,
     learn,
     practice,
     profile,
     radar,
+    rag,
     report,
     resume,
     search,
@@ -343,6 +346,9 @@ def create_app() -> FastAPI:
     # r67：技术雷达（先锋清单 / 采集 / 国子监生成任务，任务按账号隔离）。
     app.include_router(radar.router)
     app.include_router(taifu.router)
+    app.include_router(rag.router)
+    app.include_router(evidence.router)
+    app.include_router(jobs.router)
 
     @app.get("/health", response_model=HealthResponse, tags=["ops"], summary="探活（AC-8）")
     def health() -> HealthResponse:

@@ -106,6 +106,8 @@ export default function InterviewPage() {
   const [sources, setSources] = useState<SetupSources>(() => prefillOf(null).sources)
   const [track, setTrack] = useState<RunTrack>(EMPTY_TRACK)
   const [answer, setAnswer] = useState('')
+  //: r102 回合流的阶段文案（评分中 → 就绪）；流不可用时为空，回落到同步端点。
+  const [turnPhase, setTurnPhase] = useState('')
   const [draftNotice, setDraftNotice] = useState<string | null>(null)
   const [restore, setRestore] = useState<RestoreState>({ status: 'idle', error: null })
   /** 「重新读取」计数：run_id 不变时靠它触发恢复 effect 重跑。 */
@@ -341,11 +343,24 @@ export default function InterviewPage() {
     if (text.length === 0) return
     setTrack({ submitting: true, elapsedS: 0, error: null, turnError: null })
     writeInterviewDraft(userId, { runId: session.run_id, questionId, text: answer })
+    setTurnPhase('')
     try {
-      const turn: InterviewTurn = await api.scoreAnswer(session.run_id, {
-        question_id: questionId,
-        answer: text,
-      })
+      // r102：优先回合流（阶段反馈），流不可用（旧后端 / 代理缓冲 / 网络）时回落同步端点，
+      // 两者共用同一条 score_answer 业务链路，评分口径与错误码完全一致。
+      let turn: InterviewTurn
+      try {
+        turn = await api.scoreAnswerStream(
+          session.run_id,
+          { question_id: questionId, answer: text },
+          (message) => setTurnPhase(message),
+        )
+      } catch (streamError) {
+        if (streamError instanceof ApiError && streamError.code === 'STREAM_UNAVAILABLE') {
+          turn = await api.scoreAnswer(session.run_id, { question_id: questionId, answer: text })
+        } else {
+          throw streamError
+        }
+      }
       setSession((prev) => {
         if (!prev) return prev
         const answered = prev.questions.map((item) =>
@@ -369,6 +384,7 @@ export default function InterviewPage() {
       setDraftNotice(null)
       clearInterviewDraft(userId, session.run_id)
       answerDraftRef.current = { userId, runId: session.run_id, questionId: '', text: '' }
+      setTurnPhase('')
       setTrack((prev) => ({ ...prev, submitting: false, elapsedS: 0 }))
       if (!turn.next_question) {
         setStage('ended')
@@ -379,6 +395,7 @@ export default function InterviewPage() {
         writeInterviewSession(userId, session.run_id)
       }
     } catch (error) {
+      setTurnPhase('')
       setTrack((prev) => ({
         ...prev,
         submitting: false,
@@ -568,6 +585,7 @@ export default function InterviewPage() {
                 retryLabel="重试结束"
               />
             ) : null}
+            {turnPhase ? <p className="sc-search-foot">{turnPhase}</p> : null}
             <Composer
               value={answer}
               onChange={setAnswer}

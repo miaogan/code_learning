@@ -146,6 +146,19 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
 | GET | `/api/reports/{id}/markdown` | — | `text/markdown` | AC-9（P1） |
 | GET | `/api/history` | — | `RunSummary[]`（r5 起每行带 `interview_settings: InterviewSettings\|null`） | AC-10（P1）；`null` 前端渲染「未记录设定」，不出现 undefined |
 | GET | `/api/courses` | — | `Course[]` | ✅ AC-6 数据面 |
+| GET | `/api/rag/status` | — | `RagStatus` | r100 RAG 索引状态（embedder / 引擎 / chunk 计数） |
+| POST | `/api/rag/rebuild` | — | `RagRebuildResult` | r100 题库向量索引全量重建（幂等替换） |
+| POST | `/api/rag/ingest` | `RagIngestRequest` | `RagRebuildResult` | r100 教程 chunk 整份推送（全量替换语义） |
+| POST | `/api/rag/search` | `RagSearchRequest` | `RagSearchResponse` | r100 三态检索：keyword / semantic / hybrid（RRF） |
+| POST | `/api/rag/answer` | `RagAnswerRequest` | `RagAnswerResponse` | r100 检索增强生成（citations 白名单校验，能力档 light） |
+| GET | `/api/evidence/summary` | — | `EvidenceSummary` | r100 工程证据中心（行数事实 + 表数 + RAG 状态，零 AI） |
+| POST | `/api/coach/agent/run` | `CoachAgentRequest` | `CoachAgentRun` | r101 教练 Agent 编排（规划→工具→反思→结论，轨迹落库） |
+| GET | `/api/coach/agent/runs` | — | `CoachAgentRun[]` | r101 编排历史（倒序，按账号隔离） |
+| GET | `/api/coach/agent/runs/{id}` | — | `CoachAgentRun` | r101 单次轨迹回放（不存在的 id → 404 中文 envelope） |
+| POST | `/api/interviews/{run_id}/answers/stream` | `AnswerRequest` | SSE：`phase` / `turn` / `done` / `error` | r102 回合流（阶段可见；业务口径与同步端点一致） |
+| GET | `/api/jobs/{kind}/{job_id}/stream` | — | SSE：`status` / `done` / `error` / `timeout` | r102 任务进度流（kind ∈ profile / resume；只送状态事实，结果走单查） |
+| POST | `/api/rag/feedback` | `RagFeedbackRequest` | `RagFeedbackResult` | r103 召回反馈（点赞/点踩；`(user,query,chunk)` 唯一，换票覆盖） |
+| GET | `/api/rag/feedback/summary` | — | `RagFeedbackSummary` | r103 反馈看板（总票数 + 被踩最多的 chunk） |
 
 **错误 envelope**（全站唯一形态，HTTP 状态码取 4xx/5xx）：
 
@@ -171,6 +184,10 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
 >
 > r23 追加 `users` / `sessions` / `ai_usage` 三张表，并给上表 6 张业务表（除共享题库 `questions`）各加
 > `user_id TEXT NOT NULL DEFAULT 'default'`；存量行由 `ADD COLUMN ... DEFAULT` 直接回填为 `default`。见 §3.8。
+>
+> r100 追加 `rag_chunks` / `rag_index_state` 两张表（共享语料，无 `user_id`——与 `questions` 同口径）：
+> chunk 的 `(kind, ref_id, section_id)` 唯一是幂等摄取锚点；`embedding` 列按 pgvector 可用性分支为
+> `vector(AI_EMBED_DIM)` + ivfflat 余弦索引或 `double precision[]`（降级取回后 Python 余弦）。
 
 约定：时间为 ISO-8601 UTC 字符串；payload 存 JSON 文本，读写两侧过 pydantic 模型；`init_db()` 只用 `CREATE TABLE IF NOT EXISTS`，字段变更需在 `memory.md` 记录一次性升级说明（不做迁移框架）。
 

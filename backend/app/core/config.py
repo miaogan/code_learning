@@ -86,6 +86,14 @@ _NUMERIC_ENV_FIELDS: tuple[str, ...] = (
     "radar_job_stale_minutes",
     "radar_translate_timeout_s",
     "radar_translate_batch",
+    "ai_embed_timeout_s",
+    "ai_embed_dim",
+    "ai_embed_batch",
+    "jobs_stream_poll_s",
+    "jobs_stream_heartbeat_s",
+    "jobs_stream_max_s",
+    "rag_chunk_tokens",
+    "rag_chunk_overlap",
 )
 
 #: r41：视觉档未开通时的**唯一**中文说明（图片入口直接透传，不静默降级成 PDF 提示）。
@@ -198,6 +206,35 @@ class Settings(BaseSettings):
 
     #: 日志级别（DEBUG / INFO / WARNING / ERROR），非法值按 INFO 处理（不因配置错起不来）。
     log_level: str = "INFO"
+
+    # --- r100 RAG 检索（embedding 档位） --------------------------------------    #: embedding 模型名：留空 = 离线确定性 HashingEmbedder（零网络 / 零 Key，CI 可复跑）；
+    #: 非空 = OpenAI 兼容 `/embeddings` 端点（LM Studio 本地模型或云端 embedding 服务）。
+    ai_embed_model: str = ""
+    #: 留空 = 继承主档端点与 Key（「同一账号、只换模型名」的默认用法）。
+    ai_embed_base_url: str = ""
+    ai_embed_api_key: str = ""
+    #: 远端 embedding 单批请求超时（秒）。
+    ai_embed_timeout_s: float = 60.0
+    #: 向量维度：**进 DDL**（rag_chunks.embedding 是 vector(dim) 列），换 embedder
+    #: 导致维度变化时必须重建索引；插入前逐条校验，不匹配即中文报错。
+    ai_embed_dim: int = 256
+    #: 远端 embedding 单批条数（1284 道题 ÷ 32 = 41 批，足够克制）。
+    ai_embed_batch: int = 32
+
+    # --- r103 分块（按内容类型选切分器） --------------------------------------
+    #: 引擎：`auto`（装有 llama-index 时用它切 prose）/ `native`（全自研）/ `llama`（强制）。
+    rag_chunker: str = "auto"
+    #: prose 切分的 token 上限与重叠（llama SentenceSplitter 直接生效；native 以字符近似）。
+    rag_chunk_tokens: int = 320
+    rag_chunk_overlap: int = 48
+
+    # --- r102 实时推送（SSE）-------------------------------------------------
+    #: 任务进度流的服务端轮询间隔（秒）：推送是「有变化才发」，但底层仍要查库。
+    jobs_stream_poll_s: float = 0.8
+    #: 心跳间隔（秒）：经代理/负载均衡时保活，前端据此判断连接还活着。
+    jobs_stream_heartbeat_s: int = 15
+    #: 单条流的最长存活时长（秒）：任务僵死时不让连接永久占着。
+    jobs_stream_max_s: int = 3600
 
     # --- r98 数据层：PostgreSQL + Redis ---------------------------------------
     #: PostgreSQL 连接串（唯一数据库，SQLite 已下线）。`postgresql://user:pw@host:5432/db`。

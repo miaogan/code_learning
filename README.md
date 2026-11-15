@@ -79,6 +79,7 @@ docker compose ps        # backend 的 STATUS 应带 (healthy)
 
 - **换端口**：把 `docker.env.example` 复制成仓库根 `.env`，改 `WEB_PORT=127.0.0.1:8099`（格式是 `[绑定地址:]端口`，**不要只写端口号**，那会绑 `0.0.0.0`），再 `docker compose up -d`。默认 `127.0.0.1:8080` 只绑回环。
 - **从 SQLite 升级**（r97 → r98）：停机 → 备份 `app.db` → 起 PG 建表 → `scripts/migrate_sqlite_to_pg.py` 迁移（幂等可重跑，带行数校验与序列复位），命令见 [r98 迁移手册](./docs/teamflow/20261112-r98-redis-pg/DEPLOY.md)。
+- **数据库镜像**（r100）：PG 服务用 `pgvector/pgvector:pg16`（PostgreSQL 16 基线不变）——RAG 向量检索的 `vector` 扩展与 ivfflat 余弦索引在库内完成；无扩展的环境（如官方 postgres:16-alpine）应用层自动降级为「取回后 Python 余弦」，`engine` 字段如实报告。
 - **备份**：`./scripts/backup_db.sh`（`pg_dump -Fc` + `pg_restore -l` 自检 + 滚动保留），建议进 cron。
 - **建号（r23）**：`docker compose exec backend python -m app.admin_cli create-user --email me@example.com --mode own`（容器内执行，数据落在同名卷）。
 - **停止**：`docker compose down`（**保留**数据卷）；`docker compose down -v` 会连数据一起删。
@@ -113,6 +114,10 @@ CI 双 job 跑在 [GitHub Actions](https://github.com/miaogan/code_learning/acti
 python -X utf8 scripts/eval_harness.py --check              # 30 例金标集回归门禁（只读，不写 REPORT.md）
 node scripts/eval_retrieval.mjs --check                     # 教程侧 BM25 召回门禁（只读）
 python -X utf8 scripts/eval_question_retrieval.py --check   # 题目侧 PG 检索召回门禁（只读，需 PG）
+python -X utf8 scripts/eval_rag.py --check                 # RAG 三态检索门禁（关键词/语义/RRF 融合，只读，需 PG）
+python -X utf8 scripts/eval_rag_judge.py --check           # RAG 生成评审 DRY-RUN 门禁（LLM-as-judge 管线，只读，需 PG）
+# 真模型对比（不进 CI，需 AI_LIVE=1 与 AI_EMBED_BASE_URL/AI_EMBED_MODEL，产出 RAG-LIVE-REPORT.md）
+AI_LIVE=1 python -X utf8 scripts/eval_rag.py --live
 python -X utf8 scripts/eval_reliability.py                  # 故障注入 → RELIABILITY-REPORT.md
 python -X utf8 scripts/benchmark.py                         # 并发写锁 / 导入 / 检索 → PERF-REPORT.md（r98 前口径，见下）
 python -X utf8 scripts/seed_eval_demo.py --dry-run          # /eval 看板合成演示数据（不写库）
@@ -170,9 +175,13 @@ docs/teamflow/   架构总览、产品记忆、每需求一个任务夹
 | PostgreSQL 直连（psycopg 连接池）、不用 ORM / 迁移框架 | SQLModel、Alembic | 手写 SQL、改字段要自己写幂等补列；结构化产物以 JSON 文本列存，schema 演进上移到 pydantic 校验；DDL 只在 `core/db.py`、SQL 只在 `core/repository.py`，并有静态门禁。r98 起 SQLite 已下线：业务层仍写 `?` 占位符，由 `db.to_pg_sql()` 统一翻译成 psycopg 的 `%s` 并转义字面量 `%` |
 | 手写 CSS + token，不引 UI 库 / Tailwind | 原子类的书写效率 | 类名集中维护；新增组件必须复用 `tokens.css`，禁止裸色值与裸尺寸，改尺寸要回写 DESIGN §0.7 推导 |
 
-**能力边界（避免误读）**：本项目是「LLM 应用工程化与可靠性」实践 —— AI 侧是 OpenAI 兼容单次调用 + pydantic 结构化校验，
-**没有**向量检索、多 Agent 编排或模型训练；题库 / 教程 / 学习计划属于规则与内容工程，不是 RAG 系统。
-评测体系、检索增强与引用归因的实施方案见 [r51 技术方案](./docs/teamflow/20261109-r51-resume-highlight-engineering/TECHNICAL.md)。
+**能力边界（避免误读）**：本项目是「LLM 应用工程化与可靠性」实践 —— AI 侧是 OpenAI 兼容调用 +
+pydantic 结构化校验，外加 r100 起的 **RAG 检索管线**（分块 → embedding → pgvector 余弦索引 →
+向量 / 关键词 RRF 融合 → 带引用白名单的生成）与 **RAG 自动评审**（检索三态评测门禁 +
+LLM-as-judge 忠实度 / 相关性评分）；**没有**多 Agent 编排（太傅是单 Agent + ≤3 轮工具循环）
+或模型训练。题库 / 教程 / 学习计划属于规则与内容工程，不是 RAG 语料之外的第二套检索系统。
+评测体系、检索增强与引用归因的实施方案见 [r51 技术方案](./docs/teamflow/20261109-r51-resume-highlight-engineering/TECHNICAL.md)
+与 [r100 技术方案](./docs/teamflow/20261115-r100-rag-evidence/TECHNICAL.md)。
 
 ## 验收速览
 

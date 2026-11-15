@@ -8,6 +8,8 @@ import { ToolNav } from './components/ui/ToolNav'
 import { TaifuLauncher } from './components/taifu/TaifuLauncher'
 import { StreakBadge } from './components/ui/StreakBadge'
 import EvalPage from './pages/EvalPage'
+import EvidencePage from './pages/EvidencePage'
+import CoachPage from './pages/CoachPage'
 import ExamPage from './pages/ExamPage'
 import GuozijianPage from './pages/GuozijianPage'
 import HistoryPage from './pages/HistoryPage'
@@ -43,6 +45,7 @@ const STEP_BASE = [
 /** 侧栏「工具」组：日常使用的非线性出口，不混进步骤（DESIGN §1.1）。 */
 const TOOL_ITEMS = [
   { key: 'search', label: '检索', to: '/search' },
+  { key: 'coach', label: '讲席', to: '/coach' },
   { key: 'learn', label: '学堂', to: '/learn' },
   { key: 'practice', label: '演武', to: '/practice' },
   { key: 'history', label: '战绩', to: '/history' },
@@ -53,9 +56,10 @@ const TOOL_ITEMS = [
   { key: 'guozijian', label: '国子监', to: '/guozijian' },
 ]
 
-/** 侧栏「设置」组：只读看板（评鉴）与账号 / AI 配置，从工具组里分出来。 */
+/** 侧栏「设置」组：只读看板（评鉴 / 考工）与账号 / AI 配置，从工具组里分出来。 */
 const SETTINGS_ITEMS = [
   { key: 'eval', label: '评鉴', to: '/eval' },
+  { key: 'evidence', label: '考工', to: '/evidence' },
   { key: 'settings', label: '典制', to: '/settings' },
 ]
 
@@ -182,6 +186,7 @@ export default function App() {
                 <Route path="/report" element={<ReportPage />} />
                 <Route path="/history" element={<HistoryPage />} />
                 <Route path="/eval" element={<EvalPage />} />
+                <Route path="/evidence" element={<EvidencePage />} />
                 <Route path="/polish" element={<PolishPage />} />
                 <Route path="/versions" element={<VersionsPage />} />
                 <Route path="/archive" element={<ArchivePage />} />
@@ -189,6 +194,7 @@ export default function App() {
                 <Route path="/pioneer" element={<PioneerPage />} />
                 <Route path="/guozijian" element={<GuozijianPage />} />
                 <Route path="/search" element={<SearchPage />} />
+                <Route path="/coach" element={<CoachPage />} />
                 <Route path="/learn" element={<LearnPage />} />
                 <Route path="/learn/:chapterId" element={<TutorialPage />} />
                 <Route path="/settings" element={<SettingsPage />} />

@@ -21,3 +21,7 @@ ruff>=0.4
 
 # r83：太傅编排层（只做图，不用 langchain 模型抽象 —— 出网仍走 services/ai）
 langgraph>=1.2
+
+# r103：RAG 文本切分（只用 node_parser 的 SentenceSplitter；未装时自研切分兜底，
+# 检索/嵌入/融合全部走自研，不引入 langchain 模型抽象）
+llama-index-core>=0.14

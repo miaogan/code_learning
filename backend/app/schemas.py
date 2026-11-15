@@ -1373,3 +1373,263 @@ class TaifuMemoryResult(BaseModel):
 
 class TaifuClearResult(BaseModel):
     deleted: int = 0
+
+
+# --- r100 RAG 检索域（embedding 索引 + 混合检索 + 有引用的生成 + 自动评审）--------
+
+#: 检索模式闭集：单一出处是 `services/retrieval/hybrid.py:RAG_SEARCH_MODES`。
+RagSearchMode = Literal["keyword", "semantic", "hybrid"]
+
+#: chunk 来源闭集：`question` = 题库（服务端自有语料），`tutorial` = 教程小节
+#: （正文在前端 `content/tutorials/`，经 /api/rag/ingest 整份推送）。
+RagChunkKind = Literal["question", "tutorial"]
+
+
+class RagStatus(BaseModel):
+    """RAG 索引快照：embedder / 引擎形态 / chunk 计数 / 是否需要重建。"""
+
+    built: bool
+    embedder: str = ""
+    dim: int = 0
+    engine: str = ""
+    chunk_count: int = 0
+    question_chunks: int = 0
+    tutorial_chunks: int = 0
+    built_at: str = ""
+    stale: bool = False
+    embedder_kind: str = ""
+    notice: str = ""
+
+
+class RagRebuildResult(RagStatus):
+    """重建 / 摄取的结果：在状态快照上多带本次写入条数。"""
+
+    written: int = 0
+
+
+class RagIngestBlock(BaseModel):
+    """教程里的一个结构化 block（r103）：后端按 kind 选切分器，前端只传结构不切分。
+
+    与 `frontend/src/lib/tutorialTypes.ts` 的 `TutorialBlock` 一一对应；
+    所有字段可选，按 kind 取用（text/note 用 text，list 用 items，table 用 headers+rows，
+    code 用 code+caption）——用一个扁平模型而不是五个子类，避免前端多一层判别。
+    """
+
+    kind: Literal["text", "list", "table", "note", "code"]
+    text: str = Field(default="", max_length=4000)
+    title: str = Field(default="", max_length=200)
+    items: list[str] = Field(default_factory=list, max_length=60)
+    headers: list[str] = Field(default_factory=list, max_length=12)
+    rows: list[list[str]] = Field(default_factory=list, max_length=200)
+    code: str = Field(default="", max_length=6000)
+    caption: str = Field(default="", max_length=200)
+
+
+class RagIngestItem(BaseModel):
+    """一条教程小节：`chapter_id` + `section_id` 是幂等锚点，`content` 为小节正文。
+
+    r103：可选 `blocks`（结构化 block）——给了就按 block 类型切分子片（代码按行、
+    表格带表头、正文按句子），不给则退回「整段一个 chunk」的旧口径（向后兼容）。
+    """
+
+    chapter_id: str = Field(min_length=1, max_length=64)
+    section_id: str = Field(default="", max_length=64)
+    title: str = Field(default="", max_length=200)
+    content: str = Field(min_length=1, max_length=8000)
+    blocks: list[RagIngestBlock] = Field(default_factory=list, max_length=60)
+
+
+class RagIngestRequest(BaseModel):
+    """整份推送：教程语料只在前端，这里收到的必须是全量（整份替换语义）。"""
+
+    items: list[RagIngestItem] = Field(min_length=1, max_length=2000)
+
+
+class RagChunkItem(BaseModel):
+    """检索命中行：`snippet` 是正文前 160 字符，`score` 按模式分（关键词恒 1.0、
+    向量为余弦、融合为 RRF 分），量纲不互比——只用于同模式内排序展示。"""
+
+    chunk_id: str
+    kind: RagChunkKind
+    ref_id: str
+    section_id: str = ""
+    title: str = ""
+    content: str = ""
+    snippet: str = ""
+    score: float = 0.0
+
+
+class RagSearchRequest(BaseModel):
+    query: str = Field(default="", max_length=200)
+    mode: RagSearchMode = "hybrid"
+    limit: int = Field(default=5, ge=1, le=20)
+    #: kind 过滤（闭集外取值静默丢弃，空列表 = 不过滤）。
+    kinds: list[RagChunkKind] = Field(default_factory=list)
+
+
+class RagSearchResponse(BaseModel):
+    """`engine` 如实报告检索引擎：`pgvector`（索引内余弦）/ `python-cosine`
+    （无扩展降级）/ `sql-ilike`（关键词腿）。"""
+
+    items: list[RagChunkItem] = Field(default_factory=list)
+    total: int = 0
+    mode: str
+    engine: str = ""
+    notice: str = ""
+
+
+class RagAnswerDraft(BaseModel):
+    """生成草稿（模型输出契约）：citations 引用白名单由服务层校验后回填 chunk_id。"""
+
+    answer: str = Field(min_length=1, max_length=4000)
+    citations: list[str] = Field(default_factory=list, max_length=10)
+    dropped_citations: int = 0
+
+
+class RagAnswerRequest(BaseModel):
+    query: str = Field(min_length=1, max_length=200)
+    mode: RagSearchMode = "hybrid"
+    top_k: int = Field(default=5, ge=1, le=5)
+
+
+class RagAnswerResponse(BaseModel):
+    """检索增强生成结果：`citations` 只含白名单内的 chunk（越界引用被丢弃并计数）。"""
+
+    answer: str
+    citations: list[RagChunkItem] = Field(default_factory=list)
+    retrieved_count: int = 0
+    dropped_citations: int = 0
+    mode: str = "hybrid"
+    engine: str = ""
+    notice: str = ""
+
+
+class RagJudgeDraft(BaseModel):
+    """LLM-as-judge 输出契约：忠实度（引用支撑）/ 相关性（切题与信息量），0-10。"""
+
+    faithfulness: int = Field(ge=0, le=10)
+    relevance: int = Field(ge=0, le=10)
+    issues: list[str] = Field(default_factory=list, max_length=10)
+
+
+class EvidenceSummary(BaseModel):
+    """r100 工程证据中心：数据规模（按账号隔离的业务行数 + 共享题库）与 RAG 索引状态。
+
+    只聚合**真实落库的行数**（零 AI、零 Key），不做任何模型质量评分；
+    静态工程档案（架构数字 / 门禁清单）在前端 `content/engineeringArchive.ts` 单点维护。
+    """
+
+    data_scale: dict[str, int]
+    tables: int
+    rag: RagStatus
+
+
+# --- r100 B4 教练 Agent 编排（规划 → 工具 → 反思 → 有引用结论）----------------------
+
+class CoachPlanStep(BaseModel):
+    """计划中的一步：工具名 + 中文理由 + 参数（键值都是短字符串）。"""
+
+    tool: str = Field(max_length=40)
+    reason: str = Field(default="", max_length=120)
+    args: dict[str, str] = Field(default_factory=dict)
+
+
+class CoachPlanDraft(BaseModel):
+    """规划器输出契约：目标复述 + 不超过 3 步的计划（超出由服务层截断）。"""
+
+    goal: str = Field(default="", max_length=200)
+    steps: list[CoachPlanStep] = Field(default_factory=list, max_length=3)
+
+
+class CoachReflectDraft(BaseModel):
+    """反思器输出契约：材料是否足够 + 缺什么 + 需要补的执行步（最多 2 步）。"""
+
+    sufficient: bool
+    missing: list[str] = Field(default_factory=list, max_length=5)
+    extra_steps: list[CoachPlanStep] = Field(default_factory=list, max_length=2)
+
+
+class CoachBriefDraft(BaseModel):
+    """结论契约：回答 + 引用（只认工具结果回填的 ref 令牌，如 t1 / q2 / w1）+ 行动项。"""
+
+    answer: str = Field(min_length=1, max_length=4000)
+    citations: list[str] = Field(default_factory=list, max_length=8)
+    actions: list[str] = Field(default_factory=list, max_length=5)
+
+
+class CoachCitation(BaseModel):
+    """白名单内的引用：ref 令牌已解析成可点的标题与站内路径。"""
+
+    ref: str
+    title: str
+    href: str
+    kind: str
+
+
+class CoachAgentRequest(BaseModel):
+    """一次编排请求：问句必填，`goal` 是可选的目标岗位 / 时间约束（进规划器提示词）。"""
+
+    question: str = Field(min_length=1, max_length=200)
+    goal: str = Field(default="", max_length=120)
+
+
+class CoachAgentRun(BaseModel):
+    """一次编排的结果与审计轨迹：`steps` 逐节点记录（plan / tool / reflect / final）。"""
+
+    id: str
+    question: str
+    goal: str = ""
+    status: str = "completed"
+    steps: list[dict[str, Any]] = Field(default_factory=list)
+    answer: str = ""
+    citations: list[CoachCitation] = Field(default_factory=list)
+    dropped_citations: int = 0
+    notice: str = ""
+    created_at: str = ""
+
+
+# --- r103 召回反馈（点赞 / 点踩）：用户参与召回质量提升 --------------------------
+
+#: 反馈类型闭集：只有 赞 / 踩 两种态度（不引入 1-5 星，避免「中间态不作为」）。
+RagFeedbackVerdict = Literal["up", "down"]
+
+#: 反馈来源：检索页 / 带引用回答 / 教练 Agent 的引用（用于区分场景做归因）。
+RagFeedbackSurface = Literal["search", "answer", "coach"]
+
+
+class RagFeedbackRequest(BaseModel):
+    """一条反馈：同一用户同一查询对同一 chunk 只保留最新一票（换票即覆盖）。"""
+
+    query: str = Field(min_length=1, max_length=200)
+    chunk_id: str = Field(min_length=1, max_length=200)
+    verdict: RagFeedbackVerdict
+    surface: RagFeedbackSurface = "search"
+
+
+class RagFeedbackResult(BaseModel):
+    """投票后的该 chunk 票数（全局聚合，便于界面显示「已有 N 人认为有用」）。"""
+
+    chunk_id: str
+    up: int = 0
+    down: int = 0
+    net: int = 0
+
+
+class RagFeedbackTopItem(BaseModel):
+    chunk_id: str
+    title: str = ""
+    #: 正文前缀：题目 chunk 的 title 是方向标签，只有 snippet 才看得出「踩的是哪道题」。
+    snippet: str = ""
+    kind: str = ""
+    ups: int = 0
+    downs: int = 0
+
+
+class RagFeedbackSummary(BaseModel):
+    """反馈看板：全站票数与「被踩最多」的 chunk（评测挖掘入口）。"""
+
+    up: int = 0
+    down: int = 0
+    net: int = 0
+    queries: int = 0
+    top_downvoted: list[RagFeedbackTopItem] = Field(default_factory=list)

@@ -124,3 +124,12 @@
 - **镜像构建留了镜像源参数**：`PIP_INDEX_URL` / `NPM_REGISTRY`，默认官方源；国内网络直连常掉到几十 kB/s（实测一次依赖装 18 分钟没完，换源 60 秒）。
 
 - **Redis 版本口径（r98 补）**：compose 钉 `redis:8-alpine`（实测 v8.10.3）。用到的命令只有 ZSET 滑窗 / Lua EVAL / `SET NX EX` / `EXPIRE` / `SCAN` / `DEL`，7 与 8 语义一致，升 8 零代码改动。换大版本只需重建容器：内存数据全丢但都可重建，**后端不用重启**（下一个请求即重写缓存与窗口）；滚动升级期间别改 key 格式。
+
+## RAG 检索域与 pgvector（r100）
+
+- **PG 镜像钉 `pgvector/pgvector:pg16`**（16 基线不变；官方 postgres:16-alpine 没有 vector 扩展，换回去会让向量检索退化为 Python 余弦）。`CREATE EXTENSION vector` 与 pg_trgm 同模式：独立连接尽力创建，失败只记日志；`rag_chunks.embedding` 列类型按**扩展可用性**分支（`vector(AI_EMBED_DIM)` + ivfflat / `double precision[]` 降级），判定用 `information_schema` 的列类型而非扩展存在性（存量库可能先降级建列后装扩展，`ADD COLUMN IF NOT EXISTS` 不会改已有列类型）。
+- **embedding 档位**：`AI_EMBED_MODEL` 空 = 离线 `HashingEmbedder`（char-bigram + crc32，跨进程稳定；内建 `hash()` 受 PYTHONHASHSEED 影响禁止使用）；`AI_EMBED_BASE_URL/API_KEY` 留空继承主档。**维度进 DDL**（`AI_EMBED_DIM`，默认 256），换 embedder 改维度必须重建索引；插入前逐条断言。
+- **chunk 写入一律全量替换**（`rag_write_chunks(replace_kind=...)`：DELETE kind → INSERT），不做增量 diff——题库行会被 adopt / question_merge 改写，diff 依赖主键永不复用并不成立。`rag_chunks` 是共享语料（无 user_id，与 `questions` 同口径）。
+- **检索 mode 闭集** `keyword|semantic|hybrid` 唯一出处是 `services/retrieval/hybrid.py`；hybrid 走 RRF(k=60)（只看名次，免疫向量余弦与 ILIKE 的量纲不可比）。换 embedding 配置后旧向量**不删**：`rag_embedder_breakdown` 检测 stale，status 亮提示等重建；检索按当前 embedder 过滤，旧向量自然退出结果。
+- **评测两轨**：`scripts/eval_rag.py`（三态检索门禁：hybrid recall@5 ≥ 70% 且不比 keyword 回退超 5pp）与 `scripts/eval_rag_judge.py`（LLM-as-judge，DRY-RUN 进 CI / `--live` 需 `AI_LIVE=1`）；共用 `scripts_eval_shared.py` 准备评测库。
+- **一次升级说明**：r100 前的存量库执行 `init_db()` 即得新表（`CREATE TABLE IF NOT EXISTS`）；无存量数据需迁移。

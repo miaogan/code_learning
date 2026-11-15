@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../api/client'
-import type { QuestionSearchItem } from '../api/types'
+import type { QuestionSearchItem, RagSearchMode } from '../api/types'
 import { LevelChip } from '../components/learn/LevelChip'
 import { Chip } from '../components/ui/Chip'
 import { MultiChipRow, type ChipOption } from '../components/ui/ChipRow'
@@ -131,6 +131,32 @@ export default function SearchPage() {
       : questionsFailed
         ? '题库检索失败'
         : `教程 ${tutorialHits.length} 条 · 题库 ${questionTotal} 题`
+
+  const RAG_MODES: { value: RagSearchMode; label: string }[] = [
+    { value: 'hybrid', label: '混合' },
+    { value: 'semantic', label: '语义' },
+  ]
+
+  // r100 RAG 检索：向量 / 关键词两腿 RRF 融合（或纯向量），走 /api/rag/search。
+  const [ragMode, setRagMode] = useState<RagSearchMode>('hybrid')
+  const rag = useAsync(async () => {
+    if (!isSearchable(settled)) return null
+    return api.ragSearch({ query: settled, mode: ragMode, limit: 5, kinds: [] })
+  }, [settled, ragMode])
+  const ragCurrent = searchable && settled === query && rag.status === 'success' ? rag.data : null
+  const ragFailed = searchable && settled === query && rag.status === 'error'
+
+  // r103 召回反馈：点完立即重排（后端按本人投票加权），按钮态本地即时反馈。
+  const [votes, setVotes] = useState<Record<string, 'up' | 'down'>>({})
+  const vote = async (chunkId: string, verdict: 'up' | 'down'): Promise<void> => {
+    try {
+      await api.ragFeedback({ query: settled, chunk_id: chunkId, verdict, surface: 'search' })
+      setVotes((prev) => ({ ...prev, [chunkId]: verdict }))
+      rag.reload()
+    } catch {
+      /* 反馈失败不影响检索本身：静默，用户可再点一次 */
+    }
+  }
 
   const selectDirections = (next: string[]): void => {
     // 换方向清掉目录页带过来的子方向 / 难度参数，避免 URL 里留下与检索无关的筛选。
@@ -305,6 +331,81 @@ export default function SearchPage() {
                   <p className="sc-search-foot">{questionData.notice}</p>
                 )}
               </>
+            )}
+          </section>
+          <section className="sc-search-group">
+            <div className="sc-search-grouphead">
+              <span className="sc-search-grouptag">03 / RAG</span>
+              <h2 className="sc-search-grouptitle">向量混合检索</h2>
+              <span className="sc-search-groupcount">
+                {ragCurrent ? `${ragCurrent.items.length} 条` : '—'}
+              </span>
+            </div>
+            <div className="sc-lab-filter-row">
+              <div className="sc-lab-filter-body">
+                {RAG_MODES.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className={ragMode === option.value ? 'is-active' : ''}
+                    onClick={() => setRagMode(option.value)}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {ragFailed ? (
+              <InlineError
+                message={rag.error?.message ?? 'RAG 检索失败，请稍后重试'}
+                onRetry={rag.reload}
+              />
+            ) : ragCurrent === null ? (
+              <p className="sc-search-hint">
+                输入关键词后在此看到 pgvector 向量检索与关键词 RRF 融合的结果；索引未构建时请先到
+                「考工」页重建。
+              </p>
+            ) : ragCurrent.items.length === 0 ? (
+              <p className="sc-search-hint">
+                {ragCurrent.notice || `向量检索没有命中「${query}」；可换更短的关键词或用关键词模式`}
+              </p>
+            ) : (
+              <div className="sc-search-hits">
+                {ragCurrent.items.map((item) => (
+                  <span className="sc-search-hit" key={item.chunk_id}>
+                    <span className="sc-search-hit-body">
+                      <span className="sc-search-hit-title">{item.title || item.snippet}</span>
+                      <span className="sc-search-hit-snippet">{previewText(item.snippet, 90)}</span>
+                    </span>
+                    <span className="sc-search-hit-meta">
+                      <Chip label={item.kind === 'question' ? '题目' : '教程'} tone="direction" />
+                      <button
+                        type="button"
+                        className={votes[item.chunk_id] === 'up' ? 'is-active' : ''}
+                        onClick={() => void vote(item.chunk_id, 'up')}
+                        title="这条结果对你有用（会提升它在你后续同词检索中的排序）"
+                      >
+                        有用
+                      </button>
+                      <button
+                        type="button"
+                        className={votes[item.chunk_id] === 'down' ? 'is-active' : ''}
+                        onClick={() => void vote(item.chunk_id, 'down')}
+                        title="这条结果不相关（会降低它在你后续同词检索中的排序）"
+                      >
+                        没用
+                      </button>
+                      <span className="sc-search-barmeta">{item.score.toFixed(3)}</span>
+                    </span>
+                  </span>
+                ))}
+                <p className="sc-search-foot">
+                  {`引擎 ${ragCurrent.engine === 'pgvector' ? 'pgvector 余弦' : ragCurrent.engine === 'python-cosine' ? 'Python 余弦（无扩展降级）' : 'SQL 关键词'} · 融合得分只用于排序展示`}
+                </p>
+                {ragCurrent.notice === '' ? null : (
+                  <p className="sc-search-foot">{ragCurrent.notice}</p>
+                )}
+              </div>
             )}
           </section>
         </div>

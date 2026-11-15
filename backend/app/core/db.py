@@ -549,6 +549,185 @@ CREATE INDEX IF NOT EXISTS idx_taifu_memories_user ON taifu_memories (user_id, c
 """
 
 
+#: r100 RAG 检索域：chunk 表 + 索引状态单行表。
+#: chunk 是**共享语料**（题库 + 教程正文），与 `questions` 同口径不带 `user_id`——
+#: 它是从公开语料派生的索引，不含任何用户简历数据；检索结果也不分属主。
+#: `(kind, ref_id, section_id)` 唯一 = 幂等摄取的锚点（同一小节重复推送只更新不翻倍）。
+#: `embedding` 列**不在这段 DDL 里**：它的类型（`vector(dim)` vs `double precision[]`）
+#: 取决于 pgvector 扩展是否可用，由 `_ensure_rag_embedding_column()` 在建表后单独补。
+R100_SCHEMA = """
+CREATE TABLE IF NOT EXISTS rag_chunks (
+    id          TEXT PRIMARY KEY,
+    kind        TEXT NOT NULL,
+    ref_id      TEXT NOT NULL,
+    section_id  TEXT NOT NULL DEFAULT '',
+    title       TEXT NOT NULL DEFAULT '',
+    content     TEXT NOT NULL,
+    content_sha TEXT NOT NULL,
+    embedder    TEXT NOT NULL,
+    created_at  TEXT NOT NULL,
+    UNIQUE(kind, ref_id, section_id)
+);
+CREATE INDEX IF NOT EXISTS idx_rag_chunks_kind ON rag_chunks (kind);
+CREATE TABLE IF NOT EXISTS rag_index_state (
+    key         TEXT PRIMARY KEY,
+    embedder    TEXT NOT NULL,
+    dim         INTEGER NOT NULL,
+    chunk_count INTEGER NOT NULL,
+    built_at    TEXT NOT NULL
+);
+"""
+
+
+#: r100 B4 教练 Agent 编排轨迹：一次「规划 → 工具 → 反思 → 结论」的完整审计记录。
+#: `steps` 是 JSON 数组（每个节点的产出：plan / tool 执行 / reflect），
+#: 回答与引用单独列存 —— 轨迹只追加、不改写，`user_id` 隔离与其它业务表一致。
+COACH_RUNS_SCHEMA = """
+CREATE TABLE IF NOT EXISTS coach_runs (
+    id          TEXT PRIMARY KEY,
+    user_id     TEXT NOT NULL DEFAULT 'default',
+    question    TEXT NOT NULL,
+    goal        TEXT NOT NULL DEFAULT '',
+    status      TEXT NOT NULL DEFAULT 'completed',
+    steps       TEXT NOT NULL DEFAULT '[]',
+    answer      TEXT NOT NULL DEFAULT '',
+    citations   TEXT NOT NULL DEFAULT '[]',
+    created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_coach_runs_user ON coach_runs (user_id, created_at);
+"""
+
+
+#: r103 召回反馈：用户对「某次检索结果里的某条 chunk」点赞 / 点踩。
+#: 语义上这是**个人排序信号**（同一用户同一 query 的同一 chunk 只保留最新一票，
+#: 换投票＝覆盖），不是全局真理——不同人对同一 chunk 的判断可以相反，
+#: 所以 (user_id, query, chunk_id) 才是唯一键，全局聚合只用于看板与评测挖掘。
+RAG_FEEDBACK_SCHEMA = """
+CREATE TABLE IF NOT EXISTS rag_feedback (
+    id          TEXT PRIMARY KEY,
+    user_id     TEXT NOT NULL DEFAULT 'default',
+    query       TEXT NOT NULL,
+    chunk_id    TEXT NOT NULL,
+    verdict     TEXT NOT NULL,
+    surface     TEXT NOT NULL DEFAULT 'search',
+    created_at  TEXT NOT NULL,
+    UNIQUE(user_id, query, chunk_id)
+);
+CREATE INDEX IF NOT EXISTS idx_rag_feedback_user  ON rag_feedback (user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_rag_feedback_chunk ON rag_feedback (chunk_id, verdict);
+"""
+
+
+def _try_create_vector() -> bool:
+    """尽力创建 pgvector 扩展（幂等），失败只记日志——与 `_try_create_trgm` 同一模式。
+
+    必须用独立连接：DDL 失败会让当前事务 aborted，把「少个扩展」放大成「建库全挂」。
+    常见失败原因：镜像不带 pgvector（如官方 postgres:16-alpine）。降级路径是
+    `double precision[]` 列 + Python 余弦（见 `rag_embedding_mode`），功能不缺失，
+    只是把 top-K 从「索引内算」换成「取回后算」。
+    """
+    try:
+        with connection() as conn:
+            conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
+        return True
+    except psycopg.Error as exc:
+        logger.info("db.vector_unavailable error=%s", type(exc).__name__)
+        return False
+
+
+def rag_embedding_mode() -> str:
+    """`rag_chunks.embedding` 列的实际形态：'pgvector' | 'array' | 'missing'。
+
+    判据是 `information_schema.columns.udt_name` 而不是扩展存在性：存量库可能
+    在扩展装好之前就以降级形态建过列，`ADD COLUMN IF NOT EXISTS` 不会改已有列类型；
+    只认扩展会把这种库错判成 pgvector 形态，查询时才在运行期炸。
+    （踩坑实录：不能查 `data_type` —— information_schema 对用户自定义类型一律报
+    `'USER-DEFINED'`，pgvector 的 vector 列也如此，判 `"vector"` 永远不成立，
+    生产库会永远走 Python 余弦降级。`udt_name` 才有真实类型名：
+    pgvector 列 = `'vector'`，double precision[] = `'_float8'`。）
+    """
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT udt_name FROM information_schema.columns "
+            "WHERE table_schema = 'public' AND table_name = 'rag_chunks' "
+            "AND column_name = 'embedding'"
+        ).fetchone()
+    if row is None:
+        return "missing"
+    return "pgvector" if str(row["udt_name"]) == "vector" else "array"
+
+
+def _rag_column_shapes(conn: Connection) -> tuple[str, int]:
+    """当前连接内查 `rag_chunks.embedding` 的 (类型, 维度)：
+
+    - `("vector", 512)` / `("array", 0)` / `("", 0)`（列不存在）；
+    - 维度从 `format_type(atttypid, atttypmod)` 解析（pgvector 把维度存在 atttypmod 里，
+      information_schema 的 `character_maximum_length` 对它恒为 NULL，查不到维度）。
+
+    `rag_embedding_mode()` 开自己的连接适合运行期判型；`init_db()` 事务里必须复用当前
+    连接（同事务建表后马上判型），所以单留这个内部查询。
+    """
+    row = conn.execute(
+        "SELECT format_type(a.atttypid, a.atttypmod) AS col_type "
+        "FROM pg_attribute a "
+        "WHERE a.attrelid = to_regclass('public.rag_chunks') "
+        "AND a.attname = 'embedding' AND NOT a.attisdropped"
+    ).fetchone()
+    if row is None:
+        return ("", 0)
+    col_type = str(row["col_type"] or "")
+    if col_type.startswith("vector"):
+        if "(" in col_type and ")" in col_type:
+            try:
+                return ("vector", int(col_type[col_type.find("(") + 1 : col_type.find(")")]))
+            except ValueError:
+                return ("vector", 0)
+        return ("vector", 0)
+    return ("array", 0)
+
+
+def _ensure_rag_embedding_column(conn: Connection, vector_ok: bool) -> None:
+    """按 pgvector 可用性补 `rag_chunks.embedding` 列（幂等），并在**引擎/维度变化**时自愈。
+
+    维度取 `AI_EMBED_DIM`（默认 256）：它是索引的一部分，换 embedder 导致维度
+    变化时必须改配置并重建索引；插入侧逐条校验 `len(vec) == dim`，不匹配即中文报错。
+
+    两处自愈（都走同一条「派生索引可整体重建」的路）：
+
+    1. **array → pgvector**（先在无扩展镜像跑过，后换 `pgvector/pgvector`）：旧列的
+       `double precision[]` 与 `vector(dim)` 没有无损转换（`{...}` 与 `[...]` 格式互斥）；
+    2. **维度变化**（如 256 → 512，换 bge-small 这类真语义模型的典型路径）：
+       `ADD COLUMN IF NOT EXISTS` 不会改已有列的维度，旧列会让插入直接报
+       `expected 256 dimensions, not 512`——提前清空派生索引并按新维度重建列，
+       比等到运行期爆炸好。
+
+    两条都清空 `rag_chunks` + `rag_index_state`：chunk 与状态本就是可整体重建的派生
+    索引，status 回「未构建」，用户（或考工页）重建即恢复。
+    """
+    dim = get_settings().ai_embed_dim
+    kind, current_dim = _rag_column_shapes(conn)
+    if vector_ok:
+        if kind and (kind != "vector" or (current_dim and current_dim != dim)):
+            logger.info(
+                "db.rag_engine_upgrade from=%s dim=%s to=vector dim=%s action=wipe_and_rebuild",
+                kind,
+                current_dim,
+                dim,
+            )
+            conn.execute("DELETE FROM rag_chunks")
+            conn.execute("DELETE FROM rag_index_state")
+            conn.execute("ALTER TABLE rag_chunks DROP COLUMN embedding")
+        conn.execute(f"ALTER TABLE rag_chunks ADD COLUMN IF NOT EXISTS embedding vector({dim})")
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_rag_chunks_embedding "
+            "ON rag_chunks USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100)"
+        )
+    else:
+        conn.execute(
+            "ALTER TABLE rag_chunks ADD COLUMN IF NOT EXISTS embedding double precision[]"
+        )
+
+
 def trgm_available(conn: Connection) -> bool:
     """探测库上是否已装 `pg_trgm` 扩展（缺扩展时检索退化为顺序扫描，功能不受影响）。"""
     try:
@@ -663,6 +842,7 @@ def init_db() -> None:
     让这套约定比 SQLite 时代更结实（不必先查 `PRAGMA` 再补）。
     """
     trgm_ok = _try_create_trgm()
+    vector_ok = _try_create_vector()
     with connection() as conn:
         conn.executescript(SCHEMA)                    # 1. 业务表
         _ensure_columns(conn, _ADDED_COLUMNS)         # 2. r11 追加列（幂等）
@@ -688,6 +868,15 @@ def init_db() -> None:
         conn.executescript(R80_SCHEMA)                # 19. 太傅线程摘要（单行）
         conn.executescript(R81_SCHEMA)                # 20. 太傅长期记忆（多条）
         conn.executescript(R81_INDEXES)               # 21. 长期记忆索引
+        conn.executescript(R100_SCHEMA)               # 22. RAG chunk 表 + 索引状态
+        _ensure_rag_embedding_column(conn, vector_ok)  # 23. 向量列（按 pgvector 可用性分支）
+        if trgm_ok:                                   # 24. chunk 正文的 trigram GIN（混合检索的关键词腿）
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_rag_chunks_content_trgm "
+                "ON rag_chunks USING gin (content gin_trgm_ops)"
+            )
+        conn.executescript(COACH_RUNS_SCHEMA)         # 25. 教练 Agent 编排轨迹
+        conn.executescript(RAG_FEEDBACK_SCHEMA)       # 26. 召回反馈（点赞 / 点踩）
 
 
 def _sweep_stale_radar_jobs(conn: Connection) -> None:

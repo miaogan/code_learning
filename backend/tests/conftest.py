@@ -210,6 +210,11 @@ _NEUTRAL_AI_ENV: dict[str, str] = {
     "AI_VISION_MODEL": "",
     "AI_VISION_BASE_URL": "",
     "AI_VISION_API_KEY": "",
+    # r100 embedding 档：留空 = 离线 HashingEmbedder（确定性、零网络、CI 可复跑）。
+    # 不置空的话，宿主 .env 里配了远端 embedding 会让测试真的出网。
+    "AI_EMBED_MODEL": "",
+    "AI_EMBED_BASE_URL": "",
+    "AI_EMBED_API_KEY": "",
 }
 
 

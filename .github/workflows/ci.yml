@@ -55,7 +55,9 @@ jobs:
     # services 的健康检查由 Actions 自动等待，healthcheck 不通过则 job 直接失败。
     services:
       postgres:
-        image: postgres:16-alpine
+        # r100 起 RAG 检索评测（eval_rag.py --check）跑 pgvector 真路径，
+        # CI 与生产 compose 同用 pgvector 官方镜像（PostgreSQL 16 基线）。
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: postgres
@@ -109,6 +111,10 @@ jobs:
         run: python -X utf8 ../scripts/eval_harness.py --check
       - name: Question retrieval eval gate
         run: python -X utf8 ../scripts/eval_question_retrieval.py --check
+      - name: RAG retrieval eval gate
+        run: python -X utf8 ../scripts/eval_rag.py --check
+      - name: RAG judge dry-run gate
+        run: python -X utf8 ../scripts/eval_rag_judge.py --check
       - name: Reliability fault-injection gate
         run: python -X utf8 ../scripts/eval_reliability.py --check
       - name: Live eval dry-run gate

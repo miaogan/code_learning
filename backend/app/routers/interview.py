@@ -13,7 +13,10 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
+from fastapi.responses import StreamingResponse
 
+from app.core.errors import AppError
+from app.core.sse import SSE_HEADERS, sse_event
 from app.deps import CurrentUser, current_user
 from app.schemas import (
     AnswerRequest,
@@ -59,6 +62,43 @@ async def submit_answer(
 ) -> InterviewTurn:
     client = user_ai.client_for(user, "heavy")
     return await score_interview_answer(run_id, payload.question_id, payload.answer, client=client)
+
+
+@router.post(
+    "/{run_id}/answers/stream",
+    summary="提交作答并以 SSE 推送回合（phase → turn → done；错误走 error 事件）",
+)
+async def submit_answer_stream(
+    run_id: str, payload: AnswerRequest, user: CurrentUser
+) -> StreamingResponse:
+    """回合流（r102）：评分 + 出题是一次结构化补全，结果本就是 JSON，**不做逐字文本流**
+    ——把契约拆成两跳模型调用只会让成本翻倍、结果还可能不一致。这里流的是**阶段事实**：
+    评分开始 → 结果就绪 → 结束；前端据此把按钮态与 60s 等待变成有反馈的进度。
+
+    业务口径与同步端点完全一致（同一条 `score_answer`，同一套错误映射）：
+    失败在帧内以 `error` 事件返回，前端不得清空已写作答。
+    """
+    client = user_ai.client_for(user, "heavy")
+
+    async def _gen():
+        yield sse_event("phase", {"phase": "scoring", "message": "正在评分并生成下一条发言"})
+        try:
+            turn = await score_interview_answer(
+                run_id, payload.question_id, payload.answer, client=client
+            )
+        except AppError as exc:
+            yield sse_event(
+                "error",
+                {"code": exc.code, "message": exc.message, "retryable": exc.retryable},
+            )
+            return
+        yield sse_event("phase", {"phase": "ready", "message": "评分完成"})
+        yield sse_event("turn", turn.model_dump(mode="json"))
+        yield sse_event(
+            "done", {"run_id": run_id, "run_status": turn.run_status}
+        )
+
+    return StreamingResponse(_gen(), media_type="text/event-stream", headers=SSE_HEADERS)
 
 
 @router.post(

@@ -1182,3 +1182,176 @@ export interface TaifuMemoryResult {
 export interface TaifuClearResult {
   deleted: number
 }
+
+/* ---------- r100 RAG 检索域 + 工程证据中心 ---------- */
+
+/** 检索模式闭集：keyword | semantic | hybrid（与后端 RAG_SEARCH_MODES 逐字对齐）。 */
+export type RagSearchMode = 'keyword' | 'semantic' | 'hybrid'
+
+/** chunk 来源闭集：question = 题库，tutorial = 教程小节。 */
+export type RagChunkKind = 'question' | 'tutorial'
+
+/** RAG 索引状态：embedder / 引擎形态 / chunk 计数 / 是否需要重建。 */
+export interface RagStatus {
+  built: boolean
+  embedder: string
+  dim: number
+  engine: string
+  chunk_count: number
+  question_chunks: number
+  tutorial_chunks: number
+  built_at: string
+  stale: boolean
+  embedder_kind: string
+  notice: string
+}
+
+/** 重建 / 摄取结果：状态快照 + 本次写入条数。 */
+export interface RagRebuildResult extends RagStatus {
+  written: number
+}
+
+/** 检索命中行：snippet 是正文前 160 字符；score 只用于同模式内排序展示。 */
+export interface RagChunkItem {
+  chunk_id: string
+  kind: RagChunkKind
+  ref_id: string
+  section_id: string
+  title: string
+  content: string
+  snippet: string
+  score: number
+}
+
+export interface RagSearchRequest {
+  query: string
+  mode: RagSearchMode
+  limit: number
+  kinds: RagChunkKind[]
+}
+
+export interface RagSearchResponse {
+  items: RagChunkItem[]
+  total: number
+  mode: string
+  /** pgvector（索引内余弦）| python-cosine（降级）| sql-ilike（关键词腿）。 */
+  engine: string
+  notice: string
+}
+
+/** 检索增强生成结果：citations 只含白名单内的 chunk。 */
+export interface RagAnswerResponse {
+  answer: string
+  citations: RagChunkItem[]
+  retrieved_count: number
+  dropped_citations: number
+  mode: string
+  engine: string
+  notice: string
+}
+
+/** 工程证据中心摘要：行数事实 + 表数 + RAG 索引状态（零评分，只报事实）。 */
+export interface EvidenceSummary {
+  data_scale: Record<string, number>
+  tables: number
+  rag: RagStatus
+}
+
+/** 教程里的一个结构化 block（r103）：后端按 kind 选切分器，前端只传结构不切分。 */
+export interface RagIngestBlock {
+  kind: 'text' | 'list' | 'table' | 'note' | 'code'
+  text?: string
+  title?: string
+  items?: string[]
+  headers?: string[]
+  rows?: string[][]
+  code?: string
+  caption?: string
+}
+
+/** 教程摄取条目：chapter_id + section_id 是幂等锚点，content 为小节正文（兜底/兼容）。 */
+export interface RagIngestItem {
+  chapter_id: string
+  section_id: string
+  title: string
+  content: string
+  /** r103：结构化 block —— 后端据此按 block 类型切分子片（代码按行、表格带表头、正文按句）。 */
+  blocks: RagIngestBlock[]
+}
+
+/* ---------- r100 B4 教练 Agent 编排（讲席） ---------- */
+
+/** 计划中的一步：工具名 + 中文理由 + 参数。 */
+export interface CoachPlanStep {
+  tool: string
+  reason: string
+  args: Record<string, string>
+}
+
+/** 白名单内的引用：ref 令牌 + 可点标题与站内路径。 */
+export interface CoachCitation {
+  ref: string
+  title: string
+  href: string
+  kind: string
+}
+
+/** 编排轨迹里的一步：kind 区分 plan / tool / reflect / final，其余字段按 kind 而异。 */
+export interface CoachTraceStep {
+  kind: 'plan' | 'tool' | 'tool_skip' | 'reflect' | 'final' | string
+  [key: string]: unknown
+}
+
+/** 一次编排的结果与审计轨迹。 */
+export interface CoachAgentRun {
+  id: string
+  question: string
+  goal: string
+  status: string
+  steps: CoachTraceStep[]
+  answer: string
+  citations: CoachCitation[]
+  dropped_citations: number
+  notice: string
+  created_at: string
+}
+
+export interface CoachAgentRequest {
+  question: string
+  goal: string
+}
+
+/** 反馈请求：同用户同 query 同 chunk 只保留最新一票（换票覆盖）。 */
+export interface RagFeedbackRequest {
+  query: string
+  chunk_id: string
+  verdict: 'up' | 'down'
+  surface?: 'search' | 'answer' | 'coach'
+}
+
+/** 投票后的该 chunk 票数（全局聚合）。 */
+export interface RagFeedbackResult {
+  chunk_id: string
+  up: number
+  down: number
+  net: number
+}
+
+/** 被踩最多的 chunk（看板用）。 */
+export interface RagFeedbackTopItem {
+  chunk_id: string
+  title: string
+  snippet: string
+  kind: string
+  ups: number
+  downs: number
+}
+
+/** 反馈看板：总票数 + 被踩最多（评测挖掘入口）。 */
+export interface RagFeedbackSummary {
+  up: number
+  down: number
+  net: number
+  queries: number
+  top_downvoted: RagFeedbackTopItem[]
+}

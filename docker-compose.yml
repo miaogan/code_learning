@@ -16,7 +16,11 @@
 
 services:
   postgres:
-    image: postgres:16-alpine
+    # r100 起换 pgvector 官方镜像（同 PostgreSQL 16 基线）：RAG 向量检索的
+    # `vector` 扩展与 ivfflat 余弦索引在库内完成 top-K，不装扩展时应用层会
+    # 自动降级为「取回后 Python 余弦」（见 backend/app/core/db.py 的降级口径）。
+    # 官方 postgres:16-alpine 没有 pgvector，除非回滚 r100，否则不要换回去。
+    image: pgvector/pgvector:pg16
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-sc_app}
@@ -110,6 +114,38 @@ services:
         fi
         exec uvicorn app.main:app --host 0.0.0.0 --port 8000
 
+  # r104 本地 embedding 服务（可选档，默认**不启动**：必须显式 --profile embed）。
+  # 形态：HF text-embeddings-inference（Rust + CPU 推理），OpenAI 兼容 /v1/embeddings，
+  # 后端只要把 AI_EMBED_BASE_URL 指向 http://embedder:8080/v1 即可，检索代码零改动。
+  #
+  # 资源硬限额（2 vCPU / 3.6GB 的机器上刻意保守）：
+  #   cpus 1.0        → 最多吃 1 核，留 1 核给 backend / PG；
+  #   mem_limit 1g    → 超限由 cgroup OOM 只杀自己，不拖垮宿主；
+  #   memswap_limit   → 只允许 512MB 额外 swap，避免大量换页把整机 IO 拖死；
+  #   pids_limit 256  → 防 fork 风暴。
+  # 不发布宿主端口：只有 compose 内网可达，公网零暴露面。
+  embedder:
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.8
+    profiles: ["embed"]
+    restart: unless-stopped
+    command:
+      - '--model-id'
+      - '${EMBED_MODEL_ID:-BAAI/bge-small-zh-v1.5}'
+      - '--port'
+      - '8080'
+      - '--auto-truncate'
+      - '--max-client-batch-size'
+      - '64'
+    environment:
+      # 模型缓存落在命名卷里：容器重建不重新下载（bge-small 约 100MB）。
+      - HF_HOME=/data
+    volumes:
+      - skillcoach-embedcache:/data
+    cpus: '1.0'
+    mem_limit: 1g
+    memswap_limit: 1536m
+    pids_limit: 256
+
   frontend:
     build:
       context: ./frontend
@@ -131,6 +167,8 @@ services:
         condition: service_healthy
 
 volumes:
+  # r104 embedding 模型缓存（HF_HOME）：容器重建复用，不重复下载。
+  skillcoach-embedcache:
   # PostgreSQL 的数据目录。docker compose down 保留数据，down -v 才删除
   # （备份/恢复见 DEPLOY.md：pg_dump -Fc，不要直接拷数据目录）。
   skillcoach-pgdata:

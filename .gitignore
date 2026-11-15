@@ -102,3 +102,5 @@ deploy.env
 
 # 本地构建临时目录（Windows esbuild 临时文件被杀软锁时的绕行目录）
 frontend/.tmp/
+# Local sandbox build cache (when esbuild/vitest TEMP is redirected to the workspace)
+.tmp/
