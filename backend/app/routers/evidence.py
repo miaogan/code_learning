@@ -12,7 +12,6 @@
 from fastapi import APIRouter, Depends
 
 from app.core import repository
-from app.core.db import connection
 from app.deps import current_user
 from app.schemas import EvidenceSummary, RagStatus
 from app.services.retrieval import indexer
@@ -25,12 +24,7 @@ router = APIRouter(
 @router.get("/summary", response_model=EvidenceSummary, summary="工程证据摘要（行数事实 + RAG 索引状态）")
 def evidence_summary() -> EvidenceSummary:
     scale = repository.evidence_data_scale()
-    with connection() as conn:
-        tables = int(
-            conn.execute(
-                "SELECT count(*) AS n FROM pg_tables WHERE schemaname = 'public'"
-            ).fetchone()["n"]
-        )
+    tables = repository.public_table_count()
     return EvidenceSummary(
         data_scale=scale,
         tables=tables,

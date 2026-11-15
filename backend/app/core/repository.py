@@ -2744,3 +2744,22 @@ def rag_feedback_summary(limit: int = 10) -> dict[str, Any]:
             for row in rows
         ],
     }
+
+
+def public_table_count() -> int:
+    """public schema 下的表数（工程证据中心用）：DDL 演进的直接证据，只读。"""
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT count(*) AS n FROM pg_tables WHERE schemaname = 'public'"
+        ).fetchone()
+    return int(row["n"])
+
+
+def question_chunk_rows() -> list[dict[str, Any]]:
+    """题库 chunk 的取数入口（索引重建用）：只取检索需要的列，`answer` 永不外出。"""
+    with connection() as conn:
+        rows = conn.execute(
+            "SELECT id, direction, sub_direction, prompt, explanation FROM questions "
+            "ORDER BY id"
+        ).fetchall()
+    return [dict(row) for row in rows]

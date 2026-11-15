@@ -196,7 +196,10 @@ def _read_plan(_args: dict[str, str]) -> ToolOutcome:
     done = [key for key, flag in (state.get("done") or {}).items() if flag]
     if not state.get("updated_at"):
         return _empty("计划进度", "这份报告还没有开始打卡")
-    text = f"每日 {state.get('daily_minutes', 30)} 分钟，已完成 {len(done)} 项任务"
+    minutes = int(state.get("daily_minutes") or 0)
+    text = f"已完成 {len(done)} 项任务"
+    if minutes:
+        text = "每日 " + str(minutes) + " 分钟，" + text
     if state.get("started_on"):
         text += "，起始日 " + str(state["started_on"])
     return {

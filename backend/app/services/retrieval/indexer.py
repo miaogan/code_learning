@@ -79,11 +79,7 @@ def _embed_all(runtime: EmbedderRuntime, texts: list[str]) -> list[list[float]]:
 
 def _question_chunk_rows(runtime: EmbedderRuntime) -> list[dict[str, Any]]:
     """题库 → chunk 行（answer 刻意不进索引：与检索/练习的答案口径一致，永不外泄）。"""
-    with repository.connection() as conn:
-        rows = conn.execute(
-            "SELECT id, direction, sub_direction, prompt, explanation FROM questions "
-            "ORDER BY id"
-        ).fetchall()
+    rows = repository.question_chunk_rows()
     built: list[dict[str, Any]] = []
     contents: list[str] = []
     for row in rows:

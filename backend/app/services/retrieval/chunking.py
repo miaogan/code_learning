@@ -97,7 +97,13 @@ def _split_prose_llama(text: str) -> list[str]:
     splitter = _llama_splitter
     if splitter is None:
         return _split_prose_native(text)
-    chunks = splitter.split_text(text)
+    try:
+        chunks = splitter.split_text(text)
+    except Exception as exc:  # tiktoken 下载不到 / 版本不兼容：回退自研，不让分块炸链路
+        logger.warning(
+            "rag.chunking.llama_split_failed error=%s fallback=native", type(exc).__name__
+        )
+        return _split_prose_native(text)
     return [chunk.strip() for chunk in chunks if chunk.strip()]
 
 
