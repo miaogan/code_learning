@@ -105,8 +105,21 @@ jobs:
         run: python -m ruff check app tests
       - name: Question bank byte gate
         run: python -X utf8 -m app.services.assessment.question_merge --check
+      # 失败时把 FAILED 行打成 GitHub annotation —— 无需下载日志/鉴权即可从
+      # checks API 读到具体用例名（公开仓库的日志下载需要 token，annotation 不需要）。
       - name: Test
-        run: python -m pytest -q
+        run: |
+          set +e
+          python -m pytest -q 2>&1 | tee /tmp/pytest.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            grep -E '^FAILED |^ERROR ' /tmp/pytest.log | while IFS= read -r line; do
+              echo "::error title=pytest-failure::${line}"
+            done
+            echo "--- last 40 lines ---"
+            tail -40 /tmp/pytest.log
+          fi
+          exit "$status"
       - name: Offline eval gate
         run: python -X utf8 ../scripts/eval_harness.py --check
       - name: Question retrieval eval gate

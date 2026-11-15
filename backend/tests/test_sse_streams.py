@@ -41,9 +41,15 @@ def _set_status(job_id: str, status: str) -> None:
 
 
 def _fast_poll(monkeypatch: pytest.MonkeyPatch) -> None:
-    """把流内轮询压到 10ms，用例不必真的等 0.8s 一帧。"""
+    """把流内轮询压到 10ms，并**把心跳拉到 30s**。
+
+    心跳必须远大于用例时长：心跳帧会顺带做一次断连检测，而 TestClient 在请求体
+    读完后会报 client disconnected —— 慢机器上（CI）用例超过 1s 就会撞上，
+    表现为「只收到 running 帧、没收到 completed 帧」的假失败。
+    这里让心跳在用例生命周期内永不触发，断言就与机器快慢解耦。
+    """
     monkeypatch.setenv("JOBS_STREAM_POLL_S", "0.01")
-    monkeypatch.setenv("JOBS_STREAM_HEARTBEAT_S", "1")
+    monkeypatch.setenv("JOBS_STREAM_HEARTBEAT_S", "30")
     get_settings.cache_clear()
 
 
