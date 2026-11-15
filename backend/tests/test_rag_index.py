@@ -320,3 +320,25 @@ def test_kind_filter_is_applied_inside_vector_search(rag_db):
     assert result["items"], "带 kinds 过滤时不得因为全局排名而返回空"
     assert all(item["kind"] == "tutorial" for item in result["items"])
     assert result["items"][0]["ref_id"] == "ch-ev"
+
+
+def test_vector_index_uses_hnsw_and_returns_full_topk(rag_db):
+    """向量索引必须是 HNSW，且 top-K 必须凑满——ivfflat(lists=100, probes=1) 会近似丢结果。
+
+    实测过：1.7k chunk、lists=100、默认 probes=1 时 `LIMIT 3` 只回 2 条，
+    「只搜教程」甚至返回空。HNSW 不需要调 probes，千级数据召回稳定。
+    """
+    with repository.connection() as conn:
+        defs = [
+            str(row["indexdef"])
+            for row in conn.execute(
+                "SELECT indexdef FROM pg_indexes WHERE tablename = 'rag_chunks'"
+            ).fetchall()
+        ]
+    joined = " ".join(defs)
+    assert "hnsw" in joined, "向量索引应为 HNSW"
+    assert "ivfflat" not in joined, "旧的 ivfflat 索引应已移除"
+
+    indexer.rebuild_question_index()
+    payload = search_chunks("数据库慢查询", mode="semantic", top_k=3)
+    assert len(payload["items"]) == 3, "top-3 必须凑满，不得因近似索引少返回"

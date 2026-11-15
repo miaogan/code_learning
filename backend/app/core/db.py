@@ -718,9 +718,13 @@ def _ensure_rag_embedding_column(conn: Connection, vector_ok: bool) -> None:
             conn.execute("DELETE FROM rag_index_state")
             conn.execute("ALTER TABLE rag_chunks DROP COLUMN embedding")
         conn.execute(f"ALTER TABLE rag_chunks ADD COLUMN IF NOT EXISTS embedding vector({dim})")
+        # r105 修正：原用 ivfflat(lists=100)，但本库 chunk 规模只有千级 —— lists=100 把数据
+        # 拆成 100 个桶、默认 probes=1 只扫 1 个桶，近似召回会丢结果（实测 top-3 只回 2 条、
+        # 「只搜教程」直接空）。千级数据用 HNSW 更合适：不用调 probes、召回稳定，索引也小。
+        conn.execute("DROP INDEX IF EXISTS idx_rag_chunks_embedding")
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_rag_chunks_embedding "
-            "ON rag_chunks USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100)"
+            "CREATE INDEX IF NOT EXISTS idx_rag_chunks_embedding_hnsw "
+            "ON rag_chunks USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64)"
         )
     else:
         conn.execute(
