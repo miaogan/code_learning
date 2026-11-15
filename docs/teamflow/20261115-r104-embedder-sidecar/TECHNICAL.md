@@ -124,3 +124,33 @@ python -X utf8 scripts/eval_rag.py --live
 模型缓存落 `skillcoach-embedcache` 卷）。生产 compose 里还没有这个服务定义——**新代码（r100–r104）
 尚未部署**，所以 RAG 端点与维度自愈都还不在线上。等新代码随 CD 上线后：
 `docker rm -f tei-embed-bench` → `docker compose --profile embed up -d embedder` 交由 compose 托管。
+
+## 9. 生产切换实录（2026-11-15 23:30）
+
+| 步骤 | 结果 |
+|---|---|
+| 起 embedder（compose `--profile embed`） | ✅ `skillcoach-embedder-1` up；限额 `NanoCpus=1e9 / Memory=1GiB` 生效；后端容器内 `/health` 200 |
+| 改 `backend/.env` | ✅ 三项（MODEL / BASE_URL / DIM=512）；改前备份 `.env.bak-20261115233012` |
+| 重建 backend | ✅ 启动日志出现 `db.rag_engine_upgrade from=vector dim=256 to=vector dim=512 action=wipe_and_rebuild`——**维度自愈按设计触发** |
+| 重建索引 | ✅ 1284 条 / **97.1s**（bge-small，约 13 条/秒，含 32 条/批的 HTTP 往返） |
+| 检索质量 | ✅ 「数据库慢查询怎么排查」top3 命中缓存/慢页面/N+1；「事务隔离级别怎么选」top2 命中 PG 默认隔离级别与隔离级别辨析（哈希基座下会返回 TCP 握手这类无关题） |
+| 资源 | ✅ embedder 155MB / backend 187MB / PG 105MB，**可用内存 2471MB** |
+
+### 真模型 vs 离线基座（同一金标 n=20，生产同源代码）
+
+| 模式 | recall@5 | Δ | MRR@5 | hit@1 |
+|---|---|---|---|---|
+| keyword | 100.0% → 100.0% | +0.0pp | 0.9125 → 0.9125 | 85% → 85% |
+| **semantic** | 80.0% → **95.0%** | **+15.0pp** | 0.6533 → 0.7558 | 60% → 65% |
+| **hybrid** | 95.0% → **100.0%** | **+5.0pp** | 0.8583 → 0.9250 | 80% → 85% |
+
+关键词腿不变（对照组，证明只换了向量空间）；语义腿 +15pp、混合 100%——这是「换真模型值不值」的
+直接证据。报告：`docs/eval/RAG-LIVE-REPORT.md`。
+
+> 口径提醒：离线基线必须在**没有 `.env` 的目录**里跑（`-w /w` 而不是 `-w /w/backend`），
+> 否则 pydantic 会从 `backend/.env` 读回 `AI_EMBED_*`，两段都变成真模型、Δ 全 0（踩过一次）。
+
+### 回退
+
+`backend/.env` 去掉三项（或只清空 `AI_EMBED_MODEL`）→ `docker compose up -d --force-recreate backend`
+→ 启动时自愈回 `vector(256)` 并清空索引 → 考工页重建。embedder 可 `docker compose --profile embed stop embedder`。

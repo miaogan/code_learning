@@ -78,3 +78,19 @@
 **处置**：索引器已显式按 id 去重（先到先得 + WARNING），保证 `written == stored`；
 数据清理（保留每组一行）需要单独决策——`REINDEX TABLE questions` 会直接暴露冲突并失败，
 安全做法是先按 ctid 保留每组最小 ctid 的行、再删其余，属于需要停机窗口/备份的运维动作。
+
+
+## 6. 题库去重与 embedding 切换（同日晚间）
+
+1. **备份**：`scripts/backup_db.sh` → `backups/app-20261115-232851.dump`（804K，`pg_restore -l` 自检通过）。
+2. **去重**：`DELETE ... USING ... WHERE a.id=b.id AND a.ctid>b.ctid` → 删除 **77 行**冗余
+   （1361 → **1284** 唯一题），`REINDEX TABLE questions` 后索引全部 valid、重复对归零；
+   重建索引 `written 1284 == stored 1284`。
+3. **embedding 切换**：临时容器 `tei-embed-bench` 删除 → compose `--profile embed` 托管
+   （限额生效）→ `backend/.env` 三项（bge-small / `http://embedder:8080/v1` / 512）→
+   重建 backend 触发维度自愈 → 重建索引 1284 条 / 97.1s。
+4. **效果**：语义腿 recall@5 80% → **95%**，混合 95% → **100%**，MRR 0.858 → 0.925
+   （离线基线不变，说明是向量空间的收益）。详见 `docs/eval/RAG-LIVE-REPORT.md`。
+5. **切换后并发冒烟**：3 用户 51 请求 0 失败，中位 71ms、p95 222ms；embedder 常驻 155MB。
+
+> 待办：教程正文尚未推送进向量索引（语料只在前端，需在考工页点「推送教程正文」）。
