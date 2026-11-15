@@ -36,3 +36,26 @@ RAG 索引分两类 chunk：题库（后端自持）与教程小节（正文只�
 - 改教程后：`cd frontend && node ../scripts/export_tutorials.mjs` → 提交种子（CI 会拦漏导）。
 - 想强制重灌教程索引：把教程 chunk 清掉（或 `POST /api/rag/ingest` 推一份）后重启；
   或临时 `RAG_SEED_TUTORIALS=false` 只保留题库索引。
+
+## 6. 上线后发现并修掉的两个召回缺陷（都已部署验证）
+
+教程 chunk 进索引后做端到端验证，暴露两个**此前被题库单语料掩盖**的问题：
+
+1. **`kinds` 过滤做在「取回全局 top-K 之后」**：教程排不进全局前 12 就被筛掉，
+   「只搜教程 + 长问句」返回空。修复：过滤下沉到 `rag_vector_search` 的 SQL
+   `WHERE kind IN (...)` 与降级路径 `rag_array_scan` 的扫描层。
+2. **向量索引形态不适合千级数据**：`ivfflat(lists=100)` 把 1.7k chunk 拆成 100 个桶，
+   默认 `probes=1` 只扫 1 个桶——实测 `LIMIT 3` 只回 2 条、`probes=100` 才正常。
+   修复：改 HNSW（`m=16, ef_construction=64`），`init_db` 幂等迁移（DROP 旧 ivfflat + CREATE HNSW）。
+   pgvector 的 `lists` 应按行数定（官方建议 rows/1000），千级数据用 ivfflat 本身就不合适。
+
+修复后生产实测：
+
+| 查询 | 结果 |
+|---|---|
+| 「事件循环和微任务」`kinds=[tutorial]` | ✅ 命中 `fe-event-loop` 的 order#1/2/3 |
+| 「微任务」`semantic + tutorial` | ✅ 0.648 / 0.615 / 0.605（同章三节） |
+| 混合不过滤 | ✅ 教程与题目混排正常 |
+
+索引规模：题库 1284 + 教程 390 = **1674 chunk**；embedder `remote:bge-small`（512 维）；
+三用户并发冒烟 51 请求 0 失败、p95 229ms；embedder 167MB / backend 151MB / 可用 2473MB。
