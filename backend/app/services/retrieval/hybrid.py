@@ -92,7 +92,7 @@ def rrf_fuse(ranked_lists: list[list[str]], *, top_k: int, k: int = RRF_K) -> li
 
 
 def _semantic_leg(
-    query: str, *, embedder_name: str, top_k: int
+    query: str, *, embedder_name: str, top_k: int, kinds: list[str] | None = None
 ) -> tuple[list[dict[str, Any]], str]:
     """向量腿：pgvector 索引内算，或降级为「全量取回 + Python 余弦」。
 
@@ -104,10 +104,10 @@ def _semantic_leg(
     mode = rag_embedding_mode()
     if mode == "pgvector":
         rows = repository.rag_vector_search(
-            query_vec, embedder=embedder_name, top_k=top_k, mode=mode
+            query_vec, embedder=embedder_name, top_k=top_k, mode=mode, kinds=kinds
         )
         return rows, "pgvector"
-    scanned = repository.rag_array_scan(embedder=embedder_name)
+    scanned = repository.rag_array_scan(embedder=embedder_name, kinds=kinds)
     scored = [
         (repository.rag_cosine(query_vec, list(row["embedding"])), row) for row in scanned
     ]
@@ -175,7 +175,10 @@ def search_chunks(
     semantic_rows: list[dict[str, Any]] = []
     if mode in ("semantic", "hybrid") and state is not None and state["embedder"] == runtime.name:
         semantic_rows, engine = _semantic_leg(
-            needle, embedder_name=state["embedder"], top_k=size * _LEG_WIDEN
+            needle,
+            embedder_name=state["embedder"],
+            top_k=size * _LEG_WIDEN,
+            kinds=effective_kinds,
         )
 
     lexical_rows: list[dict[str, Any]] = []
@@ -183,8 +186,6 @@ def search_chunks(
         lexical_rows = repository.rag_lexical_search(
             needle, top_k=size * _LEG_WIDEN, kinds=effective_kinds
         )
-        if effective_kinds:
-            semantic_rows = [row for row in semantic_rows if row["kind"] in effective_kinds]
 
     if mode == "keyword":
         items = [_item(row, 1.0) for row in lexical_rows[:size]]

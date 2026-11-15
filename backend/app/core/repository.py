@@ -2460,32 +2460,59 @@ def rag_write_chunks(
 
 
 def rag_vector_search(
-    query_vec: list[float], *, embedder: str, top_k: int, mode: str
+    query_vec: list[float],
+    *,
+    embedder: str,
+    top_k: int,
+    mode: str,
+    kinds: Sequence[str] | None = None,
 ) -> list[dict[str, Any]]:
     """向量 top-K（pgvector 形态）：`<=>` 余弦距离在索引内算，score = 1 - distance。
 
     行按距离升序即相似度降序；`embedder` 过滤保证「换 embedding 模型后旧向量不混排」
     （不同模型的向量空间不可比，混排结果是噪声）。
+
+    **`kinds` 必须在 SQL 里过滤**：先取全局 top-K 再按 kind 筛，会把「只搜教程」变成
+    「教程得先挤进全局前 K」——实测「事件循环和微任务」全局 top-12 里没有教程，
+    过滤后直接空结果。过滤放进 WHERE 才能保证该 kind 内部真正取 top-K。
     """
     literal = _rag_embedding_value(query_vec)
+    filters = ""
+    params: list[Any] = []
+    if kinds:
+        filters = " AND kind IN (" + ", ".join("?" for _ in kinds) + ")"
+        params.extend(kinds)
     with connection() as conn:
         rows = conn.execute(
             "SELECT id, kind, ref_id, section_id, title, content, "
             "1 - (embedding <=> ?::vector) AS score "
-            "FROM rag_chunks WHERE embedder = ? "
-            "ORDER BY embedding <=> ?::vector LIMIT ?",
-            (literal, embedder, literal, int(top_k)),
+            "FROM rag_chunks WHERE embedder = ?" + filters
+            + " ORDER BY embedding <=> ?::vector LIMIT ?",
+            [literal, embedder, *params, literal, int(top_k)],
         ).fetchall()
     return [dict(row) for row in rows]
 
 
-def rag_array_scan(*, embedder: str, limit: int = _RAG_FALLBACK_SCAN_LIMIT) -> list[dict[str, Any]]:
-    """降级形态：全量取回向量（Python 余弦在服务层算）。行数上限写死，超限截断。"""
+def rag_array_scan(
+    *,
+    embedder: str,
+    limit: int = _RAG_FALLBACK_SCAN_LIMIT,
+    kinds: Sequence[str] | None = None,
+) -> list[dict[str, Any]]:
+    """降级形态：全量取回向量（Python 余弦在服务层算）。行数上限写死，超限截断。
+
+    `kinds` 同样在这一层过滤：先筛再算余弦，避免「候选被别的 kind 占满」。
+    """
+    filters = ""
+    params: list[Any] = [embedder]
+    if kinds:
+        filters = " AND kind IN (" + ", ".join("?" for _ in kinds) + ")"
+        params.extend(kinds)
     with connection() as conn:
         rows = conn.execute(
             "SELECT id, kind, ref_id, section_id, title, content, embedding "
-            "FROM rag_chunks WHERE embedder = ? LIMIT ?",
-            (embedder, int(limit)),
+            "FROM rag_chunks WHERE embedder = ?" + filters + " LIMIT ?",
+            [*params, int(limit)],
         ).fetchall()
     return [dict(row) for row in rows]
 

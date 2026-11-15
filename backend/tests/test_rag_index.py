@@ -296,3 +296,27 @@ def test_duplicate_question_ids_are_deduped(tmp_db, monkeypatch):
     result = indexer.rebuild_question_index()
     assert result["written"] == 2, "重复 id 必须只写一次"
     assert result["question_chunks"] == 2
+
+
+def test_kind_filter_is_applied_inside_vector_search(rag_db):
+    """`kinds` 过滤必须在向量检索内部生效，而不是「先取全局 top-K 再筛」。
+
+    复现过的问题：查询与该 kind 相关、但该 kind 排不进全局前 K 时，过滤后直接空结果
+    （生产上「只搜教程 + 长问句」就会空）。现在过滤下沉到 SQL / 扫描层，
+    只要该 kind 里有数据就必须能取到。
+    """
+    indexer.ingest_tutorial_chunks(
+        [
+            {
+                "chapter_id": "ch-ev",
+                "section_id": "sec-1",
+                "title": "JavaScript · 事件循环",
+                "content": "事件循环把微任务排在本轮宏任务之后执行。",
+            }
+        ]
+    )
+    # 查询强相关于题库（三题都命中）、与教程只有弱相关：全局 top-2 必是题。
+    result = search_chunks("数据库慢查询", mode="semantic", top_k=2, kinds=["tutorial"])
+    assert result["items"], "带 kinds 过滤时不得因为全局排名而返回空"
+    assert all(item["kind"] == "tutorial" for item in result["items"])
+    assert result["items"][0]["ref_id"] == "ch-ev"
