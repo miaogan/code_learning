@@ -148,6 +148,10 @@ def _embedder_probe_state() -> str:
         return str(_EMBEDDER_PROBE["state"])
     state = "down"
     base = (settings.ai_embed_base_url or "").rstrip("/")
+    # OpenAI 兼容端点的 base 以 /v1 结尾，而 TEI 的健康端点在**根路径** /health ——
+    # 直接拼会探到 /v1/health（404）而误报 down（生产实测过）。
+    if base.endswith("/v1"):
+        base = base[: -len("/v1")]
     if base:
         try:
             resp = httpx.get(base + "/health", timeout=1.5)
