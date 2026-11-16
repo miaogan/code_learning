@@ -258,9 +258,10 @@ class ProfilePatch(BaseModel):
 
 
 class InterviewSettings(BaseModel):
-    """本场面试的设定：r5 四项 + r44 可选方向聚焦，落 runs.payload.settings，永不写回画像。
+    """本场面试的设定：r5 四项 + r44 方向聚焦 + r111 岗位缺口，落 runs.payload.settings。
 
     `direction` / `sub_direction` 空串 = 不限（老 payload 缺这两键时按空串补，四项解析口径不变）；
+    `focus_gaps` 是本次 JD 对位带过来的最多 3 个缺口技能，只影响本场出题，永不写回画像。
     取值闭集由 `services.report.rules` 校验，不在本模块重复字面量。
     """
 
@@ -270,10 +271,11 @@ class InterviewSettings(BaseModel):
     company_size: CompanySize = "中型"
     direction: str = ""
     sub_direction: str = ""
+    focus_gaps: list[str] = Field(default_factory=list, max_length=3)
 
 
 class InterviewSettingsPatch(BaseModel):
-    """开局请求里的设定补丁：四项 + 可选方向全可选，缺省由服务端按画像/默认值补全。"""
+    """开局请求里的设定补丁：四项 + 可选方向 + 岗位缺口，缺省由服务端补全。"""
 
     target_role: str | None = None
     years_experience: ExperienceBand | None = None
@@ -282,6 +284,8 @@ class InterviewSettingsPatch(BaseModel):
     #: 取值见 rules.DIRECTIONS / rules.SUBDIRECTIONS；空 = 不限。
     direction: str | None = None
     sub_direction: str | None = None
+    #: 最多 3 项；服务端再逐条去空白 / 去重 / 截断，超限直接忽略而不是报错。
+    focus_gaps: list[str] | None = Field(default=None, max_length=5)
 
 
 class InterviewCreateRequest(BaseModel):
@@ -1703,6 +1707,10 @@ class LeapExpressionItem(BaseModel):
     score: float | None = None
     comment: str | None = None
     structure: LeapExpressionStructure = Field(default_factory=LeapExpressionStructure)
+    # r111：本场从 JD 带进来的缺口词及回答里的关键词命中；只是文本对照，不是掌握度结论。
+    focus_gaps: list[str] = Field(default_factory=list)
+    gap_hits: list[str] = Field(default_factory=list)
+    gap_misses: list[str] = Field(default_factory=list)
 
 
 class LeapExpression(BaseModel):
@@ -1718,4 +1726,61 @@ class LeapArchive(BaseModel):
     role_gap: LeapRoleGap = Field(default_factory=LeapRoleGap)
     engineering: LeapEngineering = Field(default_factory=LeapEngineering)
     expression: LeapExpression = Field(default_factory=LeapExpression)
+    generated_at: str = ""
+
+
+# --- r110 JD 岗位对位（零 AI 关键词匹配 / 确定性证据清单）----------------------
+
+
+class JdMatchRequest(BaseModel):
+    """一次 JD 对位的输入：正文必填，目标岗位可显式覆盖自动识别。"""
+
+    jd_text: str = Field(min_length=1, max_length=12000)
+    target_role: str | None = Field(default=None, max_length=40)
+
+
+class JdKeywordItem(BaseModel):
+    """JD 里检出的一个技术信号：命中短语 + JD 原句 + 画像里可复算的证据条数。"""
+
+    name: str
+    matched_alias: str
+    source_quote: str
+    user_level: int = Field(ge=0, le=4)
+    evidence_count: int = 0
+    evidence: list[str] = Field(default_factory=list)
+    status: Literal["evidence", "mentioned", "missing"]
+    role_required: bool = False
+
+
+class JdGapItem(BaseModel):
+    """一条缺口：要么 JD 提到但画像没证据，要么目标岗位模型要求但 JD 未直接写。"""
+
+    name: str
+    origin: Literal["jd", "role_model"]
+    reason: str
+    source_quote: str = ""
+
+
+class JdInterviewPreset(BaseModel):
+    """一键带进召对的配置：岗位 / 方向 / 子方向 + 最多 3 个缺口，其余设置在面试页决定。"""
+
+    target_role: str
+    direction: str = ""
+    sub_direction: str = ""
+    focus_gaps: list[str] = Field(default_factory=list, max_length=3)
+    reason: str = ""
+
+
+class JdMatchResult(BaseModel):
+    """岗位对位结果：证据清单 + 缺口 + 可直接用于面试页的预设，不产出百分比分数。"""
+
+    target_role: str | None = None
+    role_fit: RoleFit | None = None
+    keywords: list[JdKeywordItem] = Field(default_factory=list)
+    gaps: list[JdGapItem] = Field(default_factory=list)
+    preset: JdInterviewPreset | None = None
+    notice: str | None = None
+    source_chars: int = 0
+    matched_count: int = 0
+    missing_count: int = 0
     generated_at: str = ""

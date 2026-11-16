@@ -109,3 +109,5 @@ frontend/.tmp/
 
 # 本地演示产物（截图 / 录屏 / 一次性脚本），不进仓库
 output/
+# vitest 每次跑测试会在 frontend 根生成 vite.config.ts.timestamp-*.mjs 临时文件
+frontend/vite.config.ts.timestamp-*

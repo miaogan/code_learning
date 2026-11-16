@@ -12,7 +12,7 @@ import { ChatStream } from '../components/interview/ChatStream'
 import { Composer } from '../components/interview/Composer'
 import { InterviewSetupForm } from '../components/interview/InterviewSetupForm'
 import { SessionList } from '../components/interview/SessionList'
-import { draftToPatch, prefillOf } from '../components/interview/setupModel'
+import { draftToPatch, presetFromParams, prefillOf } from '../components/interview/setupModel'
 import type { SetupDraft, SetupSources } from '../components/interview/setupModel'
 import { SessionSummary } from '../components/interview/SessionSummary'
 import { SettingsBar } from '../components/interview/SettingsBar'
@@ -94,6 +94,8 @@ export default function InterviewPage() {
   const profileAsync = useAsync((signal) => api.latestProfile(signal), [])
   const createAbortRef = useRef<AbortController | null>(null)
   const prefilledIdRef = useRef<string | null>(null)
+  /** r110：岗位对位带过来的预填只应用一次；URL 不变时不覆盖用户手改。 */
+  const jdPresetAppliedRef = useRef<string | null>(null)
   const activeRunIdRef = useRef<string | null>(null)
   const answerDraftRef = useRef({ userId: null as string | null, runId: '', questionId: '', text: '' })
   const latestAnswerRef = useRef({ answer: '', userId: null as string | null, runId: '', questionId: '', stage: 'configure' as Stage, submitting: false })
@@ -141,17 +143,36 @@ export default function InterviewPage() {
     setSources(prefilled.sources)
   }, [profile])
 
+  // r110：岗位对位的「带配置去召对」只预填三项；预置存在时不自动接回旧会话，
+  // 否则用户明明选了新岗位，却被上一场在途面试覆盖。
+  useEffect(() => {
+    if (runIdParam !== null) return
+    const preset = presetFromParams(searchParams)
+    if (preset === null) return
+    const key = `${profile?.id ?? ''}|${searchParams.toString()}`
+    if (jdPresetAppliedRef.current === key) return
+    jdPresetAppliedRef.current = key
+    setDraft((previous) => ({ ...previous, ...preset }))
+    setSources((previous) => {
+      const next = { ...previous }
+      Object.keys(preset).forEach((field) => {
+        next[field as keyof SetupDraft] = 'default'
+      })
+      return next
+    })
+  }, [profile?.id, runIdParam, searchParams])
+
   /**
    * 站内导航（顶栏 / 报告页 / 画像页）指向的都是裸 `/interview`：URL 没带 run_id 时，
    * 用本地锚点把还在服务端的在途会话接回来（写入点在开局 / 恢复 / 每轮评分成功后）。
    * 只补 query，恢复交给下面的 effect —— 与「手动带 run_id 进来」走同一条路径。
    */
   useEffect(() => {
-    if (runIdParam !== null || userId === null) return
+    if (runIdParam !== null || userId === null || presetFromParams(searchParams) !== null) return
     const stored = readInterviewSession(userId)
     if (stored === null) return
     setSearchParams({ run_id: stored }, { replace: true })
-  }, [runIdParam, userId, setSearchParams])
+  }, [runIdParam, searchParams, setSearchParams, userId])
 
   // ?run_id= 恢复：GET 会话镜像 → running 续答 / completed 只读。
   useEffect(() => {
@@ -201,7 +222,7 @@ export default function InterviewPage() {
         setRestore({ status: 'error', error: messageOf(error, '无法恢复本场面试') })
       })
     return () => controller.abort()
-  }, [runIdParam, restoreTick, userId])
+  }, [runIdParam, restoreTick, searchParams, userId])
 
   // 开局计时（三段文案按秒步进）+ 单轮评分计时。
   useEffect(() => {

@@ -63,6 +63,10 @@ HISTORY_WINDOW = 3
 #: 画像岗位名的最长保留字符数（超长截断，避免把整段简历标题塞进提示词）。
 TARGET_ROLE_MAX_CHARS = 40
 
+#: r111：一次 JD 对位最多带 3 个缺口进面试；超出按出现顺序截断，单项过长也截到 40 字。
+MAX_FOCUS_GAPS = 3
+FOCUS_GAP_MAX_CHARS = 40
+
 #: 缺省作答提示：模型没给 hint 时的兜底，保证每条发言都有可读提示行。
 DEFAULT_HINT = "结合具体经历，说明做法、取舍与结果"
 
@@ -78,6 +82,8 @@ INTERVIEW_SYSTEM = """你是程序员模拟面试官。依据本场设定与候�
 1. 共 9 道题：technical 5 道、project 3 道、challenge 1 道（challenge 占总题量 11%，不超过 20%）。
 2. 必须按 user JSON 的 settings 与 calibration 出题：目标岗位、工作经验、面试市场、公司规模都要改变题目口径，
    不得只做措辞替换；calibration.focus 指定了方向 / 子方向时，technical 题必须优先（子方向则必须）覆盖该方向。
+   settings.focus_gaps 非空时，前 min(3, 数量) 道 technical 题必须分别围绕这些缺口技能展开，
+   hint 要求候选人按「问题—方案—指标—踩坑」作答，但不得虚构候选人没写的经历。
 3. technical 题对准画像的 tech_stack / skills；project 题必须点名画像里的具体项目；
    challenge 题给一个超出舒适区的场景题，允许没有标准答案。
 4. 每题 prompt 必须互不相同，不得换句话重复同一道题；不需要输出 id（服务端按 iq-1 起编号）。
@@ -106,6 +112,8 @@ ROUND_SYSTEM = """你是程序员模拟面试官。本轮候选人在回答当�
   必须 advance 换下一道正题，不要在同一技术点上问到底。
 - 分数 ≥ 4 且 allow_follow_up 为 true 且上一答有可深挖之处 → mode=follow_up，题面必须接住上一答
   （追问细节 / 澄清 / 施压），不要换题；题面要具体、可回答，≤120 字。
+  settings.focus_gaps 非空时，追问优先沿当前题对应的缺口技能深挖（例如要求给出方案、指标与踩坑），
+  但不得换到另一个缺口，也不得把自己没说过的生产经历塞进题面。
 - 否则 mode=advance，按 next_plan 的下一题推进（prompt 可留空，服务端用计划原文投放）。
 - settings 与 calibration 在每一轮都必须继续影响出题口径。"""
 
@@ -194,6 +202,24 @@ def _company_text(value: str | None) -> str:
     return value if value in rules.COMPANY_SIZES else rules.DEFAULT_COMPANY_SIZE
 
 
+def _focus_gaps_of(raw: list[str] | None) -> list[str]:
+    """r111：缺口来自 JD 对位，只保留非空 / 去重 / 截断后的前 3 项。
+
+    这里不做业务判断（不判定技能是否真缺）：JD 服务已给出来源，面试侧只负责不把脏值
+    或超长文本带进提示词。空列表是完全合法的「本场没有定向缺口」。
+    """
+    if not raw:
+        return []
+    result: list[str] = []
+    for item in raw:
+        cleaned = str(item).strip()[:FOCUS_GAP_MAX_CHARS]
+        if cleaned and cleaned not in result:
+            result.append(cleaned)
+        if len(result) == MAX_FOCUS_GAPS:
+            break
+    return result
+
+
 def fill_settings(
     patch: InterviewSettingsPatch | None, profile: Profile | None
 ) -> InterviewSettings:
@@ -226,6 +252,7 @@ def fill_settings(
             "company_size": size,
             "direction": direction,
             "sub_direction": sub_direction,
+            "focus_gaps": _focus_gaps_of(patch.focus_gaps),
         }
     )
 
@@ -244,6 +271,7 @@ def calibration_of(settings: InterviewSettings) -> dict[str, str]:
         "market": _MARKET_CALIBRATION[settings.market],
         "company": _COMPANY_CALIBRATION[settings.company_size],
         "focus": _focus_calibration(settings),
+        "focus_gaps": _focus_gaps_calibration(settings),
     }
 
 
@@ -256,6 +284,18 @@ def _focus_calibration(settings: InterviewSettings) -> str:
     return (
         f"本场聚焦「{settings.direction} · {settings.sub_direction}」："
         "technical 题必须覆盖该子方向，至少两题点出该子方向的真实细节"
+    )
+
+
+def _focus_gaps_calibration(settings: InterviewSettings) -> str:
+    """r111：把 JD 缺口翻成出题口径；空缺口与有缺口两档文案不同，便于单测钉住。"""
+    gaps = _focus_gaps_of(settings.focus_gaps)
+    if not gaps:
+        return "缺口重点：本场未指定 JD 缺口；按方向与画像短板均衡出题"
+    quoted = "、".join(f"「{gap}」" for gap in gaps)
+    return (
+        f"缺口重点：前 {len(gaps)} 道 technical 题必须分别围绕 {quoted} 展开；"
+        "追问优先沿当前缺口深挖方案、指标与踩坑，不虚构候选人没写的经历"
     )
 
 

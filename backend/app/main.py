@@ -50,6 +50,7 @@ from app.routers import (
     exam,
     history,
     interview,
+    jd,
     jobs,
     leap,
     learn,
@@ -573,6 +574,8 @@ def create_app() -> FastAPI:
     app.include_router(learn.router)
     # r108：跃迁档案看板（岗位差距 / 工程证据 / 面试表达，只读聚合零 AI）。
     app.include_router(leap.router)
+    # r110：JD 岗位对位（零 AI 关键词证据 / 缺口清单 / 召对预设，登录态按账号隔离）。
+    app.include_router(jd.router)
     # r65：AI 学习教练（检索增强 + 引用白名单校验，材料由前端组装后随请求上传）。
     app.include_router(coach.router)
     # r67：技术雷达（先锋清单 / 采集 / 国子监生成任务，任务按账号隔离）。

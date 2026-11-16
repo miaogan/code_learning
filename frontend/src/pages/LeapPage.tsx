@@ -16,6 +16,7 @@ import { EmptyState } from '../components/ui/EmptyState'
 import { InlineError } from '../components/ui/InlineError'
 import {
   expressionSummary,
+  gapCompareText,
   isLeapEmpty,
   orderedProjects,
   scaleRows,
@@ -38,6 +39,7 @@ function SectionHead({ index, title, note }: { index: string; title: string; not
 
 function ExpressionRow({ item }: { item: LeapExpressionItem }) {
   const { hits, misses } = structureParts(item.structure)
+  const gapText = gapCompareText(item)
   return (
     <li className="sc-leap-expr">
       <div className="sc-leap-expr-top">
@@ -58,6 +60,7 @@ function ExpressionRow({ item }: { item: LeapExpressionItem }) {
           <span className="sc-chip is-muted" key={`miss-${label}`}>{label}</span>
         ))}
       </div>
+      {gapText ? <p className="sc-leap-expr-gap">{gapText}</p> : null}
       <p className="sc-leap-expr-hint">{item.structure.hint}</p>
     </li>
   )

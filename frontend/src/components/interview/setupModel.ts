@@ -14,6 +14,7 @@ import type {
   InterviewSettingsPatch,
   Profile,
 } from '../../api/types'
+import { DIRECTIONS, subDirectionsOf } from '../../lib/questionDirections'
 
 /** 四项配置闭集（AC-1 / AC-14）。 */
 export const EXPERIENCE_BANDS = ['应届', '1-3年', '3-5年', '5-10年', '10年以上'] as const
@@ -39,6 +40,8 @@ export interface SetupDraft {
   direction: string
   /** 二级方向：只有 direction 非空时才有意义。 */
   sub_direction: string
+  /** r111：JD 对位带过来的缺口技能（最多 3 项；隐藏字段，不在表单里手改）。 */
+  focus_gaps: string[]
 }
 
 /** 单个字段的来源：画像取值 / 回落默认（用户手改后徽章消失，不再标注来源）。 */
@@ -70,6 +73,7 @@ export function prefillOf(profile: Profile | null): { draft: SetupDraft; sources
       company_size: DEFAULT_COMPANY_SIZE,
       direction: '',
       sub_direction: '',
+      focus_gaps: [],
     },
     sources: {
       target_role: role.length > 0 ? 'profile' : 'default',
@@ -78,8 +82,33 @@ export function prefillOf(profile: Profile | null): { draft: SetupDraft; sources
       company_size: 'default',
       direction: 'default',
       sub_direction: 'default',
+      focus_gaps: 'default',
     },
   }
+}
+
+/**
+ * r110/r111 岗位对位带过来的预填：岗位 / 方向 / 二级方向按闭集收敛，缺口最多 3 项。
+ * 没有合法字段时返回 null，避免把外部链接里的脏值塞进表单后下发 422。
+ */
+export function presetFromParams(params: URLSearchParams): Partial<SetupDraft> | null {
+  const role = (params.get('target_role') ?? '').trim()
+  const direction = (params.get('direction') ?? '').trim()
+  const subDirection = (params.get('sub_direction') ?? '').trim()
+  const preset: Partial<SetupDraft> = {}
+  if (role.length > 0) preset.target_role = role.slice(0, TARGET_ROLE_MAX_CHARS)
+  if (DIRECTIONS.includes(direction)) {
+    preset.direction = direction
+    if (subDirectionsOf(direction).includes(subDirection)) preset.sub_direction = subDirection
+  }
+  const focusGaps: string[] = []
+  for (const raw of params.getAll('focus')) {
+    const gap = raw.trim().slice(0, TARGET_ROLE_MAX_CHARS)
+    if (gap && !focusGaps.includes(gap)) focusGaps.push(gap)
+    if (focusGaps.length === 3) break
+  }
+  if (focusGaps.length > 0) preset.focus_gaps = focusGaps
+  return Object.keys(preset).length > 0 ? preset : null
 }
 
 /** 表单 → 提交补丁（空白目标岗位 / 不限方向不下发，交给服务端默认；其余三项始终携带）。 */
@@ -97,15 +126,19 @@ export function draftToPatch(draft: SetupDraft): InterviewSettingsPatch {
     const subDirection = draft.sub_direction.trim()
     if (subDirection.length > 0) patch.sub_direction = subDirection
   }
+  if (draft.focus_gaps.length > 0) patch.focus_gaps = draft.focus_gaps
   return patch
 }
 
 /** 开局预览行（跳过按钮旁的「将按：…」，空白岗位按默认值展示，与 fill_settings 口径一致）。 */
 export function previewLine(draft: SetupDraft): string {
   const role = draft.target_role.trim() || DEFAULT_TARGET_ROLE
-  const base = `将按：${role} · ${draft.years_experience} · ${draft.market} · ${draft.company_size}`
+  let text = `将按：${role} · ${draft.years_experience} · ${draft.market} · ${draft.company_size}`
   const direction = draft.direction.trim()
-  if (direction.length === 0) return base
-  const subDirection = draft.sub_direction.trim()
-  return subDirection.length > 0 ? `${base} · ${direction} · ${subDirection}` : `${base} · ${direction}`
+  if (direction.length > 0) {
+    const subDirection = draft.sub_direction.trim()
+    text += subDirection.length > 0 ? ` · ${direction} · ${subDirection}` : ` · ${direction}`
+  }
+  if (draft.focus_gaps.length > 0) text += ` · 缺口：${draft.focus_gaps.join(' / ')}`
+  return text
 }

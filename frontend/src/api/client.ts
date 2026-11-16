@@ -19,6 +19,8 @@ import type {
   InterviewSession,
   InterviewSessionSummary,
   InterviewTurn,
+  JdMatchRequest,
+  JdMatchResult,
   LearnProgress,
   LeapArchive,
   LoginRequest,
@@ -241,6 +243,10 @@ export const api = {
   /** r108 跃迁档案：岗位差距 + 工程证据 + 面试表达，服务端一次聚合（零 AI、零重算）。 */
   leapArchive: (signal?: AbortSignal): Promise<LeapArchive> =>
     request<LeapArchive>('/api/leap-archive', { signal }),
+
+  /** r110 岗位对位：JD → 证据清单 / 缺口 / 召对预设（零 AI，只做字面对照）。 */
+  matchJd: (payload: JdMatchRequest, signal?: AbortSignal): Promise<JdMatchResult> =>
+    request<JdMatchResult>('/api/jd-match', jsonInit('POST', payload, signal)),
 
   /* ---------- r100 B4 教练 Agent 编排（讲席）：规划 → 工具 → 反思 → 结论 ---------- */
 

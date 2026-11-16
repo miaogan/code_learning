@@ -141,6 +141,8 @@ export interface InterviewSettings {
   /** 可选方向聚焦：空串 / 缺省 = 不限（老 run 没有这两键）。取值见 lib/questionDirections。 */
   direction?: string
   sub_direction?: string
+  /** r111：JD 对位带过来的前 3 个缺口，只影响本场出题，不写回画像。 */
+  focus_gaps?: string[]
 }
 
 export interface InterviewSettingsPatch {
@@ -150,6 +152,7 @@ export interface InterviewSettingsPatch {
   company_size?: CompanySize
   direction?: string
   sub_direction?: string
+  focus_gaps?: string[]
 }
 
 export interface InterviewCreateRequest {
@@ -1412,6 +1415,10 @@ export interface LeapExpressionItem {
   score: number | null
   comment: string | null
   structure: LeapExpressionStructure
+  /** r111：本场从 JD 带进来的缺口词；只是文本对照，不是掌握度结论。 */
+  focus_gaps: string[]
+  gap_hits: string[]
+  gap_misses: string[]
 }
 
 export interface LeapExpression {
@@ -1424,5 +1431,56 @@ export interface LeapArchive {
   role_gap: LeapRoleGap
   engineering: LeapEngineering
   expression: LeapExpression
+  generated_at: string
+}
+
+/* ------------------------------------------------------------------ *
+ * r110 岗位对位 · JD 证据清单（与 backend/app/schemas.py 逐字段镜像）
+ * ------------------------------------------------------------------ */
+
+export interface JdMatchRequest {
+  jd_text: string
+  target_role?: string | null
+}
+
+export type JdKeywordStatus = 'evidence' | 'mentioned' | 'missing'
+
+export interface JdKeywordItem {
+  name: string
+  matched_alias: string
+  source_quote: string
+  user_level: number
+  evidence_count: number
+  evidence: string[]
+  status: JdKeywordStatus
+  role_required: boolean
+}
+
+export interface JdGapItem {
+  name: string
+  origin: 'jd' | 'role_model'
+  reason: string
+  source_quote: string
+}
+
+export interface JdInterviewPreset {
+  target_role: string
+  direction: string
+  sub_direction: string
+  /** r111：最多 3 个缺口技能，开局时进入本场 settings.focus_gaps。 */
+  focus_gaps: string[]
+  reason: string
+}
+
+export interface JdMatchResult {
+  target_role: string | null
+  role_fit: RoleFit | null
+  keywords: JdKeywordItem[]
+  gaps: JdGapItem[]
+  preset: JdInterviewPreset | null
+  notice: string | null
+  source_chars: number
+  matched_count: number
+  missing_count: number
   generated_at: string
 }

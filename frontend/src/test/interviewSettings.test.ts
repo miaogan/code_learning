@@ -11,6 +11,7 @@ import {
   TARGET_ROLE_MAX_CHARS,
   bandOfYears,
   draftToPatch,
+  presetFromParams,
   prefillOf,
   previewLine,
   type SetupDraft,
@@ -37,7 +38,7 @@ function profileWith(patch: Partial<Profile>): Profile {
   return { ...PROFILE_BASE, ...patch }
 }
 
-function draftWith(patch: Partial<SetupDraft>): SetupDraft {
+function draftWith(patch: Partial<SetupDraft> = {}): SetupDraft {
   return {
     target_role: '',
     years_experience: DEFAULT_EXPERIENCE_BAND,
@@ -45,6 +46,7 @@ function draftWith(patch: Partial<SetupDraft>): SetupDraft {
     company_size: DEFAULT_COMPANY_SIZE,
     direction: '',
     sub_direction: '',
+    focus_gaps: [],
     ...patch,
   }
 }
@@ -79,6 +81,7 @@ describe('prefillOf：画像预填与来源标注（画像有值 / 画像空 / �
       company_size: DEFAULT_COMPANY_SIZE,
       direction: '',
       sub_direction: '',
+      focus_gaps: [],
     })
     expect(sources).toEqual({
       target_role: 'profile',
@@ -87,6 +90,7 @@ describe('prefillOf：画像预填与来源标注（画像有值 / 画像空 / �
       company_size: 'default',
       direction: 'default',
       sub_direction: 'default',
+      focus_gaps: 'default',
     })
   })
 
@@ -102,6 +106,7 @@ describe('prefillOf：画像预填与来源标注（画像有值 / 画像空 / �
       company_size: DEFAULT_COMPANY_SIZE,
       direction: '',
       sub_direction: '',
+      focus_gaps: [],
     })
     expect(sources.target_role).toBe('default')
     expect(sources.years_experience).toBe('default')
@@ -112,7 +117,7 @@ describe('prefillOf：画像预填与来源标注（画像有值 / 画像空 / �
 
     expect(draft.target_role).toBe('')
     expect(draft.years_experience).toBe(DEFAULT_EXPERIENCE_BAND)
-    expect(Object.values(sources)).toEqual(Array(6).fill('default'))
+    expect(Object.values(sources)).toEqual(Array(7).fill('default'))
   })
 
   it('超长岗位按 TARGET_ROLE_MAX_CHARS 截断（与服务端 TARGET_ROLE_MAX_CHARS 同值）', () => {
@@ -195,5 +200,61 @@ describe('闭集字面量与后端 rules.py 逐字一致（AC-14 防漂移）', 
     expect(DEFAULT_EXPERIENCE_BAND).toBe('1-3年')
     expect(DEFAULT_MARKET).toBe('国内')
     expect(DEFAULT_COMPANY_SIZE).toBe('中型')
+  })
+})
+
+describe('presetFromParams：岗位对位带配置进召对（r110）', () => {
+  it('三项都按闭集收敛，且不碰四项里未携带的字段', () => {
+    const params = new URLSearchParams({
+      target_role: '  后端工程师  ',
+      direction: '后端',
+      sub_direction: 'python',
+    })
+    expect(presetFromParams(params)).toEqual({
+      target_role: '后端工程师',
+      direction: '后端',
+      sub_direction: 'python',
+    })
+  })
+
+  it('非法方向 / 不属于该方向的二级方向直接丢弃，不下发脏值', () => {
+    expect(presetFromParams(new URLSearchParams({ direction: '不存在' }))).toBeNull()
+    expect(
+      presetFromParams(
+        new URLSearchParams({ direction: '后端', sub_direction: 'react' }),
+      ),
+    ).toEqual({ direction: '后端' })
+  })
+
+  it('只有二级方向没有方向时不预填，超长岗位截断到 40 字', () => {
+    expect(presetFromParams(new URLSearchParams({ sub_direction: 'python' }))).toBeNull()
+    expect(
+      presetFromParams(new URLSearchParams({ target_role: '前'.repeat(50) }))?.target_role,
+    ).toHaveLength(40)
+  })
+
+  it('r111：focus 参数去重、截断，最多 3 项', () => {
+    const params = new URLSearchParams()
+    params.append('focus', ' Redis ')
+    params.append('focus', 'Redis')
+    params.append('focus', 'Docker')
+    params.append('focus', 'RAG')
+    params.append('focus', 'Kubernetes')
+    expect(presetFromParams(params)?.focus_gaps).toEqual(['Redis', 'Docker', 'RAG'])
+  })
+})
+
+describe('draftToPatch：缺口随本场设置下发（r111）', () => {
+  it('有缺口时带 focus_gaps，无缺口时不下发空键', () => {
+    expect(draftToPatch(draftWith({ focus_gaps: ['Redis', 'RAG'] })).focus_gaps).toEqual([
+      'Redis',
+      'RAG',
+    ])
+    expect('focus_gaps' in draftToPatch(draftWith())).toBe(false)
+  })
+
+  it('预览行显示缺口，但不把隐藏配置说成画像来源', () => {
+    expect(previewLine(draftWith({ focus_gaps: ['Redis'] }))).toContain('缺口：Redis')
+    expect(previewLine(draftWith())).not.toContain('缺口')
   })
 })

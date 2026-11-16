@@ -80,6 +80,18 @@ export function expressionSummary(items: LeapExpressionItem[]): string {
   return `已收录 ${items.length} 条作答（${scored} 条有评分），其中 ${full} 条四项措辞齐全；自检不是评分。`
 }
 
+/**
+ * r111：JD 缺口对照文案：命中 / 未提到直接沿用服务端关键词判断串成一句话；
+ * 本场没有带缺口词（focus_gaps 为空）时返回 null，页面不渲染对照行。
+ * 只是「回答文本里有没有出现这个词」，不是掌握度结论。
+ */
+export function gapCompareText(item: LeapExpressionItem): string | null {
+  if (item.focus_gaps.length === 0) return null
+  const hits = item.gap_hits.length > 0 ? item.gap_hits.join('、') : '无'
+  const misses = item.gap_misses.length > 0 ? item.gap_misses.join('、') : '无'
+  return `本场缺口词：提到 ${hits} · 未提到 ${misses}（仅关键词对照，不是掌握度结论）`
+}
+
 /** 整份档案是否三块皆空：仅用于展示空态引导，不改变服务端数据。 */
 export function isLeapEmpty(archive: LeapArchive): boolean {
   return (

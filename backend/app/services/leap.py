@@ -30,6 +30,7 @@ from app.schemas import (
     LeapExpressionStructure,
     LeapRoleGap,
 )
+from app.services import jd_match
 from app.services.retrieval import indexer
 
 #: 最多回看的最近面试场次（再多不进看板，避免把历史旧答案堆成一面墙）。
@@ -145,6 +146,24 @@ def _engineering() -> LeapEngineering:
     )
 
 
+def _run_focus_gaps(payload: dict[str, Any]) -> list[str]:
+    """r111：从本场 settings 回读 JD 缺口词；存量 run 没有这个键时为空，不补造。"""
+    settings = payload.get("settings")
+    if not isinstance(settings, dict):
+        return []
+    raw = settings.get("focus_gaps")
+    if not isinstance(raw, list):
+        return []
+    result: list[str] = []
+    for item in raw:
+        cleaned = str(item).strip()[:40]
+        if cleaned and cleaned not in result:
+            result.append(cleaned)
+        if len(result) == 3:
+            break
+    return result
+
+
 def _expression() -> LeapExpression:
     runs = repository.list_runs(kind="interview", limit=MAX_INTERVIEW_RUNS)
     items: list[LeapExpressionItem] = []
@@ -156,6 +175,7 @@ def _expression() -> LeapExpression:
         if not isinstance(entries, list):
             continue
         run_id = str(run.get("id") or "")
+        focus_gaps = _run_focus_gaps(payload)
         taken = 0
         for entry in entries:
             if len(items) >= MAX_EXPRESSION_ITEMS or taken >= MAX_PER_RUN:
@@ -171,6 +191,10 @@ def _expression() -> LeapExpression:
             if isinstance(score, bool) or not isinstance(score, (int, float)):
                 continue
             comment = entry.get("comment")
+            # r111：JD 缺口对照——只做「回答文本里是否出现该词」的关键词命中，
+            # 与 jd_match 同一套别名 / 词边界；命中不等于掌握，未命中不等于不会。
+            gap_hits = [name for name in focus_gaps if jd_match.term_in_text(answer, name)]
+            gap_misses = [name for name in focus_gaps if name not in gap_hits]
             items.append(
                 LeapExpressionItem(
                     run_id=run_id,
@@ -180,6 +204,9 @@ def _expression() -> LeapExpression:
                     score=float(score),
                     comment=comment if isinstance(comment, str) else None,
                     structure=check_expression_structure(answer),
+                    focus_gaps=focus_gaps,
+                    gap_hits=gap_hits,
+                    gap_misses=gap_misses,
                 )
             )
             taken += 1

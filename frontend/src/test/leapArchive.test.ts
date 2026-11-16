@@ -8,6 +8,7 @@ import type {
 import {
   STRUCTURE_PARTS,
   expressionSummary,
+  gapCompareText,
   isLeapEmpty,
   orderedProjects,
   scaleRows,
@@ -47,6 +48,9 @@ function expression(overrides: Partial<LeapExpressionItem> = {}): LeapExpression
     score: 8,
     comment: '清楚',
     structure: structure(),
+    focus_gaps: [],
+    gap_hits: [],
+    gap_misses: [],
     ...overrides,
   }
 }
@@ -130,5 +134,28 @@ describe('isLeapEmpty', () => {
   it('三块皆空才为空', () => {
     expect(isLeapEmpty(archive())).toBe(true)
     expect(isLeapEmpty(archive({ engineering: { ...archive().engineering, projects: [project()] } }))).toBe(false)
+  })
+})
+
+describe('gapCompareText（r111 JD 缺口对照）', () => {
+  it('没有缺口词的场次返回 null，不渲染对照行', () => {
+    expect(gapCompareText(expression())).toBeNull()
+  })
+
+  it('命中 / 未提到沿用服务端结果，并明说不是掌握度结论', () => {
+    const text = gapCompareText(
+      expression({ focus_gaps: ['Redis 缓存', 'RAG 检索增强'], gap_hits: ['RAG 检索增强'], gap_misses: ['Redis 缓存'] }),
+    )
+    expect(text).toContain('RAG 检索增强')
+    expect(text).toContain('Redis 缓存')
+    expect(text).toContain('不是掌握度结论')
+  })
+
+  it('全部未提到时两边都如实展示，不补造命中', () => {
+    const text = gapCompareText(
+      expression({ focus_gaps: ['Docker 与容器编排'], gap_hits: [], gap_misses: ['Docker 与容器编排'] }),
+    )
+    expect(text).toContain('提到 无')
+    expect(text).toContain('Docker 与容器编排')
   })
 })

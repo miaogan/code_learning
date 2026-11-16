@@ -231,3 +231,62 @@ def test_archive_is_user_isolated(tmp_db: Any, profile_factory: Any) -> None:
         assert snapshot.engineering.projects == []
     finally:
         context.reset_current_user_id()
+
+
+# --- r111：JD 缺口对照（settings.focus_gaps → gap_hits / gap_misses） ----------
+
+
+def test_archive_expression_gap_compare_by_run_settings(
+    client: Any, tmp_db: Any, profile_factory: Any
+) -> None:
+    """缺口对照按场次 settings 回读：命中只是回答文本里出现了该词，不是掌握度。"""
+    profile = profile_factory()
+    repository.insert_profile(profile)
+    repository.insert_run(
+        "run-gap-old",
+        "interview",
+        profile.id,
+        {"questions": [_answer("老场次没有缺口键", entry_id="iq-1")]},
+    )
+    repository.insert_run(
+        "run-gap-jd",
+        "interview",
+        profile.id,
+        {
+            "settings": {"focus_gaps": ["Redis 缓存", "RAG 检索增强", "   ", "D" * 60]},
+            "questions": [
+                _answer("我用 Redis 做了分布式锁，问题出在锁过期", entry_id="iq-1"),
+                _answer("主要讲了事务隔离的方案", entry_id="iq-2"),
+            ],
+        },
+    )
+    body = client.get("/api/leap-archive").json()
+    items = body["expression"]["items"]
+    assert len(items) == 3
+
+    jd_items = [item for item in items if item["focus_gaps"]]
+    assert len(jd_items) == 2
+    # focus_gaps 清洗口径：去空白、去重、截 40 字、最多 3 个。
+    assert jd_items[0]["focus_gaps"] == ["Redis 缓存", "RAG 检索增强", "D" * 40]
+    hits = {
+        (item["question_id"], tuple(item["gap_hits"]), tuple(item["gap_misses"]))
+        for item in jd_items
+    }
+    assert ("iq-1", ("Redis 缓存",), ("RAG 检索增强", "D" * 40)) in hits
+    assert ("iq-2", (), ("Redis 缓存", "RAG 检索增强", "D" * 40)) in hits
+
+    # 存量 run 没有这个键：空列表如实展示，不补造对照。
+    legacy = [item for item in items if not item["focus_gaps"]]
+    assert len(legacy) == 1
+    assert legacy[0]["gap_hits"] == []
+    assert legacy[0]["gap_misses"] == []
+
+
+def test_term_in_text_reuses_alias_and_word_boundary() -> None:
+    """r111 复用 jd_match 的别名与词边界：短 ASCII 别名不得命中更长的词。"""
+    from app.services import jd_match
+
+    assert jd_match.term_in_text("我们用 go 写了网关", "Go")
+    assert not jd_match.term_in_text("golang 生态", "Go")
+    assert not jd_match.term_in_text("随便说说", "Go")
+    assert not jd_match.term_in_text("任何内容", "")
