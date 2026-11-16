@@ -68,7 +68,7 @@ from app.services.ai.ai import close_ai_pool
 from app.services.assessment import question_bank
 from app.services.retrieval import indexer as rag_indexer
 
-APP_VERSION = "0.2.0"
+APP_VERSION = "0.3.0"
 
 logger = logging.getLogger("app.http")
 db_logger = logging.getLogger("app.db")
