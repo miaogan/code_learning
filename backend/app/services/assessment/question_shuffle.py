@@ -13,8 +13,8 @@
 
 1. **幂等**：位置分配只依赖「内容身份 + 固定 id 定序」与逐题递增的位置计数，
    与「当前答案落在哪个 key」无关；判断题用绝对映射表，重复运行不会二次翻转。
-2. **`options` 数组顺序恒等于 key 位置序**：重编 key 时数组一并按 `A..D` 重建，
-   判分（按 key 集合）与前端（按数组序渲染）才不会各自漂移。
+2. **`options` 数组顺序恒等于 key 位置序**：重编 key 时数组按该题选项数（2–6，
+   取 `ALL_KEYS` 前缀）重建，判分（按 key 集合）与前端（按数组序渲染）才不会各自漂移。
 """
 
 from __future__ import annotations
@@ -27,8 +27,11 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
-#: 选项位置序（单选/多选的 key 闭集，顺序即数组序）。
+#: 单选题与判断题的位置闭集（这两类题型恒为 4 / 2 选项）；报表列与门禁口径都用它。
 KEYS: tuple[str, ...] = ("A", "B", "C", "D")
+#: 客观题 key 全集，与 `question_merge._OPTION_KEYS` 对齐（有常驻测试钉住两者相等）。
+#: 任意题按选项数取前缀 `ALL_KEYS[:len(options)]`：5/6 选项题不再因超出 A–D 被跳过。
+ALL_KEYS: tuple[str, ...] = tuple("ABCDEF")
 
 #: 哈希拼接分隔符（避免 `id` 与选项文本边界歧义）。
 _HASH_SEP = "\x1f"
@@ -48,15 +51,16 @@ _LENGTH_RATIO_LONG = 3.0
 _LENGTH_RATIO_WATCH = 2.0
 
 #: 显式选项引用形式：`A 项` / `选项 A` / `选项A`。
-_EXPLICIT = re.compile(r"(?:选项\s*)?([ABCD])\s*项|选项\s*([ABCD])")
+_EXPLICIT = re.compile(r"(?:选项\s*)?([A-F])\s*项|选项\s*([A-F])")
 #: 判角短语（字母后紧跟这些词才算「指代选项」）。
 _VERDICT_TAIL = ("正确", "错误", "不正确", "不对", "误", "是", "为", "不是", "干扰项", "正解", "答案")
 #: 非引用护栏：`C 语言` / `C++` / `Java/C++` / `ACID` 之类不得当选项字母。
-_LANG_GUARD = re.compile(r"[ABCD](?:\s*(?:语言|编译器|标准|\+\+|#|/))|(?<=\/)[ABCD]")
-#: 由「、和与或」连接的纯字母清单（`A、B、D` / `A 和 B`）。
-_LIST = re.compile(r"([ABCD])(?:[、和与或]\s*([ABCD]))+")
+_LANG_GUARD = re.compile(r"[A-F](?:\s*(?:语言|编译器|标准|\+\+|#|/))|(?<=\/)[A-F]")
+#: 由「、和与或 / 点号」连接的纯字母清单（`A、B、D` / `A 和 B` / `B.D.E.`）。
+#: 点号两侧必须是大写字母，故不会把 `e.g.` 之类英文缩写当选项引用。
+_LIST = re.compile(r"([A-F])(?:[、和与或．.]\s*([A-F]))+")
 #: 独立字母 token（两侧不能是字母数字下划线）。
-_TOKEN = re.compile(r"(?<![A-Za-z0-9_])[ABCD](?![A-Za-z0-9_])")
+_TOKEN = re.compile(r"(?<![A-Za-z0-9_])[A-F](?![A-Za-z0-9_])")
 
 #: 解析一致性双校验：字母后紧跟否定判定词 ⇒ 该字母**不得**在 `answer` 里
 #: （`A 项错误 ⇔ A ∉ answer`）；紧跟肯定判定词 ⇒ 该字母**必须**在 `answer` 里。
@@ -85,7 +89,7 @@ _VERDICT_POSITIVE: tuple[str, ...] = (
 )
 #: 「正确项为 A、B、D」这类显式集合句：字母集合必须等于 `answer` 集合。
 _SET_PHRASE = re.compile(
-    r"(?:正确项|正确选项|正确答案|正确的是)(?:为|是)?[：:]*\s*([ABCD](?:[、和与或][ABCD])*)"
+    r"(?:正确项|正确选项|正确答案|正确的是)(?:为|是)?[：:]*\s*([A-F](?:[、和与或．.][A-F])*)"
 )
 #: 题面「选错项」的方向词：命中即该题的判定词极性**反向**（题面问「以下说法错误的是」时，
 #: 解析里的「`C 错误`」恰恰是在说 C 就是应选项，`C ∈ answer` 本就自洽）。
@@ -748,7 +752,7 @@ def classify_refs(text: str, valid_keys: set[str]) -> tuple[dict[int, str], list
         if letter in valid_keys:
             known[start] = letter
     for match in _LIST.finditer(text):
-        letters = re.findall(r"[ABCD]", match.group(0))
+        letters = re.findall(r"[A-F]", match.group(0))
         if not all(letter in valid_keys for letter in letters):
             continue
         for token in _TOKEN.finditer(match.group(0)):
@@ -758,7 +762,9 @@ def classify_refs(text: str, valid_keys: set[str]) -> tuple[dict[int, str], list
             continue
         if _LANG_GUARD.match(text, token.start()):
             continue
-        tail = text[token.end() : token.end() + 6].lstrip()
+        # 官方解析常写 `A. 是错误的`（字母后带点号），剥掉点号再判角；
+        # `_VERDICT_TAIL` 含「是 / 为」，故「是错误的」仍能判为选项引用。
+        tail = text[token.end() : token.end() + 8].lstrip(".． \t")
         if tail.startswith(_VERDICT_TAIL) and token.group(0) in valid_keys:
             known[token.start()] = token.group(0)
     unknown: list[int] = []
@@ -862,7 +868,7 @@ def _refs_consistency(rows: Sequence[dict[str, Any]]) -> dict[str, Any]:
         if inverted:
             inverted_rows += 1
         for position, letter in sorted(refs.items()):
-            tail = text[position + 1 : position + 8].lstrip()
+            tail = text[position + 1 : position + 10].lstrip(".． \t")
             if tail.startswith(_VERDICT_NEGATIVE):
                 expect_in_answer = False
             elif tail.startswith(_VERDICT_POSITIVE):
@@ -883,7 +889,7 @@ def _refs_consistency(rows: Sequence[dict[str, Any]]) -> dict[str, Any]:
                 )
         expected_set = sorted(key for key in valid if key not in answer) if inverted else sorted(answer)
         for match in _SET_PHRASE.finditer(text):
-            letters = sorted(re.findall(r"[ABCD]", match.group(0)))
+            letters = sorted(re.findall(r"[A-F]", match.group(0)))
             if not letters or not all(letter in valid for letter in letters):
                 continue
             pairs += 1
@@ -982,8 +988,9 @@ def _apply_length_rewrites(
 def apply(rows: Sequence[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """按内容定序重排选项并重编 key、按绝对表改写判断题陈述，返回（新行, 指标）。
 
-    不改入参、无 IO、幂等；解析判角不可靠（`classify_refs` 报出未知字母）或选项数不是
-    四道的题**保持原序**（计入 `skipped`），不猜。重写后的字母引用由 `_refs_consistency()`
+    不改入参、无 IO、幂等；解析判角不可靠（`classify_refs` 报出未知字母）或 key 不是
+    `ALL_KEYS` 前缀（非从 A 起连续的 2–6 个）的题**保持原序**（计入 `skipped`），不猜。
+    重写后的字母引用由 `_refs_consistency()`
     按「`X 项错误 ⇔ X ∉ answer`」与「正确项集合 == answer」双校验，结果进 `metrics`。
     P3-2 的 `LENGTH_REWRITES` 在重排**之后**才套：先定序再压文本，表就不会反过来扰动位置分配。
     """
@@ -998,7 +1005,9 @@ def apply(rows: Sequence[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[st
     counters: dict[str, dict[str, int]] = {}
 
     def bucket(row: dict[str, Any]) -> dict[str, int]:
-        return counters.setdefault(_language_of(row), {key: 0 for key in KEYS})
+        # 用 ALL_KEYS 建桶，避免 5/6 选项单选题取 E/F 位置时 KeyError；
+        # 4 选项单选题仍只从 A–D 取最小值，存量分布与基线哈希不受影响。
+        return counters.setdefault(_language_of(row), {key: 0 for key in ALL_KEYS})
 
     skipped: list[str] = []
     multi_shuffled = 0
@@ -1012,7 +1021,8 @@ def apply(rows: Sequence[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[st
         options = row.get("options") or []
         valid = {str(opt.get("key") or "") for opt in options}
         refs, unknown = classify_refs(str(row.get("explanation") or ""), valid)
-        if len(valid) != len(KEYS) or unknown or not valid <= set(KEYS):
+        row_keys = ALL_KEYS[: len(valid)]
+        if not (2 <= len(valid) <= len(ALL_KEYS)) or valid != set(row_keys) or unknown:
             if str(row.get("kind") or "") == "single":
                 answer = row.get("answer") or []
                 if len(answer) == 1:
@@ -1030,18 +1040,18 @@ def apply(rows: Sequence[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[st
             answer_key = str((row.get("answer") or [""])[0])
             distractors = [opt for opt in ordered if str(opt["key"]) != answer_key]
             slots_of_language = bucket(row)
-            position = min(KEYS, key=lambda key: slots_of_language[key])
-            slots = [key for key in KEYS if key != position]
+            position = min(row_keys, key=lambda key: slots_of_language[key])
+            slots = [key for key in row_keys if key != position]
             mapping: dict[str, str] = {answer_key: position}
             for slot, opt in zip(slots, distractors, strict=False):
                 mapping[str(opt["key"])] = slot
             slots_of_language[position] += 1
         else:
-            mapping = {str(opt["key"]): KEYS[index] for index, opt in enumerate(ordered)}
+            mapping = {str(opt["key"]): row_keys[index] for index, opt in enumerate(ordered)}
             multi_shuffled += 1
         updated = dict(row)
         placed = {mapping[str(opt["key"])]: str(opt.get("text") or "") for opt in ordered}
-        updated["options"] = [{"key": key, "text": placed[key]} for key in KEYS]
+        updated["options"] = [{"key": key, "text": placed[key]} for key in row_keys]
         updated["answer"] = sorted(mapping[str(key)] for key in row.get("answer") or [])
         updated["explanation"] = _remap_text(
             str(row.get("explanation") or ""), refs, mapping
@@ -1205,7 +1215,7 @@ def render_report(metrics: dict[str, Any]) -> str:
         f"- 重排并重编 key 的题：{int(metrics.get('shuffled') or 0)}"
         f"（单选 + 多选；多选 {int(multiple.get('shuffled') or 0)} 道）",
         f"- 判断题极性改写：{int(judge.get('flipped') or 0)} 条",
-        f"- 保持原序（解析判角不可靠）：{int(skipped.get('count') or 0)} 道",
+        f"- 保持原序（解析判角不可靠 / key 非 A 起连续）：{int(skipped.get('count') or 0)} 道",
         "",
         "## 2 单选题答案位置分布（前 → 后）",
         "",
@@ -1314,7 +1324,8 @@ def render_report(metrics: dict[str, Any]) -> str:
         "",
         f"共 {int(skipped.get('count') or 0)} 道：这些题的解析里出现了无法确定指向的字母"
         "（如 `C 语言`、`C++`、`ACID` 等结构性误伤），按安全优先**不打乱**，"
-        "原文与 key 保持自洽，交人工评审后再改写解析。",
+        "原文与 key 保持自洽，交人工评审后再改写解析。选项数 2–6（`ALL_KEYS` 前缀）"
+        "均正常参与重排，只有 key 非 A 起连续或判角不可靠才进本清单。",
         "",
     ]
     if skipped_ids:

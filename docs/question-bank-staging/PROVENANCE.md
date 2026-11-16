@@ -150,3 +150,46 @@
 - `question_merge --check` 与 `question_shuffle --check` 均逐字节 0 差异。
   回滚按 `question_merge.SOURCES` 删除全部登记素材（含 `sysarch-`），保留存量 260 行；
   不手工删 seed 或数据库记录。
+
+## 10 追加素材 `14-acp-official-quizzes.json`（r107，2026-11-16）
+
+| 文件 | `source` | 种子 id 前缀 | 条数 | 来源性质 | 上游 / LICENSE |
+| --- | --- | --- | --- | --- | --- |
+| `14-acp-official-quizzes.json` | `acp-official` | `acpof-` | 32 | 第三方转录：阿里云 ACP 官方开源教程课后小测验 | [atomgit/alibabaclouddocs/aliyun_acp_learning](https://atomgit.com/alibabaclouddocs/aliyun_acp_learning)，LICENSE = Apache-2.0 |
+
+- 来源为阿里云大模型 ACP 认证**官方开源教程仓库**（Apache-2.0，仓库内 `LICENSE` 文件确认），
+  教程中文版 `大模型ACP认证教程/` 下各 notebook 末尾的「🔥 课后小测验」折叠块：
+  从 `<details>` 的 `<b>` 题干、`- A.` 选项、`✅ 参考答案`、`📝 解析` 四段忠实转录，
+  仅做 HTML/markdown 标记清理（见 `.tmp/parse_acp_quiz.py` 的一次性解析口径，不随仓库提交）。
+- 共 32 道客观题：单选 29 / 多选 3；难度 basic 9 / intermediate 20 / challenge 3；
+  全属 `AI 工程`、`language=""`，二级方向 Agent 14 / 通用 AI 7 / LLM 与 RAG 6 /
+  Prompt 工程 3 / 部署与推理 2。覆盖 temperature/top_p、多轮对话、RAG 召回排查、
+  Ragas 指标、提示词要素、MCP、多 Agent、Memory、Skill、Qwen Code、部署选型与安全合规。
+- 另有 1 道「案例分析题 2.1.2」是开放问答（无选项/答案），不符合本项目客观题闭集，未纳入。
+- 2 道多选题为 5 选项（A–E）：`acpof-008`（推理模型提示词技巧）、`acpof-031`（安全纵深防御），
+  均按 `question_shuffle.ALL_KEYS`（A–F，与 `question_merge._OPTION_KEYS` 对齐）前缀
+  **正常参与重排**，解析里的字母引用同步改写（`B.D.E.` 点分隔清单与 `A. 是错误的` 句式也已纳入判角）。
+  选项数 2–6 是 schema 合法范围，判分按 key 集合不受影响。
+- 与全库（含同批 15 号素材）逐条执行题干归一化与字符 2-gram Jaccard 查重（阈值 0.62）：
+  字面重复 0 / 近重复 0。`--write` 实测读入 32 / 新增 32 / 越界 0；题库总量 1284 → 1316。
+- **版权**：Apache-2.0 允许再分发，此处标注原始来源与许可证；解析与答案属原教程，未改写其技术结论。
+
+## 11 追加素材 `15-acp-v24-extension.json`（r107，2026-11-16）
+
+| 文件 | `source` | 种子 id 前缀 | 条数 | 来源性质 | 上游 / LICENSE |
+| --- | --- | --- | --- | --- | --- |
+| `15-acp-v24-extension.json` | `acp-ext` | `acpext-` | 18 | 自建：依据官方教程正文原创 + 逐条复核 | 事实依据同上仓库 V2.4 章节正文；题目文本为本项目原创 |
+
+- 基于 ACP 教程 **V2.4 新增/改写章节正文**（Agent Skills、Memory、Harness/Loop Engineering、
+  蒸馏、生产实践、安全合规等）创作，只取正文里明确陈述的知识点作为事实依据，题目与解析均为本项目原创。
+- **刻意剔除与 14 号官方小测验同知识点换问法的题**（如 Ragas Precision、句子窗口、MCP 集成、
+  部署选型等官方题已覆盖），只保留官方小测验未涉及的独立考点：无状态性、三种记忆策略辨析、
+  agent_control 主动记忆、Skills-as-Code / 按需加载、Harness 闭环写回规则、数据合成蒸馏流程与指标、
+  TTFT/TPOT、上下文缓存、query 改写、自定义业务规则评测、成本效益口径、黑名单局限、多模态选型等。
+- 全部 18 道为单选、`AI 工程`、`language=""`；子方向 Agent 9 / 通用 AI 4 / LLM 与 RAG 3 /
+  部署与推理 2。`--write` 实测读入 18 / 新增 18 / 越界 0 / 字面重复 0 / 近重复 0；
+  题库总量 1316 → 1334。
+- 初稿 34 道中 16 道因与官方题同考点被剔除；4 道正确项长度比 >3 的题经压缩正确项、
+  加长干扰项修正，最终全库 length>3x = 0、解析字母引用违规 = 0。
+- `question_merge --check` 与 `question_shuffle --check` 均逐字节 0 差异；
+  回滚按 `question_merge.SOURCES` 删除全部登记素材（含 `acpof-` / `acpext-`），存量 260 行不受影响。

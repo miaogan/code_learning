@@ -1,0 +1,524 @@
+[
+  {
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "RAG 应用检索结果中相关文档都存在，但用户提问过于口语化、省略了关键术语，导致召回不准。下列哪一招最能对症？",
+    "options": [
+      {
+        "key": "A",
+        "text": "调低temperature让模型输出更稳定"
+      },
+      {
+        "key": "B",
+        "text": "用大模型对 query 做改写/扩充后再检索"
+      },
+      {
+        "key": "C",
+        "text": "把所有文档全文塞入提示词"
+      },
+      {
+        "key": "D",
+        "text": "更换更大的向量数据库"
+      }
+    ],
+    "answer": "B",
+    "explanation": "口语化、缺术语的 query 与文档语义空间不对齐，用大模型做 query 改写或分解为多步查询能补齐意图空间与知识空间的匹配；其余选项不解决检索输入偏差。"
+  },
+  {
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "业务专家认为「好的报销流程答案必须包含报销单链接和二级主管审批信息」。用通用 Ragas 指标评测发现分数很高，但业务仍不满意。最合理的应对是什么？",
+    "options": [
+      {
+        "key": "A",
+        "text": "继续调高 Ragas 的通过阈值"
+      },
+      {
+        "key": "B",
+        "text": "在通用指标之外补充自定义业务规则校验（如必含字段检查）"
+      },
+      {
+        "key": "C",
+        "text": "改用更大的评测模型重新打分"
+      },
+      {
+        "key": "D",
+        "text": "放弃自动化评测，全部改人工评审"
+      }
+    ],
+    "answer": "B",
+    "explanation": "通用指标衡量忠实度、相关性等共性质量，无法编码「必须包含某链接/审批信息」这类业务硬约束；应在通用指标之外加自定义规则校验，而不是抬高阈值或全盘退回人工。"
+  },
+  {
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "在 ReAct 模式中，Agent 一轮典型的工作循环是什么？",
+    "options": [
+      {
+        "key": "A",
+        "text": "跳过所有中间步骤，直接一次性生成最终答案"
+      },
+      {
+        "key": "B",
+        "text": "思考→行动→观察，再据观察继续下一轮"
+      },
+      {
+        "key": "C",
+        "text": "把全部可用工具一次性并行调用完再统一总结"
+      },
+      {
+        "key": "D",
+        "text": "把所有工具一次性并行调用完再总结"
+      }
+    ],
+    "answer": "A",
+    "explanation": "ReAct 交替进行思考理由、执行动作、观察结果，并把观察带入下一轮推理，形成可纠错的闭环；这是工具调用 Agent 的基础循环形态。"
+  },
+  {
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "关于 Agent 的三种记忆管理策略，下列说法错误的是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "固定窗口截断实现简单，但可能丢失早期关键信息"
+      },
+      {
+        "key": "B",
+        "text": "滚动摘要在压缩长度的同时保留核心信息，但增加摘要生成的调用成本"
+      },
+      {
+        "key": "C",
+        "text": "向量化召回按需检索相关历史，但引入 Embedding 与向量库等技术栈"
+      },
+      {
+        "key": "D",
+        "text": "向量化召回会完全替代短期记忆，当前会话的即时上下文应由长期记忆库提供"
+      }
+    ],
+    "answer": "D",
+    "explanation": "向量化召回构建的是长期记忆、负责跨会话检索；短期记忆仍由对话缓冲区的截断/摘要维持当前会话连贯性，二者互补而非替代。"
+  },
+  {
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "把 Agent 从「被动接收处理好的上下文」升级为「自主决定何时记、何时取」，在 AgentScope 的 Mem0LongTermMemory 中应启用哪种模式？",
+    "options": [
+      {
+        "key": "A",
+        "text": "static_control，回复前后自动保存与检索"
+      },
+      {
+        "key": "B",
+        "text": "agent_control，赋予 record_to_memory / retrieve_from_memory 工具让 Agent 自行决定"
+      },
+      {
+        "key": "C",
+        "text": "InMemoryMemory，把全部历史放在内存列表"
+      },
+      {
+        "key": "D",
+        "text": "Formatter + max_tokens 限制上下文长度"
+      }
+    ],
+    "answer": "B",
+    "explanation": "agent_control 把记忆读写做成工具交给 Agent，实现主动记忆管理；static_control 是框架被动托管，InMemoryMemory 是短期记忆，Formatter 只是截断工具。"
+  },
+  {
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "大模型「无状态（Stateless）」特性对 Agent 设计意味着什么？",
+    "options": [
+      {
+        "key": "A",
+        "text": "每次 API 调用相互独立，模型不会天然记住历史对话与用户偏好"
+      },
+      {
+        "key": "B",
+        "text": "模型无法处理多轮对话，必须每次只发一条消息"
+      },
+      {
+        "key": "C",
+        "text": "模型参数会在每次调用后被重置"
+      },
+      {
+        "key": "D",
+        "text": "模型不能调用外部工具"
+      }
+    ],
+    "answer": "A",
+    "explanation": "无状态指每次调用彼此独立、不会保留上次调用的记忆，所以多轮历史需要应用层显式传入；这不限制多轮对话本身，也不影响工具调用。"
+  },
+  {
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "团队把教程审查标准写进一个 Markdown 文件 persistent 复用，并拆成主文件 + 多个子文件、按需加载。相比把标准写在聊天 Prompt 里，这种做法最核心的价值是什么？",
+    "options": [
+      {
+        "key": "A",
+        "text": "让提示词措辞更花哨，提升模型兴趣"
+      },
+      {
+        "key": "B",
+        "text": "把会话级知识变成可存储、可版本管理、可团队共享的独立资源"
+      },
+      {
+        "key": "C",
+        "text": "彻底消除模型幻觉"
+      },
+      {
+        "key": "D",
+        "text": "减少审查所需的 token 消耗到零"
+      }
+    ],
+    "answer": "B",
+    "explanation": "Prompt 是会话级的、易散落；写成文件并结构化后成为可持久化、可版本控制、可团队共享的 Skill 知识库，解决「找不到、要重贴、口径不一、不知改了什么」的问题。"
+  },
+  {
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "一个审查知识库拆成 README.md（流程概述 + 子文件索引）与若干细节子文件，Agent 先读入口再按需加载细节。这种「按需加载」设计主要针对什么问题？",
+    "options": [
+      {
+        "key": "A",
+        "text": "拆出的多个子文件内容之间互相冲突，难以合并"
+      },
+      {
+        "key": "B",
+        "text": "一次全塞会挤占上下文，中段信息易被忽略"
+      },
+      {
+        "key": "C",
+        "text": "子文件数量太多，导致磁盘存储空间不够用"
+      },
+      {
+        "key": "D",
+        "text": "子文件内容互相冲突"
+      }
+    ],
+    "answer": "B",
+    "explanation": "即使上下文窗口够大，模型对中段信息处理也明显下降；入口精简、细节按需加载既避免上下文拥挤，也让 Agent 对每段保持高质量注意力。"
+  },
+  {
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "「Skills-as-Code」把 Skill 纳入版本控制与 CI/CD，最直接的好处是什么？",
+    "options": [
+      {
+        "key": "A",
+        "text": "让 Skill 能自动改写模型权重"
+      },
+      {
+        "key": "B",
+        "text": "让 Skill 的变更可审阅、可回滚、可一致性地在团队与环境中复用"
+      },
+      {
+        "key": "C",
+        "text": "让 Skill 不再需要触发条件"
+      },
+      {
+        "key": "D",
+        "text": "让 Agent 跳过评测直接上线"
+      }
+    ],
+    "answer": "B",
+    "explanation": "把 Skill 当代码管理后，变更有 diff、有版本、可回滚，CI 能自动校验，团队成员与环境拿到同一份标准，避免「每个人一版口径」。"
+  },
+  {
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "advanced",
+    "stem": "为什么「感觉还行」的直觉判断不足以支撑 Agent 上线与迭代？",
+    "options": [
+      {
+        "key": "A",
+        "text": "因为用户不喜欢 Agent"
+      },
+      {
+        "key": "B",
+        "text": "因为无法度量就无法稳定复现、比较与改进，感觉不可靠也不可回归"
+      },
+      {
+        "key": "C",
+        "text": "因为模型不会生成代码"
+      },
+      {
+        "key": "D",
+        "text": "因为评测会额外消耗 GPU"
+      }
+    ],
+    "answer": "B",
+    "explanation": "直觉不可复现、不可比较，改动后无法判断是否退步；建立评测基线才能量化质量、做回归对比并驱动迭代。"
+  },
+  {
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "在数据合成蒸馏（黑盒蒸馏）流程中，正确的顺序是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "学生标注 → 教师训练 → 质量过滤"
+      },
+      {
+        "key": "B",
+        "text": "教师标注 → 质量过滤 → 学生训练"
+      },
+      {
+        "key": "C",
+        "text": "学生训练 → 教师标注 → 部署"
+      },
+      {
+        "key": "D",
+        "text": "质量过滤 → 教师标注 → 学生训练"
+      }
+    ],
+    "answer": "B",
+    "explanation": "数据合成蒸馏先用教师模型对样本打标，再过滤低质量标注，最后用干净数据训练学生模型；顺序颠倒会让噪声进入训练或直接无数据可训。"
+  },
+  {
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "课程用「请求理解」任务演示蒸馏，将员工提问路由到 direct_answer / rag_query / multi_intent_split / evaluate 四类。验证这类蒸馏效果最贴切的量化指标是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "仅统计训练数据文件的总体积大小"
+      },
+      {
+        "key": "B",
+        "text": "用 JSON 合规率、意图 F1、路由准确率衡量"
+      },
+      {
+        "key": "C",
+        "text": "只看基座模型的参数量是否足够大"
+      },
+      {
+        "key": "D",
+        "text": "GPU 显存占用"
+      }
+    ],
+    "answer": "B",
+    "explanation": "蒸馏是否成功要看学生在目标任务上的表现：输出格式是否合规、意图识别是否准、路由是否正确，这些任务指标直接对应业务目标；参数量/文件体积/显存都不是效果指标。"
+  },
+  {
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "部署与推理",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "对话系统要求快速反馈、离线批处理可接受数小时延迟。衡量这类服务化体验常用 TTFT 与 TPOT，它们分别指什么？",
+    "options": [
+      {
+        "key": "A",
+        "text": "TTFT 是总响应时长，TPOT 是总 token 数"
+      },
+      {
+        "key": "B",
+        "text": "TTFT 是首 token 延迟，TPOT 是每输出 token 的时间"
+      },
+      {
+        "key": "C",
+        "text": "TTFT 是训练时长，TPOT 是推理时长"
+      },
+      {
+        "key": "D",
+        "text": "TTFT 是请求排队时间，TPOT 是模型加载时间"
+      }
+    ],
+    "answer": "B",
+    "explanation": "TTFT（Time to First Token）衡量用户等待首个 token 的延迟，直接影响体感速度；TPOT（Time per Output Token）衡量后续每个 token 的生成节奏，二者共同刻画流式服务的 SLO。"
+  },
+  {
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "多模态任务中，课程为什么不推荐简单拼装「语音识别 + 文本生成 + 图像理解」多个单模态模型？",
+    "options": [
+      {
+        "key": "A",
+        "text": "因为单模态模型不能处理文本"
+      },
+      {
+        "key": "B",
+        "text": "因为拼装方案延迟高、一致性差、开发复杂，应使用专门的多模态模型"
+      },
+      {
+        "key": "C",
+        "text": "因为语音识别模型已经废弃"
+      },
+      {
+        "key": "D",
+        "text": "因为多模态模型无法做图像生成"
+      }
+    ],
+    "answer": "B",
+    "explanation": "多模型串联会叠加延迟、跨模块语义不一致、集成复杂度高；专用的多模态模型（如 Qwen-VL）在效率与一致性上更优。"
+  },
+  {
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "部署与推理",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "线上大模型应用的用户感知延迟偏高，但 GPU 利用率并不低。在优化手段中，哪项主要通过减少重复运算来降低延迟？",
+    "options": [
+      {
+        "key": "A",
+        "text": "上下文缓存，缓存多轮/同前缀请求的公共前缀"
+      },
+      {
+        "key": "B",
+        "text": "提高temperature"
+      },
+      {
+        "key": "C",
+        "text": "增加模型参数量"
+      },
+      {
+        "key": "D",
+        "text": "延长系统提示词"
+      }
+    ],
+    "answer": "A",
+    "explanation": "上下文缓存把多个请求共享的公共前缀缓存起来，推理时跳过重复计算，直接降低延迟与成本；提高温度、加参数、 lengthen 提示都不减少运算量。"
+  },
+  {
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "关键词黑名单式提示词过滤的主要局限是什么？",
+    "options": [
+      {
+        "key": "A",
+        "text": "黑名单中间件无法输出任何审计日志"
+      },
+      {
+        "key": "B",
+        "text": "黑名单只能拦截图片，对文本请求完全无效"
+      },
+      {
+        "key": "C",
+        "text": "只能过滤图片不能过滤文本"
+      },
+      {
+        "key": "D",
+        "text": "同义替换与编码混淆可无限绕过，且误杀正常表述"
+      }
+    ],
+    "answer": "B",
+    "explanation": "有限词表挡不住无限表达（换词、base64 混淆等），还容易误伤合法问题；因此需要语义级护栏与架构层面的指令/数据隔离配合。"
+  },
+  {
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "课程强调「不能只比一次调用的成本」，評価记忆/护栏等增强机制的性价比时，更公平的口径是什么？",
+    "options": [
+      {
+        "key": "A",
+        "text": "比较一次低质量输出与一次高质量输出的单次成本"
+      },
+      {
+        "key": "B",
+        "text": "比较获得一个「可用」答案的总成本（含失败重试与人工介入）"
+      },
+      {
+        "key": "C",
+        "text": "只比较模型 API 单价"
+      },
+      {
+        "key": "D",
+        "text": "只比较首字延迟"
+      }
+    ],
+    "answer": "B",
+    "explanation": "低质量输出即使单次便宜也是浪费，需多次重试或人工补救；以「拿到可用答案的总成本」为口径，才能正确评估记忆、评测、护栏等投入的价值。"
+  },
+  {
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "在 Harness Engineering / Loop Engineering 的闭环中，课程给出的核心链路是「标准 → Skill → 测试样本 → 截图验证 → 问题记录 → 写回规则 → 新主题验证」。其中「写回规则」这一步的主要目的是什么？",
+    "options": [
+      {
+        "key": "A",
+        "text": "把一次生成任务变成可检查、可复用、能持续改进的工作能力"
+      },
+      {
+        "key": "B",
+        "text": "删除之前的测试样本以节省空间"
+      },
+      {
+        "key": "C",
+        "text": "直接替代人工评审"
+      },
+      {
+        "key": "D",
+        "text": "让 Skill 只适用于当前主题"
+      }
+    ],
+    "answer": "A",
+    "explanation": "把发现的问题写回 Skill 或验证器，才能让同类任务下次不再犯同样错误，实现从「这一次能跑」到「换主题也稳定复用」的沉淀；这正是 Harness/Loop 工程的核心。"
+  }
+]

@@ -273,7 +273,9 @@ def test_generated_bank_has_no_ai_placeholder(bank_rows: list[dict[str, Any]]) -
 #: r48 追加 `ai-sys`（11 号素材，多 Agent 编排 / RAG 评审 / harness 工程 36 道）。
 #: r55 追加 `acp-eng`（12 号素材，ACP 应用工程原创练习题 60 道）。
 #: 系统架构场景批追加 `sys-arch`（13 号素材，研发工程实践 / 架构设计 60 道）。
-R12_SOURCES = ("tiji", "local100", "iq380", "fe-interview", "ai-eng", "mw", "sql", "algo", "devprac", "ai-adv", "ai-sys", "acp-eng", "sys-arch")
+#: r107 追加 `acp-official`（14 号素材，ACP 官方课后小测验 32 道）与 `acp-ext`
+#: （15 号素材，基于教程 V2.4 正文的原创扩展题 18 道）。
+R12_SOURCES = ("tiji", "local100", "iq380", "fe-interview", "ai-eng", "mw", "sql", "algo", "devprac", "ai-adv", "ai-sys", "acp-eng", "sys-arch", "acp-official", "acp-ext")
 #: 每来源条数：`seed` 是存量 260 行（种子不写 `source`，读侧缺省 `'seed'`）。
 R12_SOURCE_COUNTS = {
     "seed": 260,
@@ -290,9 +292,11 @@ R12_SOURCE_COUNTS = {
     "ai-sys": 36,
     "acp-eng": 60,
     "sys-arch": 60,
+    "acp-official": 32,
+    "acp-ext": 18,
 }
-#: 合并后总量（= 存量 260 + 已登记素材 1024；系统架构场景批新增 60）。
-R12_TOTAL = 1284
+#: 合并后总量（= 存量 260 + 已登记素材 1074；ACP 官方小测验 32 + 原创扩展 18）。
+R12_TOTAL = 1334
 
 
 def test_r12_source_enum_and_per_source_counts(bank_rows: list[dict[str, Any]]) -> None:
@@ -309,7 +313,7 @@ def test_r12_source_enum_and_per_source_counts(bank_rows: list[dict[str, Any]]) 
 
 
 def test_r12_total_after_merge_is_1284(bank_rows: list[dict[str, Any]]) -> None:
-    """合并后总量恰 1284（260 存量 + 1024 素材题），且素材题全是客观题。"""
+    """合并后总量恰 1334（260 存量 + 1074 素材题），且素材题全是客观题。"""
     assert len(bank_rows) == R12_TOTAL, f"题库总量 {len(bank_rows)} ≠ {R12_TOTAL}"
     merged = [row for row in bank_rows if str(row.get("source") or "") in R12_SOURCES]
     assert len(merged) == R12_TOTAL - R12_SOURCE_COUNTS["seed"]
@@ -335,6 +339,30 @@ def test_r55_acp_batch_preserves_scope_and_distribution(bank_rows: list[dict[str
     assert all(str(row["direction"]) == "AI 工程" for row in rows)
     assert all(str(row.get("language") or "") == "" for row in rows)
     assert all(str(row["id"]).startswith("acpeng-") for row in rows)
+
+
+def test_acp_official_batch_is_faithful_transcription(bank_rows: list[dict[str, Any]]) -> None:
+    """r107：ACP 官方课后小测验 32 道忠实转录，全入 AI 工程，客观题、解析完整。"""
+    rows = [row for row in bank_rows if str(row.get("source") or "") == "acp-official"]
+    assert len(rows) == 32
+    assert Counter(str(row["kind"]) for row in rows) == {"single": 29, "multiple": 3}
+    assert all(str(row["direction"]) == "AI 工程" for row in rows)
+    assert all(str(row.get("language") or "") == "" for row in rows)
+    assert all(str(row["id"]).startswith("acpof-") for row in rows)
+    # 官方题的解析是转录的核心资产，不能为空或过短
+    assert all(len(str(row["explanation"]).strip()) >= 30 for row in rows)
+    assert {str(row["sub_direction"]) for row in rows} <= set(rules.SUBDIRECTIONS["AI 工程"])
+
+
+def test_acp_ext_batch_scope_and_no_overlap(bank_rows: list[dict[str, Any]]) -> None:
+    """r107：18 道原创扩展题覆盖官方小测验未涉及的知识点，全入 AI 工程合法子方向。"""
+    rows = [row for row in bank_rows if str(row.get("source") or "") == "acp-ext"]
+    assert len(rows) == 18
+    assert all(str(row["kind"]) in rules.OBJECTIVE_KINDS for row in rows)
+    assert all(str(row["direction"]) == "AI 工程" for row in rows)
+    assert all(str(row.get("language") or "") == "" for row in rows)
+    assert all(str(row["id"]).startswith("acpext-") for row in rows)
+    assert {str(row["sub_direction"]) for row in rows} <= set(rules.SUBDIRECTIONS["AI 工程"])
 
 
 def test_system_architecture_batch_scope_and_distribution(bank_rows: list[dict[str, Any]]) -> None:
