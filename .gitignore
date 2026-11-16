@@ -104,3 +104,6 @@ deploy.env
 frontend/.tmp/
 # Local sandbox build cache (when esbuild/vitest TEMP is redirected to the workspace)
 .tmp/
+
+# 本地演示产物（截图 / 录屏 / 一次性脚本），不进仓库
+output/
