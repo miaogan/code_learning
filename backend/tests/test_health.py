@@ -11,7 +11,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.core.config import JSON_MODES, get_settings
-from app.main import app
+from app.main import APP_VERSION, app
 
 client = TestClient(app)
 
@@ -23,7 +23,8 @@ def test_health_returns_ok(client: TestClient) -> None:
     assert response.status_code == 200
     body = response.json()
     assert body["status"] == "ok"
-    assert body["version"] == "0.1.0"
+    # 版本号随发版走：与 app.main.APP_VERSION 同源对比，发版改号不再破测试。
+    assert body["version"] == APP_VERSION
     assert body["db"] == "postgresql"
     assert body["ai_configured"] is False
     assert body["ai_provider"] == "legacy"
