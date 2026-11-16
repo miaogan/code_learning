@@ -50,8 +50,13 @@ GOLD = ROOT / "docs" / "eval" / "question-retrieval-gold.json"
 REPORT = ROOT / "docs" / "eval" / "RAG-RETRIEVAL-REPORT.md"
 #: 真模型对比报告单独一份：不覆盖离线基线（两条轨道的口径与可复现性都不同）。
 LIVE_REPORT = ROOT / "docs" / "eval" / "RAG-LIVE-REPORT.md"
+#: r105 教程轨金标（kinds=tutorial）：390 条教程 chunk 此前没有召回门禁覆盖。
+TUTORIAL_GOLD = ROOT / "docs" / "eval" / "tutorial-retrieval-gold.json"
 
 CHECK_HYBRID_RECALL_MIN = 0.70
+#: 教程轨门禁：hash 基座实测 82.9%（keyword 腿对长问句恒为 0，hybrid 仅语义腿贡献），
+#: 留出回归余量后定 0.75；换真模型后该数字只会更高。
+TUTORIAL_HYBRID_RECALL_MIN = 0.75
 #: 融合对关键词腿的回退容忍度：hybrid 不得比 keyword 低超过 5 个百分点。
 REGRESSION_TOLERANCE = 0.05
 TOP_K = 5
@@ -74,12 +79,20 @@ def _first_hit_rank(expected, returned):
     return 0
 
 
-def _metrics(cases, mode_name):
-    """单模式的 recall@K / MRR@K / hit@1（按 chunk.ref_id = 题目 id 对账）。"""
+def _metrics(cases, mode_name, *, match_field="ref_id"):
+    """单模式的 recall@K / MRR@K / hit@1（默认按 chunk.ref_id = 题目 id 对账）。"""
     per_case = []
     for case in cases:
         expected = set(case["expected"])
-        returned = [str(item["ref_id"]) for item in case["results"][mode_name]]
+        if match_field == "section_id":
+            # 教程 chunk 的 section_id 只有 "why"/"example" 这类段名（跨章重名），
+            # 对账键必须是 `章节id/小节id`（子片 `#n` 后缀不算）。
+            returned = [
+                str(item["ref_id"]) + "/" + str(item["section_id"]).split("#")[0]
+                for item in case["results"][mode_name]
+            ]
+        else:
+            returned = [str(item["ref_id"]) for item in case["results"][mode_name]]
         rank = _first_hit_rank(expected, returned)
         per_case.append(
             {
@@ -104,16 +117,24 @@ def _metrics(cases, mode_name):
     }
 
 
-def evaluate(gold_path):
+def evaluate(gold_path, *, kinds=None, expected_field="expected_question_ids",
+             match_field="ref_id", prepare=True):
+    """跑一条金标轨：`kinds` 传 ["tutorial"] 即教程轨（预期按 section_id `#` 前段对账）。
+
+    `prepare=False` 用于 --check：同一评测库先备一次，题目轨与教程轨共用，
+    教程轨不再 rebuild（rebuild 会清掉题库 chunk）。
+    """
     gold = json.loads(gold_path.read_text(encoding="utf-8"))
-    status = prepare_eval_db()
+    status = prepare_eval_db() if prepare else _LAST_PREPARE["status"]
     cases = []
     try:
         for case in gold["cases"]:
-            expected = [str(x) for x in case["expected_question_ids"]]
+            expected = [str(x) for x in case[expected_field]]
             results = {}
             for mode_name in MODES:
-                payload = search_chunks(str(case["query"]).strip(), mode=mode_name, top_k=TOP_K)
+                payload = search_chunks(
+                    str(case["query"]).strip(), mode=mode_name, top_k=TOP_K, kinds=kinds
+                )
                 results[mode_name] = payload["items"]
             cases.append(
                 {"id": case["id"], "query": str(case["query"]).strip(), "expected": expected,
@@ -121,17 +142,26 @@ def evaluate(gold_path):
             )
     finally:
         close_pool()
-    metrics = {name: _metrics(cases, name) for name in MODES}
+    if match_field == "section_id":
+        metrics = {name: _metrics(cases, name, match_field=match_field) for name in MODES}
+    else:
+        metrics = {name: _metrics(cases, name) for name in MODES}
     return {
         "version": gold.get("version", "v1"),
         "created_at": gold.get("created_at", "-"),
+        "gold_name": gold_path.name,
         "n": len(cases),
-        "question_count": status["question_chunks"],
+        "question_count": status.get("question_chunks", 0),
+        "tutorial_count": status.get("tutorial_chunks", 0),
         "embedder": status["embedder"],
         "engine": status["engine"],
         "dsn": status["dsn"],
         "metrics": metrics,
     }
+
+
+#: --check 只备一次库，题目轨与教程轨共用（教程轨再 rebuild 会清掉题库 chunk）。
+_LAST_PREPARE: dict = {"status": None}
 
 
 def live_embed_config() -> tuple[str, str, str]:
@@ -285,6 +315,26 @@ def render_live(offline, live):
     return "\n".join(L)
 
 
+def gate_tutorial(t):
+    """教程轨门禁：与题目轨同构（hybrid 下限 + 不比 keyword 回退超容忍）。"""
+    failures = []
+    hybrid = t["metrics"]["hybrid"]
+    keyword = t["metrics"]["keyword"]
+    if hybrid["recall"] < TUTORIAL_HYBRID_RECALL_MIN:
+        failures.append(
+            "教程 hybrid recall@{} {} 低于门禁阈值 {}".format(
+                TOP_K, pct(hybrid["recall"]), pct(TUTORIAL_HYBRID_RECALL_MIN)
+            )
+        )
+    if hybrid["recall"] < keyword["recall"] - REGRESSION_TOLERANCE:
+        failures.append(
+            "教程 hybrid recall@{} {} 比 keyword {} 回退超过 {} 个百分点".format(
+                TOP_K, pct(hybrid["recall"]), pct(keyword["recall"]), pct(REGRESSION_TOLERANCE)
+            )
+        )
+    return failures
+
+
 def gate(m):
     failures = []
     hybrid = m["metrics"]["hybrid"]
@@ -305,13 +355,17 @@ def gate(m):
     return failures
 
 
-def build_stdout(m, check_mode, report_hint="docs/eval/RAG-RETRIEVAL-REPORT.md"):
+def build_stdout(m, check_mode, report_hint="docs/eval/RAG-RETRIEVAL-REPORT.md",
+                 track="题目轨（ref_id = 题目 id）"):
     bar = "-" * 64
-    lines = [bar, " RAG 三态检索评测摘要（chunk 级，ref_id = 题目 id）", bar,
-             " 评测库    : {}（题库 chunk {} 条）".format(m["dsn"], m["question_count"]),
+    gold_name = m.get("gold_name") or "docs/eval/question-retrieval-gold.json"
+    scale = "题库 chunk {} 条".format(m["question_count"])
+    if m.get("tutorial_count"):
+        scale += "，教程 chunk {} 条".format(m["tutorial_count"])
+    lines = [bar, " RAG 三态检索评测摘要（{}）".format(track), bar,
+             " 评测库    : {}（{}）".format(m["dsn"], scale),
              " embedder  : {}（engine={}）".format(m["embedder"], m["engine"]),
-             " 标注数据  : docs/eval/question-retrieval-gold.json ({}, {})".format(
-                 m["version"], m["created_at"]),
+             " 标注数据  : {} ({}, {})".format(gold_name, m["version"], m["created_at"]),
              " 样本量 n  : {}".format(m["n"]),
              ""]
     for name in MODES:
@@ -418,20 +472,39 @@ def main(argv=None):
             activate_live_embedder(base, model, dim)
             live = evaluate(gold_path)
         else:
-            m = evaluate(gold_path)
+            # r105：评测库备一次（题库 + 教程双语料），题目轨与教程轨共用。
+            status = prepare_eval_db()
+            _LAST_PREPARE["status"] = status
+            m = evaluate(gold_path, prepare=False)
+            tutorial = None
+            if TUTORIAL_GOLD.exists():
+                LOGGER.info("教程轨：kinds=tutorial，金标 %s", TUTORIAL_GOLD.name)
+                tutorial = evaluate(
+                    TUTORIAL_GOLD,
+                    kinds=["tutorial"],
+                    expected_field="expected_section_ids",
+                    match_field="section_id",
+                    prepare=False,
+                )
     except (OSError, ValueError, KeyError, RuntimeError, psycopg.Error) as exc:
         LOGGER.error("RAG 检索评测运行失败：%s", exc)
         return 2
 
     if args.check:
-        print(build_stdout(m, check_mode=True))
         failures = gate(m)
+        print(build_stdout(m, check_mode=True, track="题目轨（ref_id = 题目 id）"))
+        if tutorial is not None:
+            print(build_stdout(
+                tutorial, check_mode=True, report_hint="--check 不写报告",
+                track="教程轨（kinds=tutorial，section_id 前段对账）",
+            ))
+            failures += gate_tutorial(tutorial)
         if failures:
             LOGGER.error("RAG 检索门禁未通过（--check 只读，未写入任何文件）：")
             for line in failures:
                 LOGGER.error("  - %s", line)
             return 1
-        print("RAG 检索门禁通过（--check 只读，未写入任何文件）")
+        print("RAG 检索门禁通过（题目轨 + 教程轨；--check 只读，未写入任何文件）")
         return 0
 
     if args.live:
@@ -461,8 +534,22 @@ def main(argv=None):
 
     report_path = Path(args.report).resolve()
     report_path.parent.mkdir(parents=True, exist_ok=True)
-    report_path.write_text(render(m), encoding="utf-8")
-    print(build_stdout(m, check_mode=False))
+    lines = render(m)
+    if tutorial is not None:
+        lines = render_tutorial_section(lines, tutorial)
+    report_path.write_text("\n".join(lines), encoding="utf-8")
+    print(build_stdout(m, check_mode=False, track="题目轨（ref_id = 题目 id）"))
+    if tutorial is not None:
+        print(build_stdout(
+            tutorial, check_mode=False, report_hint="同上报告 · 教程轨小节",
+            track="教程轨（kinds=tutorial，section_id 前段对账）",
+        ))
+        failures = gate_tutorial(tutorial)
+        if failures:
+            LOGGER.error("教程轨门禁未通过：")
+            for line in failures:
+                LOGGER.error("  - %s", line)
+            return 1
     print("报告已生成：" + str(report_path))
     return 0
 

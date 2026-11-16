@@ -83,8 +83,12 @@ def prepare_eval_db() -> dict:
         init_db()
         question_bank.ensure_seeded()
         indexer.rebuild_question_index()
+        # r105：教程语料种子若存在则一并灌入 —— 评测库与生产同为「题库 + 教程」双语料，
+        # 题目金标（混合检索）与教程金标（kinds=tutorial）才有真实口径。
+        tutorial_summary = indexer.ensure_tutorials_indexed()
         status = indexer.index_status()
         status["dsn"] = redact(dsn)
+        status["tutorial_ingested"] = bool(tutorial_summary and not tutorial_summary.get("skipped"))
         return status
     finally:
         close_pool()

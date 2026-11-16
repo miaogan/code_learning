@@ -1,0 +1,254 @@
+{
+  "version": "v1",
+  "created_at": "2026-11-16",
+  "note": "教程轨金标：query 由小节标题改写成用户口吻（存在标注泄漏，同题目金标口径——只用于 CI 回归检测与「教程 chunk 进索引后」的回归防护，不是能力宣传）。期望命中按 chunk.section_id 的 `#` 前段对账（切分子片也算命中）。",
+  "count": 35,
+  "cases": [
+    {
+      "id": "tut-001",
+      "query": "为什么 JavaScript 需要事件循环，同步执行不够用吗",
+      "expected_section_ids": [
+        "fe-event-loop/why"
+      ]
+    },
+    {
+      "id": "tut-002",
+      "query": "setTimeout 和 Promise 的回调谁先执行",
+      "expected_section_ids": [
+        "fe-event-loop/order"
+      ]
+    },
+    {
+      "id": "tut-003",
+      "query": "重排和重绘的区别，哪个代价更大",
+      "expected_section_ids": [
+        "fe-render-performance/cost"
+      ]
+    },
+    {
+      "id": "tut-004",
+      "query": "useEffect 和 useState 分别负责什么",
+      "expected_section_ids": [
+        "fe-react-render/rules"
+      ]
+    },
+    {
+      "id": "tut-005",
+      "query": "React 受控输入怎么写表单提交",
+      "expected_section_ids": [
+        "fe-react-render/example"
+      ]
+    },
+    {
+      "id": "tut-006",
+      "query": "长列表滚动卡顿怎么定位和修",
+      "expected_section_ids": [
+        "fe-render-performance/example"
+      ]
+    },
+    {
+      "id": "tut-007",
+      "query": "TypeScript 联合类型怎么收窄",
+      "expected_section_ids": [
+        "fe-typescript/narrowing"
+      ]
+    },
+    {
+      "id": "tut-008",
+      "query": "请求的 loading success error 三态怎么建模",
+      "expected_section_ids": [
+        "fe-typescript/example"
+      ]
+    },
+    {
+      "id": "tut-009",
+      "query": "REST 接口的资源路径怎么设计",
+      "expected_section_ids": [
+        "be-http-rest/resources"
+      ]
+    },
+    {
+      "id": "tut-010",
+      "query": "PUT 和 PATCH 的幂等语义",
+      "expected_section_ids": [
+        "be-http-rest/methods"
+      ]
+    },
+    {
+      "id": "tut-011",
+      "query": "数据库索引为什么能加快查询",
+      "expected_section_ids": [
+        "be-db-index/why"
+      ]
+    },
+    {
+      "id": "tut-012",
+      "query": "联合索引的最左前缀原则是什么",
+      "expected_section_ids": [
+        "be-db-index/composite"
+      ]
+    },
+    {
+      "id": "tut-013",
+      "query": "并发扣库存怎么防止超卖",
+      "expected_section_ids": [
+        "be-concurrency-idempotency/example"
+      ]
+    },
+    {
+      "id": "tut-014",
+      "query": "接口重复提交怎么防，幂等怎么设计",
+      "expected_section_ids": [
+        "be-concurrency-idempotency/idempotency"
+      ]
+    },
+    {
+      "id": "tut-015",
+      "query": "Session 和 JWT 怎么选",
+      "expected_section_ids": [
+        "be-auth-session/compare"
+      ]
+    },
+    {
+      "id": "tut-016",
+      "query": "LEFT JOIN 和 INNER JOIN 会保留谁",
+      "expected_section_ids": [
+        "sql-join-null/joins"
+      ]
+    },
+    {
+      "id": "tut-017",
+      "query": "count(列) 为什么会忽略 NULL",
+      "expected_section_ids": [
+        "sql-join-null/null"
+      ]
+    },
+    {
+      "id": "tut-018",
+      "query": "窗口函数和 group by 聚合的区别",
+      "expected_section_ids": [
+        "sql-window-explain/window"
+      ]
+    },
+    {
+      "id": "tut-019",
+      "query": "每组取前三名的 SQL 怎么写",
+      "expected_section_ids": [
+        "sql-window-explain/topn"
+      ]
+    },
+    {
+      "id": "tut-020",
+      "query": "脏读、不可重复读、幻读分别是什么",
+      "expected_section_ids": [
+        "sql-lock-isolation/anomalies"
+      ]
+    },
+    {
+      "id": "tut-021",
+      "query": "PostgreSQL 和 MySQL 的默认隔离级别",
+      "expected_section_ids": [
+        "sql-lock-isolation/levels"
+      ]
+    },
+    {
+      "id": "tut-022",
+      "query": "什么时候该故意反范式设计",
+      "expected_section_ids": [
+        "sql-schema-design/rules"
+      ]
+    },
+    {
+      "id": "tut-023",
+      "query": "缓存穿透、击穿、雪崩分别怎么处理",
+      "expected_section_ids": [
+        "mw-cache-strategy/expire"
+      ]
+    },
+    {
+      "id": "tut-024",
+      "query": "Cache-Aside 应该先更新数据库还是先删缓存",
+      "expected_section_ids": [
+        "mw-cache-strategy/example"
+      ]
+    },
+    {
+      "id": "tut-025",
+      "query": "消息队列怎么保证消息不丢",
+      "expected_section_ids": [
+        "mw-message-queue/delivery"
+      ]
+    },
+    {
+      "id": "tut-026",
+      "query": "Docker 多阶段构建是什么",
+      "expected_section_ids": [
+        "mw-docker/example"
+      ]
+    },
+    {
+      "id": "tut-027",
+      "query": "动态规划要回答的三个问题",
+      "expected_section_ids": [
+        "algo-dp-graph/dp"
+      ]
+    },
+    {
+      "id": "tut-028",
+      "query": "进程和线程的区别是什么",
+      "expected_section_ids": [
+        "cs-process-thread/memory"
+      ]
+    },
+    {
+      "id": "tut-029",
+      "query": "三次握手为什么不能是两次",
+      "expected_section_ids": [
+        "cs-tcp-http/handshake"
+      ]
+    },
+    {
+      "id": "tut-030",
+      "query": "RAG 检索完为什么还要重排",
+      "expected_section_ids": [
+        "ai-rag/retrieval"
+      ]
+    },
+    {
+      "id": "tut-031",
+      "query": "LangGraph 和 LangChain 有什么区别",
+      "expected_section_ids": [
+        "ai-langchain-langgraph/graph",
+        "ai-langchain-langgraph/why"
+      ]
+    },
+    {
+      "id": "tut-032",
+      "query": "LoRA 微调只训哪些参数",
+      "expected_section_ids": [
+        "ai-finetune-distill/peft"
+      ]
+    },
+    {
+      "id": "tut-033",
+      "query": "推理服务的 KV 缓存是什么",
+      "expected_section_ids": [
+        "ai-inference-serving/kv-cache"
+      ]
+    },
+    {
+      "id": "tut-034",
+      "query": "epoll 相比 select 好在哪",
+      "expected_section_ids": [
+        "cs-io-model/multiplex"
+      ]
+    },
+    {
+      "id": "tut-035",
+      "query": "二叉树的层序遍历怎么实现",
+      "expected_section_ids": [
+        "algo-binary-tree/example"
+      ]
+    }
+  ]
+}

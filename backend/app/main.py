@@ -11,6 +11,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from urllib.parse import urlparse
 
+import httpx
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -66,7 +67,7 @@ from app.services.ai.ai import close_ai_pool
 from app.services.assessment import question_bank
 from app.services.retrieval import indexer as rag_indexer
 
-APP_VERSION = "0.1.0"
+APP_VERSION = "0.2.0"
 
 logger = logging.getLogger("app.http")
 
@@ -131,6 +132,31 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     await close_ai_pool()
     close_pool()
     redis_cache.reset_client()
+
+
+#: embedder 探活缓存：/health 被 docker healthcheck 高频调用，探活必须带 TTL。
+_EMBEDDER_PROBE: dict[str, object] = {"state": "na", "checked_at": 0.0}
+
+
+def _embedder_probe_state() -> str:
+    """本地 embedder 探活（up / down / na）：60s 缓存 + 1.5s 超时，失败只降级。"""
+    settings = get_settings()
+    if not settings.ai_embed_model:
+        return "na"
+    now = time.monotonic()
+    if now - float(_EMBEDDER_PROBE["checked_at"]) < 60.0:
+        return str(_EMBEDDER_PROBE["state"])
+    state = "down"
+    base = (settings.ai_embed_base_url or "").rstrip("/")
+    if base:
+        try:
+            resp = httpx.get(base + "/health", timeout=1.5)
+            state = "up" if resp.status_code == 200 else "down"
+        except Exception:  # noqa: BLE001 - 探活永不抛错：/health 必须始终可用
+            state = "down"
+    _EMBEDDER_PROBE["state"] = state
+    _EMBEDDER_PROBE["checked_at"] = now
+    return state
 
 
 async def _ensure_tutorial_index() -> None:
@@ -386,6 +412,8 @@ def create_app() -> FastAPI:
             ai_configured=runtime.ready,
             # r98：数据层换成 PG，探活如实报后端类型（运维靠这一行判断「连的是哪个库」）。
             db="postgresql",
+            # r105：本地 embedder 探活（哈希档恒为 na；远程档 60s 缓存探活一次）。
+            rag_embedder=_embedder_probe_state(),
             ai_provider=runtime.provider,
             ai_model=runtime.model,
             ai_json_mode=runtime.json_mode,

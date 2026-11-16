@@ -88,6 +88,9 @@ class HealthResponse(BaseModel):
     version: str
     ai_configured: bool
     db: str
+    #: r105：本地 embedding 探活（up / down / na）。`na` = 未启用本地 embedder（哈希档）；
+    #: 探活带 60s 缓存与 1.5s 超时，绝不拖慢 /health；失败只降级不熔断。
+    rag_embedder: str = "na"
     ai_provider: str
     ai_model: str
     ai_json_mode: str

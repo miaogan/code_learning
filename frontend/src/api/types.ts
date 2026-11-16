@@ -14,6 +14,8 @@ export interface Health {
   ai_provider?: string
   ai_model?: string
   ai_json_mode?: string
+  // r105：本地 embedder 探活（up / down / na）；旧后端没有该字段。
+  rag_embedder?: string
 }
 
 export interface ResumeMeta {
