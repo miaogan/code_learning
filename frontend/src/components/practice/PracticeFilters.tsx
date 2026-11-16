@@ -173,7 +173,7 @@ export function PracticeFilters({
                 <button
                   key={label}
                   type="button"
-                  className="sc-chip sc-iq-chip sc-qa-chip"
+                  className="sc-chip sc-iq-chip sc-qa-chip is-clickable"
                   onClick={() => {
                     if (option) onChange(option.patch)
                   }}
