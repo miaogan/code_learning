@@ -32,7 +32,9 @@ GOLD = ROOT / "docs" / "eval" / "question-retrieval-gold.json"
 REPORT = ROOT / "docs" / "eval" / "RAG-JUDGE-REPORT.md"
 
 #: 评审样本量：金标前 N 组（live 模式每例两次模型调用，控制配额）。
-JUDGE_CASES = 8
+# r106：真 Key 已就位（每次调用 ~1s），全量金标 20 案例成本可忽略；
+# 需要省配额时可用 `JUDGE_CASES=N` 环境变量覆盖。
+JUDGE_CASES = int(os.environ.get("JUDGE_CASES", "20"))
 TOP_K = 3
 #: `--check` 门禁：至少 70% 的 case 能召回非空材料（检索臂的最低可用线）。
 CHECK_RETRIEVAL_COVER_MIN = 0.70

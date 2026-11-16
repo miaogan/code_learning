@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../api/client'
-import type { QuestionSearchItem, RagSearchMode } from '../api/types'
+import type { QuestionSearchItem, RagChunkKind, RagSearchMode } from '../api/types'
 import { LevelChip } from '../components/learn/LevelChip'
 import { Chip } from '../components/ui/Chip'
 import { MultiChipRow, type ChipOption } from '../components/ui/ChipRow'
@@ -136,13 +136,23 @@ export default function SearchPage() {
     { value: 'hybrid', label: '混合' },
     { value: 'semantic', label: '语义' },
   ]
+  // r106：语料范围（后端 kinds 闭集：question / tutorial）。
+  const RAG_KINDS: { value: RagKindFilter; label: string }[] = [
+    { value: 'all', label: '全部' },
+    { value: 'question', label: '题目' },
+    { value: 'tutorial', label: '教程' },
+  ]
 
   // r100 RAG 检索：向量 / 关键词两腿 RRF 融合（或纯向量），走 /api/rag/search。
+  type RagKindFilter = 'all' | RagChunkKind
   const [ragMode, setRagMode] = useState<RagSearchMode>('hybrid')
+  // r106：语料范围筛选——后端 kinds 过滤已下沉到向量检索内部，「只搜教程」是真 top-K。
+  const [ragKind, setRagKind] = useState<RagKindFilter>('all')
+  const ragKinds = ragKind === 'all' ? [] : [ragKind]
   const rag = useAsync(async () => {
     if (!isSearchable(settled)) return null
-    return api.ragSearch({ query: settled, mode: ragMode, limit: 5, kinds: [] })
-  }, [settled, ragMode])
+    return api.ragSearch({ query: settled, mode: ragMode, limit: 5, kinds: ragKinds })
+  }, [settled, ragMode, ragKind])
   const ragCurrent = searchable && settled === query && rag.status === 'success' ? rag.data : null
   const ragFailed = searchable && settled === query && rag.status === 'error'
 
@@ -349,6 +359,18 @@ export default function SearchPage() {
                     type="button"
                     className={ragMode === option.value ? 'is-active' : ''}
                     onClick={() => setRagMode(option.value)}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+                <span className="sc-lab-filter-sep" aria-hidden="true" />
+                {RAG_KINDS.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className={ragKind === option.value ? 'is-active' : ''}
+                    onClick={() => setRagKind(option.value)}
+                    title={option.value === 'tutorial' ? '只搜教程语料（后端在向量检索内部过滤）' : undefined}
                   >
                     {option.label}
                   </button>

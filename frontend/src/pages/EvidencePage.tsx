@@ -33,6 +33,8 @@ const ENGINE_LABELS: Record<string, string> = {
  */
 export default function EvidencePage() {
   const evidence = useAsync((signal) => api.evidenceSummary(signal), [])
+  // r106：召回反馈看板（r103 只做了端点，这里把「被踩最多的材料」露出给运维）。
+  const feedback = useAsync((signal) => api.ragFeedbackSummary(signal), [])
   const [rebuilding, setRebuilding] = useState<'rebuild' | 'ingest' | null>(null)
   const [actionMessage, setActionMessage] = useState('')
   const [actionError, setActionError] = useState('')
@@ -162,9 +164,59 @@ export default function EvidencePage() {
           {rag?.notice ? <p>{rag.notice}</p> : null}
           <p>
             管线：题库与教程小节分块 → embedding（默认离线确定性哈希，可配真实语义模型）→
-            pgvector 余弦索引 → 向量与关键词两腿 RRF(k=60) 融合检索 → 带引用白名单的生成。
-            教程正文只在前端，因此「推送教程正文」把整份语料（全量替换语义）送进向量索引。
+            pgvector HNSW 余弦索引 → 向量与关键词两腿 RRF(k=60) 融合检索 → 带引用白名单的生成。
+            教程语料由种子（app/seed/tutorials_rag.json，前端导出）在启动时自动摄取；
+            「推送教程正文」可在教程改版后整份重推（全量替换语义）。
           </p>
+
+          <h2>召回反馈</h2>
+          {feedback.status === 'loading' && feedback.data === null ? (
+            <p>读取反馈汇总…</p>
+          ) : null}
+          {feedback.status === 'error' && feedback.error ? (
+            <InlineError message={feedback.error.message} onRetry={feedback.reload} />
+          ) : null}
+          {feedback.data ? (
+            <>
+              <p className="sc-btn-row">
+                <span>
+                  赞 {feedback.data.up} · 踩 {feedback.data.down}（净 {feedback.data.net}）
+                </span>
+                <span>涉及查询 {feedback.data.queries} 条</span>
+              </p>
+              {feedback.data.top_downvoted.length ? (
+                <table>
+                  <thead>
+                    <tr>
+                      <th>chunk</th>
+                      <th>正文前缀</th>
+                      <th>赞</th>
+                      <th>踩</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {feedback.data.top_downvoted.map((item) => (
+                      <tr key={item.chunk_id}>
+                        <td>{item.chunk_id}</td>
+                        <td>{item.snippet.slice(0, 60)}</td>
+                        <td>{item.ups}</td>
+                        <td>{item.downs}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <p>
+                  暂无点踩记录。在检索页对结果点「没用」后，这里会列出被踩最多的材料，
+                  用于发现误导性内容并挖评测难例。
+                </p>
+              )}
+              <p>
+                反馈是**个人排序信号**：投票立即影响本人同查询的检索排序；此看板是全局聚合，
+                只做运营与评测挖掘入口，不直接改全局排序。
+              </p>
+            </>
+          ) : null}
 
           <h2>营造档案</h2>
           {ENGINEERING_ARCHIVE.map((card) => (
