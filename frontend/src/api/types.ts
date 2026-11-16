@@ -1363,3 +1363,66 @@ export interface RagFeedbackSummary {
   queries: number
   top_downvoted: RagFeedbackTopItem[]
 }
+
+// --- r108 跃迁档案看板（服务端聚合，零 AI / 零重算）--------------------------------
+
+/** 目标岗位差距块：直接复用最近报告的 role_fit，前端零减法、不重排。 */
+export interface LeapRoleGap {
+  role_fit: RoleFit | null
+  notice: string | null
+}
+
+/** 画像里的一条项目工程证据：只取真实存在的 bullets 与溯源条数。 */
+export interface LeapEngineeringItem {
+  name: string
+  role: string | null
+  period: string | null
+  bullets: string[]
+  evidence_count: number
+  status: string
+}
+
+/** 项目工程证据块：项目逐条 + 落库规模事实 + RAG / 技术雷达状态。 */
+export interface LeapEngineering {
+  projects: LeapEngineeringItem[]
+  data_scale: Record<string, number>
+  tables: number
+  rag: RagStatus | null
+  radar_techs_seen: number
+  radar_finished_at: string
+  notice: string | null
+}
+
+/** 四要素文本自检：纯启发式提示，不构成评分或能力结论。 */
+export interface LeapExpressionStructure {
+  has_problem: boolean
+  has_solution: boolean
+  has_metric: boolean
+  has_pitfall: boolean
+  hit_count: number
+  hint: string
+}
+
+/** 一条已作答的面试表达：分数 / 点评沿用当场写入的值。 */
+export interface LeapExpressionItem {
+  run_id: string
+  question_id: string
+  prompt: string
+  answer: string
+  score: number | null
+  comment: string | null
+  structure: LeapExpressionStructure
+}
+
+export interface LeapExpression {
+  items: LeapExpressionItem[]
+  notice: string | null
+}
+
+/** 跃迁档案：三块同源一次返回，generated_at 是服务端聚合时刻。 */
+export interface LeapArchive {
+  role_gap: LeapRoleGap
+  engineering: LeapEngineering
+  expression: LeapExpression
+  generated_at: string
+}

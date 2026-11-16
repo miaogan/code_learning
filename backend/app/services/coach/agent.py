@@ -8,7 +8,7 @@
 四道边界（与 r83 同一纪律）：
 1. 出网只经 `AIClient`（结构化补全），图里没有 langchain 模型抽象；
 2. 取料只经 `TOOLS` 白名单，模型不能越过工具看别的东西；
-3. 引用只由工具结果产生（ref 令牌 t1/q1/w1 白名单），越界引用丢弃并计数；
+3. 引用只由工具结果产生（ref 令牌 t1/q1/w1/p1/l1 白名单），越界引用丢弃并计数；
 4. 工具全部只读、有界（条数与字符数都封顶），一次编排最多 2 轮执行、3 条计划。
 """
 
@@ -59,6 +59,10 @@ TOOL_CATALOG: dict[str, str] = {
         "算法与数据结构/计算机基础/AI 工程/研发工程实践）。"
     ),
     "read_plan": "读取最近一份报告的 7 天学习计划打卡进度（做到第几天、完成了哪些）。参数：无。",
+    "read_leap_archive": (
+        "读取跃迁档案汇总：目标岗位差距、画像里逐条溯源的项目证据与已作答的面试表达。"
+        "用于回答「我现在离目标岗位差什么 / 有哪些项目可讲 / 表达缺什么」这类问题。参数：无。"
+    ),
 }
 
 #: 无报告 / 无画像时也要能跑：工具逐个给中文说明，不整体拒绝。
@@ -219,12 +223,60 @@ def _read_plan(_args: dict[str, str]) -> ToolOutcome:
     }
 
 
+def _read_leap_archive(_args: dict[str, str]) -> ToolOutcome:
+    """跃迁档案：复用服务端聚合（零 AI、零重算），只产出有事实支撑的条目。
+
+    `href` 统一指向 `/leap`（太傅 / 教练的页面白名单里已登记）；没有报告 / 没有项目
+    时给中文空结果，绝不编造岗位差距或项目证据。
+    """
+    from app.services.leap import build_leap_archive
+
+    snapshot = build_leap_archive()
+    items: list[dict[str, str]] = []
+    fit = snapshot.role_gap.role_fit
+    if fit is not None:
+        for index, name in enumerate(fit.first_fix[:MAX_ITEMS], start=1):
+            items.append(
+                {
+                    "ref": f"l{index}",
+                    "title": _clip(f"先补：{name}", 40),
+                    "snippet": _clip(f"{fit.target_role or '目标岗位'} · {fit.notice or '差距见跃迁档案'}", 160),
+                    "href": "/leap",
+                    "kind": "leap_role",
+                }
+            )
+    for index, project in enumerate(snapshot.engineering.projects[:MAX_ITEMS], start=1):
+        items.append(
+            {
+                "ref": f"l{MAX_ITEMS + index}",
+                "title": _clip(project.name, 40),
+                "snippet": _clip(
+                    f"{project.role or '项目'} · 原文溯源 {project.evidence_count} 条"
+                    + ("｜" + "；".join(project.bullets[:2]) if project.bullets else ""),
+                    160,
+                ),
+                "href": "/leap",
+                "kind": "leap_project",
+            }
+        )
+    if not items:
+        return _empty("跃迁档案", snapshot.role_gap.notice or "跃迁档案还没有可引用的证据")
+    return {
+        "ok": True,
+        "label": "跃迁档案",
+        "summary": f"岗位差距 {len(fit.first_fix) if fit else 0} 项、项目 {len(snapshot.engineering.projects)} 条",
+        "items": items,
+        "lines": [item["title"] + "：" + item["snippet"] for item in items],
+    }
+
+
 #: 工具名 → 执行函数（闭集；规划器给出的闭集外工具一律不执行）。
 TOOLS: dict[str, Any] = {
     "read_shortfalls": _read_shortfalls,
     "search_tutorials": _search_tutorials,
     "search_questions": _search_questions,
     "read_plan": _read_plan,
+    "read_leap_archive": _read_leap_archive,
 }
 
 _PLANNER_SYSTEM = (
@@ -245,7 +297,7 @@ _REFLECT_SYSTEM = (
 _BRIEF_SYSTEM = (
     "你是学习教练。基于【工具结果】回答用户问题，并给出可执行建议。"
     "硬性规则：只使用工具结果里的信息，没有的不要编造；引用必须用结果里的 ref 令牌"
-    "（如 t1、q2、w1），每一条引用都要真实对应结果中的条目；回答末尾的 actions 给 1-3 条"
+    "（如 t1、q2、w1、l1），每一条引用都要真实对应结果中的条目；回答末尾的 actions 给 1-3 条"
     "具体行动（做到什么、用什么材料）。只输出一个 JSON 对象："
     "{\"answer\": \"中文回答\", \"citations\": [\"t1\"], \"actions\": [\"...\"]}。"
 )

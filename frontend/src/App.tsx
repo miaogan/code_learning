@@ -15,6 +15,7 @@ import GuozijianPage from './pages/GuozijianPage'
 import HistoryPage from './pages/HistoryPage'
 import InterviewPage from './pages/InterviewPage'
 import LearnPage from './pages/LearnPage'
+import LeapPage from './pages/LeapPage'
 import LoginPage from './pages/LoginPage'
 import NotFoundPage from './pages/NotFoundPage'
 import PioneerPage from './pages/PioneerPage'
@@ -52,6 +53,7 @@ const TOOL_ITEMS = [
   { key: 'polish', label: '修文', to: '/polish' },
   { key: 'versions', label: '校勘', to: '/versions' },
   { key: 'archive', label: '卷宗', to: '/archive' },
+  { key: 'leap', label: '跃迁', to: '/leap' },
   { key: 'pioneer', label: '先锋', to: '/pioneer' },
   { key: 'guozijian', label: '国子监', to: '/guozijian' },
 ]
@@ -190,6 +192,7 @@ export default function App() {
                 <Route path="/polish" element={<PolishPage />} />
                 <Route path="/versions" element={<VersionsPage />} />
                 <Route path="/archive" element={<ArchivePage />} />
+                <Route path="/leap" element={<LeapPage />} />
                 <Route path="/practice" element={<PracticePage />} />
                 <Route path="/pioneer" element={<PioneerPage />} />
                 <Route path="/guozijian" element={<GuozijianPage />} />

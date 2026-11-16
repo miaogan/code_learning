@@ -51,6 +51,7 @@ from app.routers import (
     history,
     interview,
     jobs,
+    leap,
     learn,
     practice,
     profile,
@@ -570,6 +571,8 @@ def create_app() -> FastAPI:
     app.include_router(search.router)
     # r61：学习进度与 7 天计划打卡上云（整份状态读写，按账号隔离）。
     app.include_router(learn.router)
+    # r108：跃迁档案看板（岗位差距 / 工程证据 / 面试表达，只读聚合零 AI）。
+    app.include_router(leap.router)
     # r65：AI 学习教练（检索增强 + 引用白名单校验，材料由前端组装后随请求上传）。
     app.include_router(coach.router)
     # r67：技术雷达（先锋清单 / 采集 / 国子监生成任务，任务按账号隔离）。

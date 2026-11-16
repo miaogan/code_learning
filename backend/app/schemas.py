@@ -1643,3 +1643,79 @@ class RagFeedbackSummary(BaseModel):
     net: int = 0
     queries: int = 0
     top_downvoted: list[RagFeedbackTopItem] = Field(default_factory=list)
+
+
+# --- r108 跃迁档案看板（服务端聚合，零 AI / 零新表 / 零重算）------------------------
+
+
+class LeapRoleGap(BaseModel):
+    """目标岗位差距块：直接复用最新报告的 `role_fit`，服务端不重算数值。"""
+
+    role_fit: RoleFit | None = Field(
+        default=None, description="最近一份报告的岗位差距；未生成报告时为 None"
+    )
+    notice: str | None = Field(
+        default=None, description="无报告 / 无目标岗位时的中文指引（服务端单点产出）"
+    )
+
+
+class LeapEngineeringItem(BaseModel):
+    """画像里的一条项目工程证据：只取真实存在的 bullets 与溯源条数。"""
+
+    name: str
+    role: str | None = None
+    period: str | None = None
+    bullets: list[str] = Field(default_factory=list)
+    evidence_count: int = Field(default=0, description="source_quotes 条数（historical 项也如实展示）")
+    status: str = "active"
+
+
+class LeapEngineering(BaseModel):
+    """项目工程证据块：项目逐条 + 落库规模事实 + RAG / 技术雷达状态。"""
+
+    projects: list[LeapEngineeringItem] = Field(default_factory=list)
+    data_scale: dict[str, int] = Field(default_factory=dict)
+    tables: int = 0
+    rag: RagStatus | None = None
+    radar_techs_seen: int = 0
+    radar_finished_at: str = ""
+    notice: str | None = None
+
+
+class LeapExpressionStructure(BaseModel):
+    """面试表达的四要素文本自检（纯启发式，不构成评分或能力结论）。"""
+
+    has_problem: bool = False
+    has_solution: bool = False
+    has_metric: bool = False
+    has_pitfall: bool = False
+    hit_count: int = 0
+    hint: str = Field(default="", description="中文指引，明确「自检非评分」且不虚构")
+
+
+class LeapExpressionItem(BaseModel):
+    """一条已作答的面试表达：分数 / 点评直接取当场写入的值，读取侧零二次统计。"""
+
+    run_id: str
+    question_id: str
+    prompt: str
+    answer: str
+    score: float | None = None
+    comment: str | None = None
+    structure: LeapExpressionStructure = Field(default_factory=LeapExpressionStructure)
+
+
+class LeapExpression(BaseModel):
+    """面试表达块：最近若干场面试里已作答的发言，最多 MAX_EXPRESSION_ITEMS 条。"""
+
+    items: list[LeapExpressionItem] = Field(default_factory=list)
+    notice: str | None = None
+
+
+class LeapArchive(BaseModel):
+    """跃迁档案：目标岗位差距 + 项目工程证据 + 面试表达，三块同源一次返回。"""
+
+    role_gap: LeapRoleGap = Field(default_factory=LeapRoleGap)
+    engineering: LeapEngineering = Field(default_factory=LeapEngineering)
+    expression: LeapExpression = Field(default_factory=LeapExpression)
+    generated_at: str = ""

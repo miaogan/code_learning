@@ -258,3 +258,65 @@ def test_agent_catalog_bounded(agent_db, patch_ai, client):
     tool_steps = [step for step in payload["steps"] if step["kind"] == "tool"]
     assert len(tool_steps) <= coach_agent.MAX_ACT_ROUNDS * coach_agent.MAX_STEPS_PER_ROUND
     assert all(len(step["items"]) <= coach_agent.MAX_ITEMS for step in tool_steps)
+
+
+def test_read_leap_archive_tool_empty_state(tmp_db):
+    """无报告 / 无画像时：跃迁档案工具给中文空结果，不编造岗位差距。"""
+    from app.services.coach.agent import _read_leap_archive
+
+    outcome = _read_leap_archive({})
+    assert outcome["ok"] is False
+    assert outcome["items"] == []
+    assert outcome["summary"]
+
+
+def test_read_leap_archive_tool_maps_report_and_projects(tmp_db):
+    """有报告 + 画像时：先补项与项目都带 /leap 引用，且 ref 落在白名单形状内。"""
+    from app.schemas import Profile, ProfileProject, RoleFit, RoleFitItem, RoleModelRef
+    from app.services.coach.agent import _read_leap_archive
+
+    report = _report()
+    report.role_fit = RoleFit(
+        target_role="后端工程师",
+        role_source="profile",
+        role_source_label="简历画像",
+        model=RoleModelRef(level="中级", label="后端工程师 · 中级", direction="后端"),
+        items=[RoleFitItem(name="Redis", required=3, user_level=1, gap=2, must=True)],
+        missing_must=["Redis"],
+        first_fix=["Redis"],
+        conclusion="先补 Redis",
+    )
+    repository.insert_report(report)
+    repository.insert_profile(
+        Profile(
+            id="prof-leap-tool",
+            resume_id="res-1",
+            updated_at="2026-11-16T00:00:00+00:00",
+            skills=[],
+            tech_stack=["Python"],
+            years_experience=3.0,
+            projects=[
+                ProfileProject(
+                    name="订单系统",
+                    role="后端",
+                    period="2025",
+                    bullets=["拆分库存服务"],
+                    source_quote="负责订单系统",
+                )
+            ],
+            target_role="后端工程师",
+        )
+    )
+    outcome = _read_leap_archive({})
+    assert outcome["ok"] is True
+    assert all(item["href"] == "/leap" for item in outcome["items"])
+    assert {item["kind"] for item in outcome["items"]} == {"leap_role", "leap_project"}
+    assert any("Redis" in item["title"] for item in outcome["items"])
+    assert any("订单系统" in item["title"] for item in outcome["items"])
+    assert len({item["ref"] for item in outcome["items"]}) == len(outcome["items"])
+
+
+def test_leap_is_registered_in_tool_catalog():
+    """新工具必须在闭集里，规划器才可能选到它。"""
+    assert "read_leap_archive" in coach_agent.TOOL_CATALOG
+    assert "read_leap_archive" in coach_agent.TOOLS

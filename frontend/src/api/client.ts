@@ -20,6 +20,7 @@ import type {
   InterviewSessionSummary,
   InterviewTurn,
   LearnProgress,
+  LeapArchive,
   LoginRequest,
   Me,
   PasswordChangeRequest,
@@ -236,6 +237,10 @@ export const api = {
   /** 工程证据中心摘要：行数事实 + 表数 + RAG 索引状态（零 AI、零评分）。 */
   evidenceSummary: (signal?: AbortSignal): Promise<EvidenceSummary> =>
     request<EvidenceSummary>('/api/evidence/summary', { signal }),
+
+  /** r108 跃迁档案：岗位差距 + 工程证据 + 面试表达，服务端一次聚合（零 AI、零重算）。 */
+  leapArchive: (signal?: AbortSignal): Promise<LeapArchive> =>
+    request<LeapArchive>('/api/leap-archive', { signal }),
 
   /* ---------- r100 B4 教练 Agent 编排（讲席）：规划 → 工具 → 反思 → 结论 ---------- */
 
