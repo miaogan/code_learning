@@ -1233,6 +1233,14 @@ def connection(*, force_pg: bool = False) -> Iterator[Connection]:
                     # PG 是已提交的事实源；副本失效应触发重建，不能把成功写入翻成失败。
                     _STATE["replica_ready"] = False
                     logger.warning("db.replica_stale error=%s", type(exc).__name__)
+            elif operations:
+                # 本进程还没确认副本可用（新进程初值即 False）：写 PG 成功但没有镜像。
+                # 正在服务的进程对此不可见，`/health` 仍会报 ready——所以外部写入方
+                # （admin CLI / 一次性脚本）必须自己调 `refresh_replica()` 补齐。
+                logger.info(
+                    "db.replica.mirror_skipped count=%s hint=call db.refresh_replica()",
+                    len(operations),
+                )
         finally:
             _pending_sqlite.reset(token)
     finally:
@@ -1548,6 +1556,19 @@ def sync_sqlite_from_pg() -> dict[str, int]:
         _STATE["sync_pending"] = 0
         _STATE["replica_ready"] = True
         _STATE["last_sync_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    return counts
+
+
+def refresh_replica() -> dict[str, int]:
+    """外部写入方（`admin_cli` / 一次性运维脚本）直接写过主库后，立刻重建副本。
+
+    `replica_ready` 是**进程本地**状态：另一个进程写 PG 时它自己的镜像分支默认不成立，
+    会静默跳过镜像；而正在服务的进程完全不知道发生过这次写入，`/health` 仍报
+    `db_replica=ready`。这类「旁路写入」只能由写方自己补齐副本——生产演练时就是这样
+    发现副本少了一个刚建的账号。
+    """
+    counts = sync_sqlite_from_pg()
+    logger.info("db.replica.refreshed tables=%s rows=%s", len(counts), sum(counts.values()))
     return counts
 
 

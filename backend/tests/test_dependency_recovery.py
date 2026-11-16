@@ -11,6 +11,7 @@ import sqlite3
 import threading
 import time
 from collections.abc import Iterator
+from contextlib import closing
 from pathlib import Path
 from typing import Any
 
@@ -759,6 +760,23 @@ def test_replica_copy_reports_table_name_on_unique_conflict(tmp_path: Path) -> N
         assert "UNIQUE" in str(excinfo.value).upper()
     finally:
         conn.close()
+
+
+def test_admin_cli_write_refreshes_replica(replica: str) -> None:
+    """旁路进程（admin CLI）写主库后必须自己补齐副本。
+
+    生产演练暴露的缺口：CLI 是新进程，`replica_ready` 初值 False，镜像分支静默跳过，
+    而服务进程的 `/health` 仍报 ready —— 直到 PG 真挂了才发现副本少一个账号。
+    """
+    code = admin_cli.main(["create-user", "--email", "cli-replica@example.com"])
+    assert code == 0
+    assert db.runtime_state()["replica_ready"] is True
+
+    with closing(db._open_sqlite()) as conn:
+        row = conn.execute(
+            "SELECT email FROM users WHERE email = ?", ("cli-replica@example.com",)
+        ).fetchone()
+    assert row is not None
 
 
 def test_backoff_delay_grows_and_caps() -> None:

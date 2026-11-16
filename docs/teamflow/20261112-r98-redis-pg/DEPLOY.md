@@ -302,6 +302,7 @@ docker compose start backend
 | 恢复后 `db.recovery.retry` 反复出现、业务 503 | 回放冲突（唯一键/外键）或 PG 中途又断；只有**回放**失败才 fail-stop，副本重建失败只降级为 `db_replica=stale` | 查 `pending_operations()`、`_offline_operations` 里第一条失败的 SQL，处理冲突后等自动重试 |
 | `db.replica.rebuild_failed error=ReplicaSyncError: table=xxx detail=UNIQUE constraint failed…` | 主库数据里有副本唯一约束不允许的重复行。根因通常是**主库唯一索引在 `pg_index` 里 `indisvalid=true`，实际却不拦重复**（索引缺条目；`ON CONFLICT` 因此判不出冲突） | 先跑 `scripts/audit_unique.py` 体检（只读）；对报出的表备份后去重、`REINDEX INDEX <约束名>` 恢复约束力，插一次重复值确认被 `UniqueViolation` 拒绝，副本会在下一轮自动重建 |
 | 同一失败每 2 秒刷一次日志 | 旧版本恢复循环是固定间隔重试 | 现按指数退避（2→4→8…封顶 30 秒），日志 `retry_in=` 字段给出下一次间隔；确定性失败退避期间不再全量重拷整库 |
+| 用裸 SQL / 脚本直接改过生产库（没走 `admin_cli`） | 服务进程的 `replica_ready` 是进程本地状态，看不见别处的写入，`/health` 仍报 ready 而副本已经落后 | 改完后在容器里执行 `docker compose exec -T backend python -c "from app.core.db import refresh_replica; refresh_replica()"`；`admin_cli` 的写命令已自动做这一步 |
 
 ---
 

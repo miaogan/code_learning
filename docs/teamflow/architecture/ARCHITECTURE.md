@@ -177,6 +177,7 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
 - 副本接管期间 SQLite 自身报错（文件损坏 / 磁盘满 / 不可写）统一转成 `503 DATABASE_UNAVAILABLE`（可重试），绝不把驱动异常冒成 500；`_open_sqlite()` 在 PRAGMA 失败时关闭句柄，避免 Windows 上锁死副本文件导致无法重建。
 - 后台每 `DB_RECOVERY_INTERVAL_S`（默认 2s）重试，成功后补齐幂等 DDL、种子题库与教程索引；恢复线程真实结束后才允许 lifespan 关闭连接池。重试前先做一次**不持写锁**的 PG 轻量探活：PG 不可达时只维持 SQLite 服务，不进入独占恢复窗口，否则每轮失败都会把毫秒级业务写入挡到请求超时。连续失败按指数退避（封顶 30s）——确定性失败（如主库数据撞副本唯一约束）重试多少次都一样，固定 2s 全量重拷只会刷日志并给 PG 加压。生产安全配置校验不属于依赖降级。
 - 副本重建失败必须能从一行日志定位到表：`ReplicaSyncError` 携带 `table=` 与 SQLite 的约束详情。真实事故里主库 `radar_techs_pkey` 在 `pg_index` 中 `indisvalid=true` 却不拦重复（索引缺条目，`ON CONFLICT` 判不出冲突），副本侧 UNIQUE 是真实生效的，于是重建必然失败——只报 `IntegrityError` 类型名等于让值班重新写脚本排查。这类「目录说唯一、数据却重复」用 `scripts/audit_unique.py` 只读体检。
+- **旁路写入必须由写方补齐副本**：`replica_ready` 是进程本地状态，别的进程（`admin_cli`、一次性运维脚本）写 PG 时镜像分支默认不成立，服务进程也察觉不到，`/health` 会继续报 `db_replica=ready`。`admin_cli` 的写命令跑完自动 `refresh_replica()`；绕过它直接用 SQL 改库，必须手动补一次，否则兜底副本是静默落后的。
 - Redis 正常时 JSON 缓存同时写 Redis 与带 TTL / LRU 上限的内存副本；故障时读内存副本，限流退到进程内，锁按单进程语义处理。`memory://` 是显式进程内模式，不等同故障。缓存删除屏障防止重连后旧值复活：未回放成功的屏障不按 TTL / LRU 淘汰，重连后按「前缀失效 → 精确删除 → 新值（剩余 TTL）」回放，回放完成前 `/health` 不报 `redis_status=up`。持久性权威数据始终在数据库。
 - **完整降级方案只允许单进程、单 worker**：SQLite 文件、离线日志和内存缓存不能由多个进程共享。部署扩副本前必须先拆分恢复协调器与本地状态，不得仅增加 uvicorn `--workers`。
 - `GET /health` 的 **HTTP 200 只表示 Web 进程在线**：`status=ok|degraded`，`db=postgresql|sqlite` 表示当前业务库，`db_status=starting|up|degraded`，`db_replica=ready|stale`（stale = 主库在服务但副本需重建，已失去兜底），`redis_status=up|degraded|memory`。SQLite 接管且业务可读写时可以是 `status=ok`；依赖状态轮询带 TTL，不在探活里执行 DDL。
