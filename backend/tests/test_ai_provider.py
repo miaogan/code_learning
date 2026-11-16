@@ -414,7 +414,13 @@ def test_retry_appends_hint_under_json_mode_none(
 
 
 def test_health_exposes_provider_without_key(ai_env: Callable[..., Settings]) -> None:
-    """`/health` 暴露档位三字段；具名档缺 Key 也 ready（本地无鉴权，TECHNICAL §5.1 取舍）。"""
+    """`/health` 暴露档位三字段；**云端档缺 Key 必须如实报未就绪**。
+
+    旧语义「缺 Key 也 ready」是按「本地无鉴权」的取舍写的，但生产实测证明它是误导：
+    DeepSeek 容器 Key 缺失时 /health 仍报 ai_configured=true，直到 judge --live 全线 401
+    才暴露。新语义：`KEY_REQUIRED_PROVIDERS`（deepseek）缺 Key → ready=False；
+    lmstudio 这类本地无鉴权服务仍允许空 Key。
+    """
     ai_env(
         AI_PROVIDER="deepseek",
         AI_DEEPSEEK_BASE_URL=DEEPSEEK_BASE,
@@ -429,9 +435,26 @@ def test_health_exposes_provider_without_key(ai_env: Callable[..., Settings]) ->
     assert body["ai_provider"] == "deepseek"
     assert body["ai_model"] == "deepseek-chat"
     assert body["ai_json_mode"] == "json_object"  # 档内空 → 继承全局缺省
-    assert body["ai_configured"] is True
+    assert body["ai_configured"] is False, "云端档缺 Key 必须如实报未就绪"
     assert "key" not in response.text.lower()
     assert "sk-" not in response.text
+
+
+def test_health_lmstudio_without_key_stays_ready(ai_env: Callable[..., Settings]) -> None:
+    """本地无鉴权服务（lmstudio）空 Key 仍算就绪：`KEY_REQUIRED_PROVIDERS` 按档区分。"""
+    ai_env(
+        AI_PROVIDER="lmstudio",
+        AI_LMSTUDIO_BASE_URL="http://127.0.0.1:1234/v1",
+        AI_LMSTUDIO_MODEL="local-model",
+        AI_LMSTUDIO_API_KEY="",
+    )
+
+    response = TestClient(app).get("/health")
+    body = response.json()
+
+    assert response.status_code == 200
+    assert body["ai_provider"] == "lmstudio"
+    assert body["ai_configured"] is True
 
 
 # --- 4b. 空值数值档位不炸进程（交付自检补钉） ---------------------------------

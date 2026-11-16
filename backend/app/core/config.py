@@ -55,6 +55,11 @@ _PROFILE_FIELDS: dict[str, tuple[str, str, str, str, str]] = {
     ),
 }
 
+#: 这些供应商的 Key **必填**（云端 API，没 Key 一切调用都会 401）；不在集合里的
+#: （lmstudio 本地服务）允许空 Key。就绪判定按此区分 —— r106 前的 ready 判定漏查 key，
+#: 导致生产容器 Key 缺失时 /health 仍报 ai_configured=true，直到 judge --live 才暴露。
+KEY_REQUIRED_PROVIDERS: frozenset[str] = frozenset({"deepseek"})
+
 #: 数值型档位字段：`.env` 里写成 `KEY=`（空值）时**按「没写」处理**，回落字段默认值。
 #: 不做这一步，空串会进 `float` / `int` 校验并在 `Settings()` 构造期抛 `ValidationError` —— 那会把
 #: 整个进程（和整批用例）打挂，恰好违反上面第 1 条不变量「配置错只置 ready=False，不许炸进程」。
@@ -388,6 +393,8 @@ class Settings(BaseSettings):
             name.upper() for name, value in ((base_url_field, base_url), (model_field, model))
             if not value
         ]
+        if provider in KEY_REQUIRED_PROVIDERS and not api_key:
+            missing.append(key_field.upper())
         if missing:
             detail = "、".join(missing)
             return replace(
