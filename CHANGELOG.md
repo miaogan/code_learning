@@ -7,6 +7,32 @@
 未发版的内容留在 `dev` 上，不写进本文件；合入 `master` 前由 CI 的 `Release gate`
 校验本文件存在对应标题。tag 指向的 commit 即发版时生产实际运行的 `dev` HEAD。
 
+## [v0.4.0] - 2026-11-16
+
+岗位闭环：从「我该练什么」到「这份 JD 要什么、我有什么证据、差在哪、下场怎么练、报告怎么回收」。全部零 AI 新增、零新表、零分数。
+
+### 新增
+- **跃迁档案** `/leap` + `GET /api/leap-archive`：一次聚合目标岗位差距（复用报告已算好的 `role_fit`）、项目工程证据（画像 bullets + 溯源条数 + 站内规模事实 + RAG / 雷达状态）、面试表达（最近 5 场已评分发言 + 「问题—方案—指标—踩坑」文本自检）；服务端零 AI、零新表、零重算，前端零二次统计。教练 Agent 新增只读工具 `read_leap_archive`，太傅页面上下文白名单加入 `/leap`
+- **JD 岗位对位** `/jd` + `POST /api/jd-match`：粘贴 JD 后返回技术词三态（有证据 / 证据弱 / 未找到证据）、JD 原句与简历证据引用；缺口严格区分 `origin=jd`（JD 写到但画像无证据）与 `origin=role_model`（岗位模型要求但 JD 未直接写）；按本次岗位现场对标，不改已写入的医案报告；不产出匹配分或百分比
+- **缺口驱动定向追问**：`InterviewSettings.focus_gaps`（≤3，统一清洗）落本场 settings 且永不写回画像；开局提示词要求前 `min(3,N)` 道 technical 围绕缺口、追问沿缺口深挖不换题；`/jd` → `?focus=` → 召对表单全链路可带
+- **表达复盘对照**：跃迁档案表达条目新增 `gap_hits` / `gap_misses`——本场缺口词在回答文本里是否出现，复用 JD 对位同一套别名表与短 ASCII 词边界（`go` 不命中 `golang`）
+- **报告回收缺口**：「本场设定」行追加 `缺口：A / B / C`，报告顶 / 历史行 / 会话顶三处共用同一格式化入口
+
+### 修复
+- 移动端筛选 chip 触控高度只有 28px：`ChipRow`（单选 / 多选）与 `PracticeFilters`（无命中建议）的可点击 button 漏加 `is-clickable`，r40 的 ≥44px 规则未生效（桌面 hover 反馈同时缺失），补 class 后复测 28 → 44px
+
+### 运维与安全
+- `.gitignore` 忽略 vitest 每次跑测试生成的 `frontend/vite.config.ts.timestamp-*` 临时文件
+
+### 文档
+- 新增五套交付文档：`docs/teamflow/20261116-r108-leap-archive/`、`20261116-r109-mobile-adaptation/`、`20261116-r110-jd-match/`、`20261116-r111-jd-interview-loop/`、`20261116-r112-report-focus-gaps/`（各自 PRD / TECHNICAL / ACCEPTANCE）
+- `AGENTS.md` 追加 r108–r112 五条变更记录
+
+### 验收
+- 后端全量 1076 tests（仅 2 条本机 health 启动竞态，单独复跑 `test_health.py` 4 passed；CI Docker 环境全绿）；`ruff check` 通过
+- 前端 45 个测试文件 582 tests / 0 failures；`typecheck`、`lint --max-warnings 0`、`build` 全过
+- 生产：CI run `43900093846` 全绿（backend 285s / frontend 37s / Deploy 37s），`logs/deploy-state` = `206b389`，5 容器 healthy；公网 `/health` 200、`/docs` 404、TLSv1.3；`/api/jd-match` 与 `/api/leap-archive` 未登录均 401
+
 ## [v0.3.0] - 2026-11-16
 
 运行时依赖降级兜底：PostgreSQL 仍是唯一权威主库，但挂了不再等于服务挂——SQLite 完整副本接管全部读写并在主库恢复后自动回切；Redis 挂了退化为进程内缓存。
