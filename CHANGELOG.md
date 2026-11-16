@@ -3,7 +3,44 @@
 本文件只记录**已部署到生产并验收通过**的版本批次。版本号规则、准入清单与发版步骤见
 [`docs/teamflow/20261114-cicd/RELEASE.md`](docs/teamflow/20261114-cicd/RELEASE.md)。
 
-格式：`## [v0.2.0] - 2026-11-16
+条目格式：`## [vX.Y.Z] - YYYY-MM-DD`，按「新增 / 修复 / 运维与安全 / 文档 / 验收」分组。
+未发版的内容留在 `dev` 上，不写进本文件；合入 `master` 前由 CI 的 `Release gate`
+校验本文件存在对应标题。tag 指向的 commit 即发版时生产实际运行的 `dev` HEAD。
+
+## [v0.3.0] - 2026-11-16
+
+运行时依赖降级兜底：PostgreSQL 仍是唯一权威主库，但挂了不再等于服务挂——SQLite 完整副本接管全部读写并在主库恢复后自动回切；Redis 挂了退化为进程内缓存。
+
+### 新增
+- **PG 故障兜底**：提交后逐笔镜像 SQLite 完整副本；主库不可达时副本接管读写，写操作与 `_offline_operations` 同事务落盘；恢复后暂停业务事务、按 `_offline_receipts` 幂等重放、重建副本再回切
+- **Redis 故障兜底**：JSON 缓存退化为进程内 TTL + LRU（容量上限 `MEMORY_CACHE_MAX_ENTRIES`），限流退到进程内窗口、锁按单进程语义；删除屏障防止重连后旧值与旧会话复活
+- **健康契约扩展**：`/health` 新增 `db_replica=ready|stale|na`，区分「主库在服务」与「还留着兜底」
+- **唯一约束体检脚本** `scripts/audit_unique.py`：只读比对「`pg_index` 说唯一」与「数据实际有重复」
+
+### 修复
+- 恢复循环抢写锁：PG 不可达时每轮失败都把毫秒级副本写入挡到请求超时 → 恢复前先做不持锁的 PG 探活（实测 3945ms → 2ms）
+- 副本损坏误伤健康主库 → 拆开「回放失败 fail-stop」与「副本重建失败」两类：后者只降级为 `db_replica=stale`，业务继续在 PG 上跑
+- 副本接管期间 SQLite 自身报错冒 500 → 统一转可重试 503；`_open_sqlite()` 的 PRAGMA 失败补 `close()`，避免句柄锁死副本文件
+- Redis 重连后旧值 / 已撤销会话复活 → tombstone + 前缀屏障 + 回放，待回放期间禁用探活捷径
+- 停用账号未撤销既有会话 → `set_user_disabled()` 同时失效该用户全部会话
+- 副本重建失败日志只有异常类型 → `ReplicaSyncError` 带 `table=` 与约束详情；重试从固定 2s 改为指数退避封顶 30s
+
+### 运维与安全
+- compose 新增 `skillcoach-sqlite` 持久卷与 `SQLITE_PATH`，副本进备份范围（PG 故障时它是唯一一份未回放写入）；后端写死 `--workers 1`，横向扩容前必须先拆协调器
+- **生产事故处置**：上线后副本反复重建失败，定位为 `radar_techs_pkey` 在 `pg_index` 中 `indisvalid=true` 却不拦重复（索引缺条目，`ON CONFLICT` 判不出冲突），两次采集各插一份重复行；备份后去重 84→77 行、`REINDEX` 恢复约束力，副本随即 `ready`
+- `cd_status.py` 在 run 进行中不再因 `conclusion` 为 `null` 崩溃
+
+### 文档
+- `docs/teamflow/20261112-r98-redis-pg/DEPLOY.md`：Redis 降级矩阵、副本备份判据、`db_replica` 排障表（含索引失配这一例）
+- `ARCHITECTURE.md` §3.3.1：单一权威写库、两类恢复失败的语义边界、退避与日志可定位性
+- `README.md`、`backend/.env.example` 同步新增配置项
+
+### 验收
+- 后端 1048 tests / 0 failed / 0 errors / 1 skipped；`ruff check backend/app backend/tests` 通过；前端 `npm run typecheck` 通过
+- 隔离 project 实机闭环：在线写入毫秒级入副本 → 停 PG + Redis 后 `/health` 200 `db=sqlite`、读写正常 → 重启后端仍是副本且旧会话有效 → 起依赖后 `replayed=5` 自动回切、会话数一致
+- 生产 `/health`：`db=postgresql`、`db_status=up`、`db_replica=ready`、`redis_status=up`
+
+## [v0.2.0] - 2026-11-16
 
 RAG 检索管线与实时推送（r100–r105），「外包工程师跃迁工作台」从单一练习工具升级为带检索增强与 Agent 编排的完整工作台。
 
@@ -25,10 +62,6 @@ RAG 检索管线与实时推送（r100–r105），「外包工程师跃迁工�
 
 ### 数据
 - 生产 embedding 已切 `BAAI/bge-small-zh-v1.5`（512 维）：语义腿 recall@5 80% → 95%（+15pp）、混合 95% → 100%
-
-## [vX.Y.Z] - YYYY-MM-DD`，条目按「新增 / 修复 / 运维与安全 / 文档 / 验收」分组。
-未发版的内容留在 `dev` 上，不写进本文件；合入 `master` 前由 CI 的 `Release gate`
-校验本文件存在对应标题。tag 指向的 commit 即发版时生产实际运行的 `dev` HEAD。
 
 ## [v0.1.0] - 2026-11-14
 
