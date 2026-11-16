@@ -1,8 +1,13 @@
-"""PostgreSQL 单库访问层：24 张业务表，结构化产物以 JSON 文本列存（ARCHITECTURE §3.4）。
+"""PostgreSQL 主库 + 持久化 SQLite 完整副本的双库访问层。
 
-r98 起 SQLite 已下线，**没有本地文件库、也没有降级路径**：`DATABASE_URL` 是唯一数据源，
-连接由 `psycopg_pool.ConnectionPool` 统一给出。为了让 2261 行 `repository.py` 的 149 处 `?`
-占位符不必逐行改写，这里保留一个薄适配层（`to_pg_sql()` + `Connection`）。
+正常时 PostgreSQL 是唯一权威写库，已提交事务逐笔镜像到 SQLite；PostgreSQL 故障时，
+只有带 complete 标记的完整副本才能接管读写。离线业务行与重放日志原子提交，恢复时
+暂停业务事务，重放并校验成功后重建副本，再回切 PostgreSQL。不存在用临时空库伪造正常
+服务的路径。Redis 不在本模块处理，其进程内缓存降级见 `redis_cache.py`。
+
+`DATABASE_URL` 由 `psycopg_pool.ConnectionPool` 统一连接，`SQLITE_PATH` 指向持久化副本。
+为了让 `repository.py` 中的 `?` 占位符不必逐行改写，这里保留薄适配层
+（`to_pg_sql()` / `to_sqlite_sql()` + `Connection`）。
 **新写的 SQL 可以直接用 `%s`**（`to_pg_sql()` 只在出现 `?` 时才介入）
 ——但此时 SQL 里的 `LIKE '%kw%'` 要自己写成 `%%kw%%`，那是 psycopg 的原生语义；
 用 `?` 则连这层转义都不用管。两条路都通，同一个文件里别混用。
@@ -21,15 +26,22 @@ r11 追加题库第五维 `questions.language`、逐题解析 `questions.explana
 """
 
 import atexit
+import contextvars
+import json
 import logging
+import re
+import sqlite3
 import threading
+import time
+import uuid
 from collections.abc import Iterable, Iterator, Sequence
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
+from pathlib import Path
 from typing import Any
 
 import psycopg
 from psycopg.rows import dict_row
-from psycopg_pool import ConnectionPool
+from psycopg_pool import ConnectionPool, PoolTimeout
 
 from app.core.config import get_settings
 
@@ -68,43 +80,204 @@ def to_pg_sql(sql: str) -> str:
     return sql.replace(_PLACEHOLDER, _SENTINEL).replace("%", "%%").replace(_SENTINEL, "%s")
 
 
+#: 活跃数据库由后台协调器切换；普通全局变量确保后台线程的切换对全部请求可见。
+_active_backend = "postgresql"
+#: 在线 PG 事务结束后同步 SQLite；离线事务的语句在**同一事务**追加到 replay log。
+_change_log: contextvars.ContextVar[list[dict[str, Any]] | None] = contextvars.ContextVar(
+    "db_change_log", default=None
+)
+#: 在线语句先入缓冲，PG 提交后才镜像，避免 PG 回滚而 SQLite 已写的分叉。
+_pending_sqlite: contextvars.ContextVar[list[dict[str, Any]] | None] = contextvars.ContextVar(
+    "pending_sqlite", default=None
+)
+_coordinator: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "db_coordinator", default=False
+)
+#: asyncio 取消不会中断 to_thread 中的同步 DB 操作。仅后台恢复任务写、lifespan 读；
+#: 不能用 ContextVar：子任务里的 set 不会传播回创建它的 lifespan 上下文。
+recovery_thread: threading.Thread | None = None
+_recovery_depth: contextvars.ContextVar[int] = contextvars.ContextVar(
+    "db_recovery_depth", default=0
+)
+
+
+class _Transaction:
+    """当前线程的外层事务；嵌套 connection() 只增加深度，不再次提交。"""
+
+    __slots__ = ("conn", "depth", "thread_id")
+
+    def __init__(self, conn: "Connection") -> None:
+        self.conn = conn
+        self.depth = 0
+        self.thread_id = threading.get_ident()
+
+
+_current_transaction: contextvars.ContextVar[_Transaction | None] = contextvars.ContextVar(
+    "db_current_transaction", default=None
+)
+_SQLITE_LOCK = threading.RLock()
+_STATE_LOCK = threading.RLock()
+_STATE = {
+    "ready": True,  # PG 尚未建表时由驱动报未初始化；副本就绪前故障不能接管。
+    "replica_ready": False,
+    "mode": "starting",
+    "sync_pending": 0,
+    "conflicts": 0,
+    "last_sync_at": "",
+}
+_SYNC_TABLES: tuple[str, ...] = ()
+_WRITE_RE = re.compile(r"^\s*(?:INSERT|UPDATE|DELETE|REPLACE)\b", re.IGNORECASE)
+_CAST_RE = re.compile(r"\?(::[a-zA-Z_][a-zA-Z0-9_]*(?:\[\])?)")
+_VECTOR_SQL_RE = re.compile(
+    r"SELECT id, kind, ref_id, section_id, title, content, "
+    r"1 - \(embedding <=> \?::vector\) AS score "
+    r"FROM rag_chunks WHERE embedder = \?(?P<filters>.*?)"
+    r" ORDER BY embedding <=> \?::vector LIMIT \?"
+)
+_NOW_SQLITE = "strftime('%Y-%m-%dT%H:%M:%f', 'now') || '+00:00'"
+
+
+def to_sqlite_sql(sql: str) -> str:
+    """把业务 SQL 中的 PG 方言换成 SQLite；显式给目标库，避免镜像时误用当前后端。"""
+    result = sql.replace(SQL_NOW_ISO, _NOW_SQLITE)
+    if "embedding <=>" in result:
+        match = _VECTOR_SQL_RE.fullmatch(result)
+        if not match:
+            raise RuntimeError("未识别的向量检索 SQL")
+        return (
+            "SELECT id, kind, ref_id, section_id, title, content, embedding "
+            "FROM rag_chunks WHERE embedder = ?" + match.group("filters") + " LIMIT ?"
+        )
+    result = _CAST_RE.sub("?", result)
+    result = result.replace("ILIKE", "LIKE")
+    # PG 的 FILTER 聚合可直接换成两边同义的条件求和。
+    result = re.sub(
+        r"count\(\*\)\s+FILTER\s*\(WHERE\s+([^\)]+)\)",
+        r"sum(CASE WHEN \1 THEN 1 ELSE 0 END)",
+        result,
+        flags=re.IGNORECASE,
+    )
+    if "to_regclass('public.questions')" in result:
+        return "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'questions'"
+    if "pg_tables WHERE schemaname = 'public'" in result:
+        return "SELECT count(*) AS n FROM sqlite_master WHERE type = 'table'"
+    if "EXTRACT(EPOCH FROM (now() - created_at::timestamptz)) / 60 > ?" in result:
+        result = result.replace(
+            "EXTRACT(EPOCH FROM (now() - created_at::timestamptz)) / 60 > ?",
+            "(julianday('now') - julianday(created_at)) * 1440 > ?",
+        )
+    return result
+
+
+def to_active_sql(sql: str) -> str:
+    return to_pg_sql(sql) if _active_backend != "sqlite" else to_sqlite_sql(sql)
+
+
+def _sqlite_params(params: Sequence[Any] | None) -> tuple[Any, ...]:
+    """JSON / 向量统一存文本；不将 Python list 直接交给 sqlite3。"""
+    return tuple(
+        json.dumps(value, ensure_ascii=False) if isinstance(value, (list, dict)) else value
+        for value in (params or ())
+    )
+
+
+def _execute_raw(
+    raw: Any, backend: str, sql: str, params: Sequence[Any] | None = None
+) -> Any:
+    if backend == "postgresql":
+        return raw.execute(to_pg_sql(sql), params or ())
+    return raw.execute(to_sqlite_sql(sql), _sqlite_params(params))
+
+
+def _operation(sql: str, params: Sequence[Any] | None) -> dict[str, Any]:
+    return {
+        "op_id": uuid.uuid4().hex,
+        "sql": sql,
+        "params": json.dumps(list(params or ()), ensure_ascii=False, default=str),
+    }
+
+
+def _record_write(sql: str, params: Sequence[Any] | None) -> None:
+    if not _WRITE_RE.match(sql):
+        return
+    # 内部同步表只由本层直接写，不进入离线日志，避免重放后再次制造新操作。
+    if "_offline_" in sql:
+        return
+    for buffer in (_pending_sqlite.get(), _change_log.get()):
+        if buffer is not None:
+            buffer.append(_operation(sql, params))
+
+
 class Connection:
-    """`sqlite3.Connection` 的最小替身：只实现业务层真正用到的三个方法。
+    """两种数据库共用的最小连接接口；写语句同步 / 记录由连接上下文统一负责。"""
 
-    刻意不实现 `commit()` —— 事务边界统一由 `connection()` 上下文管理（psycopg 连接池
-    在退出时先 commit、异常时 rollback 并归还连接），业务层自己 commit 会绕开这套语义。
-    """
+    __slots__ = ("_raw", "_backend")
 
-    __slots__ = ("_raw",)
-
-    def __init__(self, raw: psycopg.Connection) -> None:
+    def __init__(self, raw: Any, backend: str = "postgresql") -> None:
         self._raw = raw
+        self._backend = backend
 
-    def execute(self, sql: str, params: Sequence[Any] | None = None) -> psycopg.Cursor:
-        if params is None:
-            return self._raw.execute(sql)
-        return self._raw.execute(to_pg_sql(sql), params)
+    def execute(self, sql: str, params: Sequence[Any] | None = None) -> Any:
+        cursor = _execute_raw(self._raw, self._backend, sql, params)
+        if self._backend == _active_backend:
+            _record_write(sql, params)
+        return cursor
 
-    def executemany(self, sql: str, params: Iterable[Sequence[Any]]) -> psycopg.Cursor:
-        """批量执行。psycopg3 的批量接口在 **cursor** 上，Connection 没有同名方法。"""
-        cursor = self._raw.cursor()
-        cursor.executemany(to_pg_sql(sql), params)
+    def executemany(self, sql: str, params: Iterable[Sequence[Any]]) -> Any:
+        rows = list(params)
+        if self._backend == "sqlite":
+            # sqlite3 已给 DML 返回正确的 rowcount，且该属性只读；total_changes 还会把
+            # 同一连接上的前序语句算进去，不能用于本批次的行数。
+            cursor = self._raw.executemany(to_sqlite_sql(sql), [_sqlite_params(p) for p in rows])
+        else:
+            cursor = self._raw.cursor()
+            cursor.executemany(to_pg_sql(sql), rows)
+        if self._backend == _active_backend:
+            for row in rows:
+                _record_write(sql, row)
         return cursor
 
     def executescript(self, script: str) -> None:
-        """执行 `;` 分隔的建表脚本：psycopg 无参数 execute 用 simple query，原生支持多语句。"""
-        self._raw.execute(script)
+        if self._backend == "sqlite":
+            self._raw.executescript(to_sqlite_sql(script))
+        else:
+            self._raw.execute(script)
+
+
+#: 多继承保留旧 psycopg 捕获点的兼容，同时覆盖 SQLite 唯一约束异常。
+class IntegrityError(psycopg.errors.IntegrityError, sqlite3.IntegrityError):
+    """统一的唯一约束冲突，业务层不直接依赖具体驱动的异常。"""
+
+
+def active_backend() -> str:
+    """当前上下文的有效业务库；恢复协调器内部无论旧状态如何都固定读写 PG。"""
+    return "postgresql" if _coordinator.get() else _active_backend
+
+
+def runtime_state() -> dict[str, Any]:
+    with _STATE_LOCK:
+        return {"backend": active_backend(), **_STATE}
 
 
 #: 连接池是进程级的：`get_settings()` 被测试改写后必须 `close_pool()`，否则旧 DSN 的连接
 #: 会继续被复用（表现为「测试改了库却仍读到上一轮数据」）。
 _pool: ConnectionPool | None = None
 _pool_lock = threading.Lock()
+#: 已连上过的连接池即使后来断线，也有后台重连能力，不能因瞬时故障整个丢弃重建。
+#: 只有从未成功连接的池需要在重试间隔后重建（池初始建连最终会给放弃）。
+#: 已连接池断线由 psycopg_pool 自愈；main 的后台恢复循环负责重新跑幂等初始化。
+_pool_ever_connected = False
+_pool_retry_at = 0.0
+_POOL_RETRY_S = 2.0
 
 
 def get_pool() -> ConnectionPool:
-    """懒建连接池（单例）。首次访问才连库，导入本模块不产生任何网络行为。"""
-    global _pool
+    """懒建连接池（单例），构造函数立即返回，建连由池的工作线程异步完成。
+
+    绝不在请求线程里同步 `open()`：PG 不可达时那会先等完整连接超时，再抛异常。
+    后台恢复任务负责初始化；这里给请求一个有上限的等待，超时翻成中文 503。
+    """
+    global _pool, _pool_ever_connected, _pool_retry_at
     if _pool is None:
         with _pool_lock:
             if _pool is None:
@@ -115,18 +288,39 @@ def get_pool() -> ConnectionPool:
                     max_size=settings.db_pool_max_size,
                     # `prepare_threshold=None` 关闭自动 prepared statement：pgbouncer 的
                     # transaction 模式（公网常见前置）不支持跨事务复用预备语句。
-                    kwargs={"row_factory": dict_row, "prepare_threshold": None},
+                    # connect_timeout 只限制单次建连，不让它沿用业务取池的长超时。
+                    kwargs={
+                        "row_factory": dict_row,
+                        "prepare_threshold": None,
+                        "connect_timeout": 2,
+                    },
                     timeout=settings.db_pool_timeout_s,
-                    open=True,
+                    # 首次建连不依赖 reconnect_failed 回调：给池一个正在等待的调用，
+                    # 让它自然触发后台 grow；初始失败池由下面的短间隔重建接管。
+                    reconnect_timeout=1.0,
+                    open=False,
                 )
+                _pool_ever_connected = False
+                _pool_retry_at = time.monotonic() + _POOL_RETRY_S
+                _pool.open(wait=False)
     return _pool
+
+
+def discard_failed_pool() -> None:
+    """从未成功建连的池在退避后重建；成功过的断线池交给自身重连。"""
+    global _pool, _pool_retry_at
+    if _pool_ever_connected or time.monotonic() < _pool_retry_at:
+        return
+    close_pool()
 
 
 def close_pool() -> None:
     """关闭并丢弃连接池（进程退出 / 测试切换数据库后调用）。"""
-    global _pool
+    global _pool, _pool_ever_connected, _pool_retry_at
     with _pool_lock:
         pool, _pool = _pool, None
+        _pool_ever_connected = False
+        _pool_retry_at = 0.0
     if pool is not None:
         pool.close()
 
@@ -627,7 +821,7 @@ def _try_create_vector() -> bool:
     只是把 top-K 从「索引内算」换成「取回后算」。
     """
     try:
-        with connection() as conn:
+        with connection(force_pg=True) as conn:
             conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
         return True
     except psycopg.Error as exc:
@@ -637,6 +831,15 @@ def _try_create_vector() -> bool:
 
 def rag_embedding_mode() -> str:
     """`rag_chunks.embedding` 列的实际形态：'pgvector' | 'array' | 'missing'。
+
+    SQLite 副本固定把向量存 JSON 文本，服务层采用 Python 余弦。
+    """
+    if active_backend() == "sqlite":
+        with connection() as conn:
+            row = conn.execute("SELECT 1 AS ok FROM pragma_table_info('rag_chunks') "
+                               "WHERE name = 'embedding'").fetchone()
+        return "array" if row is not None else "missing"
+    """PG 形态从 information_schema 读取。
 
     判据是 `information_schema.columns.udt_name` 而不是扩展存在性：存量库可能
     在扩展装好之前就以降级形态建过列，`ADD COLUMN IF NOT EXISTS` 不会改已有列类型；
@@ -749,7 +952,7 @@ def _try_create_trgm() -> bool:
     托管 PG 常常不给超级用户，这正是要兜住的场景。
     """
     try:
-        with connection() as conn:
+        with connection(force_pg=True) as conn:
             conn.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm")
         return True
     except psycopg.Error as exc:
@@ -799,14 +1002,547 @@ _R67_ADDED_COLUMNS: tuple[tuple[str, str, str], ...] = (
 #: r98 起并发写由 PostgreSQL 的行级锁与 MVCC 承担，不再需要 SQLite 时代的 `busy_timeout`
 #: 与 WAL 取舍（r53 的 8×50 基准结论仅对单文件库成立）。池获取超时单独可配，见
 #: `Settings.db_pool_timeout_s`：等连接超过该秒数即抛错，而不是无限挂住请求。
-@contextmanager
-def connection() -> Iterator[Connection]:
-    """从池里取一个连接执行一段事务；正常结束 commit，异常 rollback 并归还。
+_ACTIVE_TRANSACTIONS = 0
+#: 切换写锁覆盖「选库 → 提交 → 镜像」整个事务；SQLite 仍用独立锁串行写。
+#: 当前单进程 uvicorn；部署多 worker 前必须将协调器和 SQLite 文件访问独立成单进程服务。
+_WRITER_LOCK = threading.RLock()
 
-    `ConnectionPool.connection()` 自带这个语义（含归还），业务层无需也不应手动提交。
+
+def _sqlite_path() -> Path:
+    return Path(get_settings().sqlite_path).expanduser().resolve()
+
+
+def _open_sqlite() -> sqlite3.Connection:
+    path = _sqlite_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    raw = sqlite3.connect(path, timeout=3.0)
+    try:
+        raw.row_factory = sqlite3.Row
+        raw.execute("PRAGMA busy_timeout = 3000")
+        raw.execute("PRAGMA journal_mode = WAL")
+        raw.execute("PRAGMA synchronous = FULL")
+    except BaseException:
+        # 文件损坏 / 磁盘满时 PRAGMA 就会失败；不关掉句柄会在 Windows 上锁住文件，
+        # 后续重建与运维清理都会撞 `WinError 32`。
+        raw.close()
+        raise
+    return raw
+
+
+#: 副本故障日志节流：磁盘写满时每个请求都会失败，不能一请求一条日志。
+_last_sqlite_failure_at = 0.0
+
+
+def _note_sqlite_failure(exc: BaseException) -> None:
+    """记录副本自身故障（30s 节流）；只记类型，不写文件路径。"""
+    global _last_sqlite_failure_at
+    now = time.monotonic()
+    if now - _last_sqlite_failure_at < 30.0:
+        return
+    _last_sqlite_failure_at = now
+    logger.error("db.sqlite.unavailable backend=%s error=%s", _active_backend, type(exc).__name__)
+
+
+@contextmanager
+def _raw_pg() -> Iterator[Any]:
+    """协调器专用 PG 连接；不走活跃库，避免恢复期间重入 SQLite。"""
+    global _pool_ever_connected
+    try:
+        with get_pool().connection(timeout=max(0.01, get_settings().db_request_timeout_s)) as raw:
+            _pool_ever_connected = True
+            yield raw
+    except (psycopg.OperationalError, psycopg.InterfaceError, PoolTimeout) as exc:
+        discard_failed_pool()
+        from app.core.errors import database_unavailable
+
+        raise database_unavailable() from exc
+    except psycopg.Error as exc:
+        # 连接在语句执行 / 提交途中断开同样按可重试故障处理，不泄露 DSN。
+        if isinstance(exc, (psycopg.errors.AdminShutdown, psycopg.errors.ConnectionException)):
+            from app.core.errors import database_unavailable
+
+            raise database_unavailable() from exc
+        raise
+
+
+#: 回放失败 = 数据分叉（副本里还有未落到 PG 的操作），必须整体停写等人工对账；
+#: 副本重建/切换失败只是「失去兜底」，主库健康时不能因此中断业务。写锁保证同一
+#: 时刻只有一个恢复窗口，因此这个标记不需要额外加锁。
+_replay_failed = False
+
+
+def _mark_replay_failed() -> None:
+    global _replay_failed
+    _replay_failed = True
+
+
+def _consume_replay_failed() -> bool:
+    global _replay_failed
+    value = _replay_failed
+    _replay_failed = False
+    return value
+
+
+@contextmanager
+def recovery() -> Iterator[None]:
+    """独占恢复窗口：阻止业务事务；恢复步骤仍在同一写锁内重入数据层。"""
+    global _active_backend
+    with _WRITER_LOCK:
+        depth = _recovery_depth.get()
+        previous = _STATE["mode"]
+        previous_ready = bool(_STATE["ready"])
+        previous_backend = _active_backend
+        if depth == 0:
+            _consume_replay_failed()
+            _STATE.update(ready=False, mode="recovering")
+        token = _coordinator.set(True)
+        depth_token = _recovery_depth.set(depth + 1)
+        try:
+            yield
+        except Exception:
+            if depth == 0:
+                if _consume_replay_failed():
+                    # 回放没完成就放行业务写，会在无法对账的分叉上继续累积。
+                    _active_backend = "postgresql"
+                    _STATE.update(ready=False, mode="starting")
+                else:
+                    # 副本重建 / 回切失败：回到进入前的权威库继续服务，只是暂时
+                    # 失去兜底。磁盘满、副本损坏都属于这一类，不能把健康的主库拖成 503。
+                    _active_backend = previous_backend
+                    _STATE.update(ready=previous_ready, mode=previous)
+            raise
+        finally:
+            _recovery_depth.reset(depth_token)
+            _coordinator.reset(token)
+            if depth == 0 and _STATE["mode"] == "recovering":
+                _STATE.update(mode=previous, ready=previous_ready)
+
+
+@contextmanager
+def connection(*, force_pg: bool = False) -> Iterator[Connection]:
+    """当前唯一写库的事务。SQLite 写操作和 replay log 原子提交。
+
+    同一线程的嵌套调用复用外层连接，只有最外层提交或回滚。因此一个组合业务操作
+    不会在函数边界被拆成多个事务，也不会各自覆盖离线日志缓冲。ContextVar 可能随
+    `asyncio.to_thread` 复制到另一线程，所以还必须核对线程 ID，绝不跨线程共用连接。
+
+    正常 PG 提交后才镜像 SQLite；PG 故障的短暂切换窗口仍可能收到 503，协调器
+    随即切到已有副本，而不是请求线程各自建一个空库。
     """
-    with get_pool().connection() as raw:
-        yield Connection(raw)
+    global _ACTIVE_TRANSACTIONS
+    current = _current_transaction.get()
+    if current is not None and current.thread_id == threading.get_ident():
+        if current.conn._backend == active_backend() or (force_pg and _coordinator.get()):
+            if force_pg and not _coordinator.get():
+                raise RuntimeError("PostgreSQL 专用连接仅允许恢复协调器使用")
+            current.depth += 1
+            try:
+                yield current.conn
+            finally:
+                current.depth -= 1
+            return
+        raise RuntimeError("同一业务事务中不能切换权威数据库")
+    _WRITER_LOCK.acquire()
+    try:
+        backend = active_backend()
+        if force_pg and not _coordinator.get():
+            raise RuntimeError("PostgreSQL 专用连接仅允许恢复协调器使用")
+        if force_pg or _coordinator.get():
+            backend = "postgresql"
+        if not _STATE["ready"] and not _coordinator.get():
+            from app.core.errors import database_unavailable
+
+            raise database_unavailable()
+        _ACTIVE_TRANSACTIONS += 1
+    except Exception:
+        _WRITER_LOCK.release()
+        raise
+    try:
+        if backend == "sqlite":
+            with _SQLITE_LOCK:
+                try:
+                    with closing(_open_sqlite()) as raw:
+                        raw.execute("BEGIN IMMEDIATE")
+                        token = _change_log.set([])
+                        transaction = _Transaction(Connection(raw, "sqlite"))
+                        transaction.depth = 1
+                        transaction_token = _current_transaction.set(transaction)
+                        try:
+                            yield transaction.conn
+                            operations = _change_log.get() or []
+                            for operation in operations:
+                                raw.execute(
+                                    "INSERT INTO _offline_operations (op_id, sql_text, params_json) "
+                                    "VALUES (?, ?, ?)",
+                                    (operation["op_id"], operation["sql"], operation["params"]),
+                                )
+                            raw.commit()
+                            with _STATE_LOCK:
+                                _STATE["sync_pending"] += len(operations)
+                        except sqlite3.IntegrityError as exc:
+                            raw.rollback()
+                            raise IntegrityError(str(exc)) from exc
+                        except Exception:
+                            raw.rollback()
+                            raise
+                        finally:
+                            _current_transaction.reset(transaction_token)
+                            _change_log.reset(token)
+                except IntegrityError:
+                    raise
+                except sqlite3.Error as exc:
+                    # 副本自身故障（文件损坏 / 磁盘满 / 目录不可写）属于基础设施故障：
+                    # 给可重试 503，绝不把 sqlite3 的原始异常冒成 500。
+                    _note_sqlite_failure(exc)
+                    from app.core.errors import database_unavailable
+
+                    raise database_unavailable() from exc
+            return
+        token = _pending_sqlite.set([])
+        try:
+            try:
+                with _raw_pg() as raw:
+                    transaction = _Transaction(Connection(raw))
+                    transaction.depth = 1
+                    transaction_token = _current_transaction.set(transaction)
+                    try:
+                        yield transaction.conn
+                    finally:
+                        _current_transaction.reset(transaction_token)
+            except psycopg.errors.IntegrityError as exc:
+                raise IntegrityError(str(exc)) from exc
+            operations = _pending_sqlite.get() or []
+            if operations and _STATE["replica_ready"]:
+                try:
+                    with _SQLITE_LOCK:
+                        _mirror_operations(operations)
+                except (sqlite3.Error, RuntimeError) as exc:
+                    # PG 是已提交的事实源；副本失效应触发重建，不能把成功写入翻成失败。
+                    _STATE["replica_ready"] = False
+                    logger.warning("db.replica_stale error=%s", type(exc).__name__)
+        finally:
+            _pending_sqlite.reset(token)
+    finally:
+        _ACTIVE_TRANSACTIONS -= 1
+        _WRITER_LOCK.release()
+
+
+def ping_postgresql() -> None:
+    with _raw_pg() as raw:
+        raw.execute("SELECT 1")
+
+
+def _mirror_operations(operations: Sequence[dict[str, Any]]) -> None:
+    if not operations or active_backend() != "postgresql":
+        return
+    with closing(_open_sqlite()) as raw:
+        raw.execute("BEGIN IMMEDIATE")
+        try:
+            for operation in operations:
+                _execute_raw(
+                    raw,
+                    "sqlite",
+                    str(operation["sql"]),
+                    json.loads(str(operation["params"])),
+                )
+            raw.commit()
+        except Exception:
+            raw.rollback()
+            raise
+
+
+def activate_sqlite() -> None:
+    """切换与所有在途写事务互斥，PG 最后一笔镜像完成后才开放 SQLite。"""
+    global _active_backend
+    with _WRITER_LOCK:
+        _STATE["ready"] = False
+        with _SQLITE_LOCK:
+            initialize_sqlite()
+            with closing(_open_sqlite()) as raw:
+                complete = raw.execute(
+                    "SELECT 1 FROM _sync_state WHERE key = 'complete' AND value = '1'"
+                ).fetchone()
+            if complete is None:
+                _STATE["replica_ready"] = False
+                raise RuntimeError("SQLite 副本尚未完整同步，拒绝写入")
+            _active_backend = "sqlite"
+            _STATE.update(
+                ready=True, replica_ready=True, mode="online",
+                sync_pending=len(pending_operations()),
+            )
+
+
+def activate_postgresql() -> None:
+    global _active_backend
+    with _WRITER_LOCK:
+        _STATE["ready"] = False
+        with _SQLITE_LOCK:
+            _active_backend = "postgresql"
+            _STATE.update(ready=True, mode="online")
+
+
+def pending_operations() -> list[dict[str, Any]]:
+    with _SQLITE_LOCK:
+        initialize_sqlite()
+        with closing(_open_sqlite()) as raw:
+            rows = raw.execute(
+                "SELECT op_id, sql_text, params_json FROM _offline_operations ORDER BY seq"
+            ).fetchall()
+    return [
+        {"op_id": row["op_id"], "sql": row["sql_text"], "params": row["params_json"]}
+        for row in rows
+    ]
+
+
+def replay_pending() -> dict[str, int]:
+    """在 PG 单事务内按提交顺序重放；重复 op_id 由独立回执幂等跳过。
+
+    三种失败要区别对待：
+    - 副本连读都读不了（文件损坏 / 磁盘故障）：兜底数据本身已不可用，PG 权威且健康时
+      只失去兜底，不能因此把业务打成 503；
+    - 重放中途失败 / 约束冲突：副本里仍有未落到 PG 的操作，必须 fail-stop 等人工对账，
+      否则后续写入会在无法对账的分叉上继续累积。
+    """
+    try:
+        operations = pending_operations()
+    except sqlite3.Error as exc:
+        _note_sqlite_failure(exc)
+        with _STATE_LOCK:
+            _STATE["replica_ready"] = False
+        logger.warning("db.replay.unreadable error=%s", type(exc).__name__)
+        return {"replayed": 0, "conflicts": 0}
+    try:
+        return _replay_pending(operations)
+    except Exception:
+        _mark_replay_failed()
+        raise
+
+
+def _replay_pending(operations: Sequence[dict[str, Any]]) -> dict[str, int]:
+    conflicts = 0
+    with _raw_pg() as raw:
+        replayed = 0
+        for operation in operations:
+            exists = _execute_raw(
+                raw, "postgresql",
+                "SELECT 1 FROM _offline_receipts WHERE op_id = %s", (operation["op_id"],),
+            ).fetchone()
+            if exists:
+                continue
+            try:
+                _execute_raw(
+                    raw, "postgresql", operation["sql"], json.loads(operation["params"])
+                )
+            except psycopg.errors.IntegrityError as exc:
+                # 约束冲突不可静默跳过：事务回滚，保持 SQLite，等待下一次人工对账。
+                conflicts += 1
+                raise RuntimeError("离线变更与 PostgreSQL 约束冲突，未回切") from exc
+            _execute_raw(
+                raw, "postgresql",
+                "INSERT INTO _offline_receipts (op_id, replayed_at) VALUES (%s, %s)",
+                (operation["op_id"], time.time()),
+            )
+            replayed += 1
+    with _SQLITE_LOCK, closing(_open_sqlite()) as raw:
+        raw.execute("DELETE FROM _offline_operations")
+        # close() 不会提交事务；必须让日志删除与 PG 回执一起真正持久化。
+        raw.commit()
+    with _STATE_LOCK:
+        _STATE["sync_pending"] = 0
+        _STATE["conflicts"] = conflicts
+        _STATE["last_sync_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    return {"replayed": replayed, "conflicts": conflicts}
+
+
+def ping() -> None:
+    """当前活跃库的轻量探针，供 /health 使用。"""
+    with connection() as conn:
+        conn.execute("SELECT 1")
+
+
+SYNC_SCHEMA = """
+CREATE TABLE IF NOT EXISTS _offline_receipts (
+    op_id TEXT PRIMARY KEY,
+    replayed_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS _sync_state (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS _id_allocations (
+    kind TEXT PRIMARY KEY,
+    next_id INTEGER NOT NULL
+);
+"""
+
+
+def initialize_sqlite() -> None:
+    """离线副本只补 schema；种子仅在 PG 正常初始化时写入，避免覆盖副本数据。"""
+    with closing(_open_sqlite()) as raw:
+        conn = Connection(raw, "sqlite")
+        raw.executescript(
+            "CREATE TABLE IF NOT EXISTS _offline_operations ("
+            "seq INTEGER PRIMARY KEY AUTOINCREMENT, op_id TEXT NOT NULL UNIQUE, "
+            "sql_text TEXT NOT NULL, params_json TEXT NOT NULL)"
+        )
+        radar_schema = R67_SCHEMA.replace(
+            "INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY",
+            "INTEGER PRIMARY KEY AUTOINCREMENT",
+        )
+        for script in (
+            SCHEMA, R23_SCHEMA, SCHEMA_INDEXES, R23_INDEXES, R42_SCHEMA, R42_INDEXES,
+            R51_SCHEMA, R61_SCHEMA, radar_schema, R67_INDEXES, R77_SCHEMA, R77_INDEXES,
+            R80_SCHEMA, R81_SCHEMA, R81_INDEXES, R100_SCHEMA, COACH_RUNS_SCHEMA,
+            RAG_FEEDBACK_SCHEMA, SYNC_SCHEMA,
+        ):
+            conn.executescript(script)
+        for columns in (_ADDED_COLUMNS, _R23_ADDED_COLUMNS, _R61_ADDED_COLUMNS, _R67_ADDED_COLUMNS):
+            for table, column, ddl in columns:
+                existing = {row["name"] for row in raw.execute(f'PRAGMA table_info("{table}")')}
+                if column not in existing:
+                    raw.execute(f'ALTER TABLE "{table}" ADD COLUMN "{column}" {ddl}')
+        embedding_columns = {
+            row["name"] for row in raw.execute("PRAGMA table_info(rag_chunks)")
+        }
+        if "embedding" not in embedding_columns:
+            raw.execute("ALTER TABLE rag_chunks ADD COLUMN embedding TEXT")
+        # 新副本的初始化去重只在真正空库执行，不能把正常的 running 任务误判为重启僵尸。
+        has_data = raw.execute(
+            "SELECT 1 FROM _sync_state WHERE key = 'initialized'"
+        ).fetchone() is not None
+        if not has_data:
+            raw.execute(
+                "INSERT INTO _sync_state (key, value) VALUES ('initialized', '1')"
+            )
+
+
+def _sync_id_allocations(pg: Any, local: sqlite3.Connection) -> None:
+    rows = pg.execute(
+        "SELECT kind, next_id FROM _id_allocations"
+    ).fetchall() if pg.execute("SELECT to_regclass('public._id_allocations') AS name").fetchone()["name"] else []
+    local.execute("DELETE FROM _id_allocations")
+    local.executemany(
+        "INSERT INTO _id_allocations (kind, next_id) VALUES (?, ?)",
+        [(row["kind"], row["next_id"]) for row in rows],
+    )
+
+
+def next_id(kind: str, *, conn: Connection | None = None) -> int:
+    """共享 ID 游标；提供连接时与业务行同一事务提交，防止崩溃后游标漂移。"""
+    if conn is not None:
+        if active_backend() == "sqlite":
+            row = conn.execute(
+                "SELECT next_id FROM _id_allocations WHERE kind = ?", (kind,)
+            ).fetchone()
+            value = int(row["next_id"]) if row else 1
+            conn.execute(
+                "INSERT INTO _id_allocations (kind, next_id) VALUES (?, ?) "
+                "ON CONFLICT(kind) DO UPDATE SET next_id = excluded.next_id",
+                (kind, value + 1),
+            )
+            return value
+        row = conn.execute(
+            "INSERT INTO _id_allocations (kind, next_id) VALUES (?, 2) "
+            "ON CONFLICT(kind) DO UPDATE SET next_id = _id_allocations.next_id + 1 "
+            "RETURNING next_id",
+            (kind,),
+        ).fetchone()
+        return int(row["next_id"]) - 1
+    with connection() as owned:
+        return next_id(kind, conn=owned)
+
+
+def _sync_table_names(raw: Any) -> list[str]:
+    rows = raw.execute(
+        "SELECT table_name FROM information_schema.tables "
+        "WHERE table_schema = 'public' AND table_type = 'BASE TABLE' ORDER BY table_name"
+    ).fetchall()
+    return [
+        str(row["table_name"])
+        for row in rows
+        if not str(row["table_name"]).startswith("_offline_")
+    ]
+
+
+def sync_sqlite_from_pg() -> dict[str, int]:
+    """首次或回切后整库重建副本；只在切库写锁内调用，不接受并发离线写。"""
+    global _SYNC_TABLES
+    with _WRITER_LOCK, _raw_pg() as pg, closing(_open_sqlite()) as local:
+        initialize_sqlite()
+        counts: dict[str, int] = {}
+        local.execute("BEGIN IMMEDIATE")
+        try:
+            local.execute(
+                "INSERT INTO _sync_state (key, value) VALUES ('complete', '0') "
+                "ON CONFLICT(key) DO UPDATE SET value = '0'"
+            )
+            for table in _sync_table_names(pg):
+                pg_columns = {
+                    str(row["column_name"])
+                    for row in pg.execute(
+                        "SELECT column_name FROM information_schema.columns "
+                        "WHERE table_schema = 'public' AND table_name = %s", (table,)
+                    ).fetchall()
+                }
+                columns = [
+                    row["name"] for row in local.execute(f'PRAGMA table_info("{table}")')
+                    if row["name"] in pg_columns
+                ]
+                if not columns:
+                    continue
+                quoted = ", ".join(f'"{name}"' for name in columns)
+                rows = pg.execute(f'SELECT {quoted} FROM "{table}"').fetchall()
+                local.execute(f'DELETE FROM "{table}"')
+                payload = []
+                for row in rows:
+                    payload.append([
+                        json.dumps(value) if isinstance(value, list) else value
+                        for value in (row[name] for name in columns)
+                    ])
+                if payload:
+                    marks = ", ".join("?" for _ in columns)
+                    local.executemany(
+                        f'INSERT INTO "{table}" ({quoted}) VALUES ({marks})', payload
+                    )
+                counts[table] = len(payload)
+            _SYNC_TABLES = tuple(counts)
+            local.execute("DELETE FROM _offline_operations")
+            _sync_id_allocations(pg, local)
+            local.execute(
+                "INSERT INTO _sync_state (key, value) VALUES ('complete', '1') "
+                "ON CONFLICT(key) DO UPDATE SET value = '1'"
+            )
+            local.commit()
+        except Exception:
+            local.rollback()
+            raise
+    with _STATE_LOCK:
+        _STATE["sync_pending"] = 0
+        _STATE["replica_ready"] = True
+        _STATE["last_sync_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    return counts
+
+
+def reset_runtime() -> None:
+    """仅测试 / 进程清理使用；不会删除 SQLite 文件。"""
+    global _active_backend
+    with _WRITER_LOCK:
+        _active_backend = "postgresql"
+        _STATE.update(ready=True, mode="starting", sync_pending=0, conflicts=0, last_sync_at="")
+        # 文件是持久化副本，进程重启后先验证 complete 标记再允许接管。
+        # 副本损坏 / 不可读时只记「不可接管」，不能把重置运行态变成异常出口。
+        try:
+            with _SQLITE_LOCK, closing(_open_sqlite()) as raw:
+                complete = raw.execute(
+                    "SELECT value FROM _sync_state WHERE key = 'complete'"
+                ).fetchone() if raw.execute(
+                    "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = '_sync_state'"
+                ).fetchone() else None
+        except sqlite3.Error as exc:
+            _note_sqlite_failure(exc)
+            _STATE["replica_ready"] = False
+            return
+        _STATE["replica_ready"] = bool(complete and complete["value"] == "1")
 
 
 def _ensure_columns(conn: Connection, columns: Sequence[tuple[str, str, str]]) -> None:
@@ -838,7 +1574,7 @@ def _ensure_bigint_columns(conn: Connection) -> None:
             conn.execute(f"ALTER TABLE {table} ALTER COLUMN {column} TYPE BIGINT")
 
 
-def init_db() -> None:
+def _init_pg_schema() -> None:
     """建库并补齐结构（幂等）：新库全建，老库只补缺的列与索引。
 
     全部 DDL 都是 `IF NOT EXISTS` 形态，对已有库反复执行是安全的空操作；没有任何
@@ -847,7 +1583,7 @@ def init_db() -> None:
     """
     trgm_ok = _try_create_trgm()
     vector_ok = _try_create_vector()
-    with connection() as conn:
+    with connection(force_pg=True) as conn:
         conn.executescript(SCHEMA)                    # 1. 业务表
         _ensure_columns(conn, _ADDED_COLUMNS)         # 2. r11 追加列（幂等）
         conn.executescript(R23_SCHEMA)                # 3. 认证 / 会话 / 配额表
@@ -881,6 +1617,20 @@ def init_db() -> None:
             )
         conn.executescript(COACH_RUNS_SCHEMA)         # 25. 教练 Agent 编排轨迹
         conn.executescript(RAG_FEEDBACK_SCHEMA)       # 26. 召回反馈（点赞 / 点踩）
+        conn.executescript(SYNC_SCHEMA)               # 27. SQLite 副本 / 离线重放回执
+        for table, column in (("radar_snapshots", "id"), ("radar_assessments", "id"), ("radar_runs", "run_id")):
+            conn.execute(
+                "INSERT INTO _id_allocations (kind, next_id) "
+                f"SELECT ?, COALESCE(MAX({column}), 0) + 1 FROM {table} "
+                "ON CONFLICT(kind) DO NOTHING",
+                (table,),
+            )
+
+
+def init_db() -> None:
+    """明确在 PostgreSQL 上建表；不改变业务活动库或可用状态。"""
+    with recovery():
+        _init_pg_schema()
 
 
 def _sweep_stale_radar_jobs(conn: Connection) -> None:

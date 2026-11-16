@@ -9,6 +9,12 @@ export interface Health {
   version: string
   ai_configured: boolean
   db: string
+  /** starting / up / degraded；旧后端缺省按 up 展示（本轮仅用于运维观测）。 */
+  db_status?: string
+  /** up / degraded / memory；memory 表示显式或未配置的进程内模式。 */
+  redis_status?: string
+  /** ready / stale；stale = 主库在服务但故障兜底副本需要重建（旧后端无此字段）。 */
+  db_replica?: string
   // r9 运维白名单三字段（与 /health 逐字镜像，永不携带 Key 片段）。
   // 标可选是为了旧后端 / 旧构建产物仍类型安全；本轮不渲染它们。
   ai_provider?: string

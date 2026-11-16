@@ -15,12 +15,10 @@ from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-import psycopg
-
-from app.core import redis_cache
+from app.core import db as db_errors, redis_cache
 from app.core.config import get_settings
 from app.core.context import DEFAULT_USER_ID, get_current_user_id
-from app.core.db import SQL_NOW_ISO, connection
+from app.core.db import SQL_NOW_ISO, Connection, active_backend, connection, next_id
 from app.schemas import Profile, Report, ResumeMeta, TimelineEvent
 
 RUN_RUNNING = "running"
@@ -286,7 +284,7 @@ def insert_profile_job(
                 (job_id, _uid(), document_id, file_name, chars, sections, "running", _now(), _now()),
             )
         return True
-    except psycopg.errors.IntegrityError:
+    except db_errors.IntegrityError:
         return False
 
 
@@ -406,7 +404,7 @@ def insert_resume_job(
                 (job_id, _uid(), file_name, image_count, content_hash, _now(), _now()),
             )
         return True
-    except psycopg.errors.IntegrityError:
+    except db_errors.IntegrityError:
         return False
 
 
@@ -1293,19 +1291,25 @@ def set_user_disabled(user_id: str, disabled: bool) -> None:
         conn.execute(
             "UPDATE users SET disabled = ? WHERE id = ?", (1 if disabled else 0, user_id)
         )
+    if disabled:
+        # 停用必须撤销会话而非只靠 disabled 标志挡住请求：否则重新启用后，
+        # 数据库行和 Redis 里的旧会话会重新获得访问权限。
+        delete_user_sessions(user_id)
 
 
-def delete_expired_sessions() -> int:
-    """批量清理已过期会话（r23 收口）：登录时顺带执行，避免 sessions 表无限累积。"""
-    with connection() as conn:
-        cursor = conn.execute("DELETE FROM sessions WHERE expires_at <= ?", (_now(),))
-        return max(cursor.rowcount, 0)
+def delete_expired_sessions(*, conn: Connection | None = None) -> int:
+    """清理过期会话；有事务连接时复用，避免嵌套连接破坏离线日志顺序。"""
+    if conn is None:
+        with connection() as owned:
+            return delete_expired_sessions(conn=owned)
+    cursor = conn.execute("DELETE FROM sessions WHERE expires_at <= ?", (_now(),))
+    return max(cursor.rowcount, 0)
 
 
 def create_session(*, token_hash: str, user_id: str, expires_at: str) -> None:
-    delete_expired_sessions()
-    prune_ai_call_logs()  # r53：与会话清理同一收口点，避免日志表无限增长
     with connection() as conn:
+        delete_expired_sessions(conn=conn)
+        prune_ai_call_logs(conn=conn)  # r53：与会话清理同一收口点，避免日志表无限增长
         conn.execute(
             "INSERT INTO sessions (token_hash, user_id, created_at, expires_at) "
             "VALUES (?, ?, ?, ?)",
@@ -1473,7 +1477,9 @@ def insert_ai_call_log(
 AI_LOG_RETENTION_DAYS = 90
 
 
-def prune_ai_call_logs(days: int = AI_LOG_RETENTION_DAYS) -> int:
+def prune_ai_call_logs(
+    days: int = AI_LOG_RETENTION_DAYS, *, conn: Connection | None = None
+) -> int:
     """删除窗口外的模型调用日志，返回实际删除行数。登录时顺带执行。
 
     与 `ai_call_log_summary()` 用同一 ISO UTC 时间口径；`days` 夹紧到 [1, 365]，
@@ -1481,8 +1487,10 @@ def prune_ai_call_logs(days: int = AI_LOG_RETENTION_DAYS) -> int:
     """
     window = max(1, min(int(days), 365))
     cutoff = (datetime.now(UTC) - timedelta(days=window)).isoformat()
-    with connection() as conn:
-        cursor = conn.execute("DELETE FROM ai_call_logs WHERE created_at < ?", (cutoff,))
+    if conn is None:
+        with connection() as owned:
+            return prune_ai_call_logs(window, conn=owned)
+    cursor = conn.execute("DELETE FROM ai_call_logs WHERE created_at < ?", (cutoff,))
     return max(cursor.rowcount, 0)
 
 
@@ -1942,11 +1950,12 @@ def radar_upsert_tech(item: dict[str, Any]) -> None:
 def radar_insert_snapshot(item: dict[str, Any]) -> None:
     """补一条 star / fork 快照（`star_delta_7d` 由最新两条快照差值推出）。"""
     with connection() as conn:
+        snapshot_id = next_id("radar_snapshots", conn=conn)
         conn.execute(
-            "INSERT INTO radar_snapshots (tech_slug, taken_at, stars, forks, repo_created_at,"
-            " pushed_at, suspect) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO radar_snapshots (id, tech_slug, taken_at, stars, forks, repo_created_at,"
+            " pushed_at, suspect) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (
-                item["slug"], _now(), int(item.get("stars") or 0), int(item.get("forks") or 0),
+                snapshot_id, item["slug"], _now(), int(item.get("stars") or 0), int(item.get("forks") or 0),
                 str(item.get("repo_created_at") or ""), str(item.get("pushed_at") or ""),
                 1 if item.get("suspect") else 0,
             ),
@@ -1976,17 +1985,18 @@ def radar_insert_assessment(
 ) -> bool:
     """写一条评估；同 `(tech_slug, input_sha256)` 已存在则跳过（返回 False = 可复算幂等）。"""
     with connection() as conn:
+        assessment_id = next_id("radar_assessments", conn=conn)
         cursor = conn.execute(
-            "INSERT INTO radar_assessments (tech_slug, run_id, verdict, relevance,"
+            "INSERT INTO radar_assessments (id, tech_slug, run_id, verdict, relevance,"
             " adoption, maturity, effort, reasons_json, evidence_json, profile_digest,"
             " prompt_version, model, input_sha256, rule_based, created_at)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
             # r98：SQLite 的 `INSERT OR IGNORE` 在 PG 是 `ON CONFLICT DO NOTHING`。
             # 不指定冲突目标：唯一键 `(tech_slug, input_sha256)` 是唯一约束来源，
             # 不带 target 也只在真冲突时静默跳过，且不会因索引改名而失效。
             " ON CONFLICT DO NOTHING",
             (
-                tech_slug, run_id, result["verdict"], int(result["relevance"]),
+                assessment_id, tech_slug, run_id, result["verdict"], int(result["relevance"]),
                 int(result["adoption"]), int(result["maturity"]), int(result["effort"]),
                 _json_text(result.get("reasons") or []),
                 _json_text(result.get("evidence") or []),
@@ -2133,13 +2143,14 @@ def radar_cross_source_count() -> dict[str, int]:
 
 def radar_create_run(trigger: str) -> int:
     """开一轮采集，返回自增 `run_id`（采集结束后由 `radar_finish_run` 补终态）。"""
+    # ID 游标与业务行同事务：崩溃不能留下已消耗但未记录的游标。
     with connection() as conn:
-        # r98：psycopg 的 cursor 没有 `lastrowid`，改用 `RETURNING` 把自增主键取回来。
-        row = conn.execute(
-            "INSERT INTO radar_runs (trigger, started_at) VALUES (?, ?) RETURNING run_id",
-            (trigger, _now()),
-        ).fetchone()
-        return int(row["run_id"]) if row else 0
+        run_id = next_id("radar_runs", conn=conn)
+        conn.execute(
+            "INSERT INTO radar_runs (run_id, trigger, started_at) VALUES (?, ?, ?)",
+            (run_id, trigger, _now()),
+        )
+    return run_id
 
 
 def radar_finish_run(
@@ -2183,7 +2194,7 @@ def radar_insert_job(job_id: str, tech_slug: str, *, trigger: str, parent_job_id
                 (job_id, tech_slug, _uid(), trigger, parent_job_id, stamp, stamp),
             )
         return True
-    except psycopg.errors.IntegrityError:
+    except db_errors.IntegrityError:
         return False
 
 
@@ -2476,6 +2487,8 @@ def rag_vector_search(
     「教程得先挤进全局前 K」——实测「事件循环和微任务」全局 top-12 里没有教程，
     过滤后直接空结果。过滤放进 WHERE 才能保证该 kind 内部真正取 top-K。
     """
+    if mode == "pgvector" and active_backend() == "sqlite":
+        mode = "array"
     literal = _rag_embedding_value(query_vec)
     filters = ""
     params: list[Any] = []

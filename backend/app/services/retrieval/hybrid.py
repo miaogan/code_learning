@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any
 
@@ -91,6 +92,14 @@ def rrf_fuse(ranked_lists: list[list[str]], *, top_k: int, k: int = RRF_K) -> li
     return fused[:top_k]
 
 
+def _embedding(value: Any) -> list[float]:
+    """PG array 直接返回 list；SQLite 热副本中的向量是 JSON 文本。"""
+    if isinstance(value, str):
+        parsed = json.loads(value)
+        return [float(item) for item in parsed] if isinstance(parsed, list) else []
+    return [float(item) for item in value]
+
+
 def _semantic_leg(
     query: str, *, embedder_name: str, top_k: int, kinds: list[str] | None = None
 ) -> tuple[list[dict[str, Any]], str]:
@@ -109,7 +118,7 @@ def _semantic_leg(
         return rows, "pgvector"
     scanned = repository.rag_array_scan(embedder=embedder_name, kinds=kinds)
     scored = [
-        (repository.rag_cosine(query_vec, list(row["embedding"])), row) for row in scanned
+        (repository.rag_cosine(query_vec, _embedding(row["embedding"])), row) for row in scanned
     ]
     scored.sort(key=lambda pair: (-pair[0], pair[1]["id"]))
     rows = []

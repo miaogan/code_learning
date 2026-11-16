@@ -21,6 +21,9 @@ AUTH_RATE_LIMITED = "AUTH_RATE_LIMITED"
 RATE_LIMITED = "RATE_LIMITED"
 #: 熔断打开 / 在飞请求过载（r70）：快速失败，调用方可按 `Retry-After` 重试。
 SERVICE_BUSY = "SERVICE_BUSY"
+#: 当前写库不可用、没有完整副本或恢复窗口未就绪时快速失败；可重试。
+#: PG 故障且完整 SQLite 副本存在时由副本接管，不走该错误。
+DATABASE_UNAVAILABLE = "DATABASE_UNAVAILABLE"
 PASSWORD_INVALID = "PASSWORD_INVALID"
 FORBIDDEN = "FORBIDDEN"
 NOT_IMPLEMENTED = "NOT_IMPLEMENTED"
@@ -50,6 +53,16 @@ class AppError(Exception):
                 "retryable": self.retryable,
             }
         }
+
+
+def database_unavailable() -> AppError:
+    """PG 故障的统一出口：不泄露 DSN / 地址 / 堆栈，也不返回伪造的空数据。"""
+    return AppError(
+        DATABASE_UNAVAILABLE,
+        "数据服务暂时不可用，请稍后重试",
+        status=503,
+        retryable=True,
+    )
 
 
 def not_implemented(feature: str) -> AppError:

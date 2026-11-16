@@ -90,6 +90,10 @@ _NUMERIC_ENV_FIELDS: tuple[str, ...] = (
     "radar_gen_max_questions",
     "radar_job_stale_minutes",
     "radar_translate_timeout_s",
+    "db_pool_timeout_s",
+    "db_recovery_interval_s",
+    "db_request_timeout_s",
+    "memory_cache_max_entries",
     "radar_translate_batch",
     "ai_embed_timeout_s",
     "ai_embed_dim",
@@ -244,14 +248,22 @@ class Settings(BaseSettings):
     jobs_stream_max_s: int = 3600
 
     # --- r98 数据层：PostgreSQL + Redis ---------------------------------------
-    #: PostgreSQL 连接串（唯一数据库，SQLite 已下线）。`postgresql://user:pw@host:5432/db`。
+    #: PostgreSQL 权威主库连接串；正常时逐笔维护 SQLite 完整副本，故障时副本接管读写。
     database_url: str = "postgresql://postgres:postgres@127.0.0.1:5432/sc_app"
     #: 连接池上下限与取连接超时（秒）。上限按「单副本 × 数据库 max_connections」估算，
     #: 多副本时每副本都开这么多，总和不能超过 PG 的 `max_connections`。
     db_pool_min_size: int = 1
     db_pool_max_size: int = 10
     db_pool_timeout_s: float = 10.0
-    #: Redis 连接串；留空 = 不启用（限流/熔断回落进程内实现，缓存直通数据库）。
+    #: 数据库启动恢复的重试间隔（秒）；进程先起来，恢复后自动补 DDL / 种子。
+    db_recovery_interval_s: float = 2.0
+    #: 前台请求获取连接的短等待（秒）；不得用后台建表的长等待阻塞 HTTP 工作线程。
+    db_request_timeout_s: float = 0.25
+    #: 持久化 SQLite 热副本；仅允许单进程后端写入，PG 恢复后重放离线日志。
+    sqlite_path: str = "data/app-fallback.db"
+    #: 进程内缓存容量上限，超限按 LRU 淘汰；会话仍受自身 expires_at 约束。
+    memory_cache_max_entries: int = 2048
+    #: Redis 连接串；留空 = 进程内缓存（限流窗口与全局熔断另有各自的本地实现）。
     #: 生产档留空会在启动时被拦下（见 `production_blockers`），避免多副本各自计数。
     redis_url: str = ""
     #: 各类 Redis key 的统一前缀：同库多环境（dev/staging/prod）共用实例时避免互相踩。

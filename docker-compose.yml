@@ -1,11 +1,12 @@
 # docker-compose.yml · SkillCoach r98 四容器交付
-#   postgres = PostgreSQL 16（唯一数据源，替代 SQLite 单文件）
+#   postgres = PostgreSQL 16（在线权威主库）
 #   redis    = Redis 8（限流窗口 / 会话缓存 / 读缓存 / 分布式锁的共享层）
 #   frontend = nginx:alpine 静态托管 + 同源反代（浏览器唯一入口）
 #   backend  = FastAPI 非 root（不发布宿主端口，只在 compose 内网暴露 8000）
 #
 # 契约单源：docs/teamflow/memory.md「容器化交付约定」——服务名 backend/frontend/postgres/redis、
-# 后端端口 8000、命名卷 skillcoach-pgdata（PG 数据）、宿主端口 ${WEB_PORT:-127.0.0.1:8080}。
+# 后端端口 8000、命名卷 skillcoach-pgdata（PG 数据）与 skillcoach-sqlite（完整离线副本）、
+# 宿主端口 ${WEB_PORT:-127.0.0.1:8080}。
 # 改任一项必须三处同改：本文件 + 本夹 DEPLOY.md + README.md。
 #
 # 硬禁令：本文件不得出现任何 Key；environment 里不得出现 AI_PROVIDER
@@ -79,12 +80,17 @@ services:
       # 口令与 postgres 服务同源（同一个 ${POSTGRES_PASSWORD}），改一处即可。
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-sc_app}
       - REDIS_URL=redis://redis:6379/0
+      - SQLITE_PATH=/data/app-fallback.db
+    volumes:
+      # 含业务完整副本和未回放的离线日志，容器重建必须保留；仅限单 worker。
+      - skillcoach-sqlite:/data
     depends_on:
       postgres:
-        # 等 PG 真正可连再起后端：否则 init_db() 会在启动瞬间抛出连接错误。
-        condition: service_healthy
+        # 不让 PG 故障阻塞 Web 进程：后台恢复任务会自动建连 / 补 DDL / 灌种子，
+        # /health 的 db_status 如实报 starting/degraded/up（200 始终表示进程在线）。
+        condition: service_started
       redis:
-        # Redis 挂了后端也能跑（降级为进程内实现），所以只等「启动完成」不等健康。
+        # Redis 故障透明降级为进程内限流、缓存回源；状态见 /health 的 redis_status。
         condition: service_started
     healthcheck:
       # 探针命令与 backend/Dockerfile 的 HEALTHCHECK 逐字相同（compose 会整体覆盖镜像定义），
@@ -112,7 +118,8 @@ services:
         if [ -z "$$AI_PROVIDER" ] && [ -n "$$AI_DEEPSEEK_API_KEY" ]; then
           export AI_PROVIDER=deepseek
         fi
-        exec uvicorn app.main:app --host 0.0.0.0 --port 8000
+        # SQLite 副本与进程内缓存依赖同一进程的锁和协调器，禁止增加 --workers / 副本数。
+        exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1
 
   # r104 本地 embedding 服务（可选档，默认**不启动**：必须显式 --profile embed）。
   # 形态：HF text-embeddings-inference（Rust + CPU 推理），OpenAI 兼容 /v1/embeddings，
@@ -163,8 +170,9 @@ services:
     #   volumes: [./frontend/.htpasswd:/etc/nginx/.htpasswd:ro]
     depends_on:
       backend:
-        # 等 backend 真正 /health 通过再起前端：探针未过时 nginx 反代上去必是 502。
-        condition: service_healthy
+        # 后端进程启动即探活（PG/Redis 可随后恢复），前端不因依赖故障被卡在未创建状态。
+        # 后端容器自身 stop 时 nginx 已启动，故障期间自然返回 502，不由编排反复重启。
+        condition: service_started
 
 volumes:
   # r104 embedding 模型缓存（HF_HOME）：容器重建复用，不重复下载。
@@ -172,7 +180,10 @@ volumes:
   # PostgreSQL 的数据目录。docker compose down 保留数据，down -v 才删除
   # （备份/恢复见 DEPLOY.md：pg_dump -Fc，不要直接拷数据目录）。
   skillcoach-pgdata:
-  # r97 及更早的 SQLite 数据卷（`app.db`）。r98 起没有任何容器挂载它，留着有两个用处：
+  # 当前版本的 SQLite 完整副本与离线操作日志；使用独立新卷，不与 r97 旧 app.db 混用。
+  # 与 PG 一起备份，离线期间严禁删除或重置；恢复 PG 前删除它会造成未回同步数据丢失。
+  skillcoach-sqlite:
+  # r97 及更早的 SQLite 数据卷（`app.db`）。当前容器不挂载它，留着有两个用处：
   #   1. 升级时从这里把 app.db 取出来跑迁移脚本；
   #   2. 回滚到 r97 时原地可用。
   # **不要 `docker volume rm`**：删了旧数据就再也迁不回来了。

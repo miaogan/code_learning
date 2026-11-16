@@ -88,6 +88,13 @@ class HealthResponse(BaseModel):
     version: str
     ai_configured: bool
     db: str
+    #: 运行时依赖：starting（首次初始化）/ up / degraded；进程探活不因此返回非 200。
+    db_status: str = "up"
+    #: Redis：up / degraded（配置了但故障）/ memory（显式或未配置进程内模式）。
+    redis_status: str = "memory"
+    #: 故障兜底副本状态：ready（可随时接管）/ stale（主库健康但副本需重建）。
+    #: `db=postgresql` + `db_status=up` + `db_replica=stale` 表示业务正常但暂时失去兜底。
+    db_replica: str = "stale"
     #: r105：本地 embedding 探活（up / down / na）。`na` = 未启用本地 embedder（哈希档）；
     #: 探活带 60s 缓存与 1.5s 超时，绝不拖慢 /health；失败只降级不熔断。
     rag_embedder: str = "na"
