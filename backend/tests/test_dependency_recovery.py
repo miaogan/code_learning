@@ -23,7 +23,7 @@ from app.core import db, redis_cache, repository
 from app.core.auth import COOKIE_NAME, new_session_token, session_expiry
 from app.core.config import get_settings
 from app.core.errors import AppError
-from app.main import _recover_database, app
+from app.main import _RECOVERY_BACKOFF_CAP_S, _backoff_delay, _exc_brief, _recover_database, app
 from app.schemas import Profile, Report, ResumeMeta
 from app.services.retrieval import indexer
 from app.services.retrieval.hybrid import search_chunks
@@ -740,6 +740,43 @@ def test_corrupt_replica_returns_retryable_503_instead_of_500(isolated_replica: 
     assert excinfo.value.code == "DATABASE_UNAVAILABLE"
     assert excinfo.value.status == 503
     assert excinfo.value.retryable is True
+
+
+def test_replica_copy_reports_table_name_on_unique_conflict(tmp_path: Path) -> None:
+    """副本侧撞唯一约束必须报出表名。
+
+    生产事故：主库 `radar_techs_pkey` 在目录里 valid，实际却不拦重复（索引缺条目），
+    副本重建时只抛 `IntegrityError` 类型名，日志看不出该去修哪张表。
+    """
+    conn = sqlite3.connect(tmp_path / "copy.db")
+    try:
+        conn.execute('CREATE TABLE radar_techs (tech_slug TEXT PRIMARY KEY, name TEXT NOT NULL)')
+        payload = [["github:dup", "a"], ["github:dup", "b"]]
+        with pytest.raises(db.ReplicaSyncError) as excinfo:
+            db._copy_rows(conn, "radar_techs", ["tech_slug", "name"], payload)
+        assert excinfo.value.table == "radar_techs"
+        assert "radar_techs" in str(excinfo.value)
+        assert "UNIQUE" in str(excinfo.value).upper()
+    finally:
+        conn.close()
+
+
+def test_backoff_delay_grows_and_caps() -> None:
+    """确定性失败不该每 2s 全量重拷一遍：间隔指数增长并封顶。"""
+    assert _backoff_delay(2.0, 0) == 2.0
+    assert _backoff_delay(2.0, 1) == 2.0
+    assert _backoff_delay(2.0, 3) == 8.0
+    assert _backoff_delay(2.0, 40) == _RECOVERY_BACKOFF_CAP_S
+
+
+def test_exc_brief_keeps_message_on_one_line() -> None:
+    """日志里要能直接读到原因，而不是只有异常类型名。"""
+    err = RuntimeError("table=radar_techs detail=UNIQUE constraint failed\nsecond line")
+    brief = _exc_brief(err)
+    assert brief.startswith("RuntimeError: ")
+    assert "radar_techs" in brief
+    assert "\n" not in brief
+    assert len(_exc_brief(RuntimeError("x" * 1000))) <= 300
 
 
 def test_unreachable_pg_skips_exclusive_recovery_window(

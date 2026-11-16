@@ -155,6 +155,25 @@ def _run_recovery_thread(worker: threading.Thread, failures: list[Exception]) ->
         raise failures[0]
 
 
+#: 恢复失败后的退避上限（秒）。确定性失败（例如主库数据撞副本唯一约束）重试多少次都一样，
+#: 每 2s 全量重拷一遍只会刷日志、给 PG 加压；退到 30s 仍能在一分钟内自愈。
+_RECOVERY_BACKOFF_CAP_S = 30.0
+
+
+def _exc_brief(exc: BaseException) -> str:
+    """异常的单行摘要：带上消息本体，去掉换行，避免把堆栈灌进日志。"""
+    text = " ".join(str(exc).split())
+    head = f"{type(exc).__name__}: {text}" if text else type(exc).__name__
+    return head[:300]
+
+
+def _backoff_delay(base: float, failures: int) -> float:
+    """连续失败后的重试间隔：指数退避，封顶 `_RECOVERY_BACKOFF_CAP_S`。"""
+    if failures <= 0:
+        return base
+    return min(_RECOVERY_BACKOFF_CAP_S, base * 2 ** (failures - 1))
+
+
 #: 数据库初始化状态：只记状态，不保存异常文本 / DSN（它们绝不能进公开探活响应）。
 _DB_STATE: dict[str, object] = {
     "state": "starting",
@@ -166,6 +185,9 @@ _DB_STATE: dict[str, object] = {
 
 async def _recover_database(ready: asyncio.Event | None = None) -> None:
     """仅故障时重建副本；在线事务逐笔镜像，避免周期任务反复覆盖副本。"""
+    base_interval = max(0.1, get_settings().db_recovery_interval_s)
+    delay = base_interval
+    consecutive_failures = 0
     while True:
         # 本轮预探活是否真的拿到 PG 应答：except 分支据此区分「主库健康、只是副本坏了」
         # 与「PG 本身不可达」。仅凭 ready 判断会在首次故障时把未就绪误报成 up。
@@ -216,21 +238,30 @@ async def _recover_database(ready: asyncio.Event | None = None) -> None:
             else:
                 # 在线只做探活，不在每次探活里建 DDL / 重拷整库。
                 await asyncio.to_thread(db.ping_postgresql)
+            # 本轮没抛异常：清掉退避，回到常规节拍。
+            consecutive_failures = 0
+            delay = base_interval
         except asyncio.CancelledError:
             raise
         except Exception as exc:  # noqa: BLE001 - 恢复失败仍可尝试完整副本
+            consecutive_failures += 1
+            delay = _backoff_delay(base_interval, consecutive_failures)
+            reason = _exc_brief(exc)
             runtime = db.runtime_state()
             primary_ok = (
                 pg_answered and bool(runtime["ready"]) and runtime["backend"] == "postgresql"
             )
             if primary_ok:
-                # 主库健康、只是副本重建失败（磁盘满 / 副本文件损坏）：业务继续在 PG 上跑，
-                # 只是暂时失去兜底。把坏掉的兜底当故障扩散到健康主库是得不偿失的。
+                # 主库健康、只是副本重建失败（磁盘满 / 副本文件损坏 / 主库数据撞唯一约束）：
+                # 业务继续在 PG 上跑，只是暂时失去兜底。把坏掉的兜底当故障扩散到健康主库
+                # 是得不偿失的。
                 _DB_STATE.update(
                     state="up", initialized=True,
                     checked_at=time.monotonic(), probe_state="up",
                 )
-                db_logger.warning("db.replica.rebuild_failed error=%s", type(exc).__name__)
+                db_logger.warning(
+                    "db.replica.rebuild_failed error=%s retry_in=%.0fs", reason, delay
+                )
             else:
                 try:
                     if db.active_backend() != "sqlite":
@@ -239,22 +270,23 @@ async def _recover_database(ready: asyncio.Event | None = None) -> None:
                         state="degraded", initialized=True,
                         checked_at=time.monotonic(), probe_state="up",
                     )
-                    db_logger.warning("db.sqlite_fallback.ready error=%s", type(exc).__name__)
+                    db_logger.warning("db.sqlite_fallback.ready error=%s", reason)
                 except Exception as fallback_exc:  # noqa: BLE001 - 无完整副本时明确拒绝业务写
                     _DB_STATE.update(state="degraded", initialized=False, probe_state="degraded")
                     db_logger.warning(
-                        "db.sqlite_fallback.unavailable error=%s", type(fallback_exc).__name__
+                        "db.sqlite_fallback.unavailable error=%s", _exc_brief(fallback_exc)
                     )
             if ready is not None:
                 ready.set()
             now = time.monotonic()
             if now - float(_DB_STATE.get("last_log_at", 0.0)) >= 30.0:
                 db_logger.warning(
-                    "db.recovery.retry backend=%s replica_ready=%s error=%s",
-                    runtime["backend"], runtime["replica_ready"], type(exc).__name__,
+                    "db.recovery.retry backend=%s replica_ready=%s attempts=%s error=%s",
+                    runtime["backend"], runtime["replica_ready"],
+                    consecutive_failures, reason,
                 )
                 _DB_STATE["last_log_at"] = now
-        await asyncio.sleep(max(0.1, get_settings().db_recovery_interval_s))
+        await asyncio.sleep(delay)
 
 
 def _initialize_database() -> None:

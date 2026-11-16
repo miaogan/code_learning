@@ -47,6 +47,19 @@ from app.core.config import get_settings
 
 logger = logging.getLogger("app.db")
 
+
+class ReplicaSyncError(RuntimeError):
+    """副本重建失败，且已定位到具体表。
+
+    只记异常类型是不够的：生产真实事故里 PG 目录中的唯一索引标记 valid、实际却不拦重复，
+    `IntegrityError` 本身不说是哪张表哪条约束，排查得重新写脚本跑一遍。表名必须进日志。
+    """
+
+    def __init__(self, table: str, detail: str) -> None:
+        super().__init__(f"table={table} detail={detail}")
+        self.table = table
+        self.detail = detail
+
 #: `_now()` 的 SQL 等价物：UTC 毫秒 + `+00:00` 后缀，与业务层写入的时间串（ISO 8601 UTC）
 #: 逐字同构。PG 没有 SQLite 的 `strftime`，`to_char` 的 `MS` 恰好是 3 位毫秒。
 #: 保持字符串排序＝时间排序，是既有索引（`ORDER BY created_at DESC`）成立的前提。
@@ -1464,6 +1477,25 @@ def _sync_table_names(raw: Any) -> list[str]:
     ]
 
 
+def _copy_rows(
+    local: Connection, table: str, columns: Sequence[str], payload: Sequence[Sequence[Any]]
+) -> None:
+    """把一批行写进副本；冲突时把表名带进异常。
+
+    唯一 / 非空约束在副本侧是真实生效的，主库侧却可能因为索引损坏而不拦重复
+    （生产真实事故：`radar_techs_pkey` 目录标 valid、实际缺条目）。只抛 `IntegrityError`
+    类型名的话，日志看不出该去修哪张表。
+    """
+    if not payload:
+        return
+    quoted = ", ".join(f'"{name}"' for name in columns)
+    marks = ", ".join("?" for _ in columns)
+    try:
+        local.executemany(f'INSERT INTO "{table}" ({quoted}) VALUES ({marks})', payload)
+    except sqlite3.IntegrityError as exc:
+        raise ReplicaSyncError(table, str(exc)) from exc
+
+
 def sync_sqlite_from_pg() -> dict[str, int]:
     """首次或回切后整库重建副本；只在切库写锁内调用，不接受并发离线写。"""
     global _SYNC_TABLES
@@ -1499,11 +1531,7 @@ def sync_sqlite_from_pg() -> dict[str, int]:
                         json.dumps(value) if isinstance(value, list) else value
                         for value in (row[name] for name in columns)
                     ])
-                if payload:
-                    marks = ", ".join("?" for _ in columns)
-                    local.executemany(
-                        f'INSERT INTO "{table}" ({quoted}) VALUES ({marks})', payload
-                    )
+                _copy_rows(local, table, columns, payload)
                 counts[table] = len(payload)
             _SYNC_TABLES = tuple(counts)
             local.execute("DELETE FROM _offline_operations")
