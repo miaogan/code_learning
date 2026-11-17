@@ -220,6 +220,9 @@ _NEUTRAL_AI_ENV: dict[str, str] = {
     # r105：启动时的教程种子摄取会与用例里的 chunk 计数断言抢写（后台任务在用例中途插行），
     # 测试里一律关闭；`ensure_tutorials_indexed()` 由专门用例直接调用。
     "RAG_SEED_TUTORIALS": "false",
+    # r115：内网放行开关会把「私网端点」从拒绝变成接受（`test_r99_ssrf_guard.py` 断言的是
+    # 默认公网档），宿主 `.env` 一旦打开它，整批 SSRF 用例就会红在「本该拒绝却放行」上。
+    "AI_ALLOW_PRIVATE_ENDPOINTS": "false",
 }
 
 

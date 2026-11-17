@@ -13,12 +13,25 @@ from typing import Any
 
 import pytest
 
+from app.core.config import get_settings
 from app.core.errors import AppError
 from app.services.ai.user_ai import (
     normalize_ai_settings,
     test_connection as run_test_connection,
-    validate_public_base_url,
+    validate_ai_base_url,
 )
+
+#: 本文件断言的是**默认公网档**：宿主 `.env` 若开了内网放行，这批「必须拒绝」的用例
+#: 会红在「本该拒绝却放行」上 —— 那不是回归，是环境串味。内网档的行为见
+#: `test_r115_intranet.py`。
+
+
+@pytest.fixture(autouse=True)
+def _public_mode(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AI_ALLOW_PRIVATE_ENDPOINTS", "false")
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
 
 PRIVATE_URLS = (
     "http://127.0.0.1:1/v1",
@@ -37,9 +50,11 @@ PRIVATE_URLS = (
 @pytest.mark.parametrize("url", PRIVATE_URLS)
 def test_validate_rejects_private_targets(url: str) -> None:
     with pytest.raises(AppError) as exc:
-        validate_public_base_url(url)
+        validate_ai_base_url(url)
     assert exc.value.status == 422
-    assert "不允许指向本机" in exc.value.message
+    # r115：拒绝分两类（本机 / 内网 与 云元数据），两句都从「不允许指向」起头，
+    # 所以默认档只断言这个共同前缀 —— 换哪一类文案都不会把这条用例带红。
+    assert "不允许指向" in exc.value.message
 
 
 @pytest.mark.parametrize("url", PRIVATE_URLS)
@@ -50,12 +65,12 @@ def test_save_settings_rejects_private_targets(url: str) -> None:
 
 def test_scheme_still_validated() -> None:
     with pytest.raises(AppError) as exc:
-        validate_public_base_url("ftp://example.com/v1")
+        validate_ai_base_url("ftp://example.com/v1")
     assert "http:// 或 https://" in exc.value.message
 
 
 def test_public_ip_literal_allowed() -> None:
-    assert validate_public_base_url("https://1.1.1.1/v1") == "https://1.1.1.1/v1"
+    assert validate_ai_base_url("https://1.1.1.1/v1") == "https://1.1.1.1/v1"
 
 
 def test_unresolvable_host_passes(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -65,7 +80,7 @@ def test_unresolvable_host_passes(monkeypatch: pytest.MonkeyPatch) -> None:
         raise socket.gaierror("no dns")
 
     monkeypatch.setattr("app.services.ai.user_ai.socket.getaddrinfo", _no_dns)
-    assert validate_public_base_url("https://api.example.test/v1") == "https://api.example.test/v1"
+    assert validate_ai_base_url("https://api.example.test/v1") == "https://api.example.test/v1"
 
 
 def test_test_connection_blocks_private_before_any_request(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -85,7 +100,7 @@ def test_test_connection_blocks_private_before_any_request(monkeypatch: pytest.M
         )
     )
     assert ok is False
-    assert "不允许指向本机" in message
+    assert "不允许指向" in message
 
 
 def test_test_connection_timeout_is_bounded(monkeypatch: pytest.MonkeyPatch) -> None:
