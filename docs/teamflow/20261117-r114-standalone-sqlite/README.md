@@ -51,8 +51,10 @@ if complete is None:
 | `backend/app/core/db.py` | 新增 `_standalone` 标记、`is_standalone()`、`has_sqlite_data()`、`standalone_bootstrap_allowed()`、`mark_standalone_baseline()`、`activate_standalone_sqlite()`；`activate_sqlite()` 识别 `standalone='1'` 持久标记；单机下关闭 `_offline_operations` 写入；`sync_sqlite_from_pg()` / `refresh_replica()` 单机下 no-op；`reset_runtime()` 复位标记 |
 | `backend/app/main.py` | lifespan 分流到 `_bootstrap_standalone()`；`_recover_database` 加 `ever_ready` 与宽限期、单机后只做 5 分钟低频巡检；`_initialize_database` 拆分出 `_seed_business_data(rag_strict=...)`；`_activate_fallback(allow_bootstrap)`；`/health` 补 `db_replica=na` |
 | `backend/app/schemas.py` | `db_replica` 注释补齐 `na` 语义（r99 注释承诺过但未实现） |
-| `backend/tests/test_db_standalone.py` | 新增 7 项专项测试 |
+| `backend/tests/test_db_standalone.py` | 新增 9 项专项测试 |
 | `docs/teamflow/20261117-r114-standalone-sqlite/smoke_standalone.py` | 进程级验收脚本（无 PG / 无 Redis / 空目录冷启动） |
+
+**补丁（同批次）**：`app/admin_cli.py` 原来无条件调 `init_db()`（force_pg），单机环境下「建号」会直接失败 —— 而它恰是单机部署最需要的第一个命令。改为按模式分流：单机档接管单机库（空目录则 bootstrap 并打标记），其余档位不变；`_sync_replica()` 在单机下直接返回，不再打印「兜底副本已同步：0 张表、0 行」这种误导信息。
 
 ## 5. 四个必须一并处理的坑
 
@@ -83,7 +85,7 @@ if complete is None:
 RESULT: ALL PASS
 ```
 
-**单测**：`pytest tests/test_db_standalone.py` 7/7；`tests/test_dependency_recovery.py` + `tests/test_health.py` 33/33（含两个原本因自动降级而失败的用例，加上宽限期后恢复原有语义）。
+**单测**：`pytest tests/test_db_standalone.py` 9/9；`tests/test_dependency_recovery.py` + `tests/test_health.py` 33/33（含两个原本因自动降级而失败的用例，加上宽限期后恢复原有语义）。
 
 ## 7. 已知边界
 
