@@ -66,27 +66,48 @@ npm run dev        # http://127.0.0.1:5173，/api 与 /health 已代理到 :8000
 
 `.env` 里填 `AI_API_KEY` 后 AI 链路才有真实输出；**不填也不会 500**，页面会给出中文提示（AC-8）。
 
-## 没有 PostgreSQL / Redis 也能跑（`DB_MODE=sqlite`）
+## 没有 PostgreSQL / Redis 也能跑（默认自动）
 
-上面第 0 步的 PG + Redis 是**生产形态**的依赖，不是跑起来的必要条件。在只有 Python 的机器上（本地试用、单机部署、CI）直接用单机模式：
+上面第 0 步的 PG + Redis 是**生产形态**的依赖，不是跑起来的必要条件。**不需要改任何配置**，直接起：
 
 ```bash
 cd backend
-DB_MODE=sqlite .venv/Scripts/python -m uvicorn app.main:app --port 8000
-#   库文件默认落在 data/app-fallback.db，首次启动自动建表并灌题库种子（1300+ 题）
+.venv/Scripts/python -m uvicorn app.main:app --port 8000
+#   连不上 PG 就自动建 SQLite 单机库：data/app-fallback.db（建表 + 灌题库种子 1300+ 题）
 ```
 
-**两种进入方式**：
+启动时会打印**实际用了哪个库**，不用猜：
 
-- **显式**：`DB_MODE=sqlite` —— 完全不碰 PostgreSQL，不探测、不重试；SQLite 就是权威主库。
-- **自动**（`DB_MODE=auto`，默认）：进程**首次启动**、等过 `DB_STANDALONE_GRACE_S`（默认 15s）仍连不上 PG、且 `SQLITE_PATH` 里**没有任何既有数据**时，自动新建单机库并记 WARNING。
+```
+[数据层] db.backend.selected backend=postgresql PostgreSQL 可用 → 使用 PostgreSQL 作为权威主库
+[缓存层] Redis 可用 → 使用 Redis（限流 / 会话 / 读缓存跨进程共享）
+```
 
-自动这条路刻意加了三道闸，因为「顺手降级」在生产上很危险：`ever_ready`（本进程一次都没连上过 PG）、宽限期（区分「PG 比 backend 晚几秒就绪」和「压根没有 PG」）、`standalone_bootstrap_allowed()`（有数据就拒绝）。三者缺一，都退回原有语义 —— **返回可重试 503，绝不用空库或残缺副本顶替主库**。
+没有 PG / Redis 时：
+
+```
+[数据层] db.backend.selected backend=sqlite PostgreSQL 不可用且没有既有数据 → 已新建 SQLite 单机库：data/app-fallback.db
+[缓存层] Redis 不可用 → 已降级为进程内缓存（恢复后自动切回）
+```
+
+**判定顺序**（服务启动与 `admin_cli` 建号**共用同一套**，见 `db.bootstrap()`）：
+
+| 情况 | 结果 |
+|---|---|
+| PG 连得上 | 用 PostgreSQL（**优先**） |
+| PG 连不上，SQLite 有完整副本 | 副本接管，PG 恢复后自动回切 |
+| PG 连不上，SQLite 是单机库 | 用单机库（重启后仍认它是权威库） |
+| PG 连不上，SQLite 空库 / 不存在 | 等 `DB_STANDALONE_GRACE_S`（默认 15s，给"PG 晚几秒就绪"留机会）→ 仍不通才**新建**单机库 |
+| PG 连不上，SQLite 有数据但无权威标记 | 拒绝并报错（半份副本不能顶替主库），报错里给处理方式 |
+
+最后一行那种情况（多是从 r98 之前的老 `app.db` 升上来的），确认数据无误后加 `DB_MODE=sqlite` 显式声明即可接管。
+
+`DB_MODE` 可以强制覆盖：`auto`（默认，上面这套）／`sqlite`（不探测 PG）／`postgres`（连不上就报错，不降级）。
 
 **边界（务必知道）**：
 
 - **单进程单副本**：SQLite 是进程本地文件，不能多 worker、不能多实例同时挂载。
-- **不会自动切回 PG**：单机库的数据只有它自己一份。后来配好了 PG，服务会保持单机并每 5 分钟打一次 `db.standalone.postgres_reachable` 告警 —— 要迁走请走 `scripts/migrate_sqlite_to_pg.py` 并换一个空数据目录。
+- **不会自动切回 PG**：单机库的数据只有它自己一份，切过去等于丢。后来配好了 PG，服务会保持单机并每 5 分钟打一次 `db.standalone.postgres_reachable` 告警 —— 要迁走请走 `scripts/migrate_sqlite_to_pg.py` 并换一个空数据目录。
 - **没有外部备份**：请自行备份 `SQLITE_PATH`（备份 SQLite 时连同 `-wal` / `-shm` 一起）。
 - 离线重放日志在单机模式下**整体关闭**（没有 PG 可回放，记录只会无限增长）。
 
