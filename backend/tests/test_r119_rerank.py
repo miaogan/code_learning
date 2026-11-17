@@ -212,3 +212,87 @@ def test_keyword_mode_never_reranks(monkeypatch: pytest.MonkeyPatch) -> None:
     result = hybrid.search_chunks("查询词", mode="keyword", top_k=2)
     assert called == []
     assert result["reranked"] is False
+
+
+# --- r120 DashScope 协议 -----------------------------------------------------------
+
+_DASHSCOPE_URL = "https://dashscope.aliyuncs.com/api/v1/services/rerank/text-rerank/text-rerank"
+
+
+def _dashscope_runtime(**overrides: Any) -> Any:
+    params: dict[str, Any] = {
+        "ai_rerank_base_url": _DASHSCOPE_URL,
+        "ai_rerank_protocol": "dashscope",
+        "ai_rerank_model": "qwen3.7-text-rerank",
+    }
+    params.update(overrides)
+    return resolve_reranker(Settings(**params))
+
+
+def test_resolve_reranker_dashscope_requires_model() -> None:
+    """dashscope 缺 model = 未配置（返回 None），避免每次检索发一个必然 400 的请求。"""
+    assert _dashscope_runtime(ai_rerank_model="") is None
+    assert _dashscope_runtime() is not None
+
+
+def test_resolve_reranker_api_key_inherits_embed_tier() -> None:
+    """同一云端账号只填一次 Key：rerank 留空时继承 embed 档。"""
+    runtime = _dashscope_runtime(ai_embed_api_key="sk-from-embed")
+    assert runtime is not None
+    assert runtime.api_key == "sk-from-embed"
+    assert _dashscope_runtime(ai_rerank_api_key="sk-own").api_key == "sk-own"
+
+
+def test_resolve_reranker_unknown_protocol_falls_back_to_tei() -> None:
+    runtime = resolve_reranker(
+        Settings(ai_rerank_base_url="http://rerank:8080", ai_rerank_protocol="grpc")
+    )
+    assert runtime is not None and runtime.protocol == "tei"
+
+
+def test_rerank_order_dashscope_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_post(url: str, **kwargs: Any) -> Any:
+        # dashscope 协议的 base_url 是完整端点，不能再拼 /rerank
+        assert url == _DASHSCOPE_URL
+        assert kwargs["json"]["model"] == "qwen3.7-text-rerank"
+        assert kwargs["json"]["input"] == {"query": "q", "documents": ["a", "b", "c"]}
+        assert kwargs["json"]["parameters"] == {"top_n": 3, "return_documents": False}
+        assert kwargs["headers"]["Authorization"] == "Bearer sk-x"
+        return httpx.Response(
+            200,
+            json={
+                "output": {
+                    "results": [
+                        {"index": 1, "relevance_score": 0.9},
+                        {"index": 2, "relevance_score": 0.5},
+                        {"index": 0, "relevance_score": 0.1},
+                    ]
+                }
+            },
+        )
+
+    monkeypatch.setattr("app.services.retrieval.rerank.httpx.post", fake_post)
+    order, notice = rerank_order("q", ["a", "b", "c"], _dashscope_runtime(ai_rerank_api_key="sk-x"))
+    assert (order, notice) == ([1, 2, 0], "")
+
+
+@pytest.mark.parametrize(
+    "payload",
+    (
+        {"output": {"results": [{"index": 0}, {"index": 0}]}},  # 重复
+        {"output": {"results": [{"index": 0}]}},  # 缺号
+        {"output": {}},  # 没有 results
+        {"results": [{"index": 0}, {"index": 1}]},  # 少一层 output
+        [{"index": 0}, {"index": 1}],  # 裸 list（TEI 形态，协议不匹配）
+    ),
+)
+def test_rerank_order_dashscope_malformed_fails_open(
+    monkeypatch: pytest.MonkeyPatch, payload: Any
+) -> None:
+    monkeypatch.setattr(
+        "app.services.retrieval.rerank.httpx.post",
+        lambda url, **kwargs: httpx.Response(200, json=payload),
+    )
+    order, notice = rerank_order("q", ["a", "b"], _dashscope_runtime())
+    assert order == [0, 1]
+    assert notice == "rerank 精排响应异常，已按融合排序返回"

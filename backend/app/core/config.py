@@ -211,10 +211,21 @@ class Settings(BaseSettings):
     ai_embed_batch: int = 32
 
     # --- r119 rerank 精排（可选，默认关） --------------------------------------
-    #: rerank 端点根（TEI 形态 `POST {base}/rerank`，如 `http://reranker:8080`）；
-    #: **留空 = 不精排**，检索行为与 r100 完全一致（rrf 融合序即最终序）。
-    #: 服务端配置不受 SSRF 门禁约束（内网自建 TEI 是主用形态）。
+    #: rerank 端点：**留空 = 不精排**，检索行为与 r100 完全一致（rrf 融合序即最终序）。
+    #: 两种协议的 base_url 语义不同，见下面 `ai_rerank_protocol`。
+    #: 服务端配置不受 SSRF 门禁约束（内网自建 TEI / 云端 SaaS 都是管理员显式配置）。
     ai_rerank_base_url: str = ""
+    #: 精排协议闭集（r120）：
+    #: - `tei`（默认）：`POST {base}/rerank`，body `{query, texts}`，响应 `[{index, score}]`
+    #:   —— r118 自建 TEI 容器形态；
+    #: - `dashscope`：`AI_RERANK_BASE_URL` 填**完整端点 URL**（不再拼后缀），
+    #:   body `{model, input:{query, documents}, parameters}`，响应 `output.results[].relevance_score`
+    #:   —— 阿里云百炼 qwen3.7-text-rerank 等形态。
+    ai_rerank_protocol: str = "tei"
+    #: 精排模型名（仅 `dashscope` 协议必填；`tei` 协议由容器启动参数决定，留空即可）。
+    ai_rerank_model: str = ""
+    #: 精排 Key：留空 → 继承 `AI_EMBED_API_KEY` → 再继承主档（同一云端账号只填一次）。
+    ai_rerank_api_key: str = ""
     #: 精排单次请求超时（秒）：交叉编码器对 20 条候选在 1 核 CPU 上实测亚秒到数秒。
     ai_rerank_timeout_s: float = 8.0
     #: 送精排的候选池上限：融合腿取宽到 pool 条 → 精排 → 截回 top_k；

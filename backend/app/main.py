@@ -5,6 +5,7 @@
 """
 
 import asyncio
+import ipaddress
 import logging
 import threading
 import time
@@ -566,26 +567,49 @@ def _db_probe_state() -> str:
 _EMBEDDER_PROBE: dict[str, object] = {"state": "na", "checked_at": 0.0}
 
 
+def _probe_target_is_self_hosted(base: str) -> bool:
+    """探活只对自建 / 内网端点有意义（r120）。
+
+    公网 SaaS（如 `https://dashscope.aliyuncs.com/compatible-mode/v1`）的 `/health`
+    必然是 404 —— 探了只会把 `/health` 上的 `rag_embedder` 永久报成 down（误报），
+    还每 60 秒往公网打一次无用请求。判据：私网 IP / 回环 / 单标签主机名（compose 服务名
+    `embedder`、`reranker`）才算自建；多标签域名按公网处理。
+    """
+    host = (urlparse(base).hostname or "").strip().lower()
+    if not host:
+        return False
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError:
+        # 单标签主机名（无点）= docker compose 网络内服务名。
+        return "." not in host
+    return address.is_private or address.is_loopback or address.is_link_local
+
+
 def _embedder_probe_state() -> str:
-    """本地 embedder 探活（up / down / na）：60s 缓存 + 1.5s 超时，失败只降级。"""
+    """本地 embedder 探活（up / down / na）：60s 缓存 + 1.5s 超时，失败只降级。
+
+    远程 SaaS 端点返回 `na`（不适用）：既不误报 down，也不制造公网噪声（r120）。
+    """
     settings = get_settings()
     if not settings.ai_embed_model:
         return "na"
-    now = time.monotonic()
-    if now - float(_EMBEDDER_PROBE["checked_at"]) < 60.0:
-        return str(_EMBEDDER_PROBE["state"])
-    state = "down"
     base = (settings.ai_embed_base_url or "").rstrip("/")
     # OpenAI 兼容端点的 base 以 /v1 结尾，而 TEI 的健康端点在**根路径** /health ——
     # 直接拼会探到 /v1/health（404）而误报 down（生产实测过）。
     if base.endswith("/v1"):
         base = base[: -len("/v1")]
-    if base:
-        try:
-            resp = httpx.get(base + "/health", timeout=1.5)
-            state = "up" if resp.status_code == 200 else "down"
-        except Exception:  # noqa: BLE001 - 探活永不抛错：/health 必须始终可用
-            state = "down"
+    if not base or not _probe_target_is_self_hosted(base):
+        return "na"
+    now = time.monotonic()
+    if now - float(_EMBEDDER_PROBE["checked_at"]) < 60.0:
+        return str(_EMBEDDER_PROBE["state"])
+    state = "down"
+    try:
+        resp = httpx.get(base + "/health", timeout=1.5)
+        state = "up" if resp.status_code == 200 else "down"
+    except Exception:  # noqa: BLE001 - 探活永不抛错：/health 必须始终可用
+        state = "down"
     _EMBEDDER_PROBE["state"] = state
     _EMBEDDER_PROBE["checked_at"] = now
     return state
