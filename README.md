@@ -143,7 +143,8 @@ python -X utf8 scripts/eval_live.py --check                 # 在线评测脚手
 
 - **分支模型**：`master` 是受保护的发布存档主干（只接收已验收的版本批次，不部署），`dev` 是日常开发与**唯一自动部署**分支（push 到 `dev` 经 CI 双门禁后自动部署生产）。生产实际运行 `dev` 的 HEAD。历史需求改动曾从基线 `32487b4` 起在 `feat/dev-skill-coach` 上完成，该分支已删除。
 - **版本发布**：`master` 不直接开发、不直接合入；每个版本批次走 `vX.Y.Z` tag → `release/vX.Y.Z` 临时分支 → PR → `master`（合并后删临时分支，稳态只留两条分支）。版本号规则、准入清单与操作步骤见 [`docs/teamflow/20261114-cicd/RELEASE.md`](docs/teamflow/20261114-cicd/RELEASE.md)，版本内容见 [`CHANGELOG.md`](CHANGELOG.md)。
-- **提交**：开发期间不留中间提交，也**不由 Agent 提交或合并**；验收通过后由流水线一次性提交（代码 + `docs/teamflow/` 任务夹一起入库，`?? docs/` 不会漏）。
+- **提交**：由 Agent 执行，按语义分批——每轮改动（代码 + `docs/teamflow/` 任务夹 + `AGENTS.md` 变更记录）合成**一个语义完整的 commit**，不留「只为跑通而存」的中间提交；提交前先过门禁（`pytest` / `ruff` / `typecheck` / `lint` / `build`），推送 `dev` 后由 CI 双门禁把关并自动部署生产。跨需求交织在同一批文件时（如契约与样式表），允许合并为一个 commit，但提交信息正文要分段写清各自范围。
+- **发版即合并**：`master` 只经 `release/vX.Y.Z` 分支的 PR 合入（merge commit，不用 squash / rebase），合并后删临时分支。单人仓库的 approval 无法自我满足，按 [`RELEASE.md` §5.1](docs/teamflow/20261114-cicd/RELEASE.md) 的标准动作处理：**先等三项必需检查全绿**，再只把 `required_approving_review_count` 调 0，合并后 `finally` 立即恢复 `1` 并逐字段复验；长期方案是加第二个协作者或交给 CI 自动合并。
 - **回滚到基线（改动整体可撤销）**：
 
 ```bash
