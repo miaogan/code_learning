@@ -183,3 +183,39 @@ def test_replica_sync_is_noop_in_standalone(standalone_env: Path) -> None:
     assert db.sync_sqlite_from_pg() == {}
     assert db.refresh_replica() == {}
     assert db.is_standalone() is True
+
+
+def test_admin_cli_creates_user_without_postgres(standalone_env: Path) -> None:
+    """建号工具在单机模式下必须可用。
+
+    `admin_cli.main()` 原来无条件调 `init_db()`（强制走 PG 连接），在没有 PG 的环境里
+    「建号」这种纯本地操作会直接失败 —— 而它恰好是单机部署最需要的第一个命令。
+    """
+    from app import admin_cli
+
+    code = admin_cli.main(
+        ["create-user", "--email", "cli@test.local", "--name", "CLI", "--mode", "own"]
+    )
+    assert code == 0
+    assert db.is_standalone() is True
+    # 不只是打印了成功：行必须真的落进单机库。
+    assert repository.get_user_by_email("cli@test.local") is not None
+
+
+def test_admin_cli_bootstraps_empty_directory(standalone_env: Path) -> None:
+    """空库时先跑建号（服务还没起过）也要能成 —— CLI 自己把单机库建出来。"""
+    from app import admin_cli
+
+    # 注意判据用「有没有业务数据」而不是「文件在不在」：`reset_runtime()` 读 complete
+    # 标记时会 `sqlite3.connect`，空路径上已经留下一个 0 字节文件了。
+    assert db.has_sqlite_data() is False
+    assert db.standalone_bootstrap_allowed() is True
+    code = admin_cli.main(
+        ["create-user", "--email", "first@test.local", "--name", "First", "--mode", "own"]
+    )
+    assert code == 0
+    # 必须打上权威标记：否则服务启动会把这份库当成「来历不明的半同步副本」拒绝接管。
+    with sqlite3.connect(standalone_env) as raw:
+        keys = {row[0] for row in raw.execute("SELECT key FROM _sync_state")}
+    assert {"complete", "standalone"} <= keys
+    assert db.has_sqlite_data() is True
