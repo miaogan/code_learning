@@ -9,6 +9,12 @@
 3. **响应必须校验**：两种协议返回的行都必须含 `index`，且 index 必须恰好是输入下标的
    **排列**；不是排列（服务错乱 / 版本不符 / top_n 截断）按失败处理，不让错位映射污染排序。
 
+**分数口径（r121 修正）**：精排生效时 `score` 直接取精排模型的相关性分（归一化到 0~1），
+因为精排分才是这次结果的真实排序依据——沿用融合分会出现「第一名分数低于第四名」的
+自相矛盾。归一化按协议：`dashscope` 的 `relevance_score` 文档口径已在 [0,1]，原值透传；
+`tei` 的 `score` 是交叉编码器原始 logit（可负、可远大于 1），过 sigmoid 映射到 (0,1)。
+未启用精排 / fail-open 时 `score` 仍是该模式的引擎原分（余弦 / RRF / 1.0），行为不变。
+
 两种协议的差异（`AI_RERANK_PROTOCOL` 闭集，r120）：
 
 | 协议 | 端点 | 请求 | 响应 |
@@ -26,6 +32,7 @@
 from __future__ import annotations
 
 import logging
+import math
 from dataclasses import dataclass
 
 import httpx
@@ -112,30 +119,59 @@ def _extract_rows(payload: object, protocol: str) -> object:
     return output.get("results")
 
 
-def _order_from_response(rows: object, count: int) -> list[int]:
-    """响应行 → 输入下标的重排顺序。非排列（缺号 / 越界 / 重复）一律抛 ValueError。"""
+def _normalize_score(protocol: str, raw: float) -> float:
+    """精排原始分 → [0, 1]（r121）。
+
+    - `dashscope`：`relevance_score` 文档口径就是 [0,1] 的相关性分，原值透传；
+    - `tei`：`score` 是交叉编码器的 **logit**（可负、可远大于 1），过 sigmoid 映射。
+    越界值（协议假设被打破）统一走 sigmoid 兜底，clamp 到 ±60 防 `math.exp` 溢出。
+    """
+    if protocol == "dashscope" and 0.0 <= raw <= 1.0:
+        return round(raw, 6)
+    clamped = max(-60.0, min(60.0, raw))
+    return round(1.0 / (1.0 + math.exp(-clamped)), 6)
+
+
+def _parse_rows(rows: object, count: int) -> list[tuple[int, float]]:
+    """响应行 → `[(输入下标, 原始分)]`，保持服务返回的顺序（正常即分数降序）。
+
+    非排列（缺号 / 越界 / 重复）一律抛 ValueError；两种协议的分数键名不同，
+    统一按 `score` → `relevance_score` 取值。
+    """
     if not isinstance(rows, list) or len(rows) != count:
         raise ValueError("rerank 响应条数与候选不一致")
     seen: set[int] = set()
-    order: list[int] = []
-    for row in rows:  # 两种协议都按 score 降序返回；只认下标，不引入它的分数量纲。
+    parsed: list[tuple[int, float]] = []
+    for row in rows:
         if not isinstance(row, dict) or "index" not in row:
             raise ValueError("rerank 响应行缺少 index")
         index = int(row["index"])
         if not 0 <= index < count or index in seen:
             raise ValueError("rerank 响应的 index 不是候选下标的排列")
         seen.add(index)
-        order.append(index)
-    return order
+        try:
+            score = float(row.get("score", row.get("relevance_score", 0.0)))
+        except (TypeError, ValueError):
+            raise ValueError("rerank 响应行的分数不可解析") from None
+        parsed.append((index, score))
+    return parsed
 
 
-def rerank_order(query: str, texts: list[str], runtime: RerankRuntime) -> tuple[list[int], str]:
-    """调精排端点，返回 `(重排后的下标顺序, notice)`。
+def _order_from_response(rows: object, count: int) -> list[int]:
+    """只取重排顺序（r119 调用点 / 单测用）：`_parse_rows` 的薄封装。"""
+    return [index for index, _ in _parse_rows(rows, count)]
 
-    - 成功：`(排列, "")`；
-    - 失败 / 超时 / 畸形响应：`(原序, 中文 notice)` —— fail-open，绝不抛到检索层之上。
+
+def rerank_order(
+    query: str, texts: list[str], runtime: RerankRuntime
+) -> tuple[list[tuple[int, float]], str]:
+    """调精排端点，返回 `([(输入下标, 归一化后的精排分)], notice)`。
+
+    - 成功：`(按精排分降序的列表, "")` —— 分数已归一到 0~1，调用方应据此重写 `score`；
+    - 失败 / 超时 / 畸形响应：`(原序且分数全 0 的列表, 中文 notice)` —— fail-open，
+      绝不抛到检索层之上；此时调用方保留原有分数（见 `hybrid.search_chunks`）。
     """
-    identity = list(range(len(texts)))
+    identity = [(index, 0.0) for index in range(len(texts))]
     protocol = runtime.protocol
     url = runtime.base_url if protocol == "dashscope" else runtime.base_url + "/rerank"
     payload = _payload_for(protocol, query, texts)
@@ -153,8 +189,8 @@ def rerank_order(query: str, texts: list[str], runtime: RerankRuntime) -> tuple[
         logger.warning("rag.rerank.http_error protocol=%s status=%s", protocol, response.status_code)
         return identity, "rerank 精排服务返回异常，已按融合排序返回"
     try:
-        order = _order_from_response(_extract_rows(response.json(), protocol), len(texts))
+        parsed = _parse_rows(_extract_rows(response.json(), protocol), len(texts))
     except (ValueError, TypeError) as exc:
         logger.warning("rag.rerank.malformed_response protocol=%s detail=%s", protocol, exc)
         return identity, "rerank 精排响应异常，已按融合排序返回"
-    return order, ""
+    return [(index, _normalize_score(protocol, raw)) for index, raw in parsed], ""

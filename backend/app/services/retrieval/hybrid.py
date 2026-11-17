@@ -13,6 +13,8 @@ r119 精排（可选）：`AI_RERANK_BASE_URL` 配置后，semantic / hybrid 在
 先精排再截回 top_k，`reranked` 字段如实报告；未配置时行为与 r100 逐字节一致。
 精排启用时 r103 反馈加权不再参与最终序（它会按 RRF 分重排，会毁掉精排结果），
 这是有意取舍：交叉编码器的语义信号远强于个人投票。
+**r121**：精排生效时 `score` 换成精排相关性分（0~1），与最终排名自洽；未精排 / fail-open
+时仍是该模式的引擎原分（keyword 1.0 / semantic 余弦 / hybrid RRF）。
 
 诚实边界：默认 `HashingEmbedder` 的「语义」是字符 bigram 重叠（模糊关键词基座），
 接真实语义模型只需配 `AI_EMBED_MODEL`，管线零改动；评测报告按 embedder 名如实标注。
@@ -223,13 +225,15 @@ def search_chunks(
     # keyword 模式不精排：它是纯 ILIKE 对照面，保持与既有引擎同一口径。
     reranked = False
     if stage is not None and mode in ("semantic", "hybrid") and items:
-        order, rerank_notice = rerank_order(
+        ranked, rerank_notice = rerank_order(
             needle, [str(item["content"]) for item in items], stage
         )
         if rerank_notice:
             notices.append(rerank_notice)
         else:
-            items = [items[index] for index in order][:size]
+            # r121：score 换成精排分（已归一到 0~1）。排序依据变了，展示分必须跟着变，
+            # 否则会出现「第一名分数低于第四名」的自相矛盾（r119 遗留）。
+            items = [{**items[index], "score": score} for index, score in ranked][:size]
             reranked = True
 
     if not notices and mode == "hybrid" and not items:

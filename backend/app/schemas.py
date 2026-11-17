@@ -1464,8 +1464,12 @@ class RagIngestRequest(BaseModel):
 
 
 class RagChunkItem(BaseModel):
-    """检索命中行：`snippet` 是正文前 160 字符，`score` 按模式分（关键词恒 1.0、
-    向量为余弦、融合为 RRF 分），量纲不互比——只用于同模式内排序展示。"""
+    """检索命中行：`snippet` 是正文前 160 字符。
+
+    `score` 是**本次结果真实排序依据的分数**，量纲随模式与精排状态：
+    keyword 恒 1.0 / semantic 余弦 / hybrid RRF 分；精排生效时为精排相关性分（0~1）。
+    不同模式之间不可互比，只用于同一次结果内解释排序。
+    """
 
     chunk_id: str
     kind: RagChunkKind

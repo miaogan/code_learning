@@ -78,8 +78,12 @@ def test_rerank_order_success(monkeypatch: pytest.MonkeyPatch) -> None:
         )
 
     monkeypatch.setattr("app.services.retrieval.rerank.httpx.post", fake_post)
-    order, notice = rerank_order("q", ["a", "b", "c"], _runtime())
-    assert (order, notice) == ([2, 0, 1], "")
+    ranked, notice = rerank_order("q", ["a", "b", "c"], _runtime())
+    assert [index for index, _ in ranked] == [2, 0, 1]
+    assert notice == ""
+    # TEI 的 score 是 logit（1.0 / 0.2 / 0.0）：sigmoid 后严格递减且都落在 (0,1)
+    assert ranked[0][1] > ranked[1][1] > ranked[2][1]
+    assert all(0.0 < score < 1.0 for _, score in ranked)
 
 
 def test_rerank_order_http_error_fails_open(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -87,8 +91,9 @@ def test_rerank_order_http_error_fails_open(monkeypatch: pytest.MonkeyPatch) -> 
         raise httpx.ConnectError("down")
 
     monkeypatch.setattr("app.services.retrieval.rerank.httpx.post", boom)
-    order, notice = rerank_order("q", ["a", "b"], _runtime())
-    assert (order, notice) == ([0, 1], "rerank 精排暂不可用，已按融合排序返回")
+    ranked, notice = rerank_order("q", ["a", "b"], _runtime())
+    assert [index for index, _ in ranked] == [0, 1]
+    assert notice == "rerank 精排暂不可用，已按融合排序返回"
 
 
 def test_rerank_order_bad_status_fails_open(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -96,8 +101,9 @@ def test_rerank_order_bad_status_fails_open(monkeypatch: pytest.MonkeyPatch) -> 
         "app.services.retrieval.rerank.httpx.post",
         lambda url, **kwargs: httpx.Response(503, json={}),
     )
-    order, notice = rerank_order("q", ["a"], _runtime())
-    assert (order, notice) == ([0], "rerank 精排服务返回异常，已按融合排序返回")
+    ranked, notice = rerank_order("q", ["a"], _runtime())
+    assert [index for index, _ in ranked] == [0]
+    assert notice == "rerank 精排服务返回异常，已按融合排序返回"
 
 
 def test_rerank_order_malformed_fails_open(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -105,8 +111,9 @@ def test_rerank_order_malformed_fails_open(monkeypatch: pytest.MonkeyPatch) -> N
         "app.services.retrieval.rerank.httpx.post",
         lambda url, **kwargs: httpx.Response(200, json=[{"index": 0}, {"index": 0}]),
     )
-    order, notice = rerank_order("q", ["a", "b"], _runtime())
-    assert (order, notice) == ([0, 1], "rerank 精排响应异常，已按融合排序返回")
+    ranked, notice = rerank_order("q", ["a", "b"], _runtime())
+    assert [index for index, _ in ranked] == [0, 1]
+    assert notice == "rerank 精排响应异常，已按融合排序返回"
 
 
 # --- search_chunks 接线：池取宽、精排序、fail-open、keyword 不精排 -------------------
@@ -129,7 +136,7 @@ def _lexical_rows(count: int) -> list[dict[str, Any]]:
 def _patch_search(
     monkeypatch: pytest.MonkeyPatch,
     *,
-    rerank_result: tuple[list[int], str] | None,
+    rerank_result: tuple[list[tuple[int, float]], str] | None,
     lexical_count: int,
 ) -> dict[str, Any]:
     """打桩 repository / 向量后端 / rerank，跑一次 hybrid 检索并返回响应。
@@ -152,10 +159,14 @@ def _patch_search(
     monkeypatch.setattr(hybrid.repository, "rag_feedback_weights", lambda *a, **k: {})
     seen: dict[str, Any] = {}
 
-    def fake_rerank_order(query: str, texts: list[str], runtime: Any) -> tuple[list[int], str]:
+    def fake_rerank_order(
+        query: str, texts: list[str], runtime: Any
+    ) -> tuple[list[tuple[int, float]], str]:
         seen["texts"] = list(texts)
         assert texts == [row["content"] for row in _lexical_rows(len(texts))]
-        return rerank_result if rerank_result is not None else (list(range(len(texts))), "")
+        if rerank_result is not None:
+            return rerank_result
+        return [(index, 0.0) for index in range(len(texts))], ""
 
     monkeypatch.setattr(hybrid, "rerank_order", fake_rerank_order)
     try:
@@ -170,19 +181,25 @@ def test_search_hybrid_with_rerank_reorders_and_widens_pool(
     """精排启用：池从 top_k=2 取宽到 size*2=4，按精排序输出，reranked=True。"""
     # 语义腿打桩后为空，融合序 = 关键词腿序（0,1,2,3）；精排故意倒序。
     result = _patch_search(
-        monkeypatch, rerank_result=([3, 2, 1, 0], ""), lexical_count=4
+        monkeypatch,
+        rerank_result=([(3, 0.91), (2, 0.72), (1, 0.35), (0, 0.08)], ""),
+        lexical_count=4,
     )
     assert result["reranked"] is True
     assert [item["chunk_id"] for item in result["items"]] == [
         "question:3", "question:2", "question:1", "question:0"
     ][:2]
     assert result["total"] == 2
+    # r121：score 换成精排分，与排名自洽（不再是融合分 0.016 那种量纲）
+    assert [item["score"] for item in result["items"]] == [0.91, 0.72]
 
 
 def test_search_hybrid_rerank_failure_fails_open(monkeypatch: pytest.MonkeyPatch) -> None:
     """精排失败：融合序原样返回、reranked=False、notice 说清原因，反馈加权照常生效。"""
     result = _patch_search(
-        monkeypatch, rerank_result=(list(range(4)), "rerank 精排暂不可用，已按融合排序返回"), lexical_count=4
+        monkeypatch,
+        rerank_result=([(i, 0.0) for i in range(4)], "rerank 精排暂不可用，已按融合排序返回"),
+        lexical_count=4,
     )
     assert result["reranked"] is False
     assert "rerank 精排暂不可用" in result["notice"]
@@ -205,7 +222,7 @@ def test_keyword_mode_never_reranks(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(hybrid, "resolve_reranker", lambda: resolve_reranker(settings))
     monkeypatch.setattr(
         hybrid, "rerank_order",
-        lambda *a, **k: called.append("called") or ([0], ""),
+        lambda *a, **k: called.append("called") or ([(0, 1.0)], ""),
     )
     monkeypatch.setattr(hybrid.repository, "rag_lexical_search", lambda *a, **k: _lexical_rows(3))
     monkeypatch.setattr(hybrid.repository, "rag_feedback_weights", lambda *a, **k: {})
@@ -272,8 +289,11 @@ def test_rerank_order_dashscope_success(monkeypatch: pytest.MonkeyPatch) -> None
         )
 
     monkeypatch.setattr("app.services.retrieval.rerank.httpx.post", fake_post)
-    order, notice = rerank_order("q", ["a", "b", "c"], _dashscope_runtime(ai_rerank_api_key="sk-x"))
-    assert (order, notice) == ([1, 2, 0], "")
+    ranked, notice = rerank_order("q", ["a", "b", "c"], _dashscope_runtime(ai_rerank_api_key="sk-x"))
+    assert [index for index, _ in ranked] == [1, 2, 0]
+    assert notice == ""
+    # dashscope 的 relevance_score 文档口径就是 [0,1]，原值透传（不再过 sigmoid）
+    assert [score for _, score in ranked] == [0.9, 0.5, 0.1]
 
 
 @pytest.mark.parametrize(
@@ -293,6 +313,21 @@ def test_rerank_order_dashscope_malformed_fails_open(
         "app.services.retrieval.rerank.httpx.post",
         lambda url, **kwargs: httpx.Response(200, json=payload),
     )
-    order, notice = rerank_order("q", ["a", "b"], _dashscope_runtime())
-    assert order == [0, 1]
+    ranked, notice = rerank_order("q", ["a", "b"], _dashscope_runtime())
+    assert [index for index, _ in ranked] == [0, 1]
     assert notice == "rerank 精排响应异常，已按融合排序返回"
+
+
+# --- r121 分数口径 -----------------------------------------------------------------
+
+
+def test_normalize_score_keeps_probability_and_maps_logits() -> None:
+    """dashscope 的概率分原值透传；tei 的 logit 过 sigmoid；越界走兜底。"""
+    from app.services.retrieval.rerank import _normalize_score
+
+    assert _normalize_score("dashscope", 0.9024) == 0.9024
+    assert _normalize_score("dashscope", 0.0) == 0.0
+    assert _normalize_score("tei", 0.0) == 0.5
+    assert _normalize_score("tei", 2.0) > 0.85
+    assert _normalize_score("tei", -8.0) < 0.01
+    assert _normalize_score("dashscope", 5.0) > 0.99  # 协议假设被打破时仍归一到 (0,1)

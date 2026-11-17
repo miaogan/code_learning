@@ -1231,6 +1231,10 @@ export interface RagChunkItem {
   title: string
   content: string
   snippet: string
+  /**
+   * 本次结果真实排序依据的分数：keyword 恒 1.0 / semantic 余弦 / hybrid RRF；
+   * 精排生效时为精排相关性分（0~1）。跨模式不可互比。
+   */
   score: number
 }
 
