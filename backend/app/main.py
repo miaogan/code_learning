@@ -75,6 +75,7 @@ APP_VERSION = "0.4.0"
 logger = logging.getLogger("app.http")
 db_logger = logging.getLogger("app.db")
 cache_logger = logging.getLogger("app.cache")
+security_logger = logging.getLogger("app.security")
 
 
 def _log_access(method: str, path: str, status: int, elapsed_ms: int, request_id: str) -> None:
@@ -113,6 +114,18 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         raise RuntimeError("生产环境配置不安全，已拒绝启动：" + "；".join(blockers))
     for warning in settings.production_warnings():
         logging.getLogger(__name__).warning("production.config_warning=%s", warning)
+    # 主动放宽的安全策略必须留在启动日志里（与 `[数据层]` / `[缓存层]` 同一口径）：
+    # 静悄悄放行私网端点，等于让「谁能访问哪段网络」这件事失去可追溯性。
+    if settings.ai_allow_private_endpoints:
+        security_logger.warning(
+            "[安全] AI_ALLOW_PRIVATE_ENDPOINTS=true → 用户自带 AI 端点可指向私网 / 环回地址"
+            "（内网部署专用；公网部署等于放开内网端口探测）"
+        )
+        if not settings.radar_offline and settings.radar_schedule.strip().lower() != "off":
+            security_logger.warning(
+                "[安全] 内网放行已开，但雷达采集仍会访问公网（GitHub / arXiv / Hacker News 等）："
+                "内网 / 气隙环境请设 RADAR_OFFLINE=true 或 RADAR_SCHEDULE=off"
+            )
 
     # PG / Redis 都是可恢复的**运行时**依赖：不在 Web 启动路径上同步连库。
     db.reset_runtime()

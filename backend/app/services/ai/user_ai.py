@@ -41,34 +41,62 @@ Capability = Literal["full", "light", "none"]
 Level = Literal["light", "heavy"]
 
 _MISSING_USER_KEY = "尚未填写你自己的 API Key，请先在设置页配置"
+#: 公网档（默认）的拒绝文案。前端与用例都在断言这句，改动要连带同步。
 _SSRF_MESSAGE = "API 地址不允许指向本机、内网或云元数据地址"
+#: 内网放行档仍然拒绝的那一类：文案必须解释「为什么放行了内网还拒」。
+_SSRF_METADATA_MESSAGE = "API 地址不允许指向云元数据或链路本地地址（内网放行模式也不例外）"
 
-#: 这些名字即使 DNS 解析失败也不该放行（元数据服务常用别名）。
-_PRIVATE_HOST_HINTS = frozenset(
-    {"localhost", "metadata", "metadata.google.internal", "instance-data"}
+#: 本机别名：公网档拒绝；内网部署里模型常与后端同机（ollama / vLLM / LM Studio），必须允许。
+_LOOPBACK_HOST_HINTS = frozenset({"localhost"})
+#: 元数据服务常用别名：任何档位都拒绝。
+_METADATA_HOST_HINTS = frozenset({"metadata", "metadata.google.internal", "instance-data"})
+
+#: 已知云元数据地址：`ipaddress` 会把它们归进 private / link-local 段，光靠段判断挡不住。
+#: 内网部署也常跑在云主机上，这一层不能因为「内网」两个字就丢。
+_METADATA_ADDRESSES = frozenset(
+    {"169.254.169.254", "169.254.0.23", "100.100.100.200", "fd00:ec2::254"}
 )
 
 
-def _is_blocked_address(address: str) -> bool:
-    """判定解析结果是否落在不可出网的地址段。"""
+def _allow_private_endpoints() -> bool:
+    """内网放行开关的唯一判据（不要在别处重复读配置）。"""
+    return bool(get_settings().ai_allow_private_endpoints)
+
+
+def _is_blocked_address(address: str, *, allow_private: bool) -> bool:
+    """判定解析结果是否落在禁止出网的地址段。
+
+    `allow_private=True`（内网部署）只保留三类拒绝：云元数据、链路本地、组播 / 未指定。
+    私网、环回、CGNAT、IPv6 ULA 全部放行 —— 那正是内网模型的形态。
+
+    顺序有讲究：环回必须**先于**「保留段」判断 —— Python 的 `ipaddress` 把 `::1` 同时
+    标成 `is_reserved`，而 `localhost` 在这台机器上优先解析成 `::1`；先判 reserved 会把
+    「模型跑在本机」这个最常见的单机形态挡在门外。
+    """
     addr = ipaddress.ip_address(address.split("%", 1)[0])
-    return (
-        not addr.is_global
-        or addr.is_loopback
-        or addr.is_private
-        or addr.is_link_local
-        or addr.is_reserved
-        or addr.is_multicast
-        or addr.is_unspecified
-    )
+    if str(addr) in _METADATA_ADDRESSES:
+        return True
+    if addr.is_link_local or addr.is_multicast or addr.is_unspecified:
+        return True
+    if allow_private:
+        return False
+    return addr.is_reserved or not addr.is_global or addr.is_loopback or addr.is_private
 
 
-def validate_public_base_url(base_url: str) -> str:
-    """用户自带 AI 端点只能指向公网地址（防 SSRF 打内网 / 云元数据）。
+def validate_ai_base_url(base_url: str) -> str:
+    """校验用户自带的 AI 端点；`AI_ALLOW_PRIVATE_ENDPOINTS=true` 时放行内网地址。
 
     r99：实测 `/api/me/ai/test` 会拿表单里的 `base_url` 直接发 POST，可探测内网端口；
     而该端点**不经过** `normalize_ai_settings`，所以两个入口都必须调用本函数：
     保存设置（`PUT /api/me/ai`）与测试连接（`POST /api/me/ai/test`）。
+
+    两档语义：
+
+    - **公网档（默认，`AI_ALLOW_PRIVATE_ENDPOINTS=false`）**：只能指向公网地址，沿用 r99 口径；
+    - **内网档（`=true`）**：放行私网 / 环回 —— 内网部署的模型就在
+      `http://10.x.x.x:8000/v1` 或 `http://localhost:11434/v1` 上，不放行等于功能不可用 ——
+      但仍拒绝云元数据地址与链路本地段。这是刻意保留的：内网机器常常就是云主机，
+      元数据服务（`169.254.169.254` / `100.100.100.200` 等）是这层防护里最不能丢的一条。
 
     校验在 DNS 解析**之后**做，能挡住 localhost、十进制/简写 IP、`*.nip.io` 一类
     把域名解析回 127.0.0.1 的绕过。解析失败时放行：连 DNS 都解析不了，后续请求同样
@@ -78,13 +106,16 @@ def validate_public_base_url(base_url: str) -> str:
     在 httpx 层把已校验的 IP 钉进连接，本部署是单副本演示机，暂不引入该复杂度；
     配合 `ai_test_timeout_s` 与按 IP 限流，可把探测速度与收益压到很低。
     """
+    allow_private = _allow_private_endpoints()
     parsed = urlparse(base_url)
     if parsed.scheme not in ("http", "https"):
         raise AppError(VALIDATION_ERROR, "API 地址必须以 http:// 或 https:// 开头", status=422)
     host = (parsed.hostname or "").strip().rstrip(".").lower()
     if not host:
         raise AppError(VALIDATION_ERROR, "API 地址缺少主机名", status=422)
-    if host in _PRIVATE_HOST_HINTS:
+    if host in _METADATA_HOST_HINTS:
+        raise AppError(VALIDATION_ERROR, _SSRF_METADATA_MESSAGE, status=422)
+    if host in _LOOPBACK_HOST_HINTS and not allow_private:
         raise AppError(VALIDATION_ERROR, _SSRF_MESSAGE, status=422)
     try:
         port = parsed.port
@@ -98,11 +129,15 @@ def validate_public_base_url(base_url: str) -> str:
         return base_url
     for info in infos:
         try:
-            blocked = _is_blocked_address(info[4][0])
+            blocked = _is_blocked_address(info[4][0], allow_private=allow_private)
         except ValueError:
             continue
         if blocked:
-            raise AppError(VALIDATION_ERROR, _SSRF_MESSAGE, status=422)
+            raise AppError(
+                VALIDATION_ERROR,
+                _SSRF_METADATA_MESSAGE if allow_private else _SSRF_MESSAGE,
+                status=422,
+            )
     return base_url
 
 
@@ -239,7 +274,7 @@ def normalize_ai_settings(
     *, base_url: str, model: str, api_key: str, json_mode: str
 ) -> tuple[str, str, str]:
     """校验并归一保存的 AI 设置；返回 `(base_url, model, json_mode)`，Key 由调用方加密。"""
-    base_url = validate_public_base_url((base_url or "").strip().rstrip("/"))
+    base_url = validate_ai_base_url((base_url or "").strip().rstrip("/"))
     model = (model or "").strip()
     json_mode = (json_mode or DEFAULT_JSON_MODE).strip()
     if not model:
@@ -261,7 +296,7 @@ async def test_connection(
     # 本端点不经过 normalize_ai_settings，必须在这里独立校验，否则「保存被挡、测试照打」。
     # 这里吞掉 AppError 转成 ok=false，保持 AiTestResult 的响应契约不变。
     try:
-        base_url = validate_public_base_url((base_url or "").strip().rstrip("/"))
+        base_url = validate_ai_base_url((base_url or "").strip().rstrip("/"))
     except AppError as exc:
         return False, exc.message
     raw_key = (api_key or "").strip() or decrypt_key(stored_key)

@@ -178,6 +178,11 @@ class Settings(BaseSettings):
     #: 拿去做连通性探测会让一次失败请求挂住十分钟，可被用来耗尽 100 条连接池。
     #: 该值同时是 SSRF 探测的时间上限，不要调大。
     ai_test_timeout_s: float = 8.0
+    #: 内网部署开关：允许**用户自带** AI 端点指向私网 / 环回地址。
+    #: 默认 false —— 公网部署保持 r99 的 SSRF 防护（只能指向公网地址）。
+    #: 打开后仍然拒绝云元数据地址与链路本地段（内网机器也常是云主机，这条不能丢），
+    #: 判据见 `services/ai/user_ai.py::validate_ai_base_url()`。
+    ai_allow_private_endpoints: bool = False
 
     # --- AI 供应商档位（r9：`AI_PROVIDER` 空＝legacy） --------------------------
     #: 空＝legacy（直读上面的全局四项）；`deepseek` / `lmstudio` 时只读该档。
