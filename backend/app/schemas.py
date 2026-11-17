@@ -1487,12 +1487,14 @@ class RagSearchRequest(BaseModel):
 
 class RagSearchResponse(BaseModel):
     """`engine` 如实报告检索引擎：`pgvector`（索引内余弦）/ `python-cosine`
-    （无扩展降级）/ `sql-ilike`（关键词腿）。"""
+    （无扩展降级）/ `sql-ilike`（关键词腿）。`reranked`（r119）：本次结果
+    是否经过了交叉编码器精排（未配置 `AI_RERANK_BASE_URL` 或精排失败时为 False）。"""
 
     items: list[RagChunkItem] = Field(default_factory=list)
     total: int = 0
     mode: str
     engine: str = ""
+    reranked: bool = False
     notice: str = ""
 
 

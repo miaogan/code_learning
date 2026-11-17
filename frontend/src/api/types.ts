@@ -1247,6 +1247,8 @@ export interface RagSearchResponse {
   mode: string
   /** pgvector（索引内余弦）| python-cosine（降级）| sql-ilike（关键词腿）。 */
   engine: string
+  /** r119：本次结果是否经过交叉编码器精排（未配置 AI_RERANK_BASE_URL 或精排失败时为 false）。 */
+  reranked: boolean
   notice: string
 }
 

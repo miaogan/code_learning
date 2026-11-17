@@ -210,6 +210,17 @@ class Settings(BaseSettings):
     #: 远端 embedding 单批条数（1284 道题 ÷ 32 = 41 批，足够克制）。
     ai_embed_batch: int = 32
 
+    # --- r119 rerank 精排（可选，默认关） --------------------------------------
+    #: rerank 端点根（TEI 形态 `POST {base}/rerank`，如 `http://reranker:8080`）；
+    #: **留空 = 不精排**，检索行为与 r100 完全一致（rrf 融合序即最终序）。
+    #: 服务端配置不受 SSRF 门禁约束（内网自建 TEI 是主用形态）。
+    ai_rerank_base_url: str = ""
+    #: 精排单次请求超时（秒）：交叉编码器对 20 条候选在 1 核 CPU 上实测亚秒到数秒。
+    ai_rerank_timeout_s: float = 8.0
+    #: 送精排的候选池上限：融合腿取宽到 pool 条 → 精排 → 截回 top_k；
+    #: 上限 20 与检索条数口径一致（reranker 容器 2g 限额，候选更多会撞内存，见 r118 verify.md）。
+    ai_rerank_pool: int = 20
+
     # --- r103 分块（按内容类型选切分器） --------------------------------------
     #: 启动时是否用种子补齐教程索引（默认开；测试与「只想要题库索引」的部署可关）。
     rag_seed_tutorials: bool = True

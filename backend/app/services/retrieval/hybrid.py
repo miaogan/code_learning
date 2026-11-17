@@ -9,6 +9,11 @@
   不用分数加权——向量余弦与 ILIKE 命中的分数量纲不可比，RRF 只看名次，
   天然免疫两套分数的分布漂移（这是「不调参的融合」能稳定赢单腿的原因）。
 
+r119 精排（可选）：`AI_RERANK_BASE_URL` 配置后，semantic / hybrid 在融合池上
+先精排再截回 top_k，`reranked` 字段如实报告；未配置时行为与 r100 逐字节一致。
+精排启用时 r103 反馈加权不再参与最终序（它会按 RRF 分重排，会毁掉精排结果），
+这是有意取舍：交叉编码器的语义信号远强于个人投票。
+
 诚实边界：默认 `HashingEmbedder` 的「语义」是字符 bigram 重叠（模糊关键词基座），
 接真实语义模型只需配 `AI_EMBED_MODEL`，管线零改动；评测报告按 embedder 名如实标注。
 """
@@ -20,6 +25,7 @@ from typing import Any
 
 from app.core import repository
 from app.services.retrieval.embeddings import resolve_embedder
+from app.services.retrieval.rerank import rerank_order, resolve_reranker
 from app.services.retrieval.vector_backends import resolve_vector_store
 
 logger = logging.getLogger("app.rag.hybrid")
@@ -140,6 +146,8 @@ def search_chunks(
 
     未建索引 / 索引与当前 embedder 不一致时不 500：返回空集 + 中文 `notice`，
     `mode` 与 `engine` 仍如实报告——「能明确说清为什么没有结果」比「抛错」可用。
+    r119：配置了 `AI_RERANK_BASE_URL` 时 semantic / hybrid 先精排再截断，
+    `reranked` 字段报告是否真的精排过（精排失败 fail-open 并给 notice）。
     """
     needle = str(query or "").strip()
     size = max(1, min(int(top_k or 5), MAX_TOP_K))
@@ -147,17 +155,25 @@ def search_chunks(
         mode = "hybrid"
     if not needle:
         return {
-            "items": [], "total": 0, "mode": mode, "engine": "", "notice": "请输入检索关键词"
+            "items": [], "total": 0, "mode": mode, "engine": "", "reranked": False,
+            "notice": "请输入检索关键词"
         }
     runtime = resolve_embedder()
+    stage = resolve_reranker()
     state = repository.rag_state_get()
     notices: list[str] = []
     engine = "sql-ilike"
 
+    # r119：精排启用时把候选池取宽到 pool 条（两条腿本来就各取 size*2，pool 不会超过它），
+    # 精排后截回 size；未启用时 pool_k == size，融合序即最终序，行为与 r100 一致。
+    pool_k = size
+    if stage is not None and mode in ("semantic", "hybrid"):
+        pool_k = max(size, min(stage.pool, size * _LEG_WIDEN))
+
     if mode in ("semantic", "hybrid"):
         if state is None:
             return {
-                "items": [], "total": 0, "mode": mode, "engine": "",
+                "items": [], "total": 0, "mode": mode, "engine": "", "reranked": False,
                 "notice": "RAG 索引尚未构建，请先在「考工」页重建索引",
             }
         if state["embedder"] != runtime.name:
@@ -189,7 +205,7 @@ def search_chunks(
     if mode == "keyword":
         items = [_item(row, 1.0) for row in lexical_rows[:size]]
     elif mode == "semantic":
-        items = [_item(row, row.get("score", 0.0)) for row in semantic_rows[:size]]
+        items = [_item(row, row.get("score", 0.0)) for row in semantic_rows[:pool_k]]
     else:
         pool: dict[str, dict[str, Any]] = {}
         for row in [*semantic_rows, *lexical_rows]:
@@ -199,19 +215,36 @@ def search_chunks(
                 [str(row["id"]) for row in semantic_rows],
                 [str(row["id"]) for row in lexical_rows],
             ],
-            top_k=size,
+            top_k=pool_k,
         )
         items = [_item(pool[chunk_id], score) for chunk_id, score in fused if chunk_id in pool]
 
+    # r119 精排：交叉编码器重排融合池后截回 size；失败 fail-open（原序 + notice）。
+    # keyword 模式不精排：它是纯 ILIKE 对照面，保持与既有引擎同一口径。
+    reranked = False
+    if stage is not None and mode in ("semantic", "hybrid") and items:
+        order, rerank_notice = rerank_order(
+            needle, [str(item["content"]) for item in items], stage
+        )
+        if rerank_notice:
+            notices.append(rerank_notice)
+        else:
+            items = [items[index] for index in order][:size]
+            reranked = True
+
     if not notices and mode == "hybrid" and not items:
         notices.append("两条检索腿都没有命中，可尝试更短的关键词或换用关键词模式")
-    items, touched = _apply_feedback(items, needle)
-    if touched > 0:
-        notices.append("已按你的反馈调整 " + str(touched) + " 条结果的排序")
+    if not reranked:
+        # 反馈加权按 score 重排，会毁掉精排序——精排启用时让位（见模块 docstring 取舍）。
+        items = items[:size]
+        items, touched = _apply_feedback(items, needle)
+        if touched > 0:
+            notices.append("已按你的反馈调整 " + str(touched) + " 条结果的排序")
     return {
         "items": items,
         "total": len(items),
         "mode": mode,
         "engine": engine,
+        "reranked": reranked,
         "notice": "；".join(notices),
     }

@@ -230,6 +230,8 @@ _OUTBOUND_CALL_SITES = {
     "app/services/ai/ai.py",
     # 可选远端 embedding（留空 AI_EMBED_MODEL 时走离线哈希，零出网）。
     "app/services/retrieval/embeddings.py",
+    # 可选 rerank 精排（留空 AI_RERANK_BASE_URL 时不精排，零出网；r119）。
+    "app/services/retrieval/rerank.py",
     # 技术雷达采集（内网 / 气隙环境必须 RADAR_OFFLINE=true 或 RADAR_SCHEDULE=off）。
     "app/services/radar/sources.py",
 }
@@ -289,7 +291,7 @@ def test_frontend_production_dependencies_are_offline_safe() -> None:
 
 
 def test_outbound_call_sites_are_registered() -> None:
-    """后端出网点必须是登记过的四类；新增出网调用必须更新本文件并说明用途。"""
+    """后端出网点必须是登记过的五类；新增出网调用必须更新本文件并说明用途。"""
     found = {
         str(path.relative_to(_BACKEND_APP.parent)).replace(os.sep, "/")
         for path in _BACKEND_APP.rglob("*.py")
