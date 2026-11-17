@@ -173,6 +173,20 @@ describe('settingsLine：本场设定唯一格式化入口（AC-11）', () => {
     expect(settingsLine(null)).toBe(SETTINGS_UNKNOWN)
     expect(SETTINGS_UNKNOWN).toBe('未记录设定')
   })
+
+  it('r112 对岗缺口追加在末尾，最多 3 项；旧 run 无该键文案不变', () => {
+    expect(settingsLine({ ...SETTINGS, focus_gaps: ['Redis', 'RAG'] })).toBe(
+      '后端工程师 · 3-5年 · 北美 · 初创 · 缺口：Redis / RAG',
+    )
+    // 空数组 / 空白项 / 超长列表：不产生空段，只取前 3 项。
+    expect(settingsLine({ ...SETTINGS, focus_gaps: [] })).toBe('后端工程师 · 3-5年 · 北美 · 初创')
+    expect(settingsLine({ ...SETTINGS, focus_gaps: ['  ', ''] })).toBe(
+      '后端工程师 · 3-5年 · 北美 · 初创',
+    )
+    expect(
+      settingsLine({ ...SETTINGS, focus_gaps: ['A', 'B', 'C', 'D'] }),
+    ).toBe('后端工程师 · 3-5年 · 北美 · 初创 · 缺口：A / B / C')
+  })
 })
 
 describe('settingsTextOf：历史行设定文本三态（AC-11）', () => {

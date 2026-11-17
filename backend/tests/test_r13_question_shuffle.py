@@ -187,14 +187,44 @@ def test_judge_options_stay_two_choices() -> None:
 
 
 def test_option_keys_are_positions_in_order() -> None:
-    """`options` 数组顺序必须恒等于 key 位置序（A..D），答案 key 必须是位置的子集。"""
+    """`options` 数组顺序必须恒等于 key 位置序，答案 key 必须是位置的子集。
+
+    选项数按题目本身可为 2–6（`question_shuffle.ALL_KEYS` 前缀），key 从 A 起连续且无缺口。
+    """
     for row in _shuffled()[0]:
         if str(row["kind"]) not in ("single", "multiple"):
             continue
         keys = [str(opt["key"]) for opt in row["options"]]  # type: ignore[index]
-        assert keys == list(question_shuffle.KEYS), f"{row['id']} 的 key 不是位置序：{keys}"
+        expected = list(question_shuffle.ALL_KEYS[: len(keys)])
+        assert keys == expected, f"{row['id']} 的 key 不是位置序：{keys}"
         answer = [str(key) for key in row["answer"]]  # type: ignore[union-attr]
         assert answer and set(answer) <= set(keys), f"{row['id']} 的 answer 越界：{answer}"
+
+
+def test_shuffle_keys_align_with_merge_schema() -> None:
+    """打乱器的 key 全集必须与素材归一化 schema 对齐，两处不得各自写死。"""
+    assert question_shuffle.ALL_KEYS == question_merge._OPTION_KEYS, (
+        "question_shuffle.ALL_KEYS 与 question_merge._OPTION_KEYS 漂移："
+        "选项数上限会在「能入库」与「能重排」之间分叉"
+    )
+    assert set(question_shuffle.KEYS) <= set(question_shuffle.ALL_KEYS)
+
+
+def test_five_option_questions_are_shuffled_not_skipped() -> None:
+    """官方 5 选项多选题（A–E）必须正常参与重排，不得因 key 超出 A–D 被跳过。
+
+    这是「选项数写死」回归的钉子：把 `apply()` 的合法 key 判定退回 A–D 即红。
+    跳过只允许因解析字母判角不可靠（见 `test_shuffled_rows_have_no_unparseable_letter_refs`）。
+    """
+    rows, metrics = _shuffled()
+    skipped = {str(item) for item in metrics["skipped"]["ids"]}  # type: ignore[index]
+    five_option = {
+        str(row["id"])
+        for row in rows
+        if str(row["kind"]) in ("single", "multiple") and len(row["options"]) == 5  # type: ignore[arg-type]
+    }
+    assert five_option, "题库里没有 5 选项题，本门禁失去意义"
+    assert not (five_option & skipped), f"5 选项题被跳过重排：{sorted(five_option & skipped)}"
 
 
 def test_long_answer_ratio_within_budget() -> None:

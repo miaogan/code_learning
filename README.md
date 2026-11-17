@@ -34,7 +34,7 @@
 ## 快速开始（三步）
 
 ```bash
-# 0) 依赖：PostgreSQL + Redis（r98 起没有 SQLite 兜底，不起库后端起不来）
+# 0) 首次启动依赖：PostgreSQL + Redis（已有完整 SQLite 副本时，后续 PG/Redis 故障可降级）
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d postgres redis
 #    PG → 127.0.0.1:5433，Redis → 127.0.0.1:6380（与 backend/.env.example 一致）
 
@@ -62,7 +62,7 @@ npm run dev        # http://127.0.0.1:5173，/api 与 /health 已代理到 :8000
 
 ## Docker 部署（可选，一条命令起四容器）
 
-不装 Python / Node 也能跑：`frontend`（nginx 托管构建产物 + 同源反代 `/api`、`/health`）+ `backend`（FastAPI，非 root、只在容器内网）+ `postgres`（唯一数据源）+ `redis`（限流窗口 / 会话缓存 / 读缓存 / 分布式锁的共享层）。PG 与 Redis **不发布宿主端口**，公网入口只有 nginx。
+不装 Python / Node 也能跑：`frontend`（nginx 托管构建产物 + 同源反代 `/api`、`/health`）+ `backend`（FastAPI，非 root、单 worker、只在容器内网）+ `postgres`（在线权威主库）+ `redis`（限流窗口 / 会话缓存 / 读缓存 / 分布式锁的共享层）。PG 正常时逐笔维护 SQLite 完整副本；PG 故障时副本接管读写，恢复后重放离线变更。Redis 故障使用带 TTL / LRU 的内存缓存。PG 与 Redis **不发布宿主端口**，公网入口只有 nginx。
 
 ```bash
 # 1) 准备配置：backend/.env 是容器唯一的配置来源，需在其中填上真实 AI_DEEPSEEK_API_KEY
@@ -79,7 +79,9 @@ docker compose ps        # backend 的 STATUS 应带 (healthy)
 
 - **换端口**：把 `docker.env.example` 复制成仓库根 `.env`，改 `WEB_PORT=127.0.0.1:8099`（格式是 `[绑定地址:]端口`，**不要只写端口号**，那会绑 `0.0.0.0`），再 `docker compose up -d`。默认 `127.0.0.1:8080` 只绑回环。
 - **从 SQLite 升级**（r97 → r98）：停机 → 备份 `app.db` → 起 PG 建表 → `scripts/migrate_sqlite_to_pg.py` 迁移（幂等可重跑，带行数校验与序列复位），命令见 [r98 迁移手册](./docs/teamflow/20261112-r98-redis-pg/DEPLOY.md)。
-- **备份**：`./scripts/backup_db.sh`（`pg_dump -Fc` + `pg_restore -l` 自检 + 滚动保留），建议进 cron。
+- **数据库镜像**（r100）：PG 服务用 `pgvector/pgvector:pg16`（PostgreSQL 16 基线不变）——RAG 向量检索的 `vector` 扩展与 ivfflat 余弦索引在库内完成；无扩展的环境（如官方 postgres:16-alpine）应用层自动降级为「取回后 Python 余弦」，`engine` 字段如实报告。
+- **降级边界**：后端固定单进程、单 worker，禁止仅增加 `--workers` 或副本来扩容。SQLite 完整副本与离线日志在 `skillcoach-sqlite:/data`，不是临时缓存；有未回同步变更时删除会丢数据。首次没有完整副本时 PG 不可用仍返回可重试 503。
+- **备份**：`./scripts/backup_db.sh`（`pg_dump -Fc` + `pg_restore -l` 自检 + 滚动保留），建议进 cron；同时备份 `skillcoach-sqlite` 卷，具体一致性步骤见部署手册。
 - **建号（r23）**：`docker compose exec backend python -m app.admin_cli create-user --email me@example.com --mode own`（容器内执行，数据落在同名卷）。
 - **停止**：`docker compose down`（**保留**数据卷）；`docker compose down -v` 会连数据一起删。
 - **排障与运维**（lmstudio 本地档、备份恢复、502 / 413 / 504 排查）：见 [DEPLOY.md](./docs/teamflow/20261101-r10-docker-compose-deploy/DEPLOY.md)。
@@ -113,6 +115,10 @@ CI 双 job 跑在 [GitHub Actions](https://github.com/miaogan/code_learning/acti
 python -X utf8 scripts/eval_harness.py --check              # 30 例金标集回归门禁（只读，不写 REPORT.md）
 node scripts/eval_retrieval.mjs --check                     # 教程侧 BM25 召回门禁（只读）
 python -X utf8 scripts/eval_question_retrieval.py --check   # 题目侧 PG 检索召回门禁（只读，需 PG）
+python -X utf8 scripts/eval_rag.py --check                 # RAG 三态检索门禁（关键词/语义/RRF 融合，只读，需 PG）
+python -X utf8 scripts/eval_rag_judge.py --check           # RAG 生成评审 DRY-RUN 门禁（LLM-as-judge 管线，只读，需 PG）
+# 真模型对比（不进 CI，需 AI_LIVE=1 与 AI_EMBED_BASE_URL/AI_EMBED_MODEL，产出 RAG-LIVE-REPORT.md）
+AI_LIVE=1 python -X utf8 scripts/eval_rag.py --live
 python -X utf8 scripts/eval_reliability.py                  # 故障注入 → RELIABILITY-REPORT.md
 python -X utf8 scripts/benchmark.py                         # 并发写锁 / 导入 / 检索 → PERF-REPORT.md（r98 前口径，见下）
 python -X utf8 scripts/seed_eval_demo.py --dry-run          # /eval 看板合成演示数据（不写库）
@@ -129,7 +135,8 @@ python -X utf8 scripts/eval_live.py --check                 # 在线评测脚手
 
 ## 分支、交付与回滚
 
-- **分支模型**：`master` 是受保护的默认主干，`dev` 是日常开发与自动部署分支（push 到 `dev` 经 CI 双门禁后自动部署生产）。历史需求改动曾从基线 `32487b4` 起在 `feat/dev-skill-coach` 上完成，该分支已停用。
+- **分支模型**：`master` 是受保护的发布存档主干（只接收已验收的版本批次，不部署），`dev` 是日常开发与**唯一自动部署**分支（push 到 `dev` 经 CI 双门禁后自动部署生产）。生产实际运行 `dev` 的 HEAD。历史需求改动曾从基线 `32487b4` 起在 `feat/dev-skill-coach` 上完成，该分支已删除。
+- **版本发布**：`master` 不直接开发、不直接合入；每个版本批次走 `vX.Y.Z` tag → `release/vX.Y.Z` 临时分支 → PR → `master`（合并后删临时分支，稳态只留两条分支）。版本号规则、准入清单与操作步骤见 [`docs/teamflow/20261114-cicd/RELEASE.md`](docs/teamflow/20261114-cicd/RELEASE.md)，版本内容见 [`CHANGELOG.md`](CHANGELOG.md)。
 - **提交**：开发期间不留中间提交，也**不由 Agent 提交或合并**；验收通过后由流水线一次性提交（代码 + `docs/teamflow/` 任务夹一起入库，`?? docs/` 不会漏）。
 - **回滚到基线（改动整体可撤销）**：
 
@@ -166,12 +173,16 @@ docs/teamflow/   架构总览、产品记忆、每需求一个任务夹
 |---|---|---|
 | 不做 SSR / Next.js | SSR、文件路由、RSC | 首屏无 HTML 直出、路由表手写；首屏只等本地 `/health`，可接受 |
 | 后端选 Python 而非 Node | 单运行时（全 TS）的部署便利 | 两套工具链；用三步启动、`docker compose` 与 CI 双 job 兜住 |
-| PostgreSQL 直连（psycopg 连接池）、不用 ORM / 迁移框架 | SQLModel、Alembic | 手写 SQL、改字段要自己写幂等补列；结构化产物以 JSON 文本列存，schema 演进上移到 pydantic 校验；DDL 只在 `core/db.py`、SQL 只在 `core/repository.py`，并有静态门禁。r98 起 SQLite 已下线：业务层仍写 `?` 占位符，由 `db.to_pg_sql()` 统一翻译成 psycopg 的 `%s` 并转义字面量 `%` |
+| PostgreSQL 主库 + SQLite 完整副本，直连 SQL、不用 ORM / 迁移框架 | SQLModel、Alembic | 手写 SQL 与双库方言适配，改字段要同时维护幂等补列和副本结构；结构化产物以 JSON 文本列存，DDL 只在 `core/db.py`、SQL 只在 `core/repository.py`。PG 在线时是唯一权威写库，故障时完整副本接管并记录离线日志，恢复后重放；本地副本和内存缓存要求单 worker |
 | 手写 CSS + token，不引 UI 库 / Tailwind | 原子类的书写效率 | 类名集中维护；新增组件必须复用 `tokens.css`，禁止裸色值与裸尺寸，改尺寸要回写 DESIGN §0.7 推导 |
 
-**能力边界（避免误读）**：本项目是「LLM 应用工程化与可靠性」实践 —— AI 侧是 OpenAI 兼容单次调用 + pydantic 结构化校验，
-**没有**向量检索、多 Agent 编排或模型训练；题库 / 教程 / 学习计划属于规则与内容工程，不是 RAG 系统。
-评测体系、检索增强与引用归因的实施方案见 [r51 技术方案](./docs/teamflow/20261109-r51-resume-highlight-engineering/TECHNICAL.md)。
+**能力边界（避免误读）**：本项目是「LLM 应用工程化与可靠性」实践 —— AI 侧是 OpenAI 兼容调用 +
+pydantic 结构化校验，外加 r100 起的 **RAG 检索管线**（分块 → embedding → pgvector 余弦索引 →
+向量 / 关键词 RRF 融合 → 带引用白名单的生成）与 **RAG 自动评审**（检索三态评测门禁 +
+LLM-as-judge 忠实度 / 相关性评分）；**没有**多 Agent 编排（太傅是单 Agent + ≤3 轮工具循环）
+或模型训练。题库 / 教程 / 学习计划属于规则与内容工程，不是 RAG 语料之外的第二套检索系统。
+评测体系、检索增强与引用归因的实施方案见 [r51 技术方案](./docs/teamflow/20261109-r51-resume-highlight-engineering/TECHNICAL.md)
+与 [r100 技术方案](./docs/teamflow/20261115-r100-rag-evidence/TECHNICAL.md)。
 
 ## 验收速览
 

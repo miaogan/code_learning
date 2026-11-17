@@ -20,3 +20,8 @@ services:
   redis:
     ports:
       - '6380:6379'
+
+  # r104 本地 embedding（需 --profile embed 才会创建）：只绑回环，方便宿主直接 curl 调试。
+  embedder:
+    ports:
+      - '127.0.0.1:8090:8080'

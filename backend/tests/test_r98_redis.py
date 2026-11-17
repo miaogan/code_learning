@@ -182,6 +182,72 @@ def test_session_cache_hit_after_row_removed(tmp_db: str, real_redis: None) -> N
     assert repository.get_session(digest) is None, "登出后缓存必须立刻失效"
 
 
+def test_redis_reconnect_replays_new_values_and_session_invalidation(
+    tmp_db: str, real_redis: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.core import repository
+
+    client = redis_cache.get_client()
+    assert client is not None
+    updated = redis_cache.key("report", "reconnect", "latest")
+    deleted = repository._session_cache_name("offline-deleted")
+    kept = repository._session_cache_name("offline-kept")
+    prefix = redis_cache.key("report", "offline-prefix")
+    redis_cache.cache_set_json(deleted, {"user_id": "default"}, ttl_s=60)
+    redis_cache.cache_set_json(kept, {"user_id": "default"}, ttl_s=60)
+    redis_cache.cache_set_json(updated, {"version": "old"}, ttl_s=60)
+    redis_cache.cache_set_json(prefix + ":one", {"version": "old"}, ttl_s=60)
+    monkeypatch.setenv("REDIS_URL", "redis://127.0.0.1:1/0")
+    get_settings.cache_clear()
+
+    redis_cache.cache_set_json(updated, {"version": "new"}, ttl_s=60)
+    repository._drop_session_cache(("offline-deleted",))
+    redis_cache.cache_delete_prefix(prefix)
+    assert redis_cache.cache_get_json(updated) == {"version": "new"}
+    assert redis_cache.cache_get_json(deleted) is None
+    assert redis_cache.cache_get_json(kept) == {"user_id": "default"}
+
+    monkeypatch.setenv("REDIS_URL", REDIS_TEST_URL)
+    get_settings.cache_clear()
+    assert redis_cache.status() == "up"
+    assert client.get(updated) == '{"version":"new"}'
+    assert client.get(deleted) is None
+    assert client.get(prefix + ":one") is None
+    assert client.get(kept) == '{"user_id":"default"}'
+
+
+def test_session_invalidation_survives_redis_outage(
+    auth_user: dict[str, object], real_redis: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.core import repository
+
+    sessions = ("logout", "password", "disabled")
+    for digest in sessions:
+        repository.create_session(
+            token_hash=digest,
+            user_id=str(auth_user["id"]),
+            expires_at="2099-01-01T00:00:00+00:00",
+        )
+        assert repository.get_session(digest) is not None
+    monkeypatch.setenv("REDIS_URL", "redis://127.0.0.1:1/0")
+    get_settings.cache_clear()
+
+    repository.delete_session("logout")
+    repository.delete_other_sessions(str(auth_user["id"]), "logout")
+    repository.delete_user_sessions(str(auth_user["id"]))
+    for digest in sessions:
+        assert repository.get_session(digest) is None
+
+    monkeypatch.setenv("REDIS_URL", REDIS_TEST_URL)
+    get_settings.cache_clear()
+    assert redis_cache.status() == "up"
+    client = redis_cache.get_client()
+    assert client is not None
+    for digest in sessions:
+        assert client.get(repository._session_cache_name(digest)) is None
+        assert repository.get_session(digest) is None
+
+
 def test_report_cache_invalidation_clears_latest(tmp_db: str, real_redis: None) -> None:
     """写报告按前缀失效：`latest` 是与 id 无关的另一个 key，漏掉它首页会一直显示旧报告。"""
     from app.core import repository

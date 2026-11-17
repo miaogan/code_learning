@@ -15,12 +15,10 @@ from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-import psycopg
-
-from app.core import redis_cache
+from app.core import db as db_errors, redis_cache
 from app.core.config import get_settings
 from app.core.context import DEFAULT_USER_ID, get_current_user_id
-from app.core.db import SQL_NOW_ISO, connection
+from app.core.db import SQL_NOW_ISO, Connection, active_backend, connection, next_id
 from app.schemas import Profile, Report, ResumeMeta, TimelineEvent
 
 RUN_RUNNING = "running"
@@ -286,7 +284,7 @@ def insert_profile_job(
                 (job_id, _uid(), document_id, file_name, chars, sections, "running", _now(), _now()),
             )
         return True
-    except psycopg.errors.IntegrityError:
+    except db_errors.IntegrityError:
         return False
 
 
@@ -406,7 +404,7 @@ def insert_resume_job(
                 (job_id, _uid(), file_name, image_count, content_hash, _now(), _now()),
             )
         return True
-    except psycopg.errors.IntegrityError:
+    except db_errors.IntegrityError:
         return False
 
 
@@ -1293,19 +1291,25 @@ def set_user_disabled(user_id: str, disabled: bool) -> None:
         conn.execute(
             "UPDATE users SET disabled = ? WHERE id = ?", (1 if disabled else 0, user_id)
         )
+    if disabled:
+        # 停用必须撤销会话而非只靠 disabled 标志挡住请求：否则重新启用后，
+        # 数据库行和 Redis 里的旧会话会重新获得访问权限。
+        delete_user_sessions(user_id)
 
 
-def delete_expired_sessions() -> int:
-    """批量清理已过期会话（r23 收口）：登录时顺带执行，避免 sessions 表无限累积。"""
-    with connection() as conn:
-        cursor = conn.execute("DELETE FROM sessions WHERE expires_at <= ?", (_now(),))
-        return max(cursor.rowcount, 0)
+def delete_expired_sessions(*, conn: Connection | None = None) -> int:
+    """清理过期会话；有事务连接时复用，避免嵌套连接破坏离线日志顺序。"""
+    if conn is None:
+        with connection() as owned:
+            return delete_expired_sessions(conn=owned)
+    cursor = conn.execute("DELETE FROM sessions WHERE expires_at <= ?", (_now(),))
+    return max(cursor.rowcount, 0)
 
 
 def create_session(*, token_hash: str, user_id: str, expires_at: str) -> None:
-    delete_expired_sessions()
-    prune_ai_call_logs()  # r53：与会话清理同一收口点，避免日志表无限增长
     with connection() as conn:
+        delete_expired_sessions(conn=conn)
+        prune_ai_call_logs(conn=conn)  # r53：与会话清理同一收口点，避免日志表无限增长
         conn.execute(
             "INSERT INTO sessions (token_hash, user_id, created_at, expires_at) "
             "VALUES (?, ?, ?, ?)",
@@ -1473,7 +1477,9 @@ def insert_ai_call_log(
 AI_LOG_RETENTION_DAYS = 90
 
 
-def prune_ai_call_logs(days: int = AI_LOG_RETENTION_DAYS) -> int:
+def prune_ai_call_logs(
+    days: int = AI_LOG_RETENTION_DAYS, *, conn: Connection | None = None
+) -> int:
     """删除窗口外的模型调用日志，返回实际删除行数。登录时顺带执行。
 
     与 `ai_call_log_summary()` 用同一 ISO UTC 时间口径；`days` 夹紧到 [1, 365]，
@@ -1481,8 +1487,10 @@ def prune_ai_call_logs(days: int = AI_LOG_RETENTION_DAYS) -> int:
     """
     window = max(1, min(int(days), 365))
     cutoff = (datetime.now(UTC) - timedelta(days=window)).isoformat()
-    with connection() as conn:
-        cursor = conn.execute("DELETE FROM ai_call_logs WHERE created_at < ?", (cutoff,))
+    if conn is None:
+        with connection() as owned:
+            return prune_ai_call_logs(window, conn=owned)
+    cursor = conn.execute("DELETE FROM ai_call_logs WHERE created_at < ?", (cutoff,))
     return max(cursor.rowcount, 0)
 
 
@@ -1942,11 +1950,12 @@ def radar_upsert_tech(item: dict[str, Any]) -> None:
 def radar_insert_snapshot(item: dict[str, Any]) -> None:
     """补一条 star / fork 快照（`star_delta_7d` 由最新两条快照差值推出）。"""
     with connection() as conn:
+        snapshot_id = next_id("radar_snapshots", conn=conn)
         conn.execute(
-            "INSERT INTO radar_snapshots (tech_slug, taken_at, stars, forks, repo_created_at,"
-            " pushed_at, suspect) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO radar_snapshots (id, tech_slug, taken_at, stars, forks, repo_created_at,"
+            " pushed_at, suspect) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (
-                item["slug"], _now(), int(item.get("stars") or 0), int(item.get("forks") or 0),
+                snapshot_id, item["slug"], _now(), int(item.get("stars") or 0), int(item.get("forks") or 0),
                 str(item.get("repo_created_at") or ""), str(item.get("pushed_at") or ""),
                 1 if item.get("suspect") else 0,
             ),
@@ -1976,17 +1985,18 @@ def radar_insert_assessment(
 ) -> bool:
     """写一条评估；同 `(tech_slug, input_sha256)` 已存在则跳过（返回 False = 可复算幂等）。"""
     with connection() as conn:
+        assessment_id = next_id("radar_assessments", conn=conn)
         cursor = conn.execute(
-            "INSERT INTO radar_assessments (tech_slug, run_id, verdict, relevance,"
+            "INSERT INTO radar_assessments (id, tech_slug, run_id, verdict, relevance,"
             " adoption, maturity, effort, reasons_json, evidence_json, profile_digest,"
             " prompt_version, model, input_sha256, rule_based, created_at)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
             # r98：SQLite 的 `INSERT OR IGNORE` 在 PG 是 `ON CONFLICT DO NOTHING`。
             # 不指定冲突目标：唯一键 `(tech_slug, input_sha256)` 是唯一约束来源，
             # 不带 target 也只在真冲突时静默跳过，且不会因索引改名而失效。
             " ON CONFLICT DO NOTHING",
             (
-                tech_slug, run_id, result["verdict"], int(result["relevance"]),
+                assessment_id, tech_slug, run_id, result["verdict"], int(result["relevance"]),
                 int(result["adoption"]), int(result["maturity"]), int(result["effort"]),
                 _json_text(result.get("reasons") or []),
                 _json_text(result.get("evidence") or []),
@@ -2133,13 +2143,14 @@ def radar_cross_source_count() -> dict[str, int]:
 
 def radar_create_run(trigger: str) -> int:
     """开一轮采集，返回自增 `run_id`（采集结束后由 `radar_finish_run` 补终态）。"""
+    # ID 游标与业务行同事务：崩溃不能留下已消耗但未记录的游标。
     with connection() as conn:
-        # r98：psycopg 的 cursor 没有 `lastrowid`，改用 `RETURNING` 把自增主键取回来。
-        row = conn.execute(
-            "INSERT INTO radar_runs (trigger, started_at) VALUES (?, ?) RETURNING run_id",
-            (trigger, _now()),
-        ).fetchone()
-        return int(row["run_id"]) if row else 0
+        run_id = next_id("radar_runs", conn=conn)
+        conn.execute(
+            "INSERT INTO radar_runs (run_id, trigger, started_at) VALUES (?, ?, ?)",
+            (run_id, trigger, _now()),
+        )
+    return run_id
 
 
 def radar_finish_run(
@@ -2183,7 +2194,7 @@ def radar_insert_job(job_id: str, tech_slug: str, *, trigger: str, parent_job_id
                 (job_id, tech_slug, _uid(), trigger, parent_job_id, stamp, stamp),
             )
         return True
-    except psycopg.errors.IntegrityError:
+    except db_errors.IntegrityError:
         return False
 
 
@@ -2338,3 +2349,457 @@ def radar_tech_card(tech_slug: str) -> dict[str, Any] | None:
         "summary_zh": row["summary_zh"] or "",
         "verdict": row["verdict"] or "",
     }
+
+
+# --- r100 RAG 检索域（共享语料，无 user_id —— 与 questions 同口径）-----------------
+
+_RAG_STATE_KEY = "current"
+
+#: 无 pgvector 时的降级上限：全量取回后 Python 余弦排序的行数。
+#: 1284 题 + 教程小节的量级（≈2k 行 × 256 维 ≈ 4MB）远在限内；超限即截断并让
+#: 服务层在 notice 里说明，不让「索引比预期大」悄悄变成 OOM。
+_RAG_FALLBACK_SCAN_LIMIT = 20000
+
+
+def rag_state_get() -> dict[str, Any] | None:
+    """当前索引快照：`None` = 尚未建过索引（调用方据此给出「请先重建索引」提示）。"""
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT embedder, dim, chunk_count, built_at FROM rag_index_state "
+            "WHERE key = ?",
+            (_RAG_STATE_KEY,),
+        ).fetchone()
+    if row is None:
+        return None
+    return {
+        "embedder": str(row["embedder"]),
+        "dim": int(row["dim"]),
+        "chunk_count": int(row["chunk_count"]),
+        "built_at": str(row["built_at"]),
+    }
+
+
+def rag_state_put(embedder: str, dim: int, chunk_count: int, built_at: str) -> None:
+    """单行 upsert（key='current'）：索引重建完成时原子更新快照。"""
+    with connection() as conn:
+        conn.execute(
+            "INSERT INTO rag_index_state (key, embedder, dim, chunk_count, built_at) "
+            "VALUES (?, ?, ?, ?, ?) "
+            "ON CONFLICT(key) DO UPDATE SET embedder = excluded.embedder, "
+            "dim = excluded.dim, chunk_count = excluded.chunk_count, "
+            "built_at = excluded.built_at",
+            (_RAG_STATE_KEY, embedder, dim, chunk_count, built_at),
+        )
+
+
+def rag_chunk_counts() -> dict[str, int]:
+    """按 kind 分组的 chunk 计数（含 total）；空索引返回全零。"""
+    with connection() as conn:
+        rows = conn.execute(
+            "SELECT kind, count(*) AS n FROM rag_chunks GROUP BY kind"
+        ).fetchall()
+    counts = {str(row["kind"]): int(row["n"]) for row in rows}
+    counts["total"] = sum(counts.values())
+    return counts
+
+
+def _rag_embedding_value(vec: list[float]) -> Any:
+    """pgvector 的文本字面量形态（`'[0.1,0.2]'::vector`）；array 模式由调用方直接传 list。
+
+    psycopg3 没有内置 vector 适配器，pgvector 官方建议未装其 python 包时用字符串字面量 +
+    `::vector` 强转——这里是唯一一处做这个转换的地方。
+    """
+    return "[" + ",".join(format(value, ".6g") for value in vec) + "]"
+
+
+def rag_write_chunks(
+    rows: Sequence[dict[str, Any]], *, mode: str, replace_kind: str | None = None
+) -> int:
+    """写入 chunk 行（含 embedding）。
+
+    - `replace_kind` 非空：先整段 `DELETE kind = ?` 再插入（重建语义：题库索引以
+      「全量替换」保证与题库一致，不做增量 diff——diff 的正确性依赖题库主键永不复用，
+      而 `adopt` / `question_merge` 都会改行，全量替换是最稳的口径）；
+    - `mode` 来自 `db.rag_embedding_mode()`：'pgvector' 走 `::vector` 字面量，
+      'array' 直接传 Python list（psycopg 自动适配 double precision[]）；
+    - 同一事务内完成删 + 插（`connection()` 退出即 commit），失败整段回滚，
+      不会留下「删了一半的题库索引」。
+    """
+    if not rows:
+        return 0
+    if mode == "pgvector":
+        sql = (
+            "INSERT INTO rag_chunks (id, kind, ref_id, section_id, title, content, "
+            "content_sha, embedder, created_at, embedding) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?::vector) "
+            "ON CONFLICT(kind, ref_id, section_id) DO UPDATE SET "
+            "title = excluded.title, content = excluded.content, "
+            "content_sha = excluded.content_sha, embedder = excluded.embedder, "
+            "created_at = excluded.created_at, embedding = excluded.embedding"
+        )
+        params = [
+            (
+                row["id"], row["kind"], row["ref_id"], row["section_id"], row["title"],
+                row["content"], row["content_sha"], row["embedder"], row["created_at"],
+                _rag_embedding_value(row["embedding"]),
+            )
+            for row in rows
+        ]
+    else:
+        sql = (
+            "INSERT INTO rag_chunks (id, kind, ref_id, section_id, title, content, "
+            "content_sha, embedder, created_at, embedding) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(kind, ref_id, section_id) DO UPDATE SET "
+            "title = excluded.title, content = excluded.content, "
+            "content_sha = excluded.content_sha, embedder = excluded.embedder, "
+            "created_at = excluded.created_at, embedding = excluded.embedding"
+        )
+        params = [
+            (
+                row["id"], row["kind"], row["ref_id"], row["section_id"], row["title"],
+                row["content"], row["content_sha"], row["embedder"], row["created_at"],
+                list(row["embedding"]),
+            )
+            for row in rows
+        ]
+    with connection() as conn:
+        if replace_kind:
+            conn.execute("DELETE FROM rag_chunks WHERE kind = ?", (replace_kind,))
+        conn.executemany(sql, params)
+    return len(rows)
+
+
+def rag_vector_search(
+    query_vec: list[float],
+    *,
+    embedder: str,
+    top_k: int,
+    mode: str,
+    kinds: Sequence[str] | None = None,
+) -> list[dict[str, Any]]:
+    """向量 top-K（pgvector 形态）：`<=>` 余弦距离在索引内算，score = 1 - distance。
+
+    行按距离升序即相似度降序；`embedder` 过滤保证「换 embedding 模型后旧向量不混排」
+    （不同模型的向量空间不可比，混排结果是噪声）。
+
+    **`kinds` 必须在 SQL 里过滤**：先取全局 top-K 再按 kind 筛，会把「只搜教程」变成
+    「教程得先挤进全局前 K」——实测「事件循环和微任务」全局 top-12 里没有教程，
+    过滤后直接空结果。过滤放进 WHERE 才能保证该 kind 内部真正取 top-K。
+    """
+    if mode == "pgvector" and active_backend() == "sqlite":
+        mode = "array"
+    literal = _rag_embedding_value(query_vec)
+    filters = ""
+    params: list[Any] = []
+    if kinds:
+        filters = " AND kind IN (" + ", ".join("?" for _ in kinds) + ")"
+        params.extend(kinds)
+    with connection() as conn:
+        rows = conn.execute(
+            "SELECT id, kind, ref_id, section_id, title, content, "
+            "1 - (embedding <=> ?::vector) AS score "
+            "FROM rag_chunks WHERE embedder = ?" + filters
+            + " ORDER BY embedding <=> ?::vector LIMIT ?",
+            [literal, embedder, *params, literal, int(top_k)],
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def rag_array_scan(
+    *,
+    embedder: str,
+    limit: int = _RAG_FALLBACK_SCAN_LIMIT,
+    kinds: Sequence[str] | None = None,
+) -> list[dict[str, Any]]:
+    """降级形态：全量取回向量（Python 余弦在服务层算）。行数上限写死，超限截断。
+
+    `kinds` 同样在这一层过滤：先筛再算余弦，避免「候选被别的 kind 占满」。
+    """
+    filters = ""
+    params: list[Any] = [embedder]
+    if kinds:
+        filters = " AND kind IN (" + ", ".join("?" for _ in kinds) + ")"
+        params.extend(kinds)
+    with connection() as conn:
+        rows = conn.execute(
+            "SELECT id, kind, ref_id, section_id, title, content, embedding "
+            "FROM rag_chunks WHERE embedder = ?" + filters + " LIMIT ?",
+            [*params, int(limit)],
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def rag_lexical_search(
+    needle: str, *, top_k: int, kinds: Sequence[str] | None = None
+) -> list[dict[str, Any]]:
+    """关键词腿：chunk 正文 / 标题的 ILIKE 子串匹配（pg_trgm GIN 加速）。
+
+    只给 RRF 融合供料，不做 count(*) 与分页——两条腿各自 top-K，融合后再统一排序。
+    """
+    like = "%" + needle + "%"
+    filters = ""
+    params: list[Any] = []
+    if kinds:
+        filters = " AND kind IN (" + ", ".join("?" for _ in kinds) + ")"
+        params.extend(kinds)
+    with connection() as conn:
+        rows = conn.execute(
+            "SELECT id, kind, ref_id, section_id, title, content FROM rag_chunks "
+            "WHERE (content ILIKE ? OR title ILIKE ?)" + filters + " "
+            "ORDER BY id LIMIT ?",
+            [like, like, *params, int(top_k)],
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def rag_fetch_chunks(chunk_ids: Sequence[str]) -> dict[str, dict[str, Any]]:
+    """按 id 批量取 chunk（引用回显用）；不存在的 id 静默缺失（白名单校验在服务层）。"""
+    if not chunk_ids:
+        return {}
+    with connection() as conn:
+        rows = conn.execute(
+            "SELECT id, kind, ref_id, section_id, title, content FROM rag_chunks "
+            "WHERE id IN (" + ", ".join("?" for _ in chunk_ids) + ")",
+            list(chunk_ids),
+        ).fetchall()
+    return {str(row["id"]): dict(row) for row in rows}
+
+
+def rag_cosine(left: list[float], right: list[float]) -> float:
+    """余弦相似度（零向量防护：任一侧范数为 0 时返回 0，不产生除零）。"""
+    if len(left) != len(right):
+        return 0.0
+    dot = sum(a * b for a, b in zip(left, right, strict=False))
+    norm = math.sqrt(sum(a * a for a in left)) * math.sqrt(sum(b * b for b in right))
+    return dot / norm if norm > 0 else 0.0
+
+
+def rag_embedder_breakdown() -> dict[str, int]:
+    """按 embedder 名分组的 chunk 计数：status 用来判「索引与当前 embedding 配置是否一致」。
+
+    语义：`resolve_embedder()` 换模型后，旧 embedder 名下仍挂着旧向量——不同向量空间
+    不可比，检索层会按当前 embedder 过滤（等于旧向量静默退出检索），status 据此亮
+    `stale=true` 提示「请重建索引」，而不是让用户以为索引还是全量生效的。
+    """
+    with connection() as conn:
+        rows = conn.execute(
+            "SELECT embedder, count(*) AS n FROM rag_chunks GROUP BY embedder"
+        ).fetchall()
+    return {str(row["embedder"]): int(row["n"]) for row in rows}
+
+
+def evidence_data_scale() -> dict[str, int]:
+    """r100 工程证据中心的数据规模快照：一次往返取全组计数（零 AI、零评分）。
+
+    口径：业务表按当前账号隔离计数（与读写隔离口径一致）；`questions` 是共享题库
+    （全量）；`ai_calls` 是本账号的模型调用元数据行数。只报事实，不做任何质量判断。
+    """
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT "
+            "(SELECT count(*) FROM questions) AS questions, "
+            "(SELECT count(*) FROM question_attempts WHERE user_id = ?) AS attempts, "
+            "(SELECT count(*) FROM runs WHERE user_id = ? AND kind = 'interview') AS interview_runs, "
+            "(SELECT count(*) FROM runs WHERE user_id = ? AND kind = 'exam') AS exam_runs, "
+            "(SELECT count(*) FROM documents WHERE user_id = ?) AS documents, "
+            "(SELECT count(*) FROM profiles WHERE user_id = ?) AS profiles, "
+            "(SELECT count(*) FROM reports WHERE user_id = ?) AS reports, "
+            "(SELECT count(*) FROM ai_call_logs WHERE user_id = ?) AS ai_calls",
+            [_uid()] * 7,
+        ).fetchone()
+    return {
+        "questions": int(row["questions"]),
+        "attempts": int(row["attempts"]),
+        "interview_runs": int(row["interview_runs"]),
+        "exam_runs": int(row["exam_runs"]),
+        "documents": int(row["documents"]),
+        "profiles": int(row["profiles"]),
+        "reports": int(row["reports"]),
+        "ai_calls": int(row["ai_calls"]),
+    }
+
+
+# --- r100 B4 教练 Agent 编排轨迹（按 user_id 隔离，只追加不改写）--------------------
+
+def save_coach_run(
+    run_id: str,
+    *,
+    question: str,
+    goal: str,
+    status: str,
+    steps: list[dict[str, Any]],
+    answer: str,
+    citations: list[dict[str, Any]],
+) -> None:
+    """落一次编排轨迹：steps / citations 以 JSON 文本存，读侧由 pydantic 校验。"""
+    with connection() as conn:
+        conn.execute(
+            "INSERT INTO coach_runs (id, user_id, question, goal, status, steps, answer,"
+            " citations, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                run_id,
+                _uid(),
+                question,
+                goal,
+                status,
+                json.dumps(steps, ensure_ascii=False),
+                answer,
+                json.dumps(citations, ensure_ascii=False),
+                _now(),
+            ),
+        )
+
+
+def coach_run_row(run_id: str) -> dict[str, Any] | None:
+    """按 id 取一条轨迹（跨用户按 id 取一律 404 的口径由 `user_id` 条件保证）。"""
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT id, question, goal, status, steps, answer, citations, created_at "
+            "FROM coach_runs WHERE id = ? AND user_id = ?",
+            (run_id, _uid()),
+        ).fetchone()
+    return _coach_run_dict(row) if row is not None else None
+
+
+def list_coach_runs(limit: int = 20) -> list[dict[str, Any]]:
+    """最近若干次编排（倒序）：列表只回元信息，轨迹明细按 id 单取。"""
+    size = max(1, min(int(limit), 100))
+    with connection() as conn:
+        rows = conn.execute(
+            "SELECT id, question, goal, status, steps, answer, citations, created_at "
+            "FROM coach_runs WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT ?",
+            (_uid(), size),
+        ).fetchall()
+    return [_coach_run_dict(row) for row in rows]
+
+
+def _coach_run_dict(row: Any) -> dict[str, Any]:
+    """行 → dict（JSON 列解码；坏值退化为空，不让一条脏行打挂列表）。"""
+    return {
+        "id": str(row["id"]),
+        "question": str(row["question"]),
+        "goal": str(row["goal"] or ""),
+        "status": str(row["status"]),
+        "steps": _json_list(row["steps"]),
+        "answer": str(row["answer"] or ""),
+        "citations": _json_list(row["citations"]),
+        "created_at": str(row["created_at"]),
+    }
+
+
+# --- r103 召回反馈（点赞 / 点踩）：个人排序信号 + 全局聚合看板 -------------------
+
+def rag_feedback_upsert(
+    *, query: str, chunk_id: str, verdict: str, surface: str
+) -> dict[str, Any]:
+    """记一票（同用户同 query 同 chunk 只留最新一票）：返回该 chunk 的当前票数。
+
+    `(user_id, query, chunk_id)` 唯一 + `ON CONFLICT DO UPDATE` = 「换投票」而不是
+    「重复计票」——用户先点踩后改点赞，库里只应剩一票。
+    """
+    with connection() as conn:
+        conn.execute(
+            "INSERT INTO rag_feedback (id, user_id, query, chunk_id, verdict, surface,"
+            " created_at) VALUES (?, ?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(user_id, query, chunk_id) DO UPDATE SET verdict = excluded.verdict,"
+            " surface = excluded.surface, created_at = excluded.created_at",
+            (
+                uuid.uuid4().hex,
+                _uid(),
+                query,
+                chunk_id,
+                verdict,
+                surface,
+                _now(),
+            ),
+        )
+        row = conn.execute(
+            "SELECT count(*) FILTER (WHERE verdict = 'up') AS up,"
+            " count(*) FILTER (WHERE verdict = 'down') AS down "
+            "FROM rag_feedback WHERE chunk_id = ?",
+            (chunk_id,),
+        ).fetchone()
+    up = int(row["up"] or 0)
+    down = int(row["down"] or 0)
+    return {"chunk_id": chunk_id, "up": up, "down": down, "net": up - down}
+
+
+def rag_feedback_weights(query: str, chunk_ids: Sequence[str]) -> dict[str, int]:
+    """当前用户对**这条 query** 的净票（up=+1 / down=-1），只返回有票的 chunk。
+
+    排序只认用户自己的票：同一 chunk 在别人那里被点踩不该影响你的结果；
+    全局票数只用于看板与评测挖掘（`rag_feedback_summary`）。
+    """
+    if not chunk_ids:
+        return {}
+    ids = list(dict.fromkeys(str(item) for item in chunk_ids))
+    with connection() as conn:
+        rows = conn.execute(
+            "SELECT chunk_id, sum(CASE WHEN verdict = 'up' THEN 1 ELSE -1 END) AS net "
+            "FROM rag_feedback WHERE user_id = ? AND query = ? "
+            "AND chunk_id IN (" + ", ".join("?" for _ in ids) + ") "
+            "GROUP BY chunk_id",
+            [_uid(), query, *ids],
+        ).fetchall()
+    return {str(row["chunk_id"]): int(row["net"] or 0) for row in rows}
+
+
+def rag_feedback_summary(limit: int = 10) -> dict[str, Any]:
+    """全站反馈看板：总票数 + 被踩最多的 chunk（带标题，供运营/评测挖掘）。"""
+    size = max(1, min(int(limit), 50))
+    with connection() as conn:
+        totals = conn.execute(
+            "SELECT count(*) FILTER (WHERE verdict = 'up') AS up,"
+            " count(*) FILTER (WHERE verdict = 'down') AS down,"
+            " count(DISTINCT query) AS queries "
+            "FROM rag_feedback"
+        ).fetchone()
+        rows = conn.execute(
+            "SELECT f.chunk_id, c.title, c.kind, substr(c.content, 1, 120) AS snippet,"
+            " count(*) FILTER (WHERE f.verdict = 'down') AS downs,"
+            " count(*) FILTER (WHERE f.verdict = 'up') AS ups "
+            "FROM rag_feedback f LEFT JOIN rag_chunks c ON c.id = f.chunk_id "
+            "GROUP BY f.chunk_id, c.title, c.kind, substr(c.content, 1, 120) "
+            "HAVING count(*) FILTER (WHERE f.verdict = 'down') > 0 "
+            "ORDER BY downs DESC, f.chunk_id LIMIT ?",
+            (size,),
+        ).fetchall()
+    up = int(totals["up"] or 0)
+    down = int(totals["down"] or 0)
+    return {
+        "up": up,
+        "down": down,
+        "net": up - down,
+        "queries": int(totals["queries"] or 0),
+        "top_downvoted": [
+            {
+                "chunk_id": str(row["chunk_id"]),
+                "title": str(row["title"] or ""),
+                "snippet": str(row["snippet"] or ""),
+                "kind": str(row["kind"] or ""),
+                "ups": int(row["ups"] or 0),
+                "downs": int(row["downs"] or 0),
+            }
+            for row in rows
+        ],
+    }
+
+
+def public_table_count() -> int:
+    """public schema 下的表数（工程证据中心用）：DDL 演进的直接证据，只读。"""
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT count(*) AS n FROM pg_tables WHERE schemaname = 'public'"
+        ).fetchone()
+    return int(row["n"])
+
+
+def question_chunk_rows() -> list[dict[str, Any]]:
+    """题库 chunk 的取数入口（索引重建用）：只取检索需要的列，`answer` 永不外出。"""
+    with connection() as conn:
+        rows = conn.execute(
+            "SELECT id, direction, sub_direction, prompt, explanation FROM questions "
+            "ORDER BY id"
+        ).fetchall()
+    return [dict(row) for row in rows]

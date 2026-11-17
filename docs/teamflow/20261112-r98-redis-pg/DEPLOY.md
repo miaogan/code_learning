@@ -1,7 +1,11 @@
 # r98 数据层迁移：PostgreSQL + Redis
 
-从「SQLite 单文件 + 进程内限流」换成「PostgreSQL 唯一数据源 + Redis 共享层」的完整操作手册。
+从「SQLite 单文件 + 进程内限流」换成「PostgreSQL 权威主库 + Redis 共享层」的完整操作手册。
 面向已经跑着 r97 及更早版本、需要把线上数据搬过来的场景；全新部署只需 §2 之后的部分。
+
+> **当前数据层不止 PostgreSQL**：r98 之后又加了 **SQLite 完整副本兜底**——PG 正常时逐笔镜像，
+> PG 故障时副本接管读写并把离线操作记进 `_offline_operations`，PG 恢复后重放并回切。
+> 副本不是缓存，卷 `skillcoach-sqlite` 不能随手删；运行期只允许**单进程单 worker**（见 §7）。
 
 ---
 
@@ -9,9 +13,9 @@
 
 | 维度 | SQLite（r97 及之前） | PostgreSQL（r98） |
 |---|---|---|
-| 并发写 | 单写锁，`busy_timeout` 重试 | 行级锁 + MVCC，多副本可共享 |
-| 多副本 | 不可能（单文件被单进程独占） | 天然支持 |
-| 备份 | `Connection.backup` 拷页面 | `pg_dump` 一致性逻辑备份，可单表恢复 |
+| 并发写 | 单写锁，`busy_timeout` 重试 | 行级锁 + MVCC；但兜底副本仍要求单写进程 |
+| 多副本 | 不可能（单文件被单进程独占） | PG 侧天然支持；**应用侧暂限单 worker**（副本与内存缓存是进程本地状态） |
+| 备份 | `Connection.backup` 拷页面 | `pg_dump` 一致性逻辑备份，可单表恢复；副本卷另行备份 |
 | 全文检索 | FTS5 虚表（编译期能力，缺则降级 LIKE） | `pg_trgm` + GIN，恒可用且更快 |
 | 类型 | 动态类型（`'1'` 与 `1` 混用不报错） | 强类型，脏数据在写入时就暴露 |
 
@@ -47,7 +51,7 @@ uvicorn app.main:app --reload --port 8000
 > 本机 PostgreSQL 占用，撞端口会连到**别的库**上——那种错误看起来像「迁移丢数据」。
 > 若你的机器 5432 空闲，直接改回默认端口也可以，只要 `.env` 与 compose 一致。
 
-跑测试（**必须有真实 PG**，没有 SQLite 兜底）：
+跑测试（**必须有真实 PG 与 Redis**；依赖故障用例会自行构造不可达场景，并在临时目录建独立 SQLite 副本）：
 
 ```bash
 cd backend
@@ -90,7 +94,8 @@ docker inspect $(docker compose ps -q postgres) \
 
 ### 3.1 迁移前：把 app.db 从旧卷里取出来
 
-r98 的 backend 容器**不再挂 `/data`**，所以不能再用 `docker cp` 从容器里捞，直接挂卷取：
+r98 的 backend 容器**不再挂旧的 `skillcoach-data` 卷**（现在挂的是独立的 `skillcoach-sqlite`），
+所以不能再用 `docker cp` 从容器里捞，直接挂卷取：
 
 ```bash
 # 卷名 = <compose 项目名>_skillcoach-data，本项目 = code_learning_skillcoach-data
@@ -169,12 +174,20 @@ curl -s -X POST http://127.0.0.1:8080/api/search/questions \
 
 | 情况 | 行为 |
 |---|---|
-| `REDIS_URL` 为空或 `memory://` | 限流回落进程内窗口；缓存直通数据库；锁恒返回 True |
-| 运行期连不上 | 记一次 WARNING，本次调用当「无缓存 / 放行」；30 秒内不再重试，之后自动恢复 |
-| 生产档 `REDIS_URL` 为空 | **拒绝启动**（多副本各自计数会让限流形同虚设） |
-| 生产档 `REDIS_URL=memory://` | 能启动，但会打 WARNING（明确表示「我是单副本」） |
+| `REDIS_URL` 为空或 `memory://` | 限流回落进程内窗口；JSON 缓存走进程内 TTL+LRU 副本；锁按单进程语义放行 |
+| 运行期连不上 | 记一次 WARNING；**新值/删除都落在进程内副本并标记待同步**，30 秒后再探活，不把 503 抛给用户 |
+| 重连成功 | 先回放「前缀失效 → 精确删除 → 新值」，再公开 `up`；回放前健康检查不报 up |
+| 生产档 `REDIS_URL` 为空 | **拒绝启动**（多个进程各自计数会让限流形同虚设） |
+| 生产档 `REDIS_URL=memory://` | 能启动，但会打 WARNING（明确表示「我是单进程」） |
 
-**Redis 挂了不会 503**，这是刻意的：它只是加速与跨副本一致层，数据真值都在 PG。
+**Redis 挂了不会 503**，这是刻意的：它只是加速与跨进程一致层，数据真值在 PostgreSQL 或副本。
+两个必须知道的边界：
+
+- **删除屏障不能提前失效**：断线期间删除的会话 key 会一直记在屏障里（包括超过原 TTL），
+  直到回放成功才清除；否则 Redis 故障超过一分钟，旧会话会在重连后复活。
+- **首次故障请求会多花几秒**：Redis 客户端要等 DNS / socket 超时（实测 ~4s）才判定离线，
+  之后 30 秒内直接走内存。这是故障瞬间的一次性成本，不是持续劣化。
+
 如果你希望 Redis 故障时**限流收紧**（宁可错杀），把 `RATE_LIMIT_ENABLED` 与 Redis 健康检查
 绑到 nginx 层做，而不是在应用层加 fail-closed —— 那会让一次 Redis 抖动变成全站 429。
 
@@ -194,7 +207,7 @@ curl -s -o /dev/null -w '%{http_code}\n' -b cookie http://127.0.0.1:8080/api/me
 docker exec code_learning-redis-1 redis-cli --scan --pattern 'sc:*'   # 应出现 sc:sess / sc:rl
 ```
 
-后端**不需要重启**：重连成功后的下一个请求就会把会话缓存与限流窗口写回去。
+后端**不需要重启**：重连成功后的下一个请求（或下一次健康探活）会先回放离线期间的失效与新值。
 真正要留意的只有一处——如果两副本滚动升级，中间会短暂出现「一半连 7、一半连 8」，
 共享 key 的结构（ZSET 成员、string 值）在两版之间是兼容的，但**别在此期间改 key 格式**。
 
@@ -243,6 +256,28 @@ cron（每天 03:10，保留 14 份）：
 
 **Redis 不需要备份**：里面只有可重建的计数、缓存与短时锁。
 
+### SQLite 副本（`skillcoach-sqlite` 卷）要不要备份
+
+| 时刻 | 是否必须 | 原因 |
+|---|---|---|
+| PG 正常、`pending=0` | 可选 | 副本可由 `sync_sqlite_from_pg()` 整库重建 |
+| PG 故障 / 正在用副本服务 | **必须** | `_offline_operations` 里是尚未进入 PG 的唯一一份写入 |
+| 恢复失败（日志反复 `db.recovery.retry`） | **必须** | 重放未完成，重建副本会丢掉离线写 |
+
+```bash
+# 0) 确认还有多少未回放的离线写；非 0 时不要重建副本
+docker compose exec -T backend python -c "from app.core.db import pending_operations as p; print(len(p()))"
+
+# 1) 停后端再拷：WAL 模式下热拷可能拿到半份数据
+docker compose stop backend
+docker run --rm -v skillcoach-sqlite:/data -v "$PWD/backups:/backup" alpine \
+  sh -c 'cp /data/app-fallback.db /backup/app-fallback-$(date +%Y%m%d-%H%M%S).db'
+docker compose start backend
+```
+
+恢复副本：停后端 → 把备份文件写回 `/data/app-fallback.db`（同时删掉同目录 `-wal` / `-shm`）→ 启后端。
+启动日志出现 `db.recovery.ready` 且 `pending_operations()` 归零，才算重放完成。
+
 ---
 
 ## 6. 排障
@@ -259,7 +294,15 @@ cron（每天 03:10，保留 14 份）：
 | 明明已经改了 compose 的卷名，PG 还是报上一行的错、无限 `Restarting` | `up -d` 不因卷名变化重建已有容器，容器仍挂在旧卷上 | `docker compose up -d --force-recreate postgres`，再用 `docker inspect` 核 `.Mounts[].Name` |
 | `docker compose build` 卡在 pip / npm 下载 | 直连 pypi.org / registry.npmjs.org 掉到几十 kB/s | `PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple NPM_REGISTRY=https://registry.npmmirror.com docker compose build`（两个构建参数默认官方源，不改代码） |
 | 前后端都 healthy，但经 nginx 访问 `/health` 是 502 | nginx 启动时解析了一次 `backend` 的 IP，容器重建后 IP 变了，nginx 仍在用旧地址 | `docker compose up -d --force-recreate frontend`（或 `nginx -s reload`） |
-| `/health` 里 `db` 字段 | 如实反映数据层，r98 起恒为 `postgresql` | 若还是 `sqlite`，说明跑的是旧镜像 |
+| `/health` 里 `db` 字段 | 如实反映当前写库：`postgresql`（主库）或 `sqlite`（完整副本接管） | 长期停在 `sqlite` 说明 PG 没恢复；看 `db.recovery.retry` 与 `docker compose ps postgres` |
+| `/health` 里 `db` 是 `postgresql`、`db_status=up`，但 `db_replica=stale` | 主库正常服务，**兜底副本已失效**（磁盘满 / 副本文件损坏 / 卷不可写） | 业务不受影响，但此刻 PG 再挂就没有兜底；查 `db.replica.rebuild_failed`，修好磁盘或删掉坏副本后等下一轮重建 |
+| `/health` 返回 503 `DATABASE_UNAVAILABLE` | 既没有可用的 PG，也没有带 `complete` 标记的完整副本；或副本接管期间 SQLite 自身报错 | 先在 PG 可用时启动一次让副本建成；日志里会有 `db.sqlite_fallback.unavailable` 或 `db.sqlite.unavailable` |
+| 副本接管时请求 503，日志 `db.sqlite.unavailable` | 副本文件损坏 / 磁盘写满 / 目录不可写（这类错误已统一转成可重试 503，不再是 500） | `df -h` 看卷；确认 `skillcoach-sqlite` 可写；坏文件修复后停后端替换并删掉 `-wal`/`-shm` |
+| 停库后业务请求偶发 4s 才返回 | 故障瞬间的一次性 Redis 超时（DNS/socket），之后 30 秒内走内存 | 属预期；持续慢才是问题，检查 `redis.unavailable` 频率 |
+| 恢复后 `db.recovery.retry` 反复出现、业务 503 | 回放冲突（唯一键/外键）或 PG 中途又断；只有**回放**失败才 fail-stop，副本重建失败只降级为 `db_replica=stale` | 查 `pending_operations()`、`_offline_operations` 里第一条失败的 SQL，处理冲突后等自动重试 |
+| `db.replica.rebuild_failed error=ReplicaSyncError: table=xxx detail=UNIQUE constraint failed…` | 主库数据里有副本唯一约束不允许的重复行。根因通常是**主库唯一索引在 `pg_index` 里 `indisvalid=true`，实际却不拦重复**（索引缺条目；`ON CONFLICT` 因此判不出冲突） | 先跑 `scripts/audit_unique.py` 体检（只读）；对报出的表备份后去重、`REINDEX INDEX <约束名>` 恢复约束力，插一次重复值确认被 `UniqueViolation` 拒绝，副本会在下一轮自动重建 |
+| 同一失败每 2 秒刷一次日志 | 旧版本恢复循环是固定间隔重试 | 现按指数退避（2→4→8…封顶 30 秒），日志 `retry_in=` 字段给出下一次间隔；确定性失败退避期间不再全量重拷整库 |
+| 用裸 SQL / 脚本直接改过生产库（没走 `admin_cli`） | 服务进程的 `replica_ready` 是进程本地状态，看不见别处的写入，`/health` 仍报 ready 而副本已经落后 | 改完后在容器里执行 `docker compose exec -T backend python -c "from app.core.db import refresh_replica; refresh_replica()"`；`admin_cli` 的写命令已自动做这一步 |
 
 ---
 
@@ -272,3 +315,8 @@ cron（每天 03:10，保留 14 份）：
 - **`pg_trgm` 需要超级用户**：托管 PG 常不给，此时 `init_db()` 会记 WARNING 并跳过 GIN 索引，
   功能正常但检索退化为顺序扫描（数据量到十万级才会明显）；
 - **Redis 单点**：没有 Sentinel / Cluster；挂了会降级，不会不可用，但限流精度下降。
+- **应用侧只能单 worker**：SQLite 副本、离线日志、内存缓存与删除屏障都是进程本地状态。
+  多 worker 会让同一次写分叉到两份副本；要横向扩容，得先把「副本 + 协调器」独立成单进程服务。
+  当前 compose 已显式写死 `--workers 1`。
+- **离线屏障的内存上限让位于正确性**：Redis 长时间不可用且删除量极大时，删除屏障会持续累积
+  （这是安全状态，不是泄漏）；正常运行时回放成功即清除。

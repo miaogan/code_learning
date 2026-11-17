@@ -4,19 +4,22 @@
 都带该 id，排查时按 id 过滤即可拿到完整时间线（见 `observability.py`）。
 """
 
+import asyncio
 import logging
+import threading
 import time
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from urllib.parse import urlparse
 
+import httpx
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app.core import redis_cache, repository
+from app.core import db, redis_cache, repository
 from app.core.config import get_settings
 from app.core.db import close_pool, init_db
 from app.core.errors import (
@@ -43,13 +46,18 @@ from app.routers import (
     coach,
     courses,
     eval as eval_router,
+    evidence,
     exam,
     history,
     interview,
+    jd,
+    jobs,
+    leap,
     learn,
     practice,
     profile,
     radar,
+    rag,
     report,
     resume,
     search,
@@ -60,10 +68,12 @@ from app.schemas import HealthResponse
 from app.services import radar as radar_service, rate_limit
 from app.services.ai.ai import close_ai_pool
 from app.services.assessment import question_bank
+from app.services.retrieval import indexer as rag_indexer
 
-APP_VERSION = "0.1.0"
+APP_VERSION = "0.4.0"
 
 logger = logging.getLogger("app.http")
+db_logger = logging.getLogger("app.db")
 
 
 def _log_access(method: str, path: str, status: int, elapsed_ms: int, request_id: str) -> None:
@@ -103,21 +113,245 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     for warning in settings.production_warnings():
         logging.getLogger(__name__).warning("production.config_warning=%s", warning)
 
+    # PG / Redis 都是可恢复的**运行时**依赖：不在 Web 启动路径上同步连库。
+    db.reset_runtime()
+    # 先启动后台恢复，马上 yield 让 uvicorn 接流量；首次连得上时通常毫秒级初始化，
+    # 连不上则优先由完整 SQLite 副本接管；没有副本时才返回可重试的 503。
+    # Event 绑定当前 lifespan 的 loop，不能模块级复用（TestClient 每次新建 loop）。
+    ready = asyncio.Event()
+    _DB_STATE.update(
+        state="starting", initialized=False, checked_at=0.0, probe_state="starting",
+        ready_event=ready,
+    )
+    recovery_task = asyncio.create_task(_recover_database(ready))
+    # 正常 PG 初始化很快：给首个就绪窗口，避免 healthy 环境首个探活随机 degraded。
+    # 失败时事件会立刻 set（不会等窗口）；持续不可达最多等 0.5s 即让 Web 接流量。
+    try:
+        await asyncio.wait_for(ready.wait(), timeout=0.5)
+    except TimeoutError:
+        db_logger.warning("db.recovery.startup_degraded")
+    try:
+        radar_service.start_scheduler()
+        yield
+    finally:
+        # 先停恢复 / 调度器，避免连接池关闭后仍在写；DDL / 种子幂等，取消后下次可重试。
+        recovery_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await recovery_task
+        # asyncio 取消只取消 await，不会杀掉 to_thread 里的同步恢复；必须等它真实退出
+        # 才能关闭连接池，否则后台线程会在 lifespan 结束后继续拿库 / 留下 recovering。
+        worker = db.recovery_thread
+        if worker is not None:
+            await asyncio.to_thread(worker.join)
+        await radar_service.stop_scheduler()
+        await close_ai_pool()
+        close_pool()
+        redis_cache.reset_client()
+
+
+def _run_recovery_thread(worker: threading.Thread, failures: list[Exception]) -> None:
+    """等待真实恢复线程收尾，并把同步 DB 异常交还 asyncio 恢复循环处理。"""
+    worker.start()
+    worker.join()
+    if failures:
+        raise failures[0]
+
+
+#: 恢复失败后的退避上限（秒）。确定性失败（例如主库数据撞副本唯一约束）重试多少次都一样，
+#: 每 2s 全量重拷一遍只会刷日志、给 PG 加压；退到 30s 仍能在一分钟内自愈。
+_RECOVERY_BACKOFF_CAP_S = 30.0
+
+
+def _exc_brief(exc: BaseException) -> str:
+    """异常的单行摘要：带上消息本体，去掉换行，避免把堆栈灌进日志。"""
+    text = " ".join(str(exc).split())
+    head = f"{type(exc).__name__}: {text}" if text else type(exc).__name__
+    return head[:300]
+
+
+def _backoff_delay(base: float, failures: int) -> float:
+    """连续失败后的重试间隔：指数退避，封顶 `_RECOVERY_BACKOFF_CAP_S`。"""
+    if failures <= 0:
+        return base
+    return min(_RECOVERY_BACKOFF_CAP_S, base * 2 ** (failures - 1))
+
+
+#: 数据库初始化状态：只记状态，不保存异常文本 / DSN（它们绝不能进公开探活响应）。
+_DB_STATE: dict[str, object] = {
+    "state": "starting",
+    "initialized": False,
+    "checked_at": 0.0,
+    "probe_state": "starting",
+}
+
+
+async def _recover_database(ready: asyncio.Event | None = None) -> None:
+    """仅故障时重建副本；在线事务逐笔镜像，避免周期任务反复覆盖副本。"""
+    base_interval = max(0.1, get_settings().db_recovery_interval_s)
+    delay = base_interval
+    consecutive_failures = 0
+    while True:
+        # 本轮预探活是否真的拿到 PG 应答：except 分支据此区分「主库健康、只是副本坏了」
+        # 与「PG 本身不可达」。仅凭 ready 判断会在首次故障时把未就绪误报成 up。
+        pg_answered = False
+        try:
+            runtime = db.runtime_state()
+            if (
+                db.active_backend() != "postgresql"
+                or runtime["mode"] != "online"
+                or not runtime["replica_ready"]
+            ):
+                _DB_STATE.update(state="recovering", initialized=False)
+                # PG 不可达时不能进入独占恢复窗口：恢复要拿写锁，失败一次就会把
+                # SQLite 模式下本该毫秒级的业务写入挡到请求超时（实测 4s 后 503）。
+                # 先做无锁轻量探活，只有 PG 真的应答才值得暂停业务事务去重放/重建。
+                await asyncio.to_thread(db.ping_postgresql)
+                pg_answered = True
+                failures: list[Exception] = []
+
+                def recover(failures: list[Exception]) -> None:
+                    try:
+                        with db.recovery():
+                            _initialize_database()
+                            result = db.replay_pending()
+                            db.sync_sqlite_from_pg()
+                            db.activate_postgresql()
+                            if result["replayed"]:
+                                db_logger.info("db.recovery.replayed count=%s", result["replayed"])
+                    except Exception as exc:  # noqa: BLE001 - 由 _run_recovery_thread 交还
+                        failures.append(exc)
+
+                # 先登记真实线程再启动：取消若恰好落在 to_thread 调度前，退出路径
+                # 仍然能等到它结束，不会提前关闭 PG 连接池。
+                worker = threading.Thread(target=recover, args=(failures,), name="db-recovery")
+                db.recovery_thread = worker
+                try:
+                    await asyncio.to_thread(_run_recovery_thread, worker, failures)
+                finally:
+                    # 被取消后 to_thread 仍在运行；再 join 一次是幂等的，确保引用
+                    # 指向已结束的线程，lifespan 随后可以安全关闭连接池。
+                    worker.join()
+                _DB_STATE.update(
+                    state="up", initialized=True, checked_at=time.monotonic(), probe_state="up"
+                )
+                if ready is not None:
+                    ready.set()
+                db_logger.info("db.recovery.ready backend=%s", db.active_backend())
+            else:
+                # 在线只做探活，不在每次探活里建 DDL / 重拷整库。
+                await asyncio.to_thread(db.ping_postgresql)
+            # 本轮没抛异常：清掉退避，回到常规节拍。
+            consecutive_failures = 0
+            delay = base_interval
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:  # noqa: BLE001 - 恢复失败仍可尝试完整副本
+            consecutive_failures += 1
+            delay = _backoff_delay(base_interval, consecutive_failures)
+            reason = _exc_brief(exc)
+            runtime = db.runtime_state()
+            primary_ok = (
+                pg_answered and bool(runtime["ready"]) and runtime["backend"] == "postgresql"
+            )
+            if primary_ok:
+                # 主库健康、只是副本重建失败（磁盘满 / 副本文件损坏 / 主库数据撞唯一约束）：
+                # 业务继续在 PG 上跑，只是暂时失去兜底。把坏掉的兜底当故障扩散到健康主库
+                # 是得不偿失的。
+                _DB_STATE.update(
+                    state="up", initialized=True,
+                    checked_at=time.monotonic(), probe_state="up",
+                )
+                db_logger.warning(
+                    "db.replica.rebuild_failed error=%s retry_in=%.0fs", reason, delay
+                )
+            else:
+                try:
+                    if db.active_backend() != "sqlite":
+                        await asyncio.to_thread(db.activate_sqlite)
+                    _DB_STATE.update(
+                        state="degraded", initialized=True,
+                        checked_at=time.monotonic(), probe_state="up",
+                    )
+                    db_logger.warning("db.sqlite_fallback.ready error=%s", reason)
+                except Exception as fallback_exc:  # noqa: BLE001 - 无完整副本时明确拒绝业务写
+                    _DB_STATE.update(state="degraded", initialized=False, probe_state="degraded")
+                    db_logger.warning(
+                        "db.sqlite_fallback.unavailable error=%s", _exc_brief(fallback_exc)
+                    )
+            if ready is not None:
+                ready.set()
+            now = time.monotonic()
+            if now - float(_DB_STATE.get("last_log_at", 0.0)) >= 30.0:
+                db_logger.warning(
+                    "db.recovery.retry backend=%s replica_ready=%s attempts=%s error=%s",
+                    runtime["backend"], runtime["replica_ready"],
+                    consecutive_failures, reason,
+                )
+                _DB_STATE["last_log_at"] = now
+        await asyncio.sleep(delay)
+
+
+def _initialize_database() -> None:
+    """一次性启动初始化（仅后台恢复任务调用）：失败抛给恢复循环，不向外泄露细节。"""
     init_db()
-    # 启动即补种子（数据不是 DDL，故不进 db.py）：r11 起**每次都跑**幂等导入 + 只补空列——
-    # `ON CONFLICT DO NOTHING` 保证重复启动 0 新增，存量库（r10 卷）也能拿到新增题与解析。
     question_bank.ensure_seeded()
     # r98：题库检索由 `pg_trgm` GIN 索引支撑，重建入口保留为空操作（索引随写入自动维护）。
     repository.rebuild_question_search()
-    # r67：应用内定时采集（`RADAR_SCHEDULE=inapp` 才起，其余模式完全由手动按钮驱动）。
-    radar_service.start_scheduler()
-    yield
-    # 关停顺序：先停调度器（避免 task 在连接池关闭后仍在跑），再释放 AI 连接池，
-    # 最后关 DB 池与 Redis 客户端 —— 反过来的话调度器最后一轮写入会撞上已关闭的池。
-    await radar_service.stop_scheduler()
-    await close_ai_pool()
-    close_pool()
-    redis_cache.reset_client()
+    # 恢复后也在同一线程补教程索引；DB 初始化完成前先不让业务报 ready。
+    if get_settings().rag_seed_tutorials:
+        summary = rag_indexer.ensure_tutorials_indexed()
+        if summary is not None:
+            logger.info(
+                "rag.tutorial_seed.done skipped=%s tutorial_chunks=%s",
+                summary.get("skipped"),
+                summary.get("tutorial_chunks"),
+            )
+
+
+def _db_probe_state() -> str:
+    """初始化状态 + 短 TTL 的真实轻量查询；故障只降级，绝不让探活抛 503。"""
+    if not bool(_DB_STATE["initialized"]):
+        return str(_DB_STATE["state"])
+    now = time.monotonic()
+    if now - float(_DB_STATE.get("checked_at", 0.0)) < 15.0:
+        return str(_DB_STATE.get("probe_state", "up"))
+    try:
+        db.ping()
+        state = "up"
+    except Exception as exc:  # noqa: BLE001 - /health 必须反映故障而非自己故障
+        db_logger.warning("db.health.unavailable error=%s", type(exc).__name__)
+        state = "degraded"
+    _DB_STATE.update(probe_state=state, checked_at=now)
+    return state
+
+
+#: embedder 探活缓存：/health 被 docker healthcheck 高频调用，探活必须带 TTL。
+_EMBEDDER_PROBE: dict[str, object] = {"state": "na", "checked_at": 0.0}
+
+
+def _embedder_probe_state() -> str:
+    """本地 embedder 探活（up / down / na）：60s 缓存 + 1.5s 超时，失败只降级。"""
+    settings = get_settings()
+    if not settings.ai_embed_model:
+        return "na"
+    now = time.monotonic()
+    if now - float(_EMBEDDER_PROBE["checked_at"]) < 60.0:
+        return str(_EMBEDDER_PROBE["state"])
+    state = "down"
+    base = (settings.ai_embed_base_url or "").rstrip("/")
+    # OpenAI 兼容端点的 base 以 /v1 结尾，而 TEI 的健康端点在**根路径** /health ——
+    # 直接拼会探到 /v1/health（404）而误报 down（生产实测过）。
+    if base.endswith("/v1"):
+        base = base[: -len("/v1")]
+    if base:
+        try:
+            resp = httpx.get(base + "/health", timeout=1.5)
+            state = "up" if resp.status_code == 200 else "down"
+        except Exception:  # noqa: BLE001 - 探活永不抛错：/health 必须始终可用
+            state = "down"
+    _EMBEDDER_PROBE["state"] = state
+    _EMBEDDER_PROBE["checked_at"] = now
+    return state
 
 
 def create_app() -> FastAPI:
@@ -338,23 +572,40 @@ def create_app() -> FastAPI:
     app.include_router(search.router)
     # r61：学习进度与 7 天计划打卡上云（整份状态读写，按账号隔离）。
     app.include_router(learn.router)
+    # r108：跃迁档案看板（岗位差距 / 工程证据 / 面试表达，只读聚合零 AI）。
+    app.include_router(leap.router)
+    # r110：JD 岗位对位（零 AI 关键词证据 / 缺口清单 / 召对预设，登录态按账号隔离）。
+    app.include_router(jd.router)
     # r65：AI 学习教练（检索增强 + 引用白名单校验，材料由前端组装后随请求上传）。
     app.include_router(coach.router)
     # r67：技术雷达（先锋清单 / 采集 / 国子监生成任务，任务按账号隔离）。
     app.include_router(radar.router)
     app.include_router(taifu.router)
+    app.include_router(rag.router)
+    app.include_router(evidence.router)
+    app.include_router(jobs.router)
 
     @app.get("/health", response_model=HealthResponse, tags=["ops"], summary="探活（AC-8）")
     def health() -> HealthResponse:
         # r9：请求内 live 读取（不是 create_app 的 import 期快照），切供应商后无需重启即可被探活观测。
         # 只透传 `resolve_ai()` 的结果，不在这里做任何就绪判定 / 文案拼接（唯一出口在 config）。
         runtime = get_settings().resolve_ai()
+        db_state = _db_probe_state()
+        redis_state = redis_cache.status()
+        runtime_db = db.runtime_state()
         return HealthResponse(
-            status="ok",
+            # 200 = Web 进程可服务，不等于全部依赖就绪；真正状态看下方分项。
+            status="ok" if db_state == "up" and redis_state in ("up", "memory") else "degraded",
             version=APP_VERSION,
             ai_configured=runtime.ready,
-            # r98：数据层换成 PG，探活如实报后端类型（运维靠这一行判断「连的是哪个库」）。
-            db="postgresql",
+            # 当前实际业务读写在哪个库；degraded + sqlite 表示离线副本正在服务。
+            db=db.active_backend(),
+            db_status=db_state,
+            redis_status=redis_state,
+            # ready / stale / na：stale 表示主库在服务、但副本坏了或需要重建（失去兜底）。
+            db_replica="ready" if runtime_db["replica_ready"] else "stale",
+            # r105：本地 embedder 探活（哈希档恒为 na；远程档 60s 缓存探活一次）。
+            rag_embedder=_embedder_probe_state(),
             ai_provider=runtime.provider,
             ai_model=runtime.model,
             ai_json_mode=runtime.json_mode,

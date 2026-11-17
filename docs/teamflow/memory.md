@@ -9,7 +9,8 @@
 - 品牌与路线（2026-11-10 · r56 落定）：当前产品名「逃跑计划 / Escape Plan」，定位是**外包工程师的跃迁工作台**，主攻 **AI 应用 / Agent 后端**。品牌文案唯一来源 `frontend/src/lib/brand.ts`；叙事遵循「真实经历盘点 → 能力验证 → 项目证据补强」。ACP 只是知识补充，不将刷题、模拟评测或 dry-run 包装成生产经验或录用保证。历史任务夹、存储键、Cookie、路由、Docker 卷名保留旧标识以确保兼容，不做全局机械替换。下阶段方向是「目标岗位差距 + 项目工程证据 + 面试表达」的跃迁档案，**本轮未实现该看板**。
 
 - 技术栈基线：Web 应用 = React + Vite（TypeScript）前端 / Python FastAPI 后端；AI 能力统一由服务端调用模型 API，Key 只经服务端 `.env` 注入，前端源码与构建产物中不得出现 Key。
-- BYOK 厂商预设约定（2026-11-14）：设置页「模型服务商」下拉的闭集单点在 `frontend/src/lib/aiProviders.ts`（8 家国内厂商 + 自定义，**默认 DeepSeek**）。它只是填表助手：选中后填 `base_url` / 常用模型名，两输入框始终可编辑（模型名以厂商控制台为准），手改地址会反查并回落「自定义」；**HTTP 契约 `AiSettingsRequest` 四件套与后端零改动**，已存配置原样保留。「当前状态」卡片由 `providerLabelOf` 展示真实厂商。已知待拍板：服务端 r9 档 `AI_DEEPSEEK_MODEL` 示例与 `Settings.ai_deepseek_model` 默认值仍是 `deepseek-chat`，DeepSeek 官方文档现行名为 `deepseek-flash` / `deepseek-v4-pro`；切换会改变内置 Key 链路的模型，需产品确认后再动。
+- BYOK 厂商预设约定（2026-11-14）：设置页「模型服务商」下拉的闭集单点在 `frontend/src/lib/aiProviders.ts`（8 家国内厂商 + 自定义，**默认 DeepSeek**）。它只是填表助手：选中后填 `base_url` / 常用模型名，两输入框始终可编辑（模型名以厂商控制台为准），手改地址会反查并回落「自定义」；**HTTP 契约 `AiSettingsRequest` 四件套与后端零改动**，已存配置原样保留。「当前状态」卡片由 `providerLabelOf` 展示真实厂商。已知待拍板：服务端 r9 档 `AI_DEEPSEEK_MODEL` 示例与 `Settings.ai_deepseek_model` 默认值仍是 `deepseek-chat`，DeepSeek 官方文档现行名为 `deepseek-flash` / `deepseek-v4-pro`；实测（2026-11-14）旧名 `deepseek-chat` 仍被接受并由 `deepseek-flash` 提供服务，只是别名、不会调不通；是否统一成现行名仍待拍板。
+- AI 连通性探测约定（2026-11-14）：`response_format={"type":"json_object"}` 下 DeepSeek / OpenAI 要求 messages 里出现 "json" 字样，缺了直接 400（`Prompt must contain the word 'json' in some form`）。「测试连接」探测语常量 `PING_SYSTEM` / `PING_USER` 必须自带该字样（回归测试 `backend/tests/test_ai_ping_json_prompt.py` 钉住）；业务提示词都写了「只输出 JSON」、视觉档是 `json_mode=none`，均不受影响。上游 4xx 文案由 `services/ai/ai.py::_rejected_message()` 单点按状态码归因（400 = 模型名 / 地址 / JSON 模式，401·403 = Key，402 = 额度），流式路径复用同一函数，不再一律说「请检查 API Key 与额度」。
 - 数据落盘基线：首版用本地 SQLite 单库（`backend/app.db`），不引入外部数据库与云存储；**题库自 r6 起由 SQLite 的 `questions` 表承载（`backend/app/seed/questions.json` 退为唯一导入源，幂等导入不覆盖已有行）**，课程清单仍以服务端 JSON 文件维护。
 - 文档基线：每个需求一个不可变任务夹 `docs/teamflow/<yyyyMMdd-rN-slug>/`，跨需求约定与待办只写 `docs/teamflow/memory.md`。
 - 模块边界（2026-10-31 脚手架落定）：`frontend/` 只经 `src/api/client.ts` 出网（页面不直接 fetch）；`backend/` 路由层只做参数与错误映射，业务在 `app/services/`；画像 / 试卷 / 报告等结构化产物以 JSON 文本列入库，校验交给 pydantic（`app/schemas.py`）。
@@ -113,13 +114,22 @@
 
 ## 数据层换成 PostgreSQL + Redis（r98）
 
-- **数据层口径取代 r10 的「SQLite 落 skillcoach-data 卷」**：`DATABASE_URL` 是唯一数据源，SQLite 已下线，**没有文件库、没有降级路径**。服务名/端口/WEB_PORT 仍是跨需求契约（改任一须同改 `docker-compose.yml` + r98 DEPLOY + README）。2026-11-13 口径收紧：`WEB_PORT` 默认值由 `8080` 改为 `127.0.0.1:8080`（格式 `[绑定地址:]端口`，只写端口＝绑 0.0.0.0），`scripts/tunnel.sh` 取端口时按最后一个冒号切分；Redis 补 `--maxmemory ${REDIS_MAXMEMORY:-128mb}`（无上限时 allkeys-lru 不触发）；CI Python 3.11→3.13 与容器镜像对齐。
-- **卷拆成两个，不许复用**：PG 用 `skillcoach-pgdata`；r97 的 `skillcoach-data`（内含 `app.db`）保留但不挂载，用途只剩「升级时取数据」与「回滚」。PG 的 `initdb` 只接受空目录，复用旧卷会 `directory exists but is not empty` 直接起不来（本机实测踩到）。
+- **数据层口径取代 r10 的「SQLite 落 skillcoach-data 卷」**：`DATABASE_URL` 指向 PostgreSQL 权威主库；同时维护一份 **SQLite 完整副本**（`SQLITE_PATH` 落在 `skillcoach-sqlite` 卷），PG 故障时副本接管读写并记录离线操作，恢复后重放并回切——不是缓存，不能随手删，运行期只允许单 worker。服务名/端口/WEB_PORT 仍是跨需求契约（改任一须同改 `docker-compose.yml` + r98 DEPLOY + README）。2026-11-13 口径收紧：`WEB_PORT` 默认值由 `8080` 改为 `127.0.0.1:8080`（格式 `[绑定地址:]端口`，只写端口＝绑 0.0.0.0），`scripts/tunnel.sh` 取端口时按最后一个冒号切分；Redis 补 `--maxmemory ${REDIS_MAXMEMORY:-128mb}`（无上限时 allkeys-lru 不触发）；CI Python 3.11→3.13 与容器镜像对齐。
+- **卷拆成三个，不许复用**：PG 用 `skillcoach-pgdata`，兜底副本与离线日志用 `skillcoach-sqlite`（挂 `/data`）；r97 的 `skillcoach-data`（内含 `app.db`）保留但不再挂载，用途只剩「升级时取数据」与「回滚」。PG 的 `initdb` 只接受空目录，复用旧卷会 `directory exists but is not empty` 直接起不来（本机实测踩到）。
 - **`?` 占位符靠薄适配层翻译**（`db.to_pg_sql()`：`?`→哨兵→`%`转义→哨兵→`%s`。**判据只看有没有 `?`**——r98 收尾修正：原判据「含 `?` 或 `%`」会把直写 `%s` 的新 SQL 二次转义成 `%%s`，psycopg 报「0 placeholders but N parameters」，而文档恰好教人这么写）。两条路都可走：用 `?` 时字面量 `%` 自动转义；直写 `%s` 时 `LIKE '%kw%'` 要自己写 `%%kw%%`。同一个文件别混用。`row_factory=dict_row` + `prepare_threshold=None`。
 - **检索**：FTS5 虚表删除，改 `pg_trgm` GIN；`mode` 恒 `like`、`notice` 恒空，与旧 LIKE 分支结果一致。`CREATE EXTENSION` 必须用独立连接（DDL 失败会把当前事务整个 aborted）。
-- **Redis 是加速层不是真值**：限流窗口（Lua ZSET 滑窗，被拒请求也写）、会话缓存 60s、读缓存按前缀失效、分布式锁（Lua 比对持有者释放）。降级三档：未配/`memory://`→进程内；运行期不可达→WARNING + 30s 不重试；生产未配→**拒启**。熔断**只共享错误率样本**，在飞计数保持单副本（共享会让 N 副本共用 32 的额度）。
+- **Redis 是加速层不是真值**：限流窗口（Lua ZSET 滑窗，被拒请求也写）、会话缓存 60s、读缓存按前缀失效、分布式锁（Lua 比对持有者释放）。降级三档：未配/`memory://`→进程内；运行期不可达→进程内 TTL+LRU 副本继续服务，`_TOMBSTONES` 记录删除屏障，重连后按「前缀失效→精确删除→新值」回放成功才报 up；生产未配→**拒启**。熔断**只共享错误率样本**，在飞计数保持单副本（共享会让 N 副本共用 32 的额度）。
 - **测试必须独占跑**：四个库 `sc_test` / `_empty` / `_legacy` / `_seed` 共享，多 pytest 进程并行会互相 `TRUNCATE`，表现为大量 error + 极慢。宿主跑测试要 `docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d postgres redis`（主 compose 不发布端口）。
 - **迁移脚本**：`ON CONFLICT DO NOTHING` 幂等、列取交集、非空列兜底（缺列给占位值、值为 NULL 给列自己的 DEFAULT）、批次包 SAVEPOINT 失败降级逐行、复位 IDENTITY、逐表行数校验。切换窗口内 SQLite 的新写入带不走，**必须停服迁移**。
 - **镜像构建留了镜像源参数**：`PIP_INDEX_URL` / `NPM_REGISTRY`，默认官方源；国内网络直连常掉到几十 kB/s（实测一次依赖装 18 分钟没完，换源 60 秒）。
 
 - **Redis 版本口径（r98 补）**：compose 钉 `redis:8-alpine`（实测 v8.10.3）。用到的命令只有 ZSET 滑窗 / Lua EVAL / `SET NX EX` / `EXPIRE` / `SCAN` / `DEL`，7 与 8 语义一致，升 8 零代码改动。换大版本只需重建容器：内存数据全丢但都可重建，**后端不用重启**（下一个请求即重写缓存与窗口）；滚动升级期间别改 key 格式。
+
+## RAG 检索域与 pgvector（r100）
+
+- **PG 镜像钉 `pgvector/pgvector:pg16`**（16 基线不变；官方 postgres:16-alpine 没有 vector 扩展，换回去会让向量检索退化为 Python 余弦）。`CREATE EXTENSION vector` 与 pg_trgm 同模式：独立连接尽力创建，失败只记日志；`rag_chunks.embedding` 列类型按**扩展可用性**分支（`vector(AI_EMBED_DIM)` + ivfflat / `double precision[]` 降级），判定用 `information_schema` 的列类型而非扩展存在性（存量库可能先降级建列后装扩展，`ADD COLUMN IF NOT EXISTS` 不会改已有列类型）。
+- **embedding 档位**：`AI_EMBED_MODEL` 空 = 离线 `HashingEmbedder`（char-bigram + crc32，跨进程稳定；内建 `hash()` 受 PYTHONHASHSEED 影响禁止使用）；`AI_EMBED_BASE_URL/API_KEY` 留空继承主档。**维度进 DDL**（`AI_EMBED_DIM`，默认 256），换 embedder 改维度必须重建索引；插入前逐条断言。
+- **chunk 写入一律全量替换**（`rag_write_chunks(replace_kind=...)`：DELETE kind → INSERT），不做增量 diff——题库行会被 adopt / question_merge 改写，diff 依赖主键永不复用并不成立。`rag_chunks` 是共享语料（无 user_id，与 `questions` 同口径）。
+- **检索 mode 闭集** `keyword|semantic|hybrid` 唯一出处是 `services/retrieval/hybrid.py`；hybrid 走 RRF(k=60)（只看名次，免疫向量余弦与 ILIKE 的量纲不可比）。换 embedding 配置后旧向量**不删**：`rag_embedder_breakdown` 检测 stale，status 亮提示等重建；检索按当前 embedder 过滤，旧向量自然退出结果。
+- **评测两轨**：`scripts/eval_rag.py`（三态检索门禁：hybrid recall@5 ≥ 70% 且不比 keyword 回退超 5pp）与 `scripts/eval_rag_judge.py`（LLM-as-judge，DRY-RUN 进 CI / `--live` 需 `AI_LIVE=1`）；共用 `scripts_eval_shared.py` 准备评测库。
+- **一次升级说明**：r100 前的存量库执行 `init_db()` 即得新表（`CREATE TABLE IF NOT EXISTS`）；无存量数据需迁移。

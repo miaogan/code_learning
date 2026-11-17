@@ -95,6 +95,9 @@ export const SETTINGS_UNKNOWN = '未记录设定'
 /**
  * 本场设定的唯一格式化入口（AC-11 / TECHNICAL §4.2）。
  * 会话顶、报告顶、历史行三处都调它，避免各拼一份出现「未记录设定 / undefined」漂移。
+ *
+ * r112：对岗带入的缺口词追加在末尾（`缺口：A / B`），最多 3 项——报告页因此能回收
+ * 「本场为什么问这些」，而不必再造一行口径；旧 run 没有该键，文案保持原样。
  */
 export function settingsLine(settings: InterviewSettings | null): string {
   if (!settings) return SETTINGS_UNKNOWN
@@ -109,5 +112,9 @@ export function settingsLine(settings: InterviewSettings | null): string {
     .filter((part): part is string => typeof part === 'string' && part.trim().length > 0)
     .join(' · ')
   if (focus.length > 0) parts.push(focus)
+  const gaps = (settings.focus_gaps ?? [])
+    .filter((gap): gap is string => typeof gap === 'string' && gap.trim().length > 0)
+    .slice(0, 3)
+  if (gaps.length > 0) parts.push(`缺口：${gaps.join(' / ')}`)
   return parts.length > 0 ? parts.join(' · ') : SETTINGS_UNKNOWN
 }

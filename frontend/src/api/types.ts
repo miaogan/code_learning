@@ -9,11 +9,19 @@ export interface Health {
   version: string
   ai_configured: boolean
   db: string
+  /** starting / up / degraded；旧后端缺省按 up 展示（本轮仅用于运维观测）。 */
+  db_status?: string
+  /** up / degraded / memory；memory 表示显式或未配置的进程内模式。 */
+  redis_status?: string
+  /** ready / stale；stale = 主库在服务但故障兜底副本需要重建（旧后端无此字段）。 */
+  db_replica?: string
   // r9 运维白名单三字段（与 /health 逐字镜像，永不携带 Key 片段）。
   // 标可选是为了旧后端 / 旧构建产物仍类型安全；本轮不渲染它们。
   ai_provider?: string
   ai_model?: string
   ai_json_mode?: string
+  // r105：本地 embedder 探活（up / down / na）；旧后端没有该字段。
+  rag_embedder?: string
 }
 
 export interface ResumeMeta {
@@ -133,6 +141,8 @@ export interface InterviewSettings {
   /** 可选方向聚焦：空串 / 缺省 = 不限（老 run 没有这两键）。取值见 lib/questionDirections。 */
   direction?: string
   sub_direction?: string
+  /** r111：JD 对位带过来的前 3 个缺口，只影响本场出题，不写回画像。 */
+  focus_gaps?: string[]
 }
 
 export interface InterviewSettingsPatch {
@@ -142,6 +152,7 @@ export interface InterviewSettingsPatch {
   company_size?: CompanySize
   direction?: string
   sub_direction?: string
+  focus_gaps?: string[]
 }
 
 export interface InterviewCreateRequest {
@@ -1181,4 +1192,295 @@ export interface TaifuMemoryResult {
 
 export interface TaifuClearResult {
   deleted: number
+}
+
+/* ---------- r100 RAG 检索域 + 工程证据中心 ---------- */
+
+/** 检索模式闭集：keyword | semantic | hybrid（与后端 RAG_SEARCH_MODES 逐字对齐）。 */
+export type RagSearchMode = 'keyword' | 'semantic' | 'hybrid'
+
+/** chunk 来源闭集：question = 题库，tutorial = 教程小节。 */
+export type RagChunkKind = 'question' | 'tutorial'
+
+/** RAG 索引状态：embedder / 引擎形态 / chunk 计数 / 是否需要重建。 */
+export interface RagStatus {
+  built: boolean
+  embedder: string
+  dim: number
+  engine: string
+  chunk_count: number
+  question_chunks: number
+  tutorial_chunks: number
+  built_at: string
+  stale: boolean
+  embedder_kind: string
+  notice: string
+}
+
+/** 重建 / 摄取结果：状态快照 + 本次写入条数。 */
+export interface RagRebuildResult extends RagStatus {
+  written: number
+}
+
+/** 检索命中行：snippet 是正文前 160 字符；score 只用于同模式内排序展示。 */
+export interface RagChunkItem {
+  chunk_id: string
+  kind: RagChunkKind
+  ref_id: string
+  section_id: string
+  title: string
+  content: string
+  snippet: string
+  score: number
+}
+
+export interface RagSearchRequest {
+  query: string
+  mode: RagSearchMode
+  limit: number
+  kinds: RagChunkKind[]
+}
+
+export interface RagSearchResponse {
+  items: RagChunkItem[]
+  total: number
+  mode: string
+  /** pgvector（索引内余弦）| python-cosine（降级）| sql-ilike（关键词腿）。 */
+  engine: string
+  notice: string
+}
+
+/** 检索增强生成结果：citations 只含白名单内的 chunk。 */
+export interface RagAnswerResponse {
+  answer: string
+  citations: RagChunkItem[]
+  retrieved_count: number
+  dropped_citations: number
+  mode: string
+  engine: string
+  notice: string
+}
+
+/** 工程证据中心摘要：行数事实 + 表数 + RAG 索引状态（零评分，只报事实）。 */
+export interface EvidenceSummary {
+  data_scale: Record<string, number>
+  tables: number
+  rag: RagStatus
+}
+
+/** 教程里的一个结构化 block（r103）：后端按 kind 选切分器，前端只传结构不切分。 */
+export interface RagIngestBlock {
+  kind: 'text' | 'list' | 'table' | 'note' | 'code'
+  text?: string
+  title?: string
+  items?: string[]
+  headers?: string[]
+  rows?: string[][]
+  code?: string
+  caption?: string
+}
+
+/** 教程摄取条目：chapter_id + section_id 是幂等锚点，content 为小节正文（兜底/兼容）。 */
+export interface RagIngestItem {
+  chapter_id: string
+  section_id: string
+  title: string
+  content: string
+  /** r103：结构化 block —— 后端据此按 block 类型切分子片（代码按行、表格带表头、正文按句）。 */
+  blocks: RagIngestBlock[]
+}
+
+/* ---------- r100 B4 教练 Agent 编排（讲席） ---------- */
+
+/** 计划中的一步：工具名 + 中文理由 + 参数。 */
+export interface CoachPlanStep {
+  tool: string
+  reason: string
+  args: Record<string, string>
+}
+
+/** 白名单内的引用：ref 令牌 + 可点标题与站内路径。 */
+export interface CoachCitation {
+  ref: string
+  title: string
+  href: string
+  kind: string
+}
+
+/** 编排轨迹里的一步：kind 区分 plan / tool / reflect / final，其余字段按 kind 而异。 */
+export interface CoachTraceStep {
+  kind: 'plan' | 'tool' | 'tool_skip' | 'reflect' | 'final' | string
+  [key: string]: unknown
+}
+
+/** 一次编排的结果与审计轨迹。 */
+export interface CoachAgentRun {
+  id: string
+  question: string
+  goal: string
+  status: string
+  steps: CoachTraceStep[]
+  answer: string
+  citations: CoachCitation[]
+  dropped_citations: number
+  notice: string
+  created_at: string
+}
+
+export interface CoachAgentRequest {
+  question: string
+  goal: string
+}
+
+/** 反馈请求：同用户同 query 同 chunk 只保留最新一票（换票覆盖）。 */
+export interface RagFeedbackRequest {
+  query: string
+  chunk_id: string
+  verdict: 'up' | 'down'
+  surface?: 'search' | 'answer' | 'coach'
+}
+
+/** 投票后的该 chunk 票数（全局聚合）。 */
+export interface RagFeedbackResult {
+  chunk_id: string
+  up: number
+  down: number
+  net: number
+}
+
+/** 被踩最多的 chunk（看板用）。 */
+export interface RagFeedbackTopItem {
+  chunk_id: string
+  title: string
+  snippet: string
+  kind: string
+  ups: number
+  downs: number
+}
+
+/** 反馈看板：总票数 + 被踩最多（评测挖掘入口）。 */
+export interface RagFeedbackSummary {
+  up: number
+  down: number
+  net: number
+  queries: number
+  top_downvoted: RagFeedbackTopItem[]
+}
+
+// --- r108 跃迁档案看板（服务端聚合，零 AI / 零重算）--------------------------------
+
+/** 目标岗位差距块：直接复用最近报告的 role_fit，前端零减法、不重排。 */
+export interface LeapRoleGap {
+  role_fit: RoleFit | null
+  notice: string | null
+}
+
+/** 画像里的一条项目工程证据：只取真实存在的 bullets 与溯源条数。 */
+export interface LeapEngineeringItem {
+  name: string
+  role: string | null
+  period: string | null
+  bullets: string[]
+  evidence_count: number
+  status: string
+}
+
+/** 项目工程证据块：项目逐条 + 落库规模事实 + RAG / 技术雷达状态。 */
+export interface LeapEngineering {
+  projects: LeapEngineeringItem[]
+  data_scale: Record<string, number>
+  tables: number
+  rag: RagStatus | null
+  radar_techs_seen: number
+  radar_finished_at: string
+  notice: string | null
+}
+
+/** 四要素文本自检：纯启发式提示，不构成评分或能力结论。 */
+export interface LeapExpressionStructure {
+  has_problem: boolean
+  has_solution: boolean
+  has_metric: boolean
+  has_pitfall: boolean
+  hit_count: number
+  hint: string
+}
+
+/** 一条已作答的面试表达：分数 / 点评沿用当场写入的值。 */
+export interface LeapExpressionItem {
+  run_id: string
+  question_id: string
+  prompt: string
+  answer: string
+  score: number | null
+  comment: string | null
+  structure: LeapExpressionStructure
+  /** r111：本场从 JD 带进来的缺口词；只是文本对照，不是掌握度结论。 */
+  focus_gaps: string[]
+  gap_hits: string[]
+  gap_misses: string[]
+}
+
+export interface LeapExpression {
+  items: LeapExpressionItem[]
+  notice: string | null
+}
+
+/** 跃迁档案：三块同源一次返回，generated_at 是服务端聚合时刻。 */
+export interface LeapArchive {
+  role_gap: LeapRoleGap
+  engineering: LeapEngineering
+  expression: LeapExpression
+  generated_at: string
+}
+
+/* ------------------------------------------------------------------ *
+ * r110 岗位对位 · JD 证据清单（与 backend/app/schemas.py 逐字段镜像）
+ * ------------------------------------------------------------------ */
+
+export interface JdMatchRequest {
+  jd_text: string
+  target_role?: string | null
+}
+
+export type JdKeywordStatus = 'evidence' | 'mentioned' | 'missing'
+
+export interface JdKeywordItem {
+  name: string
+  matched_alias: string
+  source_quote: string
+  user_level: number
+  evidence_count: number
+  evidence: string[]
+  status: JdKeywordStatus
+  role_required: boolean
+}
+
+export interface JdGapItem {
+  name: string
+  origin: 'jd' | 'role_model'
+  reason: string
+  source_quote: string
+}
+
+export interface JdInterviewPreset {
+  target_role: string
+  direction: string
+  sub_direction: string
+  /** r111：最多 3 个缺口技能，开局时进入本场 settings.focus_gaps。 */
+  focus_gaps: string[]
+  reason: string
+}
+
+export interface JdMatchResult {
+  target_role: string | null
+  role_fit: RoleFit | null
+  keywords: JdKeywordItem[]
+  gaps: JdGapItem[]
+  preset: JdInterviewPreset | null
+  notice: string | null
+  source_chars: number
+  matched_count: number
+  missing_count: number
+  generated_at: string
 }

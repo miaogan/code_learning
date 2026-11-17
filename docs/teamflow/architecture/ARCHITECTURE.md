@@ -16,7 +16,7 @@
 | 样式 | 手写 CSS + CSS 变量 token | `src/styles/tokens.css` | DESIGN §0 是写死规格（token / 几何 / 逐组件状态色），CSS 变量最贴近、产物零运行时 |
 | 后端 | Python 3.13 + FastAPI + uvicorn（CI 与 `backend/Dockerfile` 同版；3.11 亦兼容） | `fastapi>=0.110` | 与简历解析（pypdf / python-docx）与 AI 结构化校验（pydantic）天然同栈 |
 | 模型调用 | httpx 异步调用 OpenAI 兼容 `/chat/completions` | `httpx>=0.27` | 单一入口、超时/重试/JSON 兜底集中在一个模块 |
-| 持久化 | PostgreSQL 16 + psycopg3 连接池（`DATABASE_URL`） | `postgres:16-alpine`、`psycopg[binary]>=3.2` | r98 起取代 SQLite：多副本可共享、真并发写、崩溃不靠文件锁；结构化产物仍以 JSON 文本列存 |
+| 持久化 | PostgreSQL 16 权威主库 + psycopg3 连接池；SQLite 持久化完整副本（`SQLITE_PATH`） | `pgvector/pgvector:pg16`、`psycopg[binary]>=3.2` | 正常时 PG 提交后逐笔镜像；故障时完整副本接管读写，恢复后重放离线日志。限单进程、单 worker |
 | 加速层 | Redis 8（`REDIS_URL`，可缺省） | `redis:8-alpine`、`redis>=5` | 限流窗口 / 会话缓存 / 读缓存 / 分布式锁四类「多副本必须共享、丢了能重建」的状态；未配或不可达时全部降级到进程内 |
 | 测试 | pytest + ruff（后端）/ vitest + tsc + eslint（前端） | — | 只需在两处夹具中防回归，不引 E2E 框架（首版无浏览器自动化要求） |
 | CI | GitHub Actions 双 job | — | 与本地命令等价，便于「网关失败即定位」 |
@@ -79,7 +79,7 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
    │  ├─ routers/                     # auth / resume / profile / interview / exam / practice / report / courses / history / timeline *
    │  ├─ services/                    # 业务域分包：ai/ resume/ profile/ interview/ assessment/ report/（+ login_guard.py）*
    │  └─ seed/{courses.json, questions.json}   # 精选清单（人工维护，便于集中换链）*
-   └─ tests/                          # pytest（r98 起用例连真实 PG，不再有本地库文件）*
+   └─ tests/                          # pytest：真实 PG + 会话级临时 SQLite 完整副本，不接触开发数据 *
 ```
 
 运行日志：`logs/teamflow/<runId>/` 仅 run 期间暂存，run 结束由 host 归档并从项目删除（已 gitignore）。
@@ -146,6 +146,19 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
 | GET | `/api/reports/{id}/markdown` | — | `text/markdown` | AC-9（P1） |
 | GET | `/api/history` | — | `RunSummary[]`（r5 起每行带 `interview_settings: InterviewSettings\|null`） | AC-10（P1）；`null` 前端渲染「未记录设定」，不出现 undefined |
 | GET | `/api/courses` | — | `Course[]` | ✅ AC-6 数据面 |
+| GET | `/api/rag/status` | — | `RagStatus` | r100 RAG 索引状态（embedder / 引擎 / chunk 计数） |
+| POST | `/api/rag/rebuild` | — | `RagRebuildResult` | r100 题库向量索引全量重建（幂等替换） |
+| POST | `/api/rag/ingest` | `RagIngestRequest` | `RagRebuildResult` | r100 教程 chunk 整份推送（全量替换语义） |
+| POST | `/api/rag/search` | `RagSearchRequest` | `RagSearchResponse` | r100 三态检索：keyword / semantic / hybrid（RRF） |
+| POST | `/api/rag/answer` | `RagAnswerRequest` | `RagAnswerResponse` | r100 检索增强生成（citations 白名单校验，能力档 light） |
+| GET | `/api/evidence/summary` | — | `EvidenceSummary` | r100 工程证据中心（行数事实 + 表数 + RAG 状态，零 AI） |
+| POST | `/api/coach/agent/run` | `CoachAgentRequest` | `CoachAgentRun` | r101 教练 Agent 编排（规划→工具→反思→结论，轨迹落库） |
+| GET | `/api/coach/agent/runs` | — | `CoachAgentRun[]` | r101 编排历史（倒序，按账号隔离） |
+| GET | `/api/coach/agent/runs/{id}` | — | `CoachAgentRun` | r101 单次轨迹回放（不存在的 id → 404 中文 envelope） |
+| POST | `/api/interviews/{run_id}/answers/stream` | `AnswerRequest` | SSE：`phase` / `turn` / `done` / `error` | r102 回合流（阶段可见；业务口径与同步端点一致） |
+| GET | `/api/jobs/{kind}/{job_id}/stream` | — | SSE：`status` / `done` / `error` / `timeout` | r102 任务进度流（kind ∈ profile / resume；只送状态事实，结果走单查） |
+| POST | `/api/rag/feedback` | `RagFeedbackRequest` | `RagFeedbackResult` | r103 召回反馈（点赞/点踩；`(user,query,chunk)` 唯一，换票覆盖） |
+| GET | `/api/rag/feedback/summary` | — | `RagFeedbackSummary` | r103 反馈看板（总票数 + 被踩最多的 chunk） |
 
 **错误 envelope**（全站唯一形态，HTTP 状态码取 4xx/5xx）：
 
@@ -153,7 +166,22 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
 { "error": { "code": "FILE_TOO_LARGE", "message": "文件超过 10MB，请压缩或分卷", "retryable": false } }
 ```
 
-`code` 闭集（`app/core/errors.py` 常量）：`EMPTY_FILE` `ENCRYPTED_PDF` `FILE_TOO_LARGE` `UNSUPPORTED_TYPE` `PARSE_FAILED` `AI_UNAVAILABLE` `AI_SCHEMA_INVALID` `NOT_IMPLEMENTED` `NOT_FOUND` `VALIDATION_ERROR` `HTTP_ERROR`（其它框架级状态透传）`METHOD_NOT_ALLOWED`（框架级 405 中文 envelope），r23 增 `AUTH_REQUIRED` `AUTH_INVALID` `AUTH_DISABLED` `AUTH_RATE_LIMITED`（HTTP 429，登录失败达阈值后锁定）`PASSWORD_INVALID` `FORBIDDEN` `AI_KEY_REQUIRED` `AI_QUOTA_EXCEEDED` `AI_KEY_STORE_UNAVAILABLE`。**message 一律中文**，且不含文件绝对路径、堆栈、模型端点或 key。
+`code` 闭集（`app/core/errors.py` 常量）：`EMPTY_FILE` `ENCRYPTED_PDF` `FILE_TOO_LARGE` `UNSUPPORTED_TYPE` `PARSE_FAILED` `AI_UNAVAILABLE` `AI_SCHEMA_INVALID` `NOT_IMPLEMENTED` `NOT_FOUND` `VALIDATION_ERROR` `HTTP_ERROR`（其它框架级状态透传）`METHOD_NOT_ALLOWED`（框架级 405 中文 envelope），r23 增 `AUTH_REQUIRED` `AUTH_INVALID` `AUTH_DISABLED` `AUTH_RATE_LIMITED`（HTTP 429，登录失败达阈值后锁定）`PASSWORD_INVALID` `FORBIDDEN` `AI_KEY_REQUIRED` `AI_QUOTA_EXCEEDED` `AI_KEY_STORE_UNAVAILABLE`；r70 `RATE_LIMITED` / `SERVICE_BUSY`，依赖降级增 `DATABASE_UNAVAILABLE`（HTTP 503，`retryable=true`）。**message 一律中文**，且不含文件绝对路径、堆栈、模型端点或 key。
+
+#### 3.3.1 运行时依赖降级与探活
+
+- 任意时刻只有一个权威业务写库。PG 正常时由 PG 提交，再逐笔镜像到 SQLite；副本镜像失败只标记副本失效并触发重建，不能把已提交的 PG 写入伪报为失败。
+- PG 不可用时，只有 `_sync_state.complete=1` 的完整持久化副本才能接管业务读写；首次故障且没有完整副本时仍返回可重试的 `503 DATABASE_UNAVAILABLE`，**绝不创建临时空库伪造历史业务数据**。
+- SQLite 离线业务写入与 `_offline_operations` 日志同事务提交。PG 恢复后由后台协调器独占写锁，暂停业务事务，按顺序重放并以 `_offline_receipts` 保证幂等；中途失败或约束冲突不回切。成功后重建 SQLite 副本，再切回 PG。
+- 恢复失败分两类，不能一律 fail-stop：**回放中途失败 / 约束冲突**意味着副本里还有未落到 PG 的操作，必须停写等人工对账；**副本重建失败**（磁盘满、副本文件损坏、目录不可写）只是失去兜底，主库健康时必须继续服务，只在 `/health` 暴露 `db_replica=stale`。副本连读都读不了时按「兜底数据不可用」处理，同样不阻断主库。
+- 副本接管期间 SQLite 自身报错（文件损坏 / 磁盘满 / 不可写）统一转成 `503 DATABASE_UNAVAILABLE`（可重试），绝不把驱动异常冒成 500；`_open_sqlite()` 在 PRAGMA 失败时关闭句柄，避免 Windows 上锁死副本文件导致无法重建。
+- 后台每 `DB_RECOVERY_INTERVAL_S`（默认 2s）重试，成功后补齐幂等 DDL、种子题库与教程索引；恢复线程真实结束后才允许 lifespan 关闭连接池。重试前先做一次**不持写锁**的 PG 轻量探活：PG 不可达时只维持 SQLite 服务，不进入独占恢复窗口，否则每轮失败都会把毫秒级业务写入挡到请求超时。连续失败按指数退避（封顶 30s）——确定性失败（如主库数据撞副本唯一约束）重试多少次都一样，固定 2s 全量重拷只会刷日志并给 PG 加压。生产安全配置校验不属于依赖降级。
+- 副本重建失败必须能从一行日志定位到表：`ReplicaSyncError` 携带 `table=` 与 SQLite 的约束详情。真实事故里主库 `radar_techs_pkey` 在 `pg_index` 中 `indisvalid=true` 却不拦重复（索引缺条目，`ON CONFLICT` 判不出冲突），副本侧 UNIQUE 是真实生效的，于是重建必然失败——只报 `IntegrityError` 类型名等于让值班重新写脚本排查。这类「目录说唯一、数据却重复」用 `scripts/audit_unique.py` 只读体检。
+- **旁路写入必须由写方补齐副本**：`replica_ready` 是进程本地状态，别的进程（`admin_cli`、一次性运维脚本）写 PG 时镜像分支默认不成立，服务进程也察觉不到，`/health` 会继续报 `db_replica=ready`。`admin_cli` 的写命令跑完自动 `refresh_replica()`；绕过它直接用 SQL 改库，必须手动补一次，否则兜底副本是静默落后的。
+- Redis 正常时 JSON 缓存同时写 Redis 与带 TTL / LRU 上限的内存副本；故障时读内存副本，限流退到进程内，锁按单进程语义处理。`memory://` 是显式进程内模式，不等同故障。缓存删除屏障防止重连后旧值复活：未回放成功的屏障不按 TTL / LRU 淘汰，重连后按「前缀失效 → 精确删除 → 新值（剩余 TTL）」回放，回放完成前 `/health` 不报 `redis_status=up`。持久性权威数据始终在数据库。
+- **完整降级方案只允许单进程、单 worker**：SQLite 文件、离线日志和内存缓存不能由多个进程共享。部署扩副本前必须先拆分恢复协调器与本地状态，不得仅增加 uvicorn `--workers`。
+- `GET /health` 的 **HTTP 200 只表示 Web 进程在线**：`status=ok|degraded`，`db=postgresql|sqlite` 表示当前业务库，`db_status=starting|up|degraded`，`db_replica=ready|stale`（stale = 主库在服务但副本需重建，已失去兜底），`redis_status=up|degraded|memory`。SQLite 接管且业务可读写时可以是 `status=ok`；依赖状态轮询带 TTL，不在探活里执行 DDL。
+- Compose 对 PG / Redis 只等 `service_started`，不把它们的健康状态作为后端启动硬门槛；前端也随后端进程启动。排障必须看 `/health` 分项，不能仅看容器 Running。
 
 ### 3.4 数据模型（PostgreSQL 16，`DATABASE_URL`）
 
@@ -171,6 +199,10 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
 >
 > r23 追加 `users` / `sessions` / `ai_usage` 三张表，并给上表 6 张业务表（除共享题库 `questions`）各加
 > `user_id TEXT NOT NULL DEFAULT 'default'`；存量行由 `ADD COLUMN ... DEFAULT` 直接回填为 `default`。见 §3.8。
+>
+> r100 追加 `rag_chunks` / `rag_index_state` 两张表（共享语料，无 `user_id`——与 `questions` 同口径）：
+> chunk 的 `(kind, ref_id, section_id)` 唯一是幂等摄取锚点；`embedding` 列按 pgvector 可用性分支为
+> `vector(AI_EMBED_DIM)` + ivfflat 余弦索引或 `double precision[]`（降级取回后 Python 余弦）。
 
 约定：时间为 ISO-8601 UTC 字符串；payload 存 JSON 文本，读写两侧过 pydantic 模型；`init_db()` 只用 `CREATE TABLE IF NOT EXISTS`，字段变更需在 `memory.md` 记录一次性升级说明（不做迁移框架）。
 
@@ -351,7 +383,7 @@ code_learning/                        # 产品根 = 工作区根（本产品线�
 | 题库种子 1284 道（2026-11-11 系统架构场景批起） | `backend/app/seed/questions.json`（r6 起退为**唯一导入源**，运行时由 `questions` 表承载；r11 起每次启动幂等导入，r14 起启动同时覆写既有行差异）；素材输入与留痕在 `docs/question-bank-staging/`（`PROVENANCE.md` + `NOTICE-fe-interview.md`），id 前缀口径见 §3.4.2 |
 | pydantic 契约模型（画像 5 维度 / 题目 / 报告 / 课程） | `backend/app/schemas.py` |
 | 后端测试 38 文件（pytest 零网络） | `backend/tests/*.py` |
-| 容器化交付（r10） | `docker-compose.yml`、`backend/Dockerfile`、`frontend/Dockerfile`、`frontend/nginx.conf`、`docker.env.example`、任务夹 `docs/teamflow/20261101-r10-docker-compose-deploy/DEPLOY.md`；`WEB_PORT=127.0.0.1:8080`（默认只绑回环）单端口对外、SQLite 落 `skillcoach-data` 卷（**r98 起改为 PG 落 `skillcoach-pgdata` + Redis，见 `docs/teamflow/20261112-r98-redis-pg/DEPLOY.md`**；旧卷保留作迁移来源，不再挂载） |
+| 容器化交付（r10） | `docker-compose.yml`、`backend/Dockerfile`、`frontend/Dockerfile`、`frontend/nginx.conf`、`docker.env.example`；`WEB_PORT=127.0.0.1:8080`（默认只绑回环）。PG 落 `skillcoach-pgdata`，当前完整 SQLite 副本与离线日志落独立 `skillcoach-sqlite`，后端限单 worker；旧 `skillcoach-data` 只保留作 r97 迁移来源，不再挂载。部署/备份见 `docs/teamflow/20261112-r98-redis-pg/DEPLOY.md` |
 | 前端 `package-lock.json` + 已装依赖 | `frontend/package-lock.json`、`frontend/node_modules/` |
 | CI 双 job | `.github/workflows/ci.yml` |
 | 本地工程验证（r43 补记） | `pypdf` 6.21.4 / `python-docx` / `ruff` 均已装，真实 PDF / DOCX 解析与 `python -m ruff check app tests` 可在本机实跑（r42 起纳入每次交付门禁） |

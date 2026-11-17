@@ -88,6 +88,16 @@ class HealthResponse(BaseModel):
     version: str
     ai_configured: bool
     db: str
+    #: 运行时依赖：starting（首次初始化）/ up / degraded；进程探活不因此返回非 200。
+    db_status: str = "up"
+    #: Redis：up / degraded（配置了但故障）/ memory（显式或未配置进程内模式）。
+    redis_status: str = "memory"
+    #: 故障兜底副本状态：ready（可随时接管）/ stale（主库健康但副本需重建）。
+    #: `db=postgresql` + `db_status=up` + `db_replica=stale` 表示业务正常但暂时失去兜底。
+    db_replica: str = "stale"
+    #: r105：本地 embedding 探活（up / down / na）。`na` = 未启用本地 embedder（哈希档）；
+    #: 探活带 60s 缓存与 1.5s 超时，绝不拖慢 /health；失败只降级不熔断。
+    rag_embedder: str = "na"
     ai_provider: str
     ai_model: str
     ai_json_mode: str
@@ -248,9 +258,10 @@ class ProfilePatch(BaseModel):
 
 
 class InterviewSettings(BaseModel):
-    """本场面试的设定：r5 四项 + r44 可选方向聚焦，落 runs.payload.settings，永不写回画像。
+    """本场面试的设定：r5 四项 + r44 方向聚焦 + r111 岗位缺口，落 runs.payload.settings。
 
     `direction` / `sub_direction` 空串 = 不限（老 payload 缺这两键时按空串补，四项解析口径不变）；
+    `focus_gaps` 是本次 JD 对位带过来的最多 3 个缺口技能，只影响本场出题，永不写回画像。
     取值闭集由 `services.report.rules` 校验，不在本模块重复字面量。
     """
 
@@ -260,10 +271,11 @@ class InterviewSettings(BaseModel):
     company_size: CompanySize = "中型"
     direction: str = ""
     sub_direction: str = ""
+    focus_gaps: list[str] = Field(default_factory=list, max_length=3)
 
 
 class InterviewSettingsPatch(BaseModel):
-    """开局请求里的设定补丁：四项 + 可选方向全可选，缺省由服务端按画像/默认值补全。"""
+    """开局请求里的设定补丁：四项 + 可选方向 + 岗位缺口，缺省由服务端补全。"""
 
     target_role: str | None = None
     years_experience: ExperienceBand | None = None
@@ -272,6 +284,8 @@ class InterviewSettingsPatch(BaseModel):
     #: 取值见 rules.DIRECTIONS / rules.SUBDIRECTIONS；空 = 不限。
     direction: str | None = None
     sub_direction: str | None = None
+    #: 最多 3 项；服务端再逐条去空白 / 去重 / 截断，超限直接忽略而不是报错。
+    focus_gaps: list[str] | None = Field(default=None, max_length=5)
 
 
 class InterviewCreateRequest(BaseModel):
@@ -1373,3 +1387,400 @@ class TaifuMemoryResult(BaseModel):
 
 class TaifuClearResult(BaseModel):
     deleted: int = 0
+
+
+# --- r100 RAG 检索域（embedding 索引 + 混合检索 + 有引用的生成 + 自动评审）--------
+
+#: 检索模式闭集：单一出处是 `services/retrieval/hybrid.py:RAG_SEARCH_MODES`。
+RagSearchMode = Literal["keyword", "semantic", "hybrid"]
+
+#: chunk 来源闭集：`question` = 题库（服务端自有语料），`tutorial` = 教程小节
+#: （正文在前端 `content/tutorials/`，经 /api/rag/ingest 整份推送）。
+RagChunkKind = Literal["question", "tutorial"]
+
+
+class RagStatus(BaseModel):
+    """RAG 索引快照：embedder / 引擎形态 / chunk 计数 / 是否需要重建。"""
+
+    built: bool
+    embedder: str = ""
+    dim: int = 0
+    engine: str = ""
+    chunk_count: int = 0
+    question_chunks: int = 0
+    tutorial_chunks: int = 0
+    built_at: str = ""
+    stale: bool = False
+    embedder_kind: str = ""
+    notice: str = ""
+
+
+class RagRebuildResult(RagStatus):
+    """重建 / 摄取的结果：在状态快照上多带本次写入条数。"""
+
+    written: int = 0
+
+
+class RagIngestBlock(BaseModel):
+    """教程里的一个结构化 block（r103）：后端按 kind 选切分器，前端只传结构不切分。
+
+    与 `frontend/src/lib/tutorialTypes.ts` 的 `TutorialBlock` 一一对应；
+    所有字段可选，按 kind 取用（text/note 用 text，list 用 items，table 用 headers+rows，
+    code 用 code+caption）——用一个扁平模型而不是五个子类，避免前端多一层判别。
+    """
+
+    kind: Literal["text", "list", "table", "note", "code"]
+    text: str = Field(default="", max_length=4000)
+    title: str = Field(default="", max_length=200)
+    items: list[str] = Field(default_factory=list, max_length=60)
+    headers: list[str] = Field(default_factory=list, max_length=12)
+    rows: list[list[str]] = Field(default_factory=list, max_length=200)
+    code: str = Field(default="", max_length=6000)
+    caption: str = Field(default="", max_length=200)
+
+
+class RagIngestItem(BaseModel):
+    """一条教程小节：`chapter_id` + `section_id` 是幂等锚点，`content` 为小节正文。
+
+    r103：可选 `blocks`（结构化 block）——给了就按 block 类型切分子片（代码按行、
+    表格带表头、正文按句子），不给则退回「整段一个 chunk」的旧口径（向后兼容）。
+    """
+
+    chapter_id: str = Field(min_length=1, max_length=64)
+    section_id: str = Field(default="", max_length=64)
+    title: str = Field(default="", max_length=200)
+    content: str = Field(min_length=1, max_length=8000)
+    blocks: list[RagIngestBlock] = Field(default_factory=list, max_length=60)
+
+
+class RagIngestRequest(BaseModel):
+    """整份推送：教程语料只在前端，这里收到的必须是全量（整份替换语义）。"""
+
+    items: list[RagIngestItem] = Field(min_length=1, max_length=2000)
+
+
+class RagChunkItem(BaseModel):
+    """检索命中行：`snippet` 是正文前 160 字符，`score` 按模式分（关键词恒 1.0、
+    向量为余弦、融合为 RRF 分），量纲不互比——只用于同模式内排序展示。"""
+
+    chunk_id: str
+    kind: RagChunkKind
+    ref_id: str
+    section_id: str = ""
+    title: str = ""
+    content: str = ""
+    snippet: str = ""
+    score: float = 0.0
+
+
+class RagSearchRequest(BaseModel):
+    query: str = Field(default="", max_length=200)
+    mode: RagSearchMode = "hybrid"
+    limit: int = Field(default=5, ge=1, le=20)
+    #: kind 过滤（闭集外取值静默丢弃，空列表 = 不过滤）。
+    kinds: list[RagChunkKind] = Field(default_factory=list)
+
+
+class RagSearchResponse(BaseModel):
+    """`engine` 如实报告检索引擎：`pgvector`（索引内余弦）/ `python-cosine`
+    （无扩展降级）/ `sql-ilike`（关键词腿）。"""
+
+    items: list[RagChunkItem] = Field(default_factory=list)
+    total: int = 0
+    mode: str
+    engine: str = ""
+    notice: str = ""
+
+
+class RagAnswerDraft(BaseModel):
+    """生成草稿（模型输出契约）：citations 引用白名单由服务层校验后回填 chunk_id。"""
+
+    answer: str = Field(min_length=1, max_length=4000)
+    citations: list[str] = Field(default_factory=list, max_length=10)
+    dropped_citations: int = 0
+
+
+class RagAnswerRequest(BaseModel):
+    query: str = Field(min_length=1, max_length=200)
+    mode: RagSearchMode = "hybrid"
+    top_k: int = Field(default=5, ge=1, le=5)
+
+
+class RagAnswerResponse(BaseModel):
+    """检索增强生成结果：`citations` 只含白名单内的 chunk（越界引用被丢弃并计数）。"""
+
+    answer: str
+    citations: list[RagChunkItem] = Field(default_factory=list)
+    retrieved_count: int = 0
+    dropped_citations: int = 0
+    mode: str = "hybrid"
+    engine: str = ""
+    notice: str = ""
+
+
+class RagJudgeDraft(BaseModel):
+    """LLM-as-judge 输出契约：忠实度（引用支撑）/ 相关性（切题与信息量），0-10。"""
+
+    faithfulness: int = Field(ge=0, le=10)
+    relevance: int = Field(ge=0, le=10)
+    issues: list[str] = Field(default_factory=list, max_length=10)
+
+
+class EvidenceSummary(BaseModel):
+    """r100 工程证据中心：数据规模（按账号隔离的业务行数 + 共享题库）与 RAG 索引状态。
+
+    只聚合**真实落库的行数**（零 AI、零 Key），不做任何模型质量评分；
+    静态工程档案（架构数字 / 门禁清单）在前端 `content/engineeringArchive.ts` 单点维护。
+    """
+
+    data_scale: dict[str, int]
+    tables: int
+    rag: RagStatus
+
+
+# --- r100 B4 教练 Agent 编排（规划 → 工具 → 反思 → 有引用结论）----------------------
+
+class CoachPlanStep(BaseModel):
+    """计划中的一步：工具名 + 中文理由 + 参数（键值都是短字符串）。"""
+
+    tool: str = Field(max_length=40)
+    reason: str = Field(default="", max_length=120)
+    args: dict[str, str] = Field(default_factory=dict)
+
+
+class CoachPlanDraft(BaseModel):
+    """规划器输出契约：目标复述 + 不超过 3 步的计划（超出由服务层截断）。"""
+
+    goal: str = Field(default="", max_length=200)
+    steps: list[CoachPlanStep] = Field(default_factory=list, max_length=3)
+
+
+class CoachReflectDraft(BaseModel):
+    """反思器输出契约：材料是否足够 + 缺什么 + 需要补的执行步（最多 2 步）。"""
+
+    sufficient: bool
+    missing: list[str] = Field(default_factory=list, max_length=5)
+    extra_steps: list[CoachPlanStep] = Field(default_factory=list, max_length=2)
+
+
+class CoachBriefDraft(BaseModel):
+    """结论契约：回答 + 引用（只认工具结果回填的 ref 令牌，如 t1 / q2 / w1）+ 行动项。"""
+
+    answer: str = Field(min_length=1, max_length=4000)
+    citations: list[str] = Field(default_factory=list, max_length=8)
+    actions: list[str] = Field(default_factory=list, max_length=5)
+
+
+class CoachCitation(BaseModel):
+    """白名单内的引用：ref 令牌已解析成可点的标题与站内路径。"""
+
+    ref: str
+    title: str
+    href: str
+    kind: str
+
+
+class CoachAgentRequest(BaseModel):
+    """一次编排请求：问句必填，`goal` 是可选的目标岗位 / 时间约束（进规划器提示词）。"""
+
+    question: str = Field(min_length=1, max_length=200)
+    goal: str = Field(default="", max_length=120)
+
+
+class CoachAgentRun(BaseModel):
+    """一次编排的结果与审计轨迹：`steps` 逐节点记录（plan / tool / reflect / final）。"""
+
+    id: str
+    question: str
+    goal: str = ""
+    status: str = "completed"
+    steps: list[dict[str, Any]] = Field(default_factory=list)
+    answer: str = ""
+    citations: list[CoachCitation] = Field(default_factory=list)
+    dropped_citations: int = 0
+    notice: str = ""
+    created_at: str = ""
+
+
+# --- r103 召回反馈（点赞 / 点踩）：用户参与召回质量提升 --------------------------
+
+#: 反馈类型闭集：只有 赞 / 踩 两种态度（不引入 1-5 星，避免「中间态不作为」）。
+RagFeedbackVerdict = Literal["up", "down"]
+
+#: 反馈来源：检索页 / 带引用回答 / 教练 Agent 的引用（用于区分场景做归因）。
+RagFeedbackSurface = Literal["search", "answer", "coach"]
+
+
+class RagFeedbackRequest(BaseModel):
+    """一条反馈：同一用户同一查询对同一 chunk 只保留最新一票（换票即覆盖）。"""
+
+    query: str = Field(min_length=1, max_length=200)
+    chunk_id: str = Field(min_length=1, max_length=200)
+    verdict: RagFeedbackVerdict
+    surface: RagFeedbackSurface = "search"
+
+
+class RagFeedbackResult(BaseModel):
+    """投票后的该 chunk 票数（全局聚合，便于界面显示「已有 N 人认为有用」）。"""
+
+    chunk_id: str
+    up: int = 0
+    down: int = 0
+    net: int = 0
+
+
+class RagFeedbackTopItem(BaseModel):
+    chunk_id: str
+    title: str = ""
+    #: 正文前缀：题目 chunk 的 title 是方向标签，只有 snippet 才看得出「踩的是哪道题」。
+    snippet: str = ""
+    kind: str = ""
+    ups: int = 0
+    downs: int = 0
+
+
+class RagFeedbackSummary(BaseModel):
+    """反馈看板：全站票数与「被踩最多」的 chunk（评测挖掘入口）。"""
+
+    up: int = 0
+    down: int = 0
+    net: int = 0
+    queries: int = 0
+    top_downvoted: list[RagFeedbackTopItem] = Field(default_factory=list)
+
+
+# --- r108 跃迁档案看板（服务端聚合，零 AI / 零新表 / 零重算）------------------------
+
+
+class LeapRoleGap(BaseModel):
+    """目标岗位差距块：直接复用最新报告的 `role_fit`，服务端不重算数值。"""
+
+    role_fit: RoleFit | None = Field(
+        default=None, description="最近一份报告的岗位差距；未生成报告时为 None"
+    )
+    notice: str | None = Field(
+        default=None, description="无报告 / 无目标岗位时的中文指引（服务端单点产出）"
+    )
+
+
+class LeapEngineeringItem(BaseModel):
+    """画像里的一条项目工程证据：只取真实存在的 bullets 与溯源条数。"""
+
+    name: str
+    role: str | None = None
+    period: str | None = None
+    bullets: list[str] = Field(default_factory=list)
+    evidence_count: int = Field(default=0, description="source_quotes 条数（historical 项也如实展示）")
+    status: str = "active"
+
+
+class LeapEngineering(BaseModel):
+    """项目工程证据块：项目逐条 + 落库规模事实 + RAG / 技术雷达状态。"""
+
+    projects: list[LeapEngineeringItem] = Field(default_factory=list)
+    data_scale: dict[str, int] = Field(default_factory=dict)
+    tables: int = 0
+    rag: RagStatus | None = None
+    radar_techs_seen: int = 0
+    radar_finished_at: str = ""
+    notice: str | None = None
+
+
+class LeapExpressionStructure(BaseModel):
+    """面试表达的四要素文本自检（纯启发式，不构成评分或能力结论）。"""
+
+    has_problem: bool = False
+    has_solution: bool = False
+    has_metric: bool = False
+    has_pitfall: bool = False
+    hit_count: int = 0
+    hint: str = Field(default="", description="中文指引，明确「自检非评分」且不虚构")
+
+
+class LeapExpressionItem(BaseModel):
+    """一条已作答的面试表达：分数 / 点评直接取当场写入的值，读取侧零二次统计。"""
+
+    run_id: str
+    question_id: str
+    prompt: str
+    answer: str
+    score: float | None = None
+    comment: str | None = None
+    structure: LeapExpressionStructure = Field(default_factory=LeapExpressionStructure)
+    # r111：本场从 JD 带进来的缺口词及回答里的关键词命中；只是文本对照，不是掌握度结论。
+    focus_gaps: list[str] = Field(default_factory=list)
+    gap_hits: list[str] = Field(default_factory=list)
+    gap_misses: list[str] = Field(default_factory=list)
+
+
+class LeapExpression(BaseModel):
+    """面试表达块：最近若干场面试里已作答的发言，最多 MAX_EXPRESSION_ITEMS 条。"""
+
+    items: list[LeapExpressionItem] = Field(default_factory=list)
+    notice: str | None = None
+
+
+class LeapArchive(BaseModel):
+    """跃迁档案：目标岗位差距 + 项目工程证据 + 面试表达，三块同源一次返回。"""
+
+    role_gap: LeapRoleGap = Field(default_factory=LeapRoleGap)
+    engineering: LeapEngineering = Field(default_factory=LeapEngineering)
+    expression: LeapExpression = Field(default_factory=LeapExpression)
+    generated_at: str = ""
+
+
+# --- r110 JD 岗位对位（零 AI 关键词匹配 / 确定性证据清单）----------------------
+
+
+class JdMatchRequest(BaseModel):
+    """一次 JD 对位的输入：正文必填，目标岗位可显式覆盖自动识别。"""
+
+    jd_text: str = Field(min_length=1, max_length=12000)
+    target_role: str | None = Field(default=None, max_length=40)
+
+
+class JdKeywordItem(BaseModel):
+    """JD 里检出的一个技术信号：命中短语 + JD 原句 + 画像里可复算的证据条数。"""
+
+    name: str
+    matched_alias: str
+    source_quote: str
+    user_level: int = Field(ge=0, le=4)
+    evidence_count: int = 0
+    evidence: list[str] = Field(default_factory=list)
+    status: Literal["evidence", "mentioned", "missing"]
+    role_required: bool = False
+
+
+class JdGapItem(BaseModel):
+    """一条缺口：要么 JD 提到但画像没证据，要么目标岗位模型要求但 JD 未直接写。"""
+
+    name: str
+    origin: Literal["jd", "role_model"]
+    reason: str
+    source_quote: str = ""
+
+
+class JdInterviewPreset(BaseModel):
+    """一键带进召对的配置：岗位 / 方向 / 子方向 + 最多 3 个缺口，其余设置在面试页决定。"""
+
+    target_role: str
+    direction: str = ""
+    sub_direction: str = ""
+    focus_gaps: list[str] = Field(default_factory=list, max_length=3)
+    reason: str = ""
+
+
+class JdMatchResult(BaseModel):
+    """岗位对位结果：证据清单 + 缺口 + 可直接用于面试页的预设，不产出百分比分数。"""
+
+    target_role: str | None = None
+    role_fit: RoleFit | None = None
+    keywords: list[JdKeywordItem] = Field(default_factory=list)
+    gaps: list[JdGapItem] = Field(default_factory=list)
+    preset: JdInterviewPreset | None = None
+    notice: str | None = None
+    source_chars: int = 0
+    matched_count: int = 0
+    missing_count: int = 0
+    generated_at: str = ""

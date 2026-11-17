@@ -6,9 +6,8 @@
 # 构建上下文是 ./backend 子目录（不是仓库根）：.env、本地 *.db、tests/ 根本不会进入上下文，
 # 这是「零凭据进镜像」的主边界；backend/.dockerignore 只是纵深防御的第二道。
 #
-# r98：数据层改为 PostgreSQL，容器**不再持有任何持久状态**——数据库在 postgres 服务里，
-# 连接串由 compose 通过 DATABASE_URL 注入。`/data` 仍在：给临时产物留一个可写目录，
-# 也避免早期镜像里 `/data` 属主规则被误删后，升级卷挂载的人踩到 EACCES。
+# 数据层以 PostgreSQL 为权威主库，同时把完整 SQLite 离线副本持久化到 `/data`。
+# 副本含离线操作日志，不是可随意丢弃的缓存；必须挂载持久卷、纳入备份并限制单 worker。
 
 FROM python:3.13-slim
 
@@ -32,8 +31,7 @@ RUN pip install --no-cache-dir -i "$PIP_INDEX_URL" -r requirements.txt
 COPY app/ ./app/
 
 # 非 root 运行 + /data 归属必须在 USER app 之前完成。
-# r98 起业务数据在 PostgreSQL，/data 只承载临时产物；这条规则保留是因为一旦有人重新挂载
-# 命名卷到 /data，属主错了就是 EACCES —— 这类错误只在容器里出现，本地永远复现不了。
+# /data 承载 SQLite 完整副本与离线日志；非 root 用户必须可写，否则 PG 故障时无法接管。
 RUN useradd --uid 10001 --create-home app \
     && mkdir -p /data \
     && chown -R app:app /data

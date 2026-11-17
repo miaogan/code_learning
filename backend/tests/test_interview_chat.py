@@ -34,6 +34,7 @@ SETTINGS_VALUES = {
     "company_size": "初创",
     "direction": "后端",
     "sub_direction": "python",
+    "focus_gaps": [],
 }
 
 
@@ -192,6 +193,7 @@ def test_create_fills_defaults_when_settings_omitted(
         # 未指定方向 = 不限（空串，不占位、不进 focus 的「已聚焦」分支）。
         "direction": "",
         "sub_direction": "",
+        "focus_gaps": [],
     }
     assert run.settings.model_dump() == expected
     assert _payload_of(run.run_id)["settings"] == expected
@@ -232,7 +234,8 @@ def test_every_round_prompt_carries_settings(
     assert len(fake_ai.calls) >= 3, "开局 1 次 + 每轮 1 次（同一轮产出评分与下一条发言）"
     for _system, user, timeout_s in fake_ai.calls[:3]:
         for value in SETTINGS_VALUES.values():
-            assert value in user, f"设定值 {value} 未进入本轮提示词"
+            needle = json.dumps(value, ensure_ascii=False) if isinstance(value, list) else value
+            assert needle in user, f"设定值 {value} 未进入本轮提示词"
         assert timeout_s is None or timeout_s <= 15.0
 
 
@@ -909,3 +912,40 @@ def test_skip_rejects_completed_and_unknown_run(tmp_db: Any, profile_factory: An
     with pytest.raises(AppError) as missing:
         interview_service.skip_question("no-such-run")
     assert missing.value.status == 404
+
+
+def test_focus_gaps_are_sanitized_and_reach_prompt(
+    tmp_db: Any, profile_factory: Any, fake_ai: Any
+) -> None:
+    """r111：JD 缺口只保留 3 项合法值，且开局输入/校准都能看到它。"""
+    profile = _seed_profile(profile_factory)
+    fake_ai.responder = _responder()
+    long_gap = "X" * (interview_service.FOCUS_GAP_MAX_CHARS + 20)
+    patch = InterviewSettingsPatch(
+        **{
+            **SETTINGS_VALUES,
+            "focus_gaps": [" Redis ", "Redis", "", long_gap, "RAG"],
+        }
+    )
+
+    run = _create(fake_ai, profile.id, patch)
+
+    expected_gaps = ["Redis", long_gap[: interview_service.FOCUS_GAP_MAX_CHARS], "RAG"]
+    assert run.settings.focus_gaps == expected_gaps
+    payload = _payload_of(run.run_id)
+    assert payload["settings"]["focus_gaps"] == expected_gaps
+    calibration = payload["calibration"]["focus_gaps"]
+    assert "缺口重点" in calibration
+    assert all(f"「{gap}」" in calibration for gap in expected_gaps)
+    assert "Docker" not in calibration, "超过 3 项必须截断，不能把第 4 项再塞进提示词"
+
+
+def test_focus_gap_calibration_has_two_distinct_states() -> None:
+    """有缺口 / 无缺口两档口径互不相同，避免「带了缺口但题目没变」。"""
+    empty = interview_service.calibration_of(InterviewSettings())["focus_gaps"]
+    focused = interview_service.calibration_of(
+        InterviewSettings(focus_gaps=["Redis", "事务"])
+    )["focus_gaps"]
+    assert empty != focused
+    assert "未指定 JD 缺口" in empty
+    assert "前 2 道 technical" in focused

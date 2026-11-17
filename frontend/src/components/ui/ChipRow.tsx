@@ -32,7 +32,7 @@ export function ChipRow<T extends string | number>({
           <button
             key={String(option.value)}
             type="button"
-            className="sc-chip sc-iq-chip sc-qa-chip"
+            className="sc-chip sc-iq-chip sc-qa-chip is-clickable"
             aria-pressed={selected}
             onClick={() => onSelect(option.value)}
           >
@@ -77,7 +77,7 @@ export function MultiChipRow<T extends string | number>({
           <button
             key={String(option.value)}
             type="button"
-            className="sc-chip sc-iq-chip sc-qa-chip"
+            className="sc-chip sc-iq-chip sc-qa-chip is-clickable"
             aria-pressed={selected}
             onClick={() => onChange(nextChoice(values, option.value, allValue, concreteValues))}
           >

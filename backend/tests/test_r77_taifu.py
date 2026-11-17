@@ -633,3 +633,13 @@ def test_memories_require_login(tmp_db: Any) -> None:
     with TestClient(app) as anonymous:
         assert anonymous.get("/api/taifu/memories").status_code == 401
         assert anonymous.delete("/api/taifu/memories").status_code == 401
+
+
+def test_sanitize_page_recognizes_leap_archive() -> None:
+    """r108：跃迁档案页进页面上下文白名单，但只用于理解指代、不是引用依据。"""
+    from app.services.taifu import policy
+
+    page = policy.sanitize_page("/leap?from=report#anchor")
+    assert page is not None
+    assert page["path"] == "/leap"
+    assert "跃迁" in page["label"]

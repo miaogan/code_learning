@@ -4,7 +4,8 @@
 - `_prepare_database`（会话级）建库建表，`tmp_db`（用例级）`TRUNCATE` 清数据；
   用例之间互不污染，且不需要每例重建 27 张表。
 - 测试库 DSN 由 `TEST_DATABASE_URL` 控制，默认指向本地 compose 的 PG 实例；
-  **没有 SQLite 兜底**——r98 起数据库只有 PostgreSQL 一种形态。
+  SQLite 降级副本落在会话级临时目录，不接触开发数据；每例前后恢复活动后端和
+  运行状态，故障场景另用不存在的副本文件验证拒绝空库接管。
 - 所有 AI 调用走 `FakeAI`（服务层 `client=` 注入）或 `patch_ai`（类级补丁，覆盖
   「路由层不注入 client」的真实链路），因此整轮测试**不产生任何外网请求**。
 """
@@ -14,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import tempfile
 from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any
@@ -23,10 +25,10 @@ import psycopg
 import pytest
 from fastapi.testclient import TestClient
 
-from app.core import redis_cache, repository
+from app.core import db, redis_cache, repository
 from app.core.auth import COOKIE_NAME, hash_password, new_session_token, session_expiry
 from app.core.config import get_settings
-from app.core.db import close_pool, connection, init_db
+from app.core.db import activate_postgresql, close_pool, connection, init_db, reset_runtime
 from app.main import app
 from app.schemas import Evidence, Profile, ProfileProject, ProfileSkill, SkillStatus
 from app.services import rate_limit
@@ -210,6 +212,14 @@ _NEUTRAL_AI_ENV: dict[str, str] = {
     "AI_VISION_MODEL": "",
     "AI_VISION_BASE_URL": "",
     "AI_VISION_API_KEY": "",
+    # r100 embedding 档：留空 = 离线 HashingEmbedder（确定性、零网络、CI 可复跑）。
+    # 不置空的话，宿主 .env 里配了远端 embedding 会让测试真的出网。
+    "AI_EMBED_MODEL": "",
+    "AI_EMBED_BASE_URL": "",
+    "AI_EMBED_API_KEY": "",
+    # r105：启动时的教程种子摄取会与用例里的 chunk 计数断言抢写（后台任务在用例中途插行），
+    # 测试里一律关闭；`ensure_tutorials_indexed()` 由专门用例直接调用。
+    "RAG_SEED_TUTORIALS": "false",
 }
 
 
@@ -226,15 +236,18 @@ def _prepare_database() -> Iterator[None]:
     """
     _ensure_database_exists(TEST_DSN)
     os.environ["DATABASE_URL"] = TEST_DSN
-    get_settings.cache_clear()
-    close_pool()
-    init_db()
-    close_pool()
-    try:
-        yield
-    finally:
-        close_pool()
+    with tempfile.TemporaryDirectory(prefix="skillcoach-test-replica-") as replica_dir:
+        os.environ["SQLITE_PATH"] = str(Path(replica_dir) / "fallback.db")
         get_settings.cache_clear()
+        close_pool()
+        reset_runtime()
+        init_db()
+        close_pool()
+        try:
+            yield
+        finally:
+            close_pool()
+            get_settings.cache_clear()
 
 
 def _ensure_database_exists(dsn: str) -> None:
@@ -334,6 +347,24 @@ def neutral_ai_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
         get_settings.cache_clear()
 
 
+@pytest.fixture(autouse=True)
+def _isolate_database_runtime() -> Iterator[None]:
+    """所有用例都从 PostgreSQL 正常态开始，即使前一例没有请求 tmp_db。
+
+    故障测试会切换全局活动后端；只清理 `tmp_db` 不够，未使用该 fixture 的用例
+    同样必须把 ready/mode/连接池恢复，不能让下一例在 SQLite 上跑 PG 清库逻辑。
+    """
+    close_pool()
+    reset_runtime()
+    activate_postgresql()
+    try:
+        yield
+    finally:
+        close_pool()
+        reset_runtime()
+        activate_postgresql()
+
+
 @pytest.fixture()
 def tmp_db(monkeypatch: pytest.MonkeyPatch, neutral_ai_env: None) -> Iterator[str]:
     """清空测试库后交给用例；返回 DSN（需要自己连库的用例用它）。
@@ -341,7 +372,16 @@ def tmp_db(monkeypatch: pytest.MonkeyPatch, neutral_ai_env: None) -> Iterator[st
     `neutral_ai_env` 是显式依赖：任何拿到 `tmp_db`（或 `client`）的用例都自动获得环境中性化。
     """
     _truncate_all()
-    yield TEST_DSN
+    # TRUNCATE 是测试基座的特殊维护操作，不属于业务 DML 镜像协议；清库后显式
+    # 重建副本，避免上一例的业务行在下一例切 SQLite 时复活。
+    db.sync_sqlite_from_pg()
+    try:
+        yield TEST_DSN
+    finally:
+        # 故障用例可能在 lifespan 退出前取消恢复任务，不能让恢复中状态串到下一例。
+        close_pool()
+        reset_runtime()
+        activate_postgresql()
 
 
 @pytest.fixture()
@@ -367,11 +407,15 @@ def _fresh_database(monkeypatch: pytest.MonkeyPatch, dsn: str) -> Iterator[str]:
     monkeypatch.setenv("DATABASE_URL", dsn)
     get_settings.cache_clear()
     close_pool()
+    reset_runtime()
+    activate_postgresql()
     try:
         yield dsn
     finally:
-        get_settings.cache_clear()
         close_pool()
+        reset_runtime()
+        activate_postgresql()
+        get_settings.cache_clear()
 
 
 def _reset_schema(dsn: str) -> None:

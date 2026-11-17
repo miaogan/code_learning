@@ -12,7 +12,7 @@ import { ChatStream } from '../components/interview/ChatStream'
 import { Composer } from '../components/interview/Composer'
 import { InterviewSetupForm } from '../components/interview/InterviewSetupForm'
 import { SessionList } from '../components/interview/SessionList'
-import { draftToPatch, prefillOf } from '../components/interview/setupModel'
+import { draftToPatch, presetFromParams, prefillOf } from '../components/interview/setupModel'
 import type { SetupDraft, SetupSources } from '../components/interview/setupModel'
 import { SessionSummary } from '../components/interview/SessionSummary'
 import { SettingsBar } from '../components/interview/SettingsBar'
@@ -94,6 +94,8 @@ export default function InterviewPage() {
   const profileAsync = useAsync((signal) => api.latestProfile(signal), [])
   const createAbortRef = useRef<AbortController | null>(null)
   const prefilledIdRef = useRef<string | null>(null)
+  /** r110：岗位对位带过来的预填只应用一次；URL 不变时不覆盖用户手改。 */
+  const jdPresetAppliedRef = useRef<string | null>(null)
   const activeRunIdRef = useRef<string | null>(null)
   const answerDraftRef = useRef({ userId: null as string | null, runId: '', questionId: '', text: '' })
   const latestAnswerRef = useRef({ answer: '', userId: null as string | null, runId: '', questionId: '', stage: 'configure' as Stage, submitting: false })
@@ -106,6 +108,8 @@ export default function InterviewPage() {
   const [sources, setSources] = useState<SetupSources>(() => prefillOf(null).sources)
   const [track, setTrack] = useState<RunTrack>(EMPTY_TRACK)
   const [answer, setAnswer] = useState('')
+  //: r102 回合流的阶段文案（评分中 → 就绪）；流不可用时为空，回落到同步端点。
+  const [turnPhase, setTurnPhase] = useState('')
   const [draftNotice, setDraftNotice] = useState<string | null>(null)
   const [restore, setRestore] = useState<RestoreState>({ status: 'idle', error: null })
   /** 「重新读取」计数：run_id 不变时靠它触发恢复 effect 重跑。 */
@@ -139,17 +143,36 @@ export default function InterviewPage() {
     setSources(prefilled.sources)
   }, [profile])
 
+  // r110：岗位对位的「带配置去召对」只预填三项；预置存在时不自动接回旧会话，
+  // 否则用户明明选了新岗位，却被上一场在途面试覆盖。
+  useEffect(() => {
+    if (runIdParam !== null) return
+    const preset = presetFromParams(searchParams)
+    if (preset === null) return
+    const key = `${profile?.id ?? ''}|${searchParams.toString()}`
+    if (jdPresetAppliedRef.current === key) return
+    jdPresetAppliedRef.current = key
+    setDraft((previous) => ({ ...previous, ...preset }))
+    setSources((previous) => {
+      const next = { ...previous }
+      Object.keys(preset).forEach((field) => {
+        next[field as keyof SetupDraft] = 'default'
+      })
+      return next
+    })
+  }, [profile?.id, runIdParam, searchParams])
+
   /**
    * 站内导航（顶栏 / 报告页 / 画像页）指向的都是裸 `/interview`：URL 没带 run_id 时，
    * 用本地锚点把还在服务端的在途会话接回来（写入点在开局 / 恢复 / 每轮评分成功后）。
    * 只补 query，恢复交给下面的 effect —— 与「手动带 run_id 进来」走同一条路径。
    */
   useEffect(() => {
-    if (runIdParam !== null || userId === null) return
+    if (runIdParam !== null || userId === null || presetFromParams(searchParams) !== null) return
     const stored = readInterviewSession(userId)
     if (stored === null) return
     setSearchParams({ run_id: stored }, { replace: true })
-  }, [runIdParam, userId, setSearchParams])
+  }, [runIdParam, searchParams, setSearchParams, userId])
 
   // ?run_id= 恢复：GET 会话镜像 → running 续答 / completed 只读。
   useEffect(() => {
@@ -199,7 +222,7 @@ export default function InterviewPage() {
         setRestore({ status: 'error', error: messageOf(error, '无法恢复本场面试') })
       })
     return () => controller.abort()
-  }, [runIdParam, restoreTick, userId])
+  }, [runIdParam, restoreTick, searchParams, userId])
 
   // 开局计时（三段文案按秒步进）+ 单轮评分计时。
   useEffect(() => {
@@ -341,11 +364,24 @@ export default function InterviewPage() {
     if (text.length === 0) return
     setTrack({ submitting: true, elapsedS: 0, error: null, turnError: null })
     writeInterviewDraft(userId, { runId: session.run_id, questionId, text: answer })
+    setTurnPhase('')
     try {
-      const turn: InterviewTurn = await api.scoreAnswer(session.run_id, {
-        question_id: questionId,
-        answer: text,
-      })
+      // r102：优先回合流（阶段反馈），流不可用（旧后端 / 代理缓冲 / 网络）时回落同步端点，
+      // 两者共用同一条 score_answer 业务链路，评分口径与错误码完全一致。
+      let turn: InterviewTurn
+      try {
+        turn = await api.scoreAnswerStream(
+          session.run_id,
+          { question_id: questionId, answer: text },
+          (message) => setTurnPhase(message),
+        )
+      } catch (streamError) {
+        if (streamError instanceof ApiError && streamError.code === 'STREAM_UNAVAILABLE') {
+          turn = await api.scoreAnswer(session.run_id, { question_id: questionId, answer: text })
+        } else {
+          throw streamError
+        }
+      }
       setSession((prev) => {
         if (!prev) return prev
         const answered = prev.questions.map((item) =>
@@ -369,6 +405,7 @@ export default function InterviewPage() {
       setDraftNotice(null)
       clearInterviewDraft(userId, session.run_id)
       answerDraftRef.current = { userId, runId: session.run_id, questionId: '', text: '' }
+      setTurnPhase('')
       setTrack((prev) => ({ ...prev, submitting: false, elapsedS: 0 }))
       if (!turn.next_question) {
         setStage('ended')
@@ -379,6 +416,7 @@ export default function InterviewPage() {
         writeInterviewSession(userId, session.run_id)
       }
     } catch (error) {
+      setTurnPhase('')
       setTrack((prev) => ({
         ...prev,
         submitting: false,
@@ -568,6 +606,7 @@ export default function InterviewPage() {
                 retryLabel="重试结束"
               />
             ) : null}
+            {turnPhase ? <p className="sc-search-foot">{turnPhase}</p> : null}
             <Composer
               value={answer}
               onChange={setAnswer}

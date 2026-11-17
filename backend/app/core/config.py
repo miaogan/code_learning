@@ -55,6 +55,11 @@ _PROFILE_FIELDS: dict[str, tuple[str, str, str, str, str]] = {
     ),
 }
 
+#: 这些供应商的 Key **必填**（云端 API，没 Key 一切调用都会 401）；不在集合里的
+#: （lmstudio 本地服务）允许空 Key。就绪判定按此区分 —— r106 前的 ready 判定漏查 key，
+#: 导致生产容器 Key 缺失时 /health 仍报 ai_configured=true，直到 judge --live 才暴露。
+KEY_REQUIRED_PROVIDERS: frozenset[str] = frozenset({"deepseek"})
+
 #: 数值型档位字段：`.env` 里写成 `KEY=`（空值）时**按「没写」处理**，回落字段默认值。
 #: 不做这一步，空串会进 `float` / `int` 校验并在 `Settings()` 构造期抛 `ValidationError` —— 那会把
 #: 整个进程（和整批用例）打挂，恰好违反上面第 1 条不变量「配置错只置 ready=False，不许炸进程」。
@@ -85,7 +90,19 @@ _NUMERIC_ENV_FIELDS: tuple[str, ...] = (
     "radar_gen_max_questions",
     "radar_job_stale_minutes",
     "radar_translate_timeout_s",
+    "db_pool_timeout_s",
+    "db_recovery_interval_s",
+    "db_request_timeout_s",
+    "memory_cache_max_entries",
     "radar_translate_batch",
+    "ai_embed_timeout_s",
+    "ai_embed_dim",
+    "ai_embed_batch",
+    "jobs_stream_poll_s",
+    "jobs_stream_heartbeat_s",
+    "jobs_stream_max_s",
+    "rag_chunk_tokens",
+    "rag_chunk_overlap",
 )
 
 #: r41：视觉档未开通时的**唯一**中文说明（图片入口直接透传，不静默降级成 PDF 提示）。
@@ -199,15 +216,54 @@ class Settings(BaseSettings):
     #: 日志级别（DEBUG / INFO / WARNING / ERROR），非法值按 INFO 处理（不因配置错起不来）。
     log_level: str = "INFO"
 
+    # --- r100 RAG 检索（embedding 档位） --------------------------------------    #: embedding 模型名：留空 = 离线确定性 HashingEmbedder（零网络 / 零 Key，CI 可复跑）；
+    #: 非空 = OpenAI 兼容 `/embeddings` 端点（LM Studio 本地模型或云端 embedding 服务）。
+    ai_embed_model: str = ""
+    #: 留空 = 继承主档端点与 Key（「同一账号、只换模型名」的默认用法）。
+    ai_embed_base_url: str = ""
+    ai_embed_api_key: str = ""
+    #: 远端 embedding 单批请求超时（秒）。
+    ai_embed_timeout_s: float = 60.0
+    #: 向量维度：**进 DDL**（rag_chunks.embedding 是 vector(dim) 列），换 embedder
+    #: 导致维度变化时必须重建索引；插入前逐条校验，不匹配即中文报错。
+    ai_embed_dim: int = 256
+    #: 远端 embedding 单批条数（1284 道题 ÷ 32 = 41 批，足够克制）。
+    ai_embed_batch: int = 32
+
+    # --- r103 分块（按内容类型选切分器） --------------------------------------
+    #: 启动时是否用种子补齐教程索引（默认开；测试与「只想要题库索引」的部署可关）。
+    rag_seed_tutorials: bool = True
+    #: 引擎：`auto`（装有 llama-index 时用它切 prose）/ `native`（全自研）/ `llama`（强制）。
+    rag_chunker: str = "auto"
+    #: prose 切分的 token 上限与重叠（llama SentenceSplitter 直接生效；native 以字符近似）。
+    rag_chunk_tokens: int = 320
+    rag_chunk_overlap: int = 48
+
+    # --- r102 实时推送（SSE）-------------------------------------------------
+    #: 任务进度流的服务端轮询间隔（秒）：推送是「有变化才发」，但底层仍要查库。
+    jobs_stream_poll_s: float = 0.8
+    #: 心跳间隔（秒）：经代理/负载均衡时保活，前端据此判断连接还活着。
+    jobs_stream_heartbeat_s: int = 15
+    #: 单条流的最长存活时长（秒）：任务僵死时不让连接永久占着。
+    jobs_stream_max_s: int = 3600
+
     # --- r98 数据层：PostgreSQL + Redis ---------------------------------------
-    #: PostgreSQL 连接串（唯一数据库，SQLite 已下线）。`postgresql://user:pw@host:5432/db`。
+    #: PostgreSQL 权威主库连接串；正常时逐笔维护 SQLite 完整副本，故障时副本接管读写。
     database_url: str = "postgresql://postgres:postgres@127.0.0.1:5432/sc_app"
     #: 连接池上下限与取连接超时（秒）。上限按「单副本 × 数据库 max_connections」估算，
     #: 多副本时每副本都开这么多，总和不能超过 PG 的 `max_connections`。
     db_pool_min_size: int = 1
     db_pool_max_size: int = 10
     db_pool_timeout_s: float = 10.0
-    #: Redis 连接串；留空 = 不启用（限流/熔断回落进程内实现，缓存直通数据库）。
+    #: 数据库启动恢复的重试间隔（秒）；进程先起来，恢复后自动补 DDL / 种子。
+    db_recovery_interval_s: float = 2.0
+    #: 前台请求获取连接的短等待（秒）；不得用后台建表的长等待阻塞 HTTP 工作线程。
+    db_request_timeout_s: float = 0.25
+    #: 持久化 SQLite 热副本；仅允许单进程后端写入，PG 恢复后重放离线日志。
+    sqlite_path: str = "data/app-fallback.db"
+    #: 进程内缓存容量上限，超限按 LRU 淘汰；会话仍受自身 expires_at 约束。
+    memory_cache_max_entries: int = 2048
+    #: Redis 连接串；留空 = 进程内缓存（限流窗口与全局熔断另有各自的本地实现）。
     #: 生产档留空会在启动时被拦下（见 `production_blockers`），避免多副本各自计数。
     redis_url: str = ""
     #: 各类 Redis key 的统一前缀：同库多环境（dev/staging/prod）共用实例时避免互相踩。
@@ -349,6 +405,8 @@ class Settings(BaseSettings):
             name.upper() for name, value in ((base_url_field, base_url), (model_field, model))
             if not value
         ]
+        if provider in KEY_REQUIRED_PROVIDERS and not api_key:
+            missing.append(key_field.upper())
         if missing:
             detail = "、".join(missing)
             return replace(

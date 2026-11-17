@@ -18,10 +18,19 @@ import uuid
 
 from app.core import repository
 from app.core.auth import hash_password, normalize_email
-from app.core.db import init_db
+from app.core.db import init_db, refresh_replica
 from app.services.ai.user_ai import KEY_MODE_OWN, KEY_MODE_SHARED
 
 _MODES = (KEY_MODE_OWN, KEY_MODE_SHARED)
+
+#: 会改库的子命令；跑完必须补一次副本重建，否则服务进程仍会报 `db_replica=ready`。
+_MUTATING_COMMANDS = (
+    "create-user",
+    "adopt-default",
+    "set-mode",
+    "disable",
+    "reset-password",
+)
 
 
 def _generate_password() -> str:
@@ -162,7 +171,28 @@ def main(argv: list[str] | None = None) -> int:
 
     args = parser.parse_args(argv)
     init_db()
-    return args.func(args)
+    code = args.func(args)
+    if code == 0 and args.command in _MUTATING_COMMANDS:
+        _sync_replica()
+    return code
+
+
+def _sync_replica() -> None:
+    """独立进程写过主库后补齐兜底副本。
+
+    这是单进程约束下唯一诚实的做法：服务进程察觉不到别处的写入，副本会不会落后
+    只能由写入方负责。失败不算命令失败——PG 已经是事实源，下一次后端恢复会整库重建。
+    """
+    try:
+        counts = refresh_replica()
+    except Exception as exc:  # noqa: BLE001 - 副本同步失败不该把已完成的写库翻成失败
+        print(
+            f"警告：兜底副本同步失败（{type(exc).__name__}），"
+            "`/health` 可能仍显示 db_replica=ready；重启后端会整库重建",
+            file=sys.stderr,
+        )
+        return
+    print(f"兜底副本已同步：{len(counts)} 张表、{sum(counts.values())} 行")
 
 
 if __name__ == "__main__":

@@ -13,6 +13,7 @@ import { InlineError } from '../components/ui/InlineError'
 import { PhaseLoader } from '../components/ui/PhaseLoader'
 import { RingProgress } from '../components/ui/RingProgress'
 import { formatChars } from '../lib/format'
+import { watchJob } from '../lib/jobWatch'
 import {
   NEWCOMER_GUIDE,
   STEP_HREFS,
@@ -417,24 +418,23 @@ export default function UploadPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, recoverTick, reloadSavedProfile])
 
-  // r30 轮询：每 2 秒查一次任务状态。网络抖动继续轮（不轻易判死）；
-  // 404 说明任务行没了，如实报错。轮询随卸载/终态自动停止，任务本身在服务端照跑。
+  // r102：任务进度改 SSE 推送（有变化才查一次），流打不开时 watchJob 自动回落 2s 轮询。
+  // 网络抖动继续重试（不轻易判死）；404 说明任务行没了，如实报错。
+  // 流随卸载/终态自动停止，任务本身在服务端照跑。
   // r42：连续两次取不到状态就给中文提示（断网 / 弱网），但仍继续重试，不误判任务失败。
   useEffect(() => {
     if (jobId === null) return
     let stopped = false
-    let timer = 0
     let failures = 0
-    const poll = async () => {
+
+    // 返回 true = 已到终态（监听停止）；false = 任务仍在跑（等下一次推送 / 轮询）。
+    const fetchOnce = async (): Promise<boolean> => {
       try {
         const job = await api.getProfileJob(jobId)
-        if (stopped) return
+        if (stopped) return true
         failures = 0
         setNetNotice(null)
-        if (isJobRunning(job)) {
-          timer = window.setTimeout(() => void poll(), PROFILE_JOB_POLL_MS)
-          return
-        }
+        if (isJobRunning(job)) return false
         setJobId(null)
         if (job.status === 'completed' && job.result !== null) {
           // 后台完成也带一次性 merge_summary（r3 的「本次合并」摘要不因异步而丢）。
@@ -446,8 +446,9 @@ export default function UploadPage() {
           setFailure({ message: jobFailureNotice(job), stage: 'profile', retryable: true })
           setPhase('error')
         }
+        return true
       } catch (err) {
-        if (stopped) return
+        if (stopped) return true
         if (err instanceof ApiError && err.status === 404) {
           setJobId(null)
           setFailure({
@@ -456,7 +457,7 @@ export default function UploadPage() {
             retryable: true,
           })
           setPhase('error')
-          return
+          return true
         }
         failures += 1
         if (failures >= 2) {
@@ -466,13 +467,14 @@ export default function UploadPage() {
               : '网络连接不稳定，正在自动重试；任务在服务端继续，不会丢失。',
           )
         }
-        timer = window.setTimeout(() => void poll(), PROFILE_JOB_POLL_MS)
+        return false
       }
     }
-    timer = window.setTimeout(() => void poll(), PROFILE_JOB_POLL_MS)
+
+    const stop = watchJob('profile', jobId, { fetchOnce, intervalMs: PROFILE_JOB_POLL_MS })
     return () => {
       stopped = true
-      window.clearTimeout(timer)
+      stop()
     }
   }, [jobId, reloadSavedProfile])
 

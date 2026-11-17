@@ -43,6 +43,9 @@ jobs:
         run: npm run build
       - name: Retrieval eval gate
         run: node ../scripts/eval_retrieval.mjs --check
+      # r105：教程语料导出的种子必须与前端源一致（改了教程却没重新导出 → 这里红）
+      - name: Tutorial seed freshness
+        run: node ../scripts/export_tutorials.mjs --check
 
   backend:
     runs-on: ubuntu-latest
@@ -55,7 +58,9 @@ jobs:
     # services 的健康检查由 Actions 自动等待，healthcheck 不通过则 job 直接失败。
     services:
       postgres:
-        image: postgres:16-alpine
+        # r100 起 RAG 检索评测（eval_rag.py --check）跑 pgvector 真路径，
+        # CI 与生产 compose 同用 pgvector 官方镜像（PostgreSQL 16 基线）。
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: postgres
@@ -103,16 +108,58 @@ jobs:
         run: python -m ruff check app tests
       - name: Question bank byte gate
         run: python -X utf8 -m app.services.assessment.question_merge --check
+      # 失败时把 FAILED 行打成 GitHub annotation —— 无需下载日志/鉴权即可从
+      # checks API 读到具体用例名（公开仓库的日志下载需要 token，annotation 不需要）。
       - name: Test
-        run: python -m pytest -q
+        run: |
+          set +e
+          python -m pytest -q 2>&1 | tee /tmp/pytest.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            grep -E '^FAILED |^ERROR ' /tmp/pytest.log | while IFS= read -r line; do
+              echo "::error title=pytest-failure::${line}"
+            done
+            echo "--- last 40 lines ---"
+            tail -40 /tmp/pytest.log
+          fi
+          exit "$status"
       - name: Offline eval gate
         run: python -X utf8 ../scripts/eval_harness.py --check
       - name: Question retrieval eval gate
         run: python -X utf8 ../scripts/eval_question_retrieval.py --check
+      - name: RAG retrieval eval gate
+        run: python -X utf8 ../scripts/eval_rag.py --check
+      - name: RAG judge dry-run gate
+        run: python -X utf8 ../scripts/eval_rag_judge.py --check
       - name: Reliability fault-injection gate
         run: python -X utf8 ../scripts/eval_reliability.py --check
       - name: Live eval dry-run gate
         run: python -X utf8 ../scripts/eval_live.py --check
+
+  # 版本门禁：只在「准备合入 master」的发版 PR 上跑。
+  # 不判断代码质量（frontend / backend 负责），只判断这一批代码有没有资格作为
+  # 正式版本进受保护主干：来源分支、版本号、CHANGELOG、tag 指向、版本递增。
+  # 要让它真正拦住合并，需在 Settings → Branches → master 的 Required status checks
+  # 里把 `Release gate` 加进去（与 frontend / backend 并列）。规则见
+  # docs/teamflow/20261114-cicd/RELEASE.md。
+  release-gate:
+    name: Release gate
+    if: github.event_name == 'pull_request' && github.base_ref == 'master'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Fetch dev history and tags
+        run: |
+          git fetch --quiet --tags --force origin
+          git fetch --quiet origin '+refs/heads/dev:refs/remotes/origin/dev'
+      - name: Validate release PR
+        env:
+          PR_HEAD_REF: ${{ github.head_ref }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: bash scripts/release-gate.sh
 
   # CD：只有两个门禁 job 全绿、且是部署分支的 push 才触发。
   # 走「受限 deploy key + 固定 known_hosts」：服务器 authorized_keys 用

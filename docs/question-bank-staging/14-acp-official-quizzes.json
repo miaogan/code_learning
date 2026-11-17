@@ -1,0 +1,938 @@
+[
+  {
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "你开发的答疑机器人上线后，用户反馈\"每次问同一个问题，得到的回答都不一样，有时候内容还互相矛盾\"。排查发现当前使用的是默认参数配置，你应该优先调整什么来降低输出的随机性",
+    "options": [
+      {
+        "key": "A",
+        "text": "将 temperature 调低至接近 0，使模型倾向于选择概率最高的 Token"
+      },
+      {
+        "key": "B",
+        "text": "将 top_p 调高至接近 1，扩大候选 Token 的采样范围"
+      },
+      {
+        "key": "C",
+        "text": "在 system prompt 中追加\"请保持回答一致\"的指令约束"
+      },
+      {
+        "key": "D",
+        "text": "切换为参数量更大的模型，因为大模型的输出稳定性更高"
+      }
+    ],
+    "answer": "A",
+    "explanation": "temperature 控制 softmax 输出概率分布的\"尖锐程度\"。调低 temperature 会让概率集中在少数高概率 Token 上，从而使输出更加确定和稳定。选项 B 会扩大采样范围，反而增加随机性；选项 C 的提示词约束无法从根本上改变采样机制的随机行为；选项 D 中模型参数量与输出随机性无直接关系。"
+  },
+  {
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "你在测试答疑机器人的多轮对话功能。用户先问\"我们公司用什么项目管理工具\"，机器人回答了 Jira。用户接着问\"怎么申请账号\"，但机器人回答的是通用的账号申请流程，完全没有提到 Jira。最可能的原因是什么",
+    "options": [
+      {
+        "key": "A",
+        "text": "第二次调用时没有把之前的对话历史放入 messages 数组，模型无法理解\"账号\"指的是 Jira 账号"
+      },
+      {
+        "key": "B",
+        "text": "流式输出模式下模型只能处理当前轮次的输入，无法读取之前的 system prompt 内容"
+      },
+      {
+        "key": "C",
+        "text": "模型的上下文窗口已满，自动丢弃了第一轮对话中包含 Jira 信息的 assistant 消息"
+      },
+      {
+        "key": "D",
+        "text": "大模型的 temperature 设置过高，导致模型在第二轮对话中\"遗忘\"了之前提到的工具名称"
+      }
+    ],
+    "answer": "A",
+    "explanation": "大模型 API 是无状态的，每次调用都是独立的。如果第二次调用时只传入了\"怎么申请账号\"，模型无从知道用户指的是哪个工具的账号。选项 B 错误，流式输出只是改变内容的展示方式，不影响模型对 messages 数组的处理；选项 C 不太可能，两轮简短对话远不会填满上下文窗口；选项 D 错误，temperature 控制的是输出的随机性，不会导致模型\"遗忘\"上下文中明确提供的信息。"
+  },
+  {
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "你需要用大模型从用户反馈中提取结构化信息（如产品名称、问题类型、严重程度），要求每次提取结果稳定一致。下列参数配置最合理的是哪个",
+    "options": [
+      {
+        "key": "A",
+        "text": "temperature=1.5, top_p=0.9 —— 高创造力配置，让模型灵活理解用户表述"
+      },
+      {
+        "key": "B",
+        "text": "temperature=0.1, top_p=0.3 —— 低随机性配置，让模型尽量选择概率最高的 Token"
+      },
+      {
+        "key": "C",
+        "text": "temperature=0.7, top_p=0.8 —— 默认均衡配置，适用于大多数通用对话场景"
+      },
+      {
+        "key": "D",
+        "text": "temperature=0.1, top_p=0.95 —— 同时调低温度并放宽采样范围以兼顾稳定和多样"
+      }
+    ],
+    "answer": "B",
+    "explanation": "结构化信息提取属于明确答案类任务，需要输出高度稳定。temperature 和 top_p 都应调低，使模型集中选择高概率 Token。选项 A 的高 temperature 会引入大量随机性；选项 C 的默认配置虽然通用但随机性仍偏高；选项 D 同时调整两个参数且方向相反（温度低但采样范围宽），可能导致输出行为不可预测，且课程建议不要同时调整这两个参数。"
+  },
+  {
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "在RAG应用中进行多轮对话，应该如何进行检索",
+    "options": [
+      {
+        "key": "A",
+        "text": "使用完整的对话历史作为检索查询"
+      },
+      {
+        "key": "B",
+        "text": "结合历史对话信息对输入问题改写后进入检索阶段"
+      },
+      {
+        "key": "C",
+        "text": "仅使用最新问题进行检索，忽略对话历史。"
+      },
+      {
+        "key": "D",
+        "text": "将上一轮召回的文本段迁移过来"
+      }
+    ],
+    "answer": "B",
+    "explanation": "- 在多轮对话中，直接使用原始问题（如选项 C ）或完整历史记录（选项 A ）会导致检索噪声或信息冗余。\n- 而选项 B 通过动态重写当前问题，既保留了对话连贯性，又避免了选项 D 的过时文本迁移问题，是平衡效率与精度的最优方案。"
+  },
+  {
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "你用 RAG 搭建了售后问答机器人，保修政策文档已录入知识库。测试中发现机器人把某款耳机的保修期答错了。排查时应先检查哪一项",
+    "options": [
+      {
+        "key": "A",
+        "text": "大模型自身是否掌握该产品的保修知识"
+      },
+      {
+        "key": "B",
+        "text": "召回的文本段里有没有正确的保修条款"
+      },
+      {
+        "key": "C",
+        "text": "提示词模板是否要求严格依据资料作答"
+      },
+      {
+        "key": "D",
+        "text": "知识库中是否收录了该产品的保修文档"
+      }
+    ],
+    "answer": "B",
+    "explanation": "RAG 的回答分两步产生：先检索召回相关文本段，再由大模型根据这些文本段生成回答。所以排查答错的问题，要先看召回结果。召回的文本段里没有正确条款，说明问题出在检索阶段，生成环节怎么调都答不对。召回内容正确但回答仍然错，再去查提示词和生成参数。选项 A 不成立：RAG 生成回答靠的是大模型的总结能力，依据来自召回的资料，不是模型自己掌握的知识。选项 C 是生成阶段的调整，要先确认召回内容正确，调整才有意义。选项 D 检查知识库内容也很必要，但应该先从问答工作流本身入手，即使知识库中有相关资料也不能确保召回本身是正确的。"
+  },
+  {
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Prompt 工程",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "你的答疑机器人在回答\"如何提交代码\"时，给出了一份面向资深开发者的 Git 高级操作指南，包含 rebase、cherry-pick 等内容。但实际用户大多是刚入职的非技术岗新人，反馈看不懂。你应该在提示词中优先补充哪个要素",
+    "options": [
+      {
+        "key": "A",
+        "text": "补充角色(Role)，要求模型扮演一位耐心的技术导师来组织语言"
+      },
+      {
+        "key": "B",
+        "text": "补充受众(Audience)，明确目标用户是零编程基础的新入职员工"
+      },
+      {
+        "key": "C",
+        "text": "补充输出格式(Format)，要求模型以编号步骤的形式呈现操作流程"
+      },
+      {
+        "key": "D",
+        "text": "补充少样本示例(Sample)，提供一份简洁版操作指南作为参考范例"
+      }
+    ],
+    "answer": "B",
+    "explanation": "问题的核心是\"内容深度不匹配目标用户\"——模型生成了专家级内容，但用户是零基础新人。受众(Audience)要素直接告诉模型\"为谁而写\"，从而调整内容的深度和用词。选项 A 的角色设定能影响语气风格，但不如直接指定受众精准；选项 C 的格式调整不解决内容深度问题；选项 D 的示例能引导风格但本质上是\"给答案\"而非让模型理解受众需求。"
+  },
+  {
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Prompt 工程",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "你接手了一个复杂的、用于生成代码的提示词，但缺乏相关文档。在直接修改这个“黑盒”提示词之前，你会执行哪些准备工作来确保后续优化的有效性？",
+    "options": [
+      {
+        "key": "A",
+        "text": "收集模型输出不佳的具体案例（Bad Cases）。"
+      },
+      {
+        "key": "B",
+        "text": "立即开始草拟一个全新的、更简单的替代版本。"
+      },
+      {
+        "key": "C",
+        "text": "清晰地用文字描述出期望的输出标准和格式。"
+      },
+      {
+        "key": "D",
+        "text": "通读整个提示词，尝试凭直觉找出逻辑漏洞。"
+      }
+    ],
+    "answer": "A,C",
+    "explanation": "本题考查在启动一个结构化优化流程前，必须具备哪些核心输入。正确的优化（如Meta Prompting）需要明确的“问题”和“目标”。\n- 选项A（坏样本）和选项C（期望输出）是定义“问题”和“目标”的关键步骤，是Meta Prompting方法的两个核心输入。\n- 选项B（推倒重来）和选项D（凭直觉修改）都是高风险低效率的方法，它们没有考虑系统的结构，也没有考虑系统的效果。"
+  },
+  {
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Prompt 工程",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "在使用推理型大模型（如qwen3-plus）执行深度思考任务时。以下哪些提示词技巧是推荐的",
+    "options": [
+      {
+        "key": "A",
+        "text": "给出简单、明确的任务指示"
+      },
+      {
+        "key": "B",
+        "text": "补充足够的背景信息"
+      },
+      {
+        "key": "C",
+        "text": "如有特定用户群体或特定任务要求，设定角色或受众"
+      },
+      {
+        "key": "D",
+        "text": "必须在提示词里写“一步一步推理”或者“给出解释”，模型才会使用深度思考模式"
+      },
+      {
+        "key": "E",
+        "text": "当描述太抽象或无法准确描述时，可以通过增加示例来明确这些信息"
+      }
+    ],
+    "answer": "A,B,C,E",
+    "explanation": "- 通常情况下，推理型大模型（如qwen3-plus）无需显式要求即可通过类似“思维链”（chain of thought）的模式做深度思考。"
+  },
+  {
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "你在评测答疑机器人时发现：对于问题\"张伟是哪个部门的\"，系统召回了5个文档切片，其中第4个包含正确答案，而排名前3的切片都是无关内容。Answer Correctness 分数尚可，但你怀疑检索排序有问题。应该重点关注哪个 Ragas 指标来验证这个判断",
+    "options": [
+      {
+        "key": "A",
+        "text": "Context Recall —— 检查包含正确答案的文档切片是否被召回到了结果集中"
+      },
+      {
+        "key": "B",
+        "text": "Context Precision —— 检查召回结果中相关切片是否排在靠前的位置"
+      },
+      {
+        "key": "C",
+        "text": "Answer Correctness —— 检查最终生成的答案与标准答案之间的事实一致性"
+      },
+      {
+        "key": "D",
+        "text": "Answer Relevancy —— 检查最终生成的答案与用户原始问题之间的相关程度"
+      }
+    ],
+    "answer": "B",
+    "explanation": "场景中的核心问题是\"正确文档存在但排名靠后\"，这正是 Context Precision 衡量的内容——检索结果中相关切片是否排在前面、信噪比是否足够高。选项 A 的 Context Recall 关注的是\"有没有召回\"，但场景中正确切片已经被召回了；选项 C 和 D 关注的都是最终答案的质量，不是检索排序问题。这种排序问题可能导致\"Lost in the Middle\"现象，后续可通过重排序(Rerank)来优化。"
+  },
+  {
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "RAGAS评测中，如果Context Recall分数低但Answer Relevancy分数高，说明什么问题",
+    "options": [
+      {
+        "key": "A",
+        "text": "模型回答的语言质量差"
+      },
+      {
+        "key": "B",
+        "text": "检索到了正确文档但模型理解错误"
+      },
+      {
+        "key": "C",
+        "text": "虽然检索没有找到所有相关内容，但模型也可以利用找到的内容给出了相关回答"
+      },
+      {
+        "key": "D",
+        "text": "评测数据集设计有问题"
+      }
+    ],
+    "answer": "C",
+    "explanation": "Context Recall衡量\"相关文档有没有被全部检索到\"，分数低说明有遗漏。Answer Relevancy衡量\"回答和问题是否相关\"，分数高说明模型基于检索到的内容给出了相关回答。优化方向是改进检索策略，扩大召回范围。"
+  },
+  {
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "你的 RAG 应用处理一份包含多个部门信息的 Markdown 格式员工手册。用户问\"技术部的考勤规则是什么\"，但系统召回的切片同时包含了技术部、市场部、财务部三个部门的考勤规则，导致大模型回答时混淆了不同部门的制度。你应该优先采取哪种切片优化策略",
+    "options": [
+      {
+        "key": "A",
+        "text": "改用 Token 切片并设置较小的 chunk_size，按固定长度截断文档内容"
+      },
+      {
+        "key": "B",
+        "text": "改用 Markdown 切片，让系统按标题层级自动将不同部门拆分为独立切片"
+      },
+      {
+        "key": "C",
+        "text": "将整份手册按部门拆分为独立文档，为每个部门单独建立向量索引"
+      },
+      {
+        "key": "D",
+        "text": "增大句子窗口的 window_size，让每个切片携带更多的上下文背景信息"
+      }
+    ],
+    "answer": "B",
+    "explanation": "Markdown 格式文档天然有标题层级结构（如\"## 技术部\"\"## 市场部\"），Markdown 切片能按标题层级智能分割，将不同部门的内容拆分为独立切片，从根本上避免多部门信息混在一起。选项 A 的 Token 切片按固定长度截断，可能在段落中间断开，反而丢失完整性；选项 C 方向对但手段过重，需要人工拆分维护多份文档和多个索引，而 Markdown 切片能自动按标题结构完成同样的效果；选项 D 会引入更多上下文，加剧而非缓解信息混淆问题。"
+  },
+  {
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "句子窗口检索（Sentence Window Retrieval）解决了什么矛盾",
+    "options": [
+      {
+        "key": "A",
+        "text": "检索速度和检索精度的矛盾"
+      },
+      {
+        "key": "B",
+        "text": "小chunk精准定位与大chunk上下文完整的矛盾"
+      },
+      {
+        "key": "C",
+        "text": "向量检索和关键词检索的矛盾"
+      },
+      {
+        "key": "D",
+        "text": "在线推理和离线索引的矛盾"
+      }
+    ],
+    "answer": "B",
+    "explanation": "小chunk能精准匹配用户问题，但返回的内容太短、缺少上下文；大chunk上下文完整但定位不够精准。句子窗口检索的方案是：用小块做检索定位，返回时自动扩展到周围几句话，兼顾精准和完整。"
+  },
+  {
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "你的Agent已经集成了日历、邮件、代码仓库三个工具，每次新增工具都要修改Agent代码、更新JSON Schema、重新部署。团队计划再接入十几个内部系统。你该如何降低工具集成的维护成本",
+    "options": [
+      {
+        "key": "A",
+        "text": "把所有工具的JSON Schema抽取到一个统一的配置文件中，新增工具只改配置不改代码"
+      },
+      {
+        "key": "B",
+        "text": "引入MCP协议，让每个工具作为独立服务运行，Agent通过标准协议动态发现和调用"
+      },
+      {
+        "key": "C",
+        "text": "为所有工具封装一个统一的HTTP网关，Agent只需调用网关的单一接口即可转发请求"
+      },
+      {
+        "key": "D",
+        "text": "减少工具数量，将功能相近的工具合并为一个多功能工具以降低管理复杂度"
+      }
+    ],
+    "answer": "B",
+    "explanation": "A只是把配置从代码中分离出来，减少了改代码的频率，但Agent仍然要感知所有工具的Schema定义，且每次新增仍需手动更新配置并重启。C的HTTP网关统一了调用入口，但Agent失去了对每个工具能力的感知，无法根据任务自主选择合适的工具。D违背了扩展需求，合并工具会降低专业性且增加单个工具的复杂度。B是正解：MCP让工具作为独立服务暴露自己的能力描述，Agent通过标准协议动态发现可用工具，新增工具无需修改Agent代码，实现了工具与Agent的解耦。"
+  },
+  {
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "你开发了一个\"课程前期调研\"Agent，使用固定工作流并行调用三个工具：行业分析、用户画像、竞品分析。上线后竞品网站改版导致爬虫工具频繁失败，整个流程卡死。你该如何改进",
+    "options": [
+      {
+        "key": "A",
+        "text": "为竞品分析工具增加重试机制，失败时自动重试三次后报错退出"
+      },
+      {
+        "key": "B",
+        "text": "在工作流中为每个工具失败场景都预设分支处理逻辑和降级方案"
+      },
+      {
+        "key": "C",
+        "text": "将固定工作流改为Plan & Execute模式，让Agent根据目标自主规划并动态应对异常"
+      },
+      {
+        "key": "D",
+        "text": "更换为更稳定的竞品数据API服务商，从数据源层面消除工具失败的可能"
+      }
+    ],
+    "answer": "C",
+    "explanation": "在本题“结构经常变化、意外类型无法提前穷举”的前提下，C比单纯重试或为每种异常手写分支更有适应性。A可用于短暂网络故障，但不能保证解决页面结构变化；B对少数已知异常仍然有效；D可作为特定场景的工程改进，却不能保证永不失败。Plan & Execute也要设置允许的替代方案、停止条件和人工确认，不能未经核对就跳过必需调研步骤。"
+  },
+  {
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "你的团队要用多Agent系统开发一门新课程。需求明确：先由教学设计师出大纲，再由技术专家填充代码示例，最后由编辑撰写文稿。你应该选择哪种协作模式",
+    "options": [
+      {
+        "key": "A",
+        "text": "共创协作模式，让三个Agent围绕共享白板自由讨论，通过多轮迭代涌现最终方案"
+      },
+      {
+        "key": "B",
+        "text": "分层规划模式，设置Leader Agent按顺序将子任务分派给各专家Agent并汇总结果"
+      },
+      {
+        "key": "C",
+        "text": "让一个全能Agent依次扮演三种角色，在同一个上下文窗口中完成所有环节的工作"
+      },
+      {
+        "key": "D",
+        "text": "三个Agent各自独立完成完整课程初稿，最后由人工挑选质量最好的一份作为成品"
+      }
+    ],
+    "answer": "B",
+    "explanation": "该任务具有明确的上下游依赖关系（大纲→代码→文稿），目标清晰、可拆解，适合分层规划模式。A的共创模式适合开放性创意问题（如\"设计什么样的案例\"），用于有明确流程的任务容易讨论发散无法收敛。C违背了多Agent的核心价值——每个Agent拥有独立上下文、专注各自任务，单体Agent处理多角色任务容易注意力涣散。D是平行冗余策略而非协作，浪费3倍计算资源且无法利用专业分工优势。"
+  },
+  {
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "你的课程编写Agent在连续工作30轮后，忘记了第1轮用户设定的\"风格要求严谨学术化\"，开始输出轻松口语化的内容。你当前使用的是简单截断策略（保留最近N轮）。最合理的改进方案是什么",
+    "options": [
+      {
+        "key": "A",
+        "text": "将截断窗口从N轮扩大到2N轮，确保早期的风格要求不被丢弃"
+      },
+      {
+        "key": "B",
+        "text": "将风格要求硬编码到系统提示词中，使其不受记忆管理策略的影响"
+      },
+      {
+        "key": "C",
+        "text": "引入向量化长期记忆，将关键偏好持久化存储并在每次回复前按需检索"
+      },
+      {
+        "key": "D",
+        "text": "改用滚动摘要策略，定期将旧对话压缩为摘要以保留核心信息"
+      }
+    ],
+    "answer": "C",
+    "explanation": "A只是延迟问题发生的时间，窗口再大也终会被填满，且长上下文会导致注意力稀释。B在此场景可行，但仅适用于已知的固定偏好，无法处理用户在对话中动态产生的新偏好，不具备通用性。D比截断好，能保留部分关键信息，但摘要质量取决于压缩模型，长期累积仍可能丢失细节。C是最合理的方案：向量化长期记忆将关键偏好持久化到向量数据库中，每次按当前任务语义检索最相关的记忆，从根本上摆脱上下文窗口的长度限制。"
+  },
+  {
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "你的课程审查Agent总是遗漏\"代码示例必须有注释\"这一团队规范。你已经在多次对话中反复提醒它，但每开一个新会话又会忘记。最有效的解决方式是什么",
+    "options": [
+      {
+        "key": "A",
+        "text": "将\"代码必须有注释\"写入Agent的长期记忆，让它在每次审查前自动检索该条经验"
+      },
+      {
+        "key": "B",
+        "text": "编写一个包含完整审查检查清单的Skill文件，让Agent在执行审查任务时加载该Skill"
+      },
+      {
+        "key": "C",
+        "text": "在每次新建对话时手动将这条要求粘贴到第一条消息中作为提示"
+      },
+      {
+        "key": "D",
+        "text": "提高模型的temperature参数，让Agent在审查时考虑更多可能性从而覆盖该规范"
+      }
+    ],
+    "answer": "B",
+    "explanation": "A方向对但层次不够——Memory适合记录偏好和经验片段（如\"上次API报错是因为版本不对\"），但一条零散的记忆缺乏执行上下文，Agent知道\"要检查注释\"却未必知道完整的检查流程。C是人工重复劳动，无法规模化。D与问题无关，temperature影响输出多样性而非检查覆盖面。B是正解：Skill将完整的审查SOP（包括所有检查项、检查顺序、判定标准）封装为可复用模块，Agent加载后获得系统化的工作指令，而非零散的记忆提示。"
+  },
+  {
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "你的课程写作Agent端到端评测显示课程质量得分稳定在4.2/5，但用户反馈\"代码示例经常无法运行\"。你应该如何定位并解决这个问题",
+    "options": [
+      {
+        "key": "A",
+        "text": "提高端到端评测的评分严格度，将通过阈值从4.0上调到4.5以过滤低质量输出"
+      },
+      {
+        "key": "B",
+        "text": "增加白盒化评测，单独检查代码生成环节的输出是否可执行，精确定位故障节点"
+      },
+      {
+        "key": "C",
+        "text": "更换底层大模型为代码能力更强的版本，从模型层面提升代码生成的正确率"
+      },
+      {
+        "key": "D",
+        "text": "在系统提示词中追加\"生成的代码必须保证可运行\"的强调指令来约束输出"
+      }
+    ],
+    "answer": "B",
+    "explanation": "A只是收紧整体评分门槛，无法精确定位\"代码不可执行\"这个具体环节的问题。C是可选的优化方向，但没有先定位问题就换模型属于盲目投入，且代码问题可能源于上下文而非模型能力。D是典型的\"用提示词解决工程问题\"，效果不确定且无法验证。B是正解：白盒化评测的核心价值就是\"打开黑盒\"，对Agent执行链路中的特定节点（如代码生成环节）单独设置检查指标，精确定位问题后才能有针对性地优化。"
+  },
+  {
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "stem": "关于“先理解、再计划、再编码、再提交”的工作流，以下哪种做法最合理",
+    "options": [
+      {
+        "key": "A",
+        "text": "每次都严格按照 E → P → C → C 四个阶段执行，不跳过任何阶段"
+      },
+      {
+        "key": "B",
+        "text": "对于简单的单文件修改，可以跳过 Explore 和 Plan，直接进入 Code 阶段"
+      },
+      {
+        "key": "C",
+        "text": "Plan 阶段让 Agent 生成计划后直接执行，不需要人工审查"
+      },
+      {
+        "key": "D",
+        "text": "Commit 阶段直接让 Agent 提交，不需要检查 staged 文件列表"
+      }
+    ],
+    "answer": "B",
+    "explanation": "这套工作流是灵活框架，不是僵化流程。对于简单任务，直接告诉 Agent 做什么即可；但涉及多文件、多步骤的复杂任务时，先理解和先计划能显著减少返工。C 选项错误：计划必须人工审查。D 选项错误：提交前必须检查 staged 文件列表。"
+  },
+  {
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "nice_to_know",
+    "stem": "Agent 每次新会话都把 DashScope 的 API 地址写成 OpenAI 默认地址，你已经纠正了三次。最合理的解决方式是",
+    "options": [
+      {
+        "key": "A",
+        "text": "每次会话开始时手动提醒 Agent"
+      },
+      {
+        "key": "B",
+        "text": "将正确的 API 地址和错误示例写入 QWEN.md 的\"常见陷阱\"部分"
+      },
+      {
+        "key": "C",
+        "text": "创建一个自定义命令 /fix-url，每次发现错误时手动触发"
+      },
+      {
+        "key": "D",
+        "text": "创建一个 Skill，让 Agent 在写代码时自动检查 API 地址"
+      }
+    ],
+    "answer": "B",
+    "explanation": "这是一个跨会话始终成立的项目约束，且是 Agent 反复犯的具体错误——完全符合 QWEN.md\"面向失败写记忆\"的原则。写入后 Agent 每次启动都会加载。C 选项是事后补救而非预防。D 选项过于重量级。"
+  },
+  {
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "nice_to_know",
+    "stem": "开发 Gradio UI 时，/context 显示上下文使用量达 75%。此时最合理的操作是",
+    "options": [
+      {
+        "key": "A",
+        "text": "立即运行 /clear 清空所有上下文"
+      },
+      {
+        "key": "B",
+        "text": "运行 /compress 压缩历史对话，然后继续当前任务"
+      },
+      {
+        "key": "C",
+        "text": "忽略使用量，继续开发直到 Agent 出现明显遗忘"
+      },
+      {
+        "key": "D",
+        "text": "关闭终端重新启动 Qwen Code"
+      }
+    ],
+    "answer": "B",
+    "explanation": "当上下文使用量较高但任务尚未完成时，/compress 保留关键信息，压缩冗余的历史对话，释放空间继续工作。A 选项过于激进——丢失所有会话上下文，你需要重新向 Agent 解释当前任务。C 选项有风险——上下文溢出后 Agent 可能丢失重要约束的记忆。"
+  },
+  {
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "nice_to_know",
+    "stem": "以下四种需求分别应该使用哪种扩展机制？① 每次提交前检查是否有硬编码的 API Key② 编写代码时实时查阅 LlamaIndex 最新文档③ 项目必须使用 PEP 8 规范④ 审查课程内容时自动检查教学编写规范",
+    "options": [
+      {
+        "key": "A",
+        "text": "① Skill ② MCP ③ QWEN.md ④ 自定义命令"
+      },
+      {
+        "key": "B",
+        "text": "① 自定义命令 ② MCP ③ QWEN.md ④ Skill"
+      },
+      {
+        "key": "C",
+        "text": "① 自定义命令 ② Skill ③ QWEN.md ④ MCP"
+      },
+      {
+        "key": "D",
+        "text": "① QWEN.md ② MCP ③ Skill ④ 自定义命令"
+      }
+    ],
+    "answer": "B",
+    "explanation": "按 5.4 节决策树分析——① 是固定检查流程，手动触发 → 自定义命令。② 需要调用外部服务，Agent 自主判断何时查阅 → MCP。③ 是跨会话始终成立的项目约束 → QWEN.md。④ 是领域专家知识，Agent 识别到相关任务时自动加载 → Skill。"
+  },
+  {
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "stem": "以下哪种做法属于\"不验证就提交\"的反模式",
+    "options": [
+      {
+        "key": "A",
+        "text": "Agent 修改了 rag.py 后，你运行了已有的测试用例，确认通过后提交"
+      },
+      {
+        "key": "B",
+        "text": "Agent 生成了 app.py 后，你启动 Gradio 应用并手动测试了三个场景后提交"
+      },
+      {
+        "key": "C",
+        "text": "Agent 修改了 evaluate.py 后，你检查了 diff 确认改动合理，直接提交"
+      },
+      {
+        "key": "D",
+        "text": "Agent 新建了 .gitignore 文件后，你检查了文件内容确认包含 Key.json 后提交"
+      }
+    ],
+    "answer": "C",
+    "explanation": "C 选项只检查了 diff\"看起来合理\"，但没有实际运行代码验证修改是否正确。evaluate.py 涉及 RAGAS 评测逻辑，diff 审查无法发现运行时才暴露的问题（如参数类型不匹配）。\"不验证就提交\"的核心问题不是\"没看 diff\"，而是\"没有运行或测试就认为代码正确\"。"
+  },
+  {
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "stem": "关于 QWEN.md 的三级配置层次，以下说法正确的是",
+    "options": [
+      {
+        "key": "A",
+        "text": "目录级 QWEN.md 的内容会完全覆盖项目级 QWEN.md 的内容"
+      },
+      {
+        "key": "B",
+        "text": "全局 QWEN.md 适合放置特定项目的技术栈和模块结构信息"
+      },
+      {
+        "key": "C",
+        "text": "三级配置按\"全局 → 项目 → 目录\"顺序加载，更具体的层级优先级更高"
+      },
+      {
+        "key": "D",
+        "text": "如果项目级和目录级 QWEN.md 有冲突，Agent 会提示用户选择"
+      }
+    ],
+    "answer": "C",
+    "explanation": "三级配置的设计原则是\"从通用到具体\"，更具体的配置优先级更高。A 错：目录级是在项目级基础上追加和覆盖，不是完全替换。B 错：全局配置放跨项目通用的内容（如个人编码偏好）。D 错：配置冲突按优先级自动解决，不需要用户手动选择。"
+  },
+  {
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "stem": "关于 Skill 的五步编写法，以下哪个步骤最关键",
+    "options": [
+      {
+        "key": "A",
+        "text": "第三步：写 Skill 初稿——规则写得越完整越好"
+      },
+      {
+        "key": "B",
+        "text": "第一步：让 Agent 裸跑一次，记录失败案例作为基线"
+      },
+      {
+        "key": "C",
+        "text": "第五步：反复迭代直到 Skill 完美覆盖所有场景"
+      },
+      {
+        "key": "D",
+        "text": "第四步：用新会话验证——确保 Agent 加载了 Skill"
+      }
+    ],
+    "answer": "B",
+    "explanation": "第一步（建立基线）是整个方法的基础。没有基线，你无法判断 Skill 是否真正改善了 Agent 的行为——你只是在\"感觉\"它变好了。跳过第一步直接写 Skill，往往会得到\"看起来合理但实际不解决问题\"的规则。A 选项的问题是追求完整性而非针对性——Skill 应该首先覆盖最关键的失败场景，而不是试图写一本百科全书。"
+  },
+  {
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "从 Harness Engineering 的角度看，QWEN.md 应该扮演什么角色",
+    "options": [
+      {
+        "key": "A",
+        "text": "项目的完整技术文档，越详细越好"
+      },
+      {
+        "key": "B",
+        "text": "项目知识的目录和导航——保持精简，指向更详细的信息源"
+      },
+      {
+        "key": "C",
+        "text": "Agent 的唯一知识来源——所有规则都必须写在 QWEN.md 里"
+      },
+      {
+        "key": "D",
+        "text": "一次性写好的配置文件，后续不需要更新"
+      }
+    ],
+    "answer": "B",
+    "explanation": "QWEN.md 更适合做项目知识的目录，而不是百科全书。它保持精简，只提供项目背景和“去哪里找更详细信息”的指引。详细的设计文档、编码规范、架构决策放在独立文件中，Agent 按需读取。A 选项会挤占上下文。C 选项忽略了 Skill 和独立文档的作用。D 选项违背了“面向问题持续更新”的原则。"
+  },
+  {
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "部署与推理",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "选择云服务API还是自托管部署的关键判断因素是什么",
+    "options": [
+      {
+        "key": "A",
+        "text": "自托管一定比云服务便宜"
+      },
+      {
+        "key": "B",
+        "text": "要算账：月调用量、GPU运维成本、盈亏平衡点"
+      },
+      {
+        "key": "C",
+        "text": "云服务一定比自托管快"
+      },
+      {
+        "key": "D",
+        "text": "只有大公司才能自托管"
+      }
+    ],
+    "answer": "B",
+    "explanation": "没有绝对的好坏之分。云服务零运维、按量付费，适合规模不确定的早期阶段；自托管成本低但需要GPU运维能力，适合流量稳定、规模够大的场景。选型的本质是算一笔账：月调用量多少时自托管成本低于云服务？这个盈亏平衡点因场景而异。"
+  },
+  {
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "部署与推理",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "一个三人创业团队正在开发 AI 客服产品，目前日均调用量约 500 次，没有专职运维人员，使用的是千问系列模型。团队希望尽快上线验证商业模式。最合适的部署方式是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "租用 GPU 云服务器自行部署 vLLM，完全掌控推理环境和性能调优"
+      },
+      {
+        "key": "B",
+        "text": "使用百炼平台一键部署，通过 API 直接集成到产品中"
+      },
+      {
+        "key": "C",
+        "text": "使用容器服务 ACK 搭建 Kubernetes 集群，方便后续扩展微服务架构"
+      },
+      {
+        "key": "D",
+        "text": "使用函数计算 FC 部署模型，利用 Serverless 按需计费降低成本"
+      }
+    ],
+    "answer": "B",
+    "explanation": "三个关键约束决定了选型：千问系列模型（百炼原生支持）、无运维人员（排除需要运维能力的 GPU 服务器和 ACK）、快速上线（百炼一键部署最快）。GPU 云服务器和 ACK 都需要较强的运维能力，不适合三人团队。函数计算 FC 虽然也免运维，但它更适合低频离线任务且有冷启动延迟问题，对客服这种需要实时响应的场景不够理想。百炼平台零运维、可视化操作、API 直接调用，是这个阶段的最优选择。"
+  },
+  {
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "你的AI应用最近遭受了大量请求，导致GPU资源耗尽，服务频繁中断。这种攻击属于哪一类？应该优先考虑启用哪一层防护？",
+    "options": [
+      {
+        "key": "A",
+        "text": "提示词注入攻击，应加强AI大模型安全层。"
+      },
+      {
+        "key": "B",
+        "text": "数据投毒攻击，应加强AI基础设施安全层。"
+      },
+      {
+        "key": "C",
+        "text": "DDoS攻击，应加强AI应用安全层。"
+      },
+      {
+        "key": "D",
+        "text": "模型窃取攻击，应加强AI大模型安全层。"
+      }
+    ],
+    "answer": "C",
+    "explanation": "- DDoS攻击，应加强AI应用安全层。利用高计算成本请求耗尽GPU资源，是针对AI服务的应用层DDoS攻击。在应用层做防御，例如使用DDoS高防和WAF进行流量清洗与访问控制。"
+  },
+  {
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "你开发的 AI 助手具备\"阅读用户上传文档并回答问题\"的功能。安全团队在测试中发现：上传一份精心构造的 PDF 后，AI 助手会忽略用户的真实提问，转而执行 PDF 中嵌入的隐藏指令。以下哪种防御措施最能针对性地缓解这一威胁？",
+    "options": [
+      {
+        "key": "A",
+        "text": "在用户输入端部署关键词黑名单过滤，拦截包含\"忽略指令\"等字样的请求"
+      },
+      {
+        "key": "B",
+        "text": "将外部文档内容标记为\"数据上下文\"而非\"指令\"，禁止模型将其升级为可执行指令"
+      },
+      {
+        "key": "C",
+        "text": "限制用户每分钟的上传次数，通过频率控制防止攻击者批量尝试绕过防线"
+      },
+      {
+        "key": "D",
+        "text": "使用更大参数的模型替换当前模型，依靠更强的理解能力自动识别恶意内容"
+      }
+    ],
+    "answer": "B",
+    "explanation": "这是典型的间接 Prompt 注入攻击——攻击指令不在用户输入中，而是隐藏在 Agent 读取的外部文档里。关键词黑名单挡不住，因为恶意指令可以用无穷种方式表达，且攻击面在文档而非用户输入。频率控制防的是 DDoS 而非注入。更大模型不会自动具备区分指令和数据的能力。正确的防御核心是在架构层面区分\"用户指令\"和\"外部数据内容\"，确保外部内容不会被提升为指令执行。"
+  },
+  {
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "在构建一个完整的AI应用安全体系时，以下哪些产品或技术的组合是合理的？（选择所有适用选项）",
+    "options": [
+      {
+        "key": "A",
+        "text": "仅使用AI安全护栏就足够了，它能解决所有问题。"
+      },
+      {
+        "key": "B",
+        "text": "使用RAM进行权限控制，属于AI基础设施安全的一部分。"
+      },
+      {
+        "key": "C",
+        "text": "单独使用WAF（Web应用防火墙）就能有效抵御针对大模型的提示词注入攻击。"
+      },
+      {
+        "key": "D",
+        "text": "结合使用AI安全护栏和DDoS高防，分别应对模型层面的攻击和应用层面的攻击。"
+      },
+      {
+        "key": "E",
+        "text": "对RAG系统的知识库和向量进行加密，是一种有效的数据安全增强手段。"
+      }
+    ],
+    "answer": "B,D,E",
+    "explanation": "- A. 是错误的，单一工具无法应对所有威胁。\n- C. 是错误的，传统的WAF主要防御SQL注入、XSS等Web攻击，对理解语义的提示词注入攻击防御能力有限，需要AI安全护栏这类专门针对模型语义和逻辑的工具进行深度防护。\n- B.D.E. 分别体现了基础设施、应用层和数据层面的正确防护思路。"
+  },
+  {
+    "language": "",
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "nice_to_know",
+    "stem": "在业务环境中快速验证新 AI 工具的有效策略是什么",
+    "options": [
+      {
+        "key": "A",
+        "text": "在实施前先进行广泛全面的市场研究"
+      },
+      {
+        "key": "B",
+        "text": "选择一小群有代表性的用户进行试点"
+      },
+      {
+        "key": "C",
+        "text": "立即着手进行大规模部署"
+      },
+      {
+        "key": "D",
+        "text": "待竞争对手先测试该方法，然后跟进"
+      }
+    ],
+    "answer": "B",
+    "explanation": "小规模试点可以有效控制风险，避免因技术不成熟或业务场景不合适而导致项目失败。"
+  }
+]

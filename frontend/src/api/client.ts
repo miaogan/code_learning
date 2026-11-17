@@ -19,7 +19,10 @@ import type {
   InterviewSession,
   InterviewSessionSummary,
   InterviewTurn,
+  JdMatchRequest,
+  JdMatchResult,
   LearnProgress,
+  LeapArchive,
   LoginRequest,
   Me,
   PasswordChangeRequest,
@@ -43,6 +46,17 @@ import type {
   PracticeWrongBook,
   QuestionSearchRequest,
   QuestionSearchResponse,
+  EvidenceSummary,
+  CoachAgentRequest,
+  CoachAgentRun,
+  RagFeedbackRequest,
+  RagFeedbackResult,
+  RagFeedbackSummary,
+  RagIngestItem,
+  RagRebuildResult,
+  RagSearchRequest,
+  RagSearchResponse,
+  RagStatus,
   RadarGenerateRequest,
   RadarJobAccepted,
   RadarJobItem,
@@ -71,6 +85,7 @@ import type {
   TimelineEvent,
 } from './types'
 import { reportKeyRequired } from '../state/aiGate'
+import { SseError, streamSse } from '../lib/sse'
 
 /** 练习统计查询参数（r11）：与题单同口径，但**不带 limit**（命中数不受题量截断）。 */
 export type PracticeStatsParams = Pick<
@@ -194,6 +209,58 @@ export const api = {
   /** r51 题目全文检索：FTS5 优先，环境不支持时服务端降级并给中文 notice。 */
   searchQuestions: (payload: QuestionSearchRequest): Promise<QuestionSearchResponse> =>
     request<QuestionSearchResponse>('/api/search/questions', jsonInit('POST', payload)),
+
+  /* ---------- r100 RAG 检索域（向量 / 混合检索 + 索引管理） ---------- */
+
+  /** RAG 索引状态：embedder / 引擎形态 / chunk 计数（只读）。 */
+  ragStatus: (signal?: AbortSignal): Promise<RagStatus> =>
+    request<RagStatus>('/api/rag/status', { signal }),
+
+  /** 重建题库向量索引（全量替换）：离线 HashingEmbedder 下即时完成。 */
+  ragRebuild: (): Promise<RagRebuildResult> =>
+    request<RagRebuildResult>('/api/rag/rebuild', { method: 'POST' }),
+
+  /** 整份推送教程正文（小节 chunk 全量替换；必须全量，少推的旧节会被删除）。 */
+  ragIngest: (items: RagIngestItem[]): Promise<RagRebuildResult> =>
+    request<RagRebuildResult>('/api/rag/ingest', jsonInit('POST', { items })),
+
+  /** RAG 三态检索：keyword / semantic / hybrid（服务端按闭集收敛越界值）。 */
+  ragSearch: (payload: RagSearchRequest, signal?: AbortSignal): Promise<RagSearchResponse> =>
+    request<RagSearchResponse>('/api/rag/search', jsonInit('POST', payload, signal)),
+
+  /** r103 召回反馈：点赞 / 点踩（同查询同 chunk 只留最新一票，立即参与本人排序）。 */
+  ragFeedback: (payload: RagFeedbackRequest): Promise<RagFeedbackResult> =>
+    request<RagFeedbackResult>('/api/rag/feedback', jsonInit('POST', payload)),
+
+  /** 反馈看板：总票数 + 被踩最多的 chunk（评测挖掘入口）。 */
+  ragFeedbackSummary: (signal?: AbortSignal): Promise<RagFeedbackSummary> =>
+    request<RagFeedbackSummary>('/api/rag/feedback/summary', { signal }),
+
+  /** 工程证据中心摘要：行数事实 + 表数 + RAG 索引状态（零 AI、零评分）。 */
+  evidenceSummary: (signal?: AbortSignal): Promise<EvidenceSummary> =>
+    request<EvidenceSummary>('/api/evidence/summary', { signal }),
+
+  /** r108 跃迁档案：岗位差距 + 工程证据 + 面试表达，服务端一次聚合（零 AI、零重算）。 */
+  leapArchive: (signal?: AbortSignal): Promise<LeapArchive> =>
+    request<LeapArchive>('/api/leap-archive', { signal }),
+
+  /** r110 岗位对位：JD → 证据清单 / 缺口 / 召对预设（零 AI，只做字面对照）。 */
+  matchJd: (payload: JdMatchRequest, signal?: AbortSignal): Promise<JdMatchResult> =>
+    request<JdMatchResult>('/api/jd-match', jsonInit('POST', payload, signal)),
+
+  /* ---------- r100 B4 教练 Agent 编排（讲席）：规划 → 工具 → 反思 → 结论 ---------- */
+
+  /** 跑一次编排：服务端自己调度只读工具，返回完整审计轨迹（steps 逐节点）。 */
+  coachAgentRun: (payload: CoachAgentRequest): Promise<CoachAgentRun> =>
+    request<CoachAgentRun>('/api/coach/agent/run', jsonInit('POST', payload)),
+
+  /** 编排历史（倒序，按账号隔离）；列表带轨迹但通常只用于选一条回放。 */
+  coachAgentRuns: (limit = 20, signal?: AbortSignal): Promise<CoachAgentRun[]> =>
+    request<CoachAgentRun[]>(`/api/coach/agent/runs?${queryString({ limit })}`, { signal }),
+
+  /** 单次编排轨迹（审计回放）。 */
+  coachAgentRunDetail: (runId: string, signal?: AbortSignal): Promise<CoachAgentRun> =>
+    request<CoachAgentRun>(`/api/coach/agent/runs/${encodeURIComponent(runId)}`, { signal }),
 
   /** r65 AI 学习教练：材料由前端组装上传，服务端按 href 白名单校验引用后回建议。 */
   coachAdvice: (payload: CoachAdviceRequest, signal?: AbortSignal): Promise<CoachAdvice> =>
@@ -395,11 +462,66 @@ export const api = {
   createInterview: (payload: InterviewCreateRequest): Promise<InterviewRun> =>
     request<InterviewRun>('/api/interviews', jsonInit('POST', payload)),
 
+  /** 提交作答（同步端点）：契约与错误信封不变，是回合流的兜底路径。 */
   scoreAnswer: (runId: string, payload: AnswerRequest): Promise<InterviewTurn> =>
     request<InterviewTurn>(
       `/api/interviews/${encodeURIComponent(runId)}/answers`,
       jsonInit('POST', payload),
     ),
+
+  /**
+   * r102 回合流（POST + SSE）：等待期间通过 `onPhase` 拿到阶段文案。
+   * 流打不开（旧后端 / 代理缓冲 / 网络）时抛 `STREAM_UNAVAILABLE`，调用方回落同步端点；
+   * 业务失败走 `error` 事件，按原错误码抛出（与同步端点同一套语义）。
+   */
+  scoreAnswerStream: async (
+    runId: string,
+    payload: AnswerRequest,
+    onPhase?: (message: string) => void,
+    signal?: AbortSignal,
+  ): Promise<InterviewTurn> => {
+    const box: { turn: InterviewTurn | null; error: ApiError | null } = {
+      turn: null,
+      error: null,
+    }
+    try {
+      await streamSse(
+        API_BASE,
+        `/api/interviews/${encodeURIComponent(runId)}/answers/stream`,
+        jsonInit('POST', payload, signal),
+        (frame) => {
+          if (frame.event === 'phase') {
+            try {
+              const data = JSON.parse(frame.data) as { message?: string }
+              if (data.message) onPhase?.(data.message)
+            } catch {
+              /* 坏帧忽略：阶段文案不是契约的一部分 */
+            }
+          } else if (frame.event === 'turn') {
+            box.turn = JSON.parse(frame.data) as InterviewTurn
+          } else if (frame.event === 'error') {
+            const data = JSON.parse(frame.data) as {
+              code: string
+              message: string
+              retryable: boolean
+            }
+            box.error = new ApiError(data.code, data.message, 400, data.retryable)
+          }
+        },
+        signal,
+      )
+    } catch (error) {
+      if (error instanceof SseError && box.error === null) {
+        throw new ApiError('STREAM_UNAVAILABLE', error.message, error.status, error.retryable)
+      }
+      throw error
+    }
+    if (box.error !== null) throw box.error
+    if (box.turn === null) {
+      throw new ApiError('STREAM_UNAVAILABLE', '评分流意外结束，请重试', 0, true)
+    }
+    return box.turn
+  },
 
   /** r62 历史面试列表：在途场次也列出，点进去可接着答或只读回放。 */
   listInterviews: (limit = 8, signal?: AbortSignal): Promise<InterviewSessionSummary[]> =>
