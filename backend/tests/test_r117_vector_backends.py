@@ -8,14 +8,14 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import Any
 
 import pytest
 from pydantic import ValidationError
 
-from app.core import db as database
-from app.core import repository
+from app.core import db as database, repository
 from app.core.config import Settings, get_settings
 from app.core.db import rag_embedding_mode
 from app.services.retrieval import indexer
@@ -83,7 +83,7 @@ def _chunk_row(chunk_id: str, kind: str, content: str) -> dict[str, Any]:
 def test_vector_mode_closed_set_is_pinned() -> None:
     """`VECTOR_MODE` 闭集与 config 的 Literal 必须同步：改一边不改另一边要当场红。"""
     assert VECTOR_MODES == ("auto", "pgvector", "sqlite", "faiss", "milvus")
-    for mode in VECTOR_MODES:
+    for _mode in VECTOR_MODES:
         assert Settings.model_fields["vector_mode"].annotation is not None
 
 
@@ -293,7 +293,7 @@ def test_faiss_index_is_exact_cosine(faiss_env: Path) -> None:
     scores, ordinals = index.search(query, 3)
     # 参照值手算：cos(a,q)=1/√1.09，cos(c,q)=1.3/(√2·√1.09)，cos(b,q)=0.3/√1.09。
     reference = [1 / math.sqrt(1.09), 1.3 / (math.sqrt(2) * math.sqrt(1.09)), 0.3 / math.sqrt(1.09)]
-    got = {ids[o]: s for s, o in zip(scores[0].tolist(), ordinals[0].tolist())}
+    got = {ids[o]: s for s, o in zip(scores[0].tolist(), ordinals[0].tolist(), strict=False)}
     assert got["question:a"] == pytest.approx(reference[0], abs=1e-6)
     assert got["question:c"] == pytest.approx(reference[1], abs=1e-6)
     assert got["question:b"] == pytest.approx(reference[2], abs=1e-6)
@@ -310,7 +310,7 @@ class _FakeSchema:
 class _FakeIndexParams:
     """真实 pymilvus 的 `prepare_index_params()` 返回对象（有 `.add_index`），不是 dict。"""
 
-    def __init__(self, owner: "_FakeMilvus") -> None:
+    def __init__(self, owner: _FakeMilvus) -> None:
         self._owner = owner
 
     def add_index(self, **kwargs: Any) -> None:
@@ -420,3 +420,66 @@ def test_milvus_collection_defaults_and_custom_name(tmp_db: str) -> None:
     assert custom._collection == "sc_rag"
     default = MilvusStore(uri="http://milvus:19530", collection="")
     assert default._collection == "rag_chunks"
+
+
+# --- 启动清单：规范化的「启用了哪些存储组件」---------------------------------
+
+
+def _summary_records(caplog: pytest.LogCaptureFixture) -> list[logging.LogRecord]:
+    return [record for record in caplog.records if "[启动清单]" in record.getMessage()]
+
+
+def test_startup_summary_lists_all_components(
+    faiss_env: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """db / cache / vector 三项都在：一行结构化 key（可 grep）+ 一行中文清单。"""
+    from app.main import _report_runtime_summary
+
+    caplog.set_level(logging.INFO, logger="app.runtime")
+    _report_runtime_summary("memory")
+
+    records = _summary_records(caplog)
+    assert len(records) == 2, [r.getMessage() for r in records]
+    assert all(record.levelno == logging.INFO for record in records)
+    head = records[0].getMessage()
+    assert "db=sqlite" in head and "vector=faiss" in head
+    detail = records[1].getMessage()
+    # faiss_env 激活的 sqlite 可能是单机库也可能是完整副本（tmp_db 会先同步一份副本），
+    # 两种形态都合法；这里只钉「数据库这一项确实说了 SQLite」。
+    assert "数据库=SQLite" in detail
+    assert "缓存=进程内缓存" in detail
+    assert "向量库=faiss（" in detail
+
+
+def test_startup_summary_warns_when_vector_not_ready(
+    tmp_db: str, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """faiss 没装 / Milvus 地址没填必须在启动时可见（WARNING），不是第一次检索才炸。"""
+    from app.main import _report_runtime_summary
+
+    database.activate_sqlite()
+    monkeypatch.setenv("VECTOR_MODE", "milvus")
+    get_settings.cache_clear()
+    caplog.set_level(logging.INFO, logger="app.runtime")
+
+    _report_runtime_summary("memory")
+
+    records = _summary_records(caplog)
+    assert records and all(record.levelno == logging.WARNING for record in records)
+    assert any("VECTOR_MILVUS_URI" in record.getMessage() for record in records)
+    get_settings.cache_clear()
+
+
+def test_startup_summary_reports_postgres_primary(
+    tmp_db: str, caplog: pytest.LogCaptureFixture
+) -> None:
+    """PG 档：数据库 = PostgreSQL 权威主库、缓存 = Redis（up）、向量 = pgvector。"""
+    from app.main import _report_runtime_summary
+
+    caplog.set_level(logging.INFO, logger="app.runtime")
+    _report_runtime_summary("up")
+
+    detail = _summary_records(caplog)[1].getMessage()
+    assert "数据库=PostgreSQL 权威主库" in detail
+    assert "缓存=Redis" in detail
+    assert "向量库=pgvector" in detail

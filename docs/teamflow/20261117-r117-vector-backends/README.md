@@ -127,7 +127,28 @@ faiss 索引文件在 `data/rag-vectors/`，与 `data/app-fallback.db` 同根—
 目录即可同时带走业务库与向量索引**。索引与业务库的 embedder / 行数对账保证了
 「备份的索引配新库」也不会返回错的结果（对不上就提示重建）。
 
-## 6. 验证
+## 6. 启动清单（r117 续）
+
+数据层 / 缓存层 / 向量库的决策日志各自回答「**为什么**用它」，用户最先要问的是「**到底**
+启用了哪几个库」。启动时在 `[数据层]` / `[缓存层]` 之后统一收口两行：
+
+```
+INFO  [启动清单] runtime.components db=sqlite cache=memory vector=faiss
+INFO  [启动清单] 说明: 数据库=SQLite 单机库（data/app-fallback.db）；缓存=进程内缓存（未配置 Redis，仅单进程有效）；向量库=faiss（data/rag-vectors）
+```
+
+- 一行结构化 key（可 grep / 可告警），一行中文清单（可直接读）；顺序固定 db → cache → vector。
+- **向量库未就绪（faiss 没装 / Milvus 地址没填）时两行都是 WARNING** —— 这类配置问题必须
+  在启动时可见，不能等到第一次检索才炸。
+- Milvus 地址剥掉凭据再打印（URI 可能带 `user:pass@host`），地址本身可以出现，密码不行。
+
+**顺带修掉一个真 bug**：清单上线前的冒烟测试抓到 `resolve_vector_store()` 在 PG 不可达时
+会因 `rag_embedding_mode()` 开库连接而抛 `database_unavailable` —— 违反了本模块
+「resolve 永不 raise」的第一不变量，且正好发生在启动恢复循环里。修法：pgvector / sqlite 档的
+存储形态探测折进 `ready=False`（下一次检索会重新 resolve，自愈）；启动清单本身也逐项兜底，
+任何一项探活失败只降级成那一项的说明，绝不打断 `_recover_database` 的重试。
+
+## 7. 验证
 
 - `backend/tests/test_r117_vector_backends.py`（21 项，全零网络）：
   - 配置：闭集钉住、非法值启动期拒绝、带空格容错；
@@ -141,4 +162,5 @@ faiss 索引文件在 `data/rag-vectors/`，与 `data/app-fallback.db` 同根—
   `test_dependency_recovery` 里「副本用 JSON 向量服务」那条改为显式
   `VECTOR_MODE=sqlite` 钉住（装了 faiss 后 auto 会分派给 faiss，那条用例要测的是
   sqlite **存储**形态本身）。
+- 启动清单：3 项（三组件齐全且 INFO / 向量未就绪升 WARNING 并带原因 / PG 档标签）。
 - 后端全量：0 failed / 0 error / 1 skipped。
