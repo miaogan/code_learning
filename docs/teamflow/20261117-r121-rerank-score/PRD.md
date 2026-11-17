@@ -63,4 +63,4 @@ RAG 链路的通行口径是**「展示分 = 当前排序依据的分数」**：
 - [x] 精排成功时 `score` 被替换且与排名单调（`test_search_hybrid_with_rerank_reorders_and_widens_pool`）
 - [x] fail-open 三态（HTTP 错 / 非 200 / 畸形响应）断言同步更新，行为不变
 - [x] 后端全量 + ruff + 前端 typecheck
-- [ ] 生产验证：`reranked=true` 时分数严格递减且落在 0~1
+- [x] 生产验证：`reranked=true` 时分数严格递减且落在 0~1（见 `verify.md`）
