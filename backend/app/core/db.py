@@ -138,6 +138,19 @@ _STATE = {
     "conflicts": 0,
     "last_sync_at": "",
 }
+
+#: 单机模式（r113）：SQLite 是**唯一权威库**，没有 PostgreSQL 可回放。
+#: 用普通全局布尔而不是 `_STATE` 项：`connection()` 在已持 `_WRITER_LOCK` 的路径里读它，
+#: 再去取 `_STATE_LOCK` 会多一层无谓的锁序约束；与 `_active_backend` 同样是「后台线程写、
+#: 请求线程读」的单值标记，GIL 下读写原子。
+_standalone = False
+
+#: r113 判定「能否把空 SQLite 直接立为权威库」时要看的业务根表：任一有行就说明这个库里
+#: 有过真实数据，自动接管会把它当空库覆盖掉，必须拒绝。
+_STANDALONE_PROBE_TABLES: tuple[str, ...] = (
+    "users", "documents", "profiles", "runs", "reports", "questions",
+)
+
 _SYNC_TABLES: tuple[str, ...] = ()
 _WRITE_RE = re.compile(r"^\s*(?:INSERT|UPDATE|DELETE|REPLACE)\b", re.IGNORECASE)
 _CAST_RE = re.compile(r"\?(::[a-zA-Z_][a-zA-Z0-9_]*(?:\[\])?)")
@@ -267,9 +280,14 @@ def active_backend() -> str:
     return "postgresql" if _coordinator.get() else _active_backend
 
 
+def is_standalone() -> bool:
+    """SQLite 是否为唯一权威库（单机模式；离线重放与副本镜像在此模式下整体关闭）。"""
+    return _standalone
+
+
 def runtime_state() -> dict[str, Any]:
     with _STATE_LOCK:
-        return {"backend": active_backend(), **_STATE}
+        return {"backend": active_backend(), "standalone": _standalone, **_STATE}
 
 
 #: 连接池是进程级的：`get_settings()` 被测试改写后必须 `close_pool()`，否则旧 DSN 的连接
@@ -1042,6 +1060,44 @@ def _open_sqlite() -> sqlite3.Connection:
     return raw
 
 
+def has_sqlite_data() -> bool:
+    """SQLite 文件里是否已有真实业务数据（决定能否安全地把它确立为单机权威库）。
+
+    只探业务根表（`_STANDALONE_PROBE_TABLES`），不数 `_sync_state` 之类的内部表 ——
+    「表建过但没数据」等于没有数据可丢，允许直接立为权威库。
+
+    读不了（文件损坏 / 无权限）一律返回 True：宁可拒绝接管，也不要把坏文件当空库覆盖。
+    """
+    if not _sqlite_path().exists():
+        return False
+    try:
+        with closing(_open_sqlite()) as raw:
+            existing = {
+                str(row["name"])
+                for row in raw.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
+            }
+            for table in _STANDALONE_PROBE_TABLES:
+                if table not in existing:
+                    continue
+                if raw.execute(f'SELECT 1 FROM "{table}" LIMIT 1').fetchone() is not None:
+                    return True
+    except sqlite3.Error as exc:
+        _note_sqlite_failure(exc)
+        return True
+    return False
+
+
+def standalone_bootstrap_allowed() -> bool:
+    """能否把当前 SQLite 直接立为权威库（单机模式的准入判据）。
+
+    判据只有一条：**没有既有数据可丢**。这既是显式 `DB_MODE=sqlite` 的安全底线，
+    也是 `auto` 模式自动降级的唯一触发条件 —— 文件不存在 / 空库意味着新建库不覆盖
+    任何东西；而「有数据但缺 `complete` 标记」的库仍然是来历不明的半同步副本，
+    必须拒绝接管（否则会用一份残缺数据顶替真实主库）。
+    """
+    return not has_sqlite_data()
+
+
 #: 副本故障日志节流：磁盘写满时每个请求都会失败，不能一请求一条日志。
 _last_sqlite_failure_at = 0.0
 
@@ -1094,6 +1150,16 @@ def _consume_replay_failed() -> bool:
     value = _replay_failed
     _replay_failed = False
     return value
+
+
+def _offline_log_enabled() -> bool:
+    """SQLite 写入是否需要记离线重放日志。
+
+    只有「SQLite 是 PG 的完整副本」时才有意义：那时 SQLite 上的写是 PG 不可用期间的
+    临时落脚点，PG 恢复后必须按提交顺序回放。单机模式下 SQLite 就是权威库，不存在回放
+    对象 —— 继续记录等于给每一笔业务写附一条永远无法消费的垃圾。
+    """
+    return not _standalone
 
 
 @contextmanager
@@ -1183,15 +1249,24 @@ def connection(*, force_pg: bool = False) -> Iterator[Connection]:
                         try:
                             yield transaction.conn
                             operations = _change_log.get() or []
-                            for operation in operations:
-                                raw.execute(
-                                    "INSERT INTO _offline_operations (op_id, sql_text, params_json) "
-                                    "VALUES (?, ?, ?)",
-                                    (operation["op_id"], operation["sql"], operation["params"]),
-                                )
+                            # 单机模式下没有 PG 可回放：这些记录既不会被消费，也没有对账
+                            # 意义，写进去只会让 `_offline_operations` 随业务写入无限增长
+                            # （实测每次写都追加一条，长期运行会撑爆磁盘并拖慢提交）。
+                            if _offline_log_enabled():
+                                for operation in operations:
+                                    raw.execute(
+                                        "INSERT INTO _offline_operations "
+                                        "(op_id, sql_text, params_json) VALUES (?, ?, ?)",
+                                        (
+                                            operation["op_id"],
+                                            operation["sql"],
+                                            operation["params"],
+                                        ),
+                                    )
                             raw.commit()
-                            with _STATE_LOCK:
-                                _STATE["sync_pending"] += len(operations)
+                            if operations and _offline_log_enabled():
+                                with _STATE_LOCK:
+                                    _STATE["sync_pending"] += len(operations)
                         except sqlite3.IntegrityError as exc:
                             raw.rollback()
                             raise IntegrityError(str(exc)) from exc
@@ -1253,6 +1328,22 @@ def ping_postgresql() -> None:
         raw.execute("SELECT 1")
 
 
+def probe_postgresql_quiet() -> bool:
+    """一次性短连接探活，**不走连接池**，失败只返回 False 不抛。
+
+    专供单机模式的低频巡检：连接池探活即使失败也会在后台留一轮建连尝试，由 psycopg
+    自己打出 `error connecting in 'pool-1': connection timeout expired` —— 那正是
+    「没有外部依赖」这个模式要消除的噪声。这里用 libpq 的 `connect_timeout` 直接连一次，
+    失败静默返回。
+    """
+    try:
+        with psycopg.connect(get_settings().database_url, connect_timeout=1) as raw:
+            raw.execute("SELECT 1")
+    except Exception:  # noqa: BLE001 - 探活失败是单机模式的正常结果
+        return False
+    return True
+
+
 def _mirror_operations(operations: Sequence[dict[str, Any]]) -> None:
     if not operations or active_backend() != "postgresql":
         return
@@ -1273,8 +1364,18 @@ def _mirror_operations(operations: Sequence[dict[str, Any]]) -> None:
 
 
 def activate_sqlite() -> None:
-    """切换与所有在途写事务互斥，PG 最后一笔镜像完成后才开放 SQLite。"""
-    global _active_backend
+    """切换与所有在途写事务互斥，PG 最后一笔镜像完成后才开放 SQLite。
+
+    两种接管形态由库内标记区分，都要求 `complete='1'`，只是凭证来源不同：
+
+    - `standalone='1'`：单机模式的权威库 —— 权威性不来自 PG，而来自「它被显式声明为
+      唯一权威库」（见 `mark_standalone_baseline()`）。没有 PG 可回放，关闭重放日志。
+    - 其余：由 PG 同步出来的完整副本，接管期间按离线语义记录重放日志。
+
+    重启后靠持久标记恢复单机语义很关键：否则单机库会被当成「待回放的离线副本」，
+    每笔写又重新开始堆 `_offline_operations`。
+    """
+    global _active_backend, _standalone
     with _WRITER_LOCK:
         _STATE["ready"] = False
         with _SQLITE_LOCK:
@@ -1283,19 +1384,65 @@ def activate_sqlite() -> None:
                 complete = raw.execute(
                     "SELECT 1 FROM _sync_state WHERE key = 'complete' AND value = '1'"
                 ).fetchone()
+                standalone = raw.execute(
+                    "SELECT 1 FROM _sync_state WHERE key = 'standalone' AND value = '1'"
+                ).fetchone()
             if complete is None:
                 _STATE["replica_ready"] = False
                 raise RuntimeError("SQLite 副本尚未完整同步，拒绝写入")
             _active_backend = "sqlite"
+            if standalone is not None:
+                _standalone = True
+                # replica_ready=False：单机模式下没有「副本」这个概念，`/health` 据此报 na。
+                _STATE.update(
+                    ready=True, replica_ready=False, mode="standalone", sync_pending=0,
+                )
+                logger.info("db.standalone.activated")
+                return
+            _standalone = False
             _STATE.update(
                 ready=True, replica_ready=True, mode="online",
                 sync_pending=len(pending_operations()),
             )
 
 
+def mark_standalone_baseline() -> None:
+    """把当前 SQLite 库确立为单机权威库：写入 `complete` + `standalone` 标记。
+
+    `complete='1'` 在既有语义里是「这是 PG 同步出来的完整副本」的凭证，纯单机环境
+    永远产生不了它。这里发一张等价凭证：这个库的权威性不来自 PG，而来自**运行模式
+    的显式声明**。
+
+    **只应在「文件不存在 / 空库」时调用**，由 `standalone_bootstrap_allowed()` 把关 ——
+    对已有数据的库执行不会丢数据，但会把一个来历不明的半同步副本洗成权威库。
+    """
+    with _SQLITE_LOCK:
+        initialize_sqlite()
+        with closing(_open_sqlite()) as raw:
+            for key in ("complete", "standalone"):
+                raw.execute(
+                    "INSERT INTO _sync_state (key, value) VALUES (?, '1') "
+                    "ON CONFLICT(key) DO UPDATE SET value = '1'",
+                    (key,),
+                )
+            raw.commit()
+
+
+def activate_standalone_sqlite(*, bootstrap: bool = False) -> None:
+    """进入单机模式：SQLite 成为唯一权威库，与 PostgreSQL 完全解耦。
+
+    `bootstrap=True` 先确立权威标记（仅限空库，由 `standalone_bootstrap_allowed()` 把关），
+    随后统一走 `activate_sqlite()` —— 让「接管」只有一处实现，两种形态不会各自漂移。
+    """
+    if bootstrap:
+        mark_standalone_baseline()
+    activate_sqlite()
+
+
 def activate_postgresql() -> None:
-    global _active_backend
+    global _active_backend, _standalone
     with _WRITER_LOCK:
+        _standalone = False
         _STATE["ready"] = False
         with _SQLITE_LOCK:
             _active_backend = "postgresql"
@@ -1507,6 +1654,11 @@ def _copy_rows(
 def sync_sqlite_from_pg() -> dict[str, int]:
     """首次或回切后整库重建副本；只在切库写锁内调用，不接受并发离线写。"""
     global _SYNC_TABLES
+    if _standalone:
+        # 单机模式下 SQLite 是权威库而不是副本：整库重建会用 PG 数据把它覆盖掉，
+        # 而 PG 在这个环境里根本不该被访问。
+        logger.warning("db.standalone.replica_sync_skipped")
+        return {}
     with _WRITER_LOCK, _raw_pg() as pg, closing(_open_sqlite()) as local:
         initialize_sqlite()
         counts: dict[str, int] = {}
@@ -1574,8 +1726,11 @@ def refresh_replica() -> dict[str, int]:
 
 def reset_runtime() -> None:
     """仅测试 / 进程清理使用；不会删除 SQLite 文件。"""
-    global _active_backend
+    global _active_backend, _standalone
     with _WRITER_LOCK:
+        # 单机标记是进程本地状态，重置必须一并清掉：否则上一轮的单机语义会漏到下一轮，
+        # 让本该记录重放日志的副本模式静默停止记录。
+        _standalone = False
         _active_backend = "postgresql"
         _STATE.update(ready=True, mode="starting", sync_pending=0, conflicts=0, last_sync_at="")
         # 文件是持久化副本，进程重启后先验证 complete 标记再允许接管。

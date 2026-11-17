@@ -92,6 +92,7 @@ _NUMERIC_ENV_FIELDS: tuple[str, ...] = (
     "radar_translate_timeout_s",
     "db_pool_timeout_s",
     "db_recovery_interval_s",
+    "db_standalone_grace_s",
     "db_request_timeout_s",
     "memory_cache_max_entries",
     "radar_translate_batch",
@@ -248,6 +249,16 @@ class Settings(BaseSettings):
     jobs_stream_max_s: int = 3600
 
     # --- r98 数据层：PostgreSQL + Redis ---------------------------------------
+    #: 数据层运行模式（r113 起）。三档语义互斥，都不改变默认档行为：
+    #: - `auto`（默认）：PG 优先；PG 不可达时由**完整副本**接管。副本必须由 PG 同步
+    #:   生成（`_sync_state.complete='1'`），没有副本就是可重试 503，绝不用空库兜底。
+    #: - `sqlite`：单机模式 —— 完全不碰 PG，SQLite 自己就是权威主库。用于没有任何外部
+    #:   依赖的环境（本地试用、单机部署、CI）：启动即建表写种子，离线重放日志也随之关闭
+    #:   （没有 PG 可回放，记了只会无限增长）。
+    #: - `postgres`：强制 PG，连不上按故障处理并持续重试，不降级到单机。
+    #: `auto` 之外的自动降级只在「SQLite 文件不存在」时发生 —— 没有任何数据可丢，
+    #: 才允许新建单机库；已有副本但缺 complete 标记仍拒绝接管（保护半同步数据）。
+    db_mode: Literal["auto", "postgres", "sqlite"] = "auto"
     #: PostgreSQL 权威主库连接串；正常时逐笔维护 SQLite 完整副本，故障时副本接管读写。
     database_url: str = "postgresql://postgres:postgres@127.0.0.1:5432/sc_app"
     #: 连接池上下限与取连接超时（秒）。上限按「单副本 × 数据库 max_connections」估算，
@@ -261,6 +272,13 @@ class Settings(BaseSettings):
     db_request_timeout_s: float = 0.25
     #: 持久化 SQLite 热副本；仅允许单进程后端写入，PG 恢复后重放离线日志。
     sqlite_path: str = "data/app-fallback.db"
+    #: `DB_MODE=auto` 下允许**自动**新建单机库前的 PostgreSQL 宽限期（秒）。
+    #:
+    #: 自动降级只在这三个条件同时成立时发生：进程首次启动从未连上过 PG、SQLite 里没有
+    #: 任何既有数据、且已经等过这个宽限期。宽限期的作用是把两类场景分开 ——
+    #: 「容器编排里 PG 比 backend 晚几秒就绪 / PG 正在重启」等得到，不该被误判成单机；
+    #: 「这个环境压根没有 PG」等不到，才允许新建单机库。设为 0 = 不等（仅测试/演示）。
+    db_standalone_grace_s: float = 15.0
     #: 进程内缓存容量上限，超限按 LRU 淘汰；会话仍受自身 expires_at 约束。
     memory_cache_max_entries: int = 2048
     #: Redis 连接串；留空 = 进程内缓存（限流窗口与全局熔断另有各自的本地实现）。
@@ -506,6 +524,14 @@ class Settings(BaseSettings):
     def is_production(self) -> bool:
         return self.app_env.strip().lower() in ("production", "prod")
 
+    @property
+    def is_sqlite_mode(self) -> bool:
+        """单机模式：SQLite 是权威主库，完全不碰 PostgreSQL。
+
+        唯一判据（不要在别处再写一遍字符串比较）：大小写 / 前后空白都归一。
+        """
+        return str(self.db_mode or "").strip().lower() == "sqlite"
+
     def production_blockers(self) -> list[str]:
         """生产档下必须修掉才能启动的配置问题（中文，直接进启动异常信息）。"""
         if not self.is_production:
@@ -524,7 +550,7 @@ class Settings(BaseSettings):
             problems.append(
                 "CORS_ORIGINS 不能为空（同源部署也请显式写上 https://<域名>，避免来源校验失去锚点）"
             )
-        if not self.redis_url.strip():
+        if not self.redis_url.strip() and not self.is_sqlite_mode:
             problems.append(
                 "REDIS_URL 不能为空（生产档必须共享限流窗口与熔断状态；"
                 "否则多副本各自计数，实际放行量是配置值的 N 倍。"
@@ -548,8 +574,15 @@ class Settings(BaseSettings):
             warnings.append("BREAKER_ENABLED=false：在飞请求熔断已关闭")
         if not self.secret_key.strip():
             warnings.append("SECRET_KEY 为空：用户自带 AI Key 无法加密保存（该功能对所有人不可用）")
-        if "postgres:postgres@" in self.database_url:
+        if not self.is_sqlite_mode and "postgres:postgres@" in self.database_url:
             warnings.append("DATABASE_URL 仍是示例口令（postgres:postgres），公网部署请换成独立口令")
+        if self.is_sqlite_mode:
+            # 不是拦人：单机模式是给「没有外部依赖」的环境用的合法形态，但它有硬边界 ——
+            # 唯一权威库是进程本地文件，只能单进程单副本，且没有外部备份。
+            warnings.append(
+                "DB_MODE=sqlite：SQLite 为唯一权威主库，仅支持单进程单副本部署，"
+                "请自行备份 SQLITE_PATH，并确保不会被多个实例同时挂载"
+            )
         if self.redis_url.strip() == "memory://":
             warnings.append("REDIS_URL=memory://：限流 / 熔断 / 缓存均为进程内，仅限单副本部署")
         runtime = self.resolve_ai()

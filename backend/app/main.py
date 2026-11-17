@@ -123,7 +123,11 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         state="starting", initialized=False, checked_at=0.0, probe_state="starting",
         ready_event=ready,
     )
-    recovery_task = asyncio.create_task(_recover_database(ready))
+    # 单机模式（DB_MODE=sqlite）走独立启动路径：它不探测、不重试、不碰 PG ——
+    # 复用 PG 恢复循环会让「没有外部依赖」的环境每 30s 刷一条重试告警，
+    # 而那正是这个模式要避免的噪声。
+    bootstrap = _bootstrap_standalone if settings.is_sqlite_mode else _recover_database
+    recovery_task = asyncio.create_task(bootstrap(ready))
     # 正常 PG 初始化很快：给首个就绪窗口，避免 healthy 环境首个探活随机 degraded。
     # 失败时事件会立刻 set（不会等窗口）；持续不可达最多等 0.5s 即让 Web 接流量。
     try:
@@ -185,15 +189,81 @@ _DB_STATE: dict[str, object] = {
 }
 
 
+async def _bootstrap_standalone(ready: asyncio.Event | None = None) -> None:
+    """单机模式启动：在 SQLite 上建表 + 写种子，全程不接触 PostgreSQL。
+
+    不做重试循环。单机模式没有「可等待的外部依赖」，建库失败（目录不可写 / 磁盘满 /
+    文件损坏）是确定性问题，重试只会刷日志；直接把状态标成 degraded，让 `/health`
+    与业务请求如实反映，人工修好文件后重启即可。
+    """
+    try:
+        await asyncio.to_thread(_initialize_database)
+        _DB_STATE.update(
+            state="up", initialized=True, checked_at=time.monotonic(), probe_state="up"
+        )
+        db_logger.info(
+            "db.standalone.ready backend=%s path_kind=%s",
+            db.active_backend(),
+            "bootstrapped" if db.is_standalone() else "existing",
+        )
+    except asyncio.CancelledError:
+        raise
+    except Exception as exc:  # noqa: BLE001 - 启动失败要如实反映，不能让进程崩
+        _DB_STATE.update(state="degraded", initialized=False, probe_state="degraded")
+        db_logger.error("db.standalone.failed error=%s", _exc_brief(exc))
+    finally:
+        if ready is not None:
+            ready.set()
+
+
+#: 单机模式下巡检 PostgreSQL 的间隔（秒）。巡检本身不是启动/运行依赖，只用来在
+#: 「用户后来把 PG 配好了」时给一次明确告警 —— 单机库里的数据只有它自己一份，
+#: 自动切到 PG 等于把它丢掉，所以这里只告警、绝不切换。
+_STANDALONE_SUPERVISE_S = 300.0
+
+
+async def _supervise_standalone() -> None:
+    """单机模式的低频巡检：PG 可达时提示「不会自动切换」。
+
+    用 `probe_postgresql_quiet()` 而不是 `ping_postgresql()`：后者走连接池，失败会在
+    后台留一轮建连并让 psycopg 打出 `error connecting in 'pool-1'` —— 在「没有 PG」的
+    环境里，这条噪声每 5 分钟来一次，正好抵消单机模式的意义。
+    """
+    if not await asyncio.to_thread(db.probe_postgresql_quiet):
+        return
+    now = time.monotonic()
+    if now - float(_DB_STATE.get("standalone_warn_at", 0.0)) < _STANDALONE_SUPERVISE_S:
+        return
+    _DB_STATE["standalone_warn_at"] = now
+    db_logger.warning(
+        "db.standalone.postgres_reachable "
+        "hint=不会自动切换；请先迁移数据，或改用 DB_MODE=auto 并换一个空数据目录"
+    )
+
+
 async def _recover_database(ready: asyncio.Event | None = None) -> None:
     """仅故障时重建副本；在线事务逐笔镜像，避免周期任务反复覆盖副本。"""
     base_interval = max(0.1, get_settings().db_recovery_interval_s)
     delay = base_interval
     consecutive_failures = 0
+    started_at = time.monotonic()
+    #: 本进程是否**成功完成过一次**数据库初始化。
+    #: 这是「自动单机」的核心前提：运行中 PG 抖一下绝不能变成单机库 —— 一旦建成单机库
+    #: 就不会再自动切回 PG，数据会留在本地文件里形成分叉。只有「从启动到现在一次都没
+    #: 成功过」才说明这个环境可能压根没有 PG。
+    ever_ready = False
     while True:
         # 本轮预探活是否真的拿到 PG 应答：except 分支据此区分「主库健康、只是副本坏了」
         # 与「PG 本身不可达」。仅凭 ready 判断会在首次故障时把未就绪误报成 up。
         pg_answered = False
+        if db.is_standalone():
+            # auto 模式已经降级到单机：不再跑 PG 恢复（那会一直刷重试告警），
+            # 只做低频巡检，PG 变得可达时提示一次「不会自动切换」。
+            # **先睡再探**：刚进入单机就立刻探测会让连接池在后台拉起一轮注定超时的建连
+            # （psycopg 自己会打 `error connecting in 'pool-1'`），恰好是单机模式要避免的噪声。
+            await asyncio.sleep(_STANDALONE_SUPERVISE_S)
+            await _supervise_standalone()
+            continue
         try:
             runtime = db.runtime_state()
             if (
@@ -234,6 +304,7 @@ async def _recover_database(ready: asyncio.Event | None = None) -> None:
                 _DB_STATE.update(
                     state="up", initialized=True, checked_at=time.monotonic(), probe_state="up"
                 )
+                ever_ready = True
                 if ready is not None:
                     ready.set()
                 db_logger.info("db.recovery.ready backend=%s", db.active_backend())
@@ -265,14 +336,38 @@ async def _recover_database(ready: asyncio.Event | None = None) -> None:
                     "db.replica.rebuild_failed error=%s retry_in=%.0fs", reason, delay
                 )
             else:
+                need_seed = False
+                # 自动新建单机库的三个前提缺一不可：本进程从未成功连上过 PG、已经等过
+                # 宽限期、SQLite 里没有任何既有数据。少任何一个都退回原有语义（拒绝接管，
+                # 返回可重试 503），绝不用空库或残缺数据顶替主库。
+                allow_bootstrap = (
+                    not ever_ready
+                    and time.monotonic() - started_at >= get_settings().db_standalone_grace_s
+                )
                 try:
-                    if db.active_backend() != "sqlite":
-                        await asyncio.to_thread(db.activate_sqlite)
+                    if db.active_backend() != "sqlite" or not db.is_standalone():
+                        need_seed = await asyncio.to_thread(
+                            _activate_fallback, allow_bootstrap
+                        )
+                    standalone = db.is_standalone()
                     _DB_STATE.update(
-                        state="degraded", initialized=True,
+                        state="up" if standalone else "degraded", initialized=True,
                         checked_at=time.monotonic(), probe_state="up",
                     )
-                    db_logger.warning("db.sqlite_fallback.ready error=%s", reason)
+                    if standalone:
+                        # reason 只作附注：这里的「原因」是 PG 不可达，而单机模式本来
+                        # 就不需要 PG —— 不能让它读起来像一次故障。
+                        db_logger.warning(
+                            "db.standalone.ready reason=postgres_unreachable error=%s", reason
+                        )
+                    else:
+                        db_logger.warning("db.sqlite_fallback.ready error=%s", reason)
+                    # 先放行流量再补种子：新建的单机库此刻表结构已就绪、可读写，
+                    # 题库为空时 `question_bank.load_questions()` 自己会补种子，不会报错。
+                    if ready is not None:
+                        ready.set()
+                    if need_seed:
+                        await asyncio.to_thread(_seed_business_data, rag_strict=False)
                 except Exception as fallback_exc:  # noqa: BLE001 - 无完整副本时明确拒绝业务写
                     _DB_STATE.update(state="degraded", initialized=False, probe_state="degraded")
                     db_logger.warning(
@@ -292,20 +387,66 @@ async def _recover_database(ready: asyncio.Event | None = None) -> None:
 
 
 def _initialize_database() -> None:
-    """一次性启动初始化（仅后台恢复任务调用）：失败抛给恢复循环，不向外泄露细节。"""
-    init_db()
+    """一次性启动初始化（仅后台启动 / 恢复任务调用）：失败抛给调用方，不向外泄露细节。"""
+    standalone = get_settings().is_sqlite_mode or db.is_standalone()
+    if standalone:
+        # 单机模式：SQLite 自己就是权威库。`bootstrap` 只在「没有既有数据」时执行，
+        # 上次启动建好的单机库直接沿用 —— 语义与重启前一致，也不会重复刷标记。
+        db.activate_standalone_sqlite(bootstrap=db.standalone_bootstrap_allowed())
+    else:
+        init_db()
+    _seed_business_data(rag_strict=not standalone)
+
+
+def _activate_fallback(allow_bootstrap: bool) -> bool:
+    """PG 不可达时把 SQLite 立为服务库；返回「是否新建了单机库」（需补种子）。
+
+    顺序有意义：先判断能否安全地新建单机库，不能才按副本接管 —— 副本接管在缺
+    `complete` 标记时会明确抛错，从而保留「绝不用残缺数据顶替主库」的原有语义。
+
+    `allow_bootstrap=False`（运行中故障 / 宽限期内 / 有既有数据）一律走副本接管，
+    行为与 r99 完全一致。
+
+    这里**不写种子**：种子里的教程索引要连 embedding 供应商，可能耗时数秒。写库（激活）
+    和补种子必须分开，让「服务可用」的信号先发出去，不让 `ready` 等一次网络调用。
+    """
+    if allow_bootstrap and db.standalone_bootstrap_allowed():
+        # 没有 PG、也没有任何历史数据：这是唯一能让该环境跑起来的路径，
+        # 新建的空库不存在被覆盖的风险，因此允许直接确立为单机权威库。
+        db.activate_standalone_sqlite(bootstrap=True)
+        return True
+    db.activate_sqlite()
+    return False
+
+
+def _seed_business_data(*, rag_strict: bool) -> None:
+    """业务种子（题库 + 检索索引）：PG 与单机两种形态共用同一份实现。
+
+    `rag_strict` 区分失败语义，刻意不统一：
+    - `True`（PG 档，沿用既有行为）：教程索引失败即算初始化失败，交给恢复循环重试；
+    - `False`（单机档）：教程索引依赖 embedding 供应商，缺 AI Key 时必然失败，而它是
+      **可选增强**，不该把整个服务拖成不可用 —— 降级为跳过并留一条日志。
+    """
     question_bank.ensure_seeded()
     # r98：题库检索由 `pg_trgm` GIN 索引支撑，重建入口保留为空操作（索引随写入自动维护）。
     repository.rebuild_question_search()
-    # 恢复后也在同一线程补教程索引；DB 初始化完成前先不让业务报 ready。
-    if get_settings().rag_seed_tutorials:
+    # DB 初始化完成前先不让业务报 ready；教程索引在同一线程补。
+    if not get_settings().rag_seed_tutorials:
+        return
+    if rag_strict:
         summary = rag_indexer.ensure_tutorials_indexed()
-        if summary is not None:
-            logger.info(
-                "rag.tutorial_seed.done skipped=%s tutorial_chunks=%s",
-                summary.get("skipped"),
-                summary.get("tutorial_chunks"),
-            )
+    else:
+        try:
+            summary = rag_indexer.ensure_tutorials_indexed()
+        except Exception as exc:  # noqa: BLE001 - 可选增强，失败不阻断启动
+            logger.warning("rag.tutorial_seed.skipped error=%s", _exc_brief(exc))
+            return
+    if summary is not None:
+        logger.info(
+            "rag.tutorial_seed.done skipped=%s tutorial_chunks=%s",
+            summary.get("skipped"),
+            summary.get("tutorial_chunks"),
+        )
 
 
 def _db_probe_state() -> str:
@@ -598,12 +739,19 @@ def create_app() -> FastAPI:
             status="ok" if db_state == "up" and redis_state in ("up", "memory") else "degraded",
             version=APP_VERSION,
             ai_configured=runtime.ready,
-            # 当前实际业务读写在哪个库；degraded + sqlite 表示离线副本正在服务。
+            # 当前实际业务读写在哪个库：`postgresql`（正常）/ `sqlite`。
+            # `sqlite` 有两种情形，靠 `db_replica` 与 `status` 区分：离线副本正在服务
+            # （degraded + ready/stale），或单机模式下的权威库（ok + na）。
             db=db.active_backend(),
             db_status=db_state,
             redis_status=redis_state,
-            # ready / stale / na：stale 表示主库在服务、但副本坏了或需要重建（失去兜底）。
-            db_replica="ready" if runtime_db["replica_ready"] else "stale",
+            # ready / stale / na：stale 表示主库在服务、但副本坏了或需要重建（失去兜底）；
+            # na 表示**没有副本这个概念** —— 单机模式下 SQLite 就是权威库本身，
+            # 报 ready 会假装有兜底、报 stale 会假装兜底坏了，两者都是误导。
+            db_replica=(
+                "na" if runtime_db["standalone"]
+                else ("ready" if runtime_db["replica_ready"] else "stale")
+            ),
             # r105：本地 embedder 探活（哈希档恒为 na；远程档 60s 缓存探活一次）。
             rag_embedder=_embedder_probe_state(),
             ai_provider=runtime.provider,

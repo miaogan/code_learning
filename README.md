@@ -66,6 +66,33 @@ npm run dev        # http://127.0.0.1:5173，/api 与 /health 已代理到 :8000
 
 `.env` 里填 `AI_API_KEY` 后 AI 链路才有真实输出；**不填也不会 500**，页面会给出中文提示（AC-8）。
 
+## 没有 PostgreSQL / Redis 也能跑（`DB_MODE=sqlite`）
+
+上面第 0 步的 PG + Redis 是**生产形态**的依赖，不是跑起来的必要条件。在只有 Python 的机器上（本地试用、单机部署、CI）直接用单机模式：
+
+```bash
+cd backend
+DB_MODE=sqlite .venv/Scripts/python -m uvicorn app.main:app --port 8000
+#   库文件默认落在 data/app-fallback.db，首次启动自动建表并灌题库种子（1300+ 题）
+```
+
+**两种进入方式**：
+
+- **显式**：`DB_MODE=sqlite` —— 完全不碰 PostgreSQL，不探测、不重试；SQLite 就是权威主库。
+- **自动**（`DB_MODE=auto`，默认）：进程**首次启动**、等过 `DB_STANDALONE_GRACE_S`（默认 15s）仍连不上 PG、且 `SQLITE_PATH` 里**没有任何既有数据**时，自动新建单机库并记 WARNING。
+
+自动这条路刻意加了三道闸，因为「顺手降级」在生产上很危险：`ever_ready`（本进程一次都没连上过 PG）、宽限期（区分「PG 比 backend 晚几秒就绪」和「压根没有 PG」）、`standalone_bootstrap_allowed()`（有数据就拒绝）。三者缺一，都退回原有语义 —— **返回可重试 503，绝不用空库或残缺副本顶替主库**。
+
+**边界（务必知道）**：
+
+- **单进程单副本**：SQLite 是进程本地文件，不能多 worker、不能多实例同时挂载。
+- **不会自动切回 PG**：单机库的数据只有它自己一份。后来配好了 PG，服务会保持单机并每 5 分钟打一次 `db.standalone.postgres_reachable` 告警 —— 要迁走请走 `scripts/migrate_sqlite_to_pg.py` 并换一个空数据目录。
+- **没有外部备份**：请自行备份 `SQLITE_PATH`（备份 SQLite 时连同 `-wal` / `-shm` 一起）。
+- 离线重放日志在单机模式下**整体关闭**（没有 PG 可回放，记录只会无限增长）。
+
+`/health` 在单机模式下的语义：`db=sqlite` + `db_status=up` + `db_replica=na` + `status=ok`。
+`db_replica=na` 表示「没有副本这个概念」，与 `stale`（主库在跑但兜底坏了）不是一回事。
+
 ## Docker 部署（可选，一条命令起五容器：backend / frontend / postgres / redis / embedder）
 
 不装 Python / Node 也能跑：`frontend`（nginx 托管构建产物 + 同源反代 `/api`、`/health`）+ `backend`（FastAPI，非 root、单 worker、只在容器内网）+ `postgres`（在线权威主库）+ `redis`（限流窗口 / 会话缓存 / 读缓存 / 分布式锁的共享层）。PG 正常时逐笔维护 SQLite 完整副本；PG 故障时副本接管读写，恢复后重放离线变更。Redis 故障使用带 TTL / LRU 的内存缓存。PG 与 Redis **不发布宿主端口**，公网入口只有 nginx。
@@ -86,7 +113,7 @@ docker compose ps        # backend 的 STATUS 应带 (healthy)
 - **换端口**：把 `docker.env.example` 复制成仓库根 `.env`，改 `WEB_PORT=127.0.0.1:8099`（格式是 `[绑定地址:]端口`，**不要只写端口号**，那会绑 `0.0.0.0`），再 `docker compose up -d`。默认 `127.0.0.1:8080` 只绑回环。
 - **从 SQLite 升级**（r97 → r98）：停机 → 备份 `app.db` → 起 PG 建表 → `scripts/migrate_sqlite_to_pg.py` 迁移（幂等可重跑，带行数校验与序列复位），命令见 [r98 迁移手册](./docs/teamflow/20261112-r98-redis-pg/DEPLOY.md)。
 - **数据库镜像**（r100）：PG 服务用 `pgvector/pgvector:pg16`（PostgreSQL 16 基线不变）——RAG 向量检索的 `vector` 扩展与 ivfflat 余弦索引在库内完成；无扩展的环境（如官方 postgres:16-alpine）应用层自动降级为「取回后 Python 余弦」，`engine` 字段如实报告。
-- **降级边界**：后端固定单进程、单 worker，禁止仅增加 `--workers` 或副本来扩容。SQLite 完整副本与离线日志在 `skillcoach-sqlite:/data`，不是临时缓存；有未回同步变更时删除会丢数据。首次没有完整副本时 PG 不可用仍返回可重试 503。
+- **降级边界**：后端固定单进程、单 worker，禁止仅增加 `--workers` 或副本来扩容。SQLite 完整副本与离线日志在 `skillcoach-sqlite:/data`，不是临时缓存；有未回同步变更时删除会丢数据。首次没有完整副本时 PG 不可用仍返回可重试 503（不会拿空库顶替）；确实没有 PG 的环境请用 `DB_MODE=sqlite` 单机模式，见上一节。
 - **备份**：`./scripts/backup_db.sh`（`pg_dump -Fc` + `pg_restore -l` 自检 + 滚动保留），建议进 cron；同时备份 `skillcoach-sqlite` 卷，具体一致性步骤见部署手册。
 - **建号（r23）**：`docker compose exec backend python -m app.admin_cli create-user --email me@example.com --mode own`（容器内执行，数据落在同名卷）。
 - **停止**：`docker compose down`（**保留**数据卷）；`docker compose down -v` 会连数据一起删。
@@ -161,7 +188,7 @@ git reset --hard 32487b4 && git clean -fdx
 
 ```
 frontend/   React 18 + Vite 5 + TypeScript（5 步向导 + 学习 / 练习 / 卷宗 / 跃迁 / 对岗等工具页 + 设计 token）
-backend/    FastAPI + PostgreSQL + Redis（app/routers、app/services、app/seed）
+backend/    FastAPI + PostgreSQL + Redis（PG 可缺省：`DB_MODE=sqlite` 走单机库；app/routers、app/services、app/seed）
 docs/teamflow/   架构总览、产品记忆、每需求一个任务夹
 ```
 
