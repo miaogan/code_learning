@@ -65,4 +65,4 @@
 - [x] `dashscope` 协议单测三态（成功 / 畸形 / 缺 model）+ Key 继承 + 未知协议兜底
 - [x] 探针：公网端点 `na` 且零网络请求；内网端点仍探活
 - [x] 后端全量测试 + ruff + 前端门禁
-- [ ] 生产 `.env` 切换、停本地模型容器、重建索引、真实 `/api/rag/search` 返回 `reranked=true`
+- [x] 生产 `.env` 切换、停本地模型容器、重建索引、真实 `/api/rag/search` 返回 `reranked=true`
