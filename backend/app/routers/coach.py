@@ -12,7 +12,7 @@
 from fastapi import APIRouter, Depends
 
 from app.core import repository
-from app.core.errors import NOT_FOUND, AppError
+from app.core.errors import GUARDRAIL_BLOCKED, NOT_FOUND, AppError
 from app.deps import CurrentUser, current_user
 from app.schemas import (
     CoachAdvice,
@@ -21,7 +21,7 @@ from app.schemas import (
     CoachAgentRun,
     CoachCitation,
 )
-from app.services.ai import user_ai
+from app.services.ai import guardrails, user_ai
 from app.services.coach import policy
 from app.services.coach.agent import run_agent
 from app.services.coach.coach import build_advice, empty_advice
@@ -45,8 +45,17 @@ async def coach_advice(payload: CoachAdviceRequest, user: CurrentUser) -> CoachA
     summary="跑一次教练 Agent 编排（规划 → 工具 → 反思 → 有引用结论）",
 )
 async def coach_agent_run(payload: CoachAgentRequest, user: CurrentUser) -> CoachAgentRun:
+    # r122：编排器的问句是自由文本，也是唯一能让模型“自己决定调研工具”的入口，
+    # 注入拦截放在建客户端之前 —— 拦下来的一次编排就省掉规划 + 多轮工具调用。
+    checked = guardrails.guard_input(payload.question, surface="coach.agent")
+    if checked.blocked:
+        raise AppError(GUARDRAIL_BLOCKED, checked.notice, status=422)
     client = user_ai.client_for(user, "light")
-    return await run_agent(payload.question, goal=payload.goal, client=client)
+    run = await run_agent(checked.text, goal=payload.goal, client=client)
+    guarded = guardrails.guard_output(run.answer, surface="coach.agent")
+    if guarded.blocked or guarded.changed:
+        run.answer = guarded.notice if guarded.blocked else guarded.text
+    return run
 
 
 @router.get(

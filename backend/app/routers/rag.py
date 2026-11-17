@@ -10,7 +10,7 @@
 from fastapi import APIRouter, Depends
 
 from app.core import repository
-from app.core.errors import NOT_FOUND, AppError
+from app.core.errors import GUARDRAIL_BLOCKED, NOT_FOUND, AppError
 from app.deps import CurrentUser, current_user
 from app.schemas import (
     RagAnswerRequest,
@@ -25,7 +25,7 @@ from app.schemas import (
     RagSearchResponse,
     RagStatus,
 )
-from app.services.ai import user_ai
+from app.services.ai import guardrails, user_ai
 from app.services.retrieval import indexer
 from app.services.retrieval.answer import generate_answer, retrieve_for_answer
 from app.services.retrieval.hybrid import search_chunks
@@ -72,7 +72,13 @@ def rag_search(payload: RagSearchRequest) -> RagSearchResponse:
     summary="检索增强生成：答案只基于检索命中，引用必须可回指 chunk",
 )
 async def rag_answer(payload: RagAnswerRequest, user: CurrentUser) -> RagAnswerResponse:
-    retrieved = retrieve_for_answer(payload.query, mode=payload.mode, top_k=payload.top_k)
+    # r122：输入护栏放在检索之前 —— 命中注入/越狱时既不该白花一次检索，也不该把
+    # 恶意指令拼进提示词。注意 `/search` 不做输入护栏：它是本地检索、不调模型，
+    # 而本站题库里就有讲提示注入的题，「搜索 prompt injection」必须照常能搜到。
+    checked = guardrails.guard_input(payload.query, surface="rag.answer")
+    if checked.blocked:
+        raise AppError(GUARDRAIL_BLOCKED, checked.notice, status=422)
+    retrieved = retrieve_for_answer(checked.text, mode=payload.mode, top_k=payload.top_k)
     chunks = list(retrieved["items"])
     if not chunks:
         return RagAnswerResponse(
@@ -84,11 +90,13 @@ async def rag_answer(payload: RagAnswerRequest, user: CurrentUser) -> RagAnswerR
             notice=retrieved["notice"] or "两条检索腿都没有命中",
         )
     client = user_ai.client_for(user, "light")
-    draft = await generate_answer(payload.query, chunks, client)
+    draft = await generate_answer(checked.text, chunks, client)
+    # r122：输出护栏 —— PII 打码放行；系统提示词泄漏整段换掉（那种回答已经不可信）。
+    answer = guardrails.guard_output(draft.answer, surface="rag.answer")
     by_id = {chunk["chunk_id"]: chunk for chunk in chunks}
     citations = [RagChunkItem(**by_id[cid]) for cid in draft.citations if cid in by_id]
     return RagAnswerResponse(
-        answer=draft.answer,
+        answer=answer.notice if answer.blocked else answer.text,
         citations=citations,
         retrieved_count=len(chunks),
         dropped_citations=draft.dropped_citations,

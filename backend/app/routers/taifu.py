@@ -29,7 +29,7 @@ from app.schemas import (
     TaifuReply,
     TaifuThread,
 )
-from app.services.ai import user_ai
+from app.services.ai import guardrails, user_ai
 from app.services.taifu import ai_sdk, graph, policy, taifu
 
 logger = logging.getLogger("app.taifu")
@@ -60,13 +60,22 @@ async def chat(payload: TaifuChatRequest, user: CurrentUser) -> TaifuReply:
     question = policy.sanitize_question(payload.question)
     if not question:
         return taifu.missing_question_reply()
+    # r122：护栏走「零成本出口」同一形态 —— 命中注入时既不查库也不建客户端，
+    # 用 notice 回话而不是抛错：这条端点本来就有一套 notice 口径（空问句 / 空档案）。
+    checked = guardrails.guard_input(question, surface="taifu.chat")
+    if checked.blocked:
+        return TaifuReply(notice=checked.notice)
     if not _has_any_record():
         return taifu.empty_reply()
     # 页面与焦点都只用于消解指代 / 提示模型去哪读，不进引用白名单。
     page = policy.sanitize_page(payload.page)
     focus = policy.sanitize_focus(payload.focus)
     client = user_ai.client_for(user, "light")
-    return await graph.run_collect(question, page=page, focus=focus, client=client)
+    reply = await graph.run_collect(checked.text, page=page, focus=focus, client=client)
+    guarded = guardrails.guard_output(reply.reply, surface="taifu.chat")
+    if guarded.blocked or guarded.changed:
+        reply.reply = guarded.notice if guarded.blocked else guarded.text
+    return reply
 
 
 @router.post("/chat/stream", summary="问太傅（流式）：AI SDK UI Message Stream v1")
@@ -82,17 +91,30 @@ async def chat_stream(payload: TaifuChatRequest, user: CurrentUser) -> Streaming
     encoder = ai_sdk.StreamEncoder()
     if not question:
         return _stream(_notice_stream(encoder, policy.EMPTY_QUESTION_NOTICE, "empty_question"))
+    # r122：命中注入走同一条 notice 流（理由码 `guardrail`），前端按既有分支展示，
+    # 不新增协议形态；此时既不建客户端也不查库。
+    checked = guardrails.guard_input(question, surface="taifu.chat")
+    if checked.blocked:
+        return _stream(_notice_stream(encoder, checked.notice, "guardrail"))
     if not _has_any_record():
         return _stream(_notice_stream(encoder, policy.EMPTY_BRIEF_NOTICE, "no_records"))
     client = user_ai.client_for(user, "light")
 
     async def events() -> AsyncIterator[str]:
+        # r122：逐 token 下发时手机号会被拆成多片，必须用 holdback 缓冲再脱敏
+        # （见 `guardrails.StreamRedactor`）。收尾时 flush，否则最后几十个字永远发不出去。
+        redactor = guardrails.StreamRedactor()
         for chunk in encoder.start():
             yield chunk
         try:
             async for event in graph.run_events(
-                question, page=page, focus=focus, client=client
+                checked.text, page=page, focus=focus, client=client
             ):
+                if str(event.get("type") or "") == "token":
+                    safe = redactor.feed(str(event.get("delta") or ""))
+                    if not safe:
+                        continue
+                    event = {**event, "delta": safe}
                 for chunk in encoder.encode(event):
                     yield chunk
         except AppError as exc:
@@ -105,6 +127,10 @@ async def chat_stream(payload: TaifuChatRequest, user: CurrentUser) -> Streaming
             for chunk in encoder.encode(
                 {"type": "error", "message": "生成中断了，可以再问一次"}
             ):
+                yield chunk
+        tail = redactor.flush()
+        if tail:
+            for chunk in encoder.encode({"type": "token", "delta": tail}):
                 yield chunk
         for chunk in encoder.finish():
             yield chunk

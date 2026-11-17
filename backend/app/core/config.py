@@ -232,6 +232,16 @@ class Settings(BaseSettings):
     #: 上限 20 与检索条数口径一致（reranker 容器 2g 限额，候选更多会撞内存，见 r118 verify.md）。
     ai_rerank_pool: int = 20
 
+    # --- r122 输入 / 输出护栏（guardrails） ------------------------------------
+    #: 输入护栏档位闭集：`off` 全关 / `log` 只记命中不拦截（灰度期看真实误杀率）/
+    #: `enforce` 命中即拦（默认）。规则与豁免口径见 `services/ai/guardrails.py`。
+    guard_input_mode: str = "enforce"
+    #: 输出护栏档位：`off` / `log` / `enforce`（默认；PII 直接打码，提示词泄漏整段拦截）。
+    guard_output_mode: str = "enforce"
+    #: 站方自定义屏蔽词（英文逗号分隔，大小写不敏感的子串匹配）。留空＝无附加规则。
+    #: 这是给「合规词表」留的运维口子：不写代码也能加，但会被 `log` 档记录命中量。
+    guard_extra_terms: str = ""
+
     # --- r103 分块（按内容类型选切分器） --------------------------------------
     #: 启动时是否用种子补齐教程索引（默认开；测试与「只想要题库索引」的部署可关）。
     rag_seed_tutorials: bool = True

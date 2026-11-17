@@ -12,10 +12,12 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 
-from app.core.errors import AppError
+from app.core.errors import GUARDRAIL_BLOCKED, AppError
 from app.core.sse import SSE_HEADERS, sse_event
 from app.deps import CurrentUser, current_user
 from app.schemas import (
@@ -26,7 +28,7 @@ from app.schemas import (
     InterviewSessionSummary,
     InterviewTurn,
 )
-from app.services.ai import user_ai
+from app.services.ai import guardrails, user_ai
 from app.services.interview.interview import (
     create_run as create_interview_run,
     finish_run as finish_interview_run,
@@ -39,6 +41,20 @@ from app.services.interview.interview import (
 router = APIRouter(
     prefix="/api/interviews", tags=["interview"], dependencies=[Depends(current_user)]
 )
+
+#: r122：作答正文上限。面试作答通常几百字，6000 已远超实际需求 ——
+#: `AnswerRequest.answer` 的 schema 不限长度，这里补一道兜底，避免单次请求把提示词撑爆。
+_ANSWER_MAX_CHARS = 6000
+
+
+def _guard_answer(raw: str) -> str:
+    """作答正文过输入护栏：放行时返回归一化后的文本，命中则抛 422。"""
+    checked = guardrails.guard_input(
+        raw, surface="interview.answer", max_chars=_ANSWER_MAX_CHARS
+    )
+    if checked.blocked:
+        raise AppError(GUARDRAIL_BLOCKED, checked.notice, status=422)
+    return checked.text
 
 
 @router.get("", response_model=list[InterviewSessionSummary], summary="历史面试列表（含在途场次）")
@@ -60,8 +76,12 @@ async def create_run(payload: InterviewCreateRequest, user: CurrentUser) -> Inte
 async def submit_answer(
     run_id: str, payload: AnswerRequest, user: CurrentUser
 ) -> InterviewTurn:
+    # r122：作答正文会原样进评分提示词，是注入的入口之一（且 schema 不限长度）。
+    checked = _guard_answer(payload.answer)
     client = user_ai.client_for(user, "heavy")
-    return await score_interview_answer(run_id, payload.question_id, payload.answer, client=client)
+    return await score_interview_answer(
+        run_id, payload.question_id, checked, client=client
+    )
 
 
 @router.post(
@@ -78,13 +98,33 @@ async def submit_answer_stream(
     业务口径与同步端点完全一致（同一条 `score_answer`，同一套错误映射）：
     失败在帧内以 `error` 事件返回，前端不得清空已写作答。
     """
+    # r122：护栏在 `client_for` 之前 —— 被拦的请求不该扣掉一次内置 Key 配额。
+    # 帧内报错而不是 HTTP 4xx：本端点的契约是「业务失败走 error 事件」，前端据此保留作答。
+    checked = guardrails.guard_input(
+        payload.answer, surface="interview.answer", max_chars=_ANSWER_MAX_CHARS
+    )
+    if checked.blocked:
+
+        async def _blocked() -> AsyncIterator[str]:
+            yield sse_event(
+                "error",
+                {
+                    "code": GUARDRAIL_BLOCKED,
+                    "message": checked.notice,
+                    "retryable": False,
+                },
+            )
+
+        return StreamingResponse(
+            _blocked(), media_type="text/event-stream", headers=SSE_HEADERS
+        )
     client = user_ai.client_for(user, "heavy")
 
     async def _gen():
         yield sse_event("phase", {"phase": "scoring", "message": "正在评分并生成下一条发言"})
         try:
             turn = await score_interview_answer(
-                run_id, payload.question_id, payload.answer, client=client
+                run_id, payload.question_id, checked.text, client=client
             )
         except AppError as exc:
             yield sse_event(

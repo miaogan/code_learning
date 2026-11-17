@@ -22,7 +22,8 @@ _CITE_CONTEXT_CHARS = 600
 #: 单次生成最多喂几条 chunk：top_k 与它取小。
 _MAX_CONTEXT_CHUNKS = 5
 
-_ANSWER_SYSTEM = (
+#: r122：公开（去掉下划线）以便 `services/ai/guardrails.py` 采集指纹做提示词泄漏检测。
+ANSWER_SYSTEM = (
     "你是站内题库与教程的答疑助手。你只能依据【材料】回答问题："
     "材料里没有的内容不要编造，可以直说材料未覆盖。"
     "回答末尾给出 citations 数组，逐项填写你实际引用的材料编号（如 m1、m2），"
@@ -54,7 +55,7 @@ async def generate_answer(
         return RagAnswerDraft(answer="没有检索到相关材料，暂时无法回答这个问题。", citations=[])
     user = "【问题】\n" + query + "\n\n【材料】\n" + _material_block(chunks)
     draft: RagAnswerDraft = await client.complete_model(  # type: ignore[attr-defined]
-        _ANSWER_SYSTEM, user, RagAnswerDraft
+        ANSWER_SYSTEM, user, RagAnswerDraft
     )
     # 白名单：m<n> 映射回第 n 条 chunk 的 chunk_id；模型若直接引用 chunk_id 也可通过
     # （两种形态都认），越界 / 不存在的引用一律丢弃并计入 dropped_citations。
