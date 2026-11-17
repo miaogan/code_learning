@@ -24,6 +24,7 @@ from app.core.errors import AI_UNAVAILABLE, AppError
 from app.services.retrieval import tutorial_seed
 from app.services.retrieval.chunking import split_tutorial_blocks
 from app.services.retrieval.embeddings import EmbedderRuntime, resolve_embedder
+from app.services.retrieval.vector_backends import resolve_vector_store
 
 logger = logging.getLogger("app.rag.indexer")
 
@@ -120,6 +121,19 @@ def _question_chunk_rows(runtime: EmbedderRuntime) -> list[dict[str, Any]]:
     return built
 
 
+def _store_or_raise() -> Any:
+    """向量后端就绪检查：`resolve_vector_store` 永不 raise，这里把未就绪折成中文 503。
+
+    索引构建是**写**路径：用户点了「重建索引」就该知道为什么没写成，而不是静默失败。
+    """
+    handle = resolve_vector_store()
+    if handle.store is None or not handle.ready:
+        raise AppError(
+            AI_UNAVAILABLE, handle.reason or "向量后端未就绪，请检查 VECTOR_MODE 配置", retryable=False
+        )
+    return handle.store
+
+
 def rebuild_question_index(runtime: EmbedderRuntime | None = None) -> dict[str, Any]:
     """题库索引全量替换 + 索引状态原子更新。返回摘要（HTTP 层直接投影）。"""
     current = _runtime_or_raise(runtime)
@@ -129,7 +143,11 @@ def rebuild_question_index(runtime: EmbedderRuntime | None = None) -> dict[str, 
             AI_UNAVAILABLE, "RAG 表结构未初始化，请先重启服务执行 init_db", retryable=False
         )
     rows = _question_chunk_rows(current)
-    written = repository.rag_write_chunks(rows, mode=mode, replace_kind="question")
+    # r117：写入统一走向量后端 —— 元数据行落业务库（事务化），派生索引（faiss 文件 /
+    # milvus collection）随后写；pgvector / sqlite 档与 r100 行为完全一致。
+    written = _store_or_raise().write(
+        rows, kind="question", embedder=current.name, dim=current.dim
+    )
     repository.rag_state_put(
         current.name, current.dim, repository.rag_chunk_counts()["total"], _now_iso()
     )
@@ -147,8 +165,7 @@ def ingest_tutorial_chunks(
     的旧 chunk 会被删掉（整份替换）。前端契约因此必须是全量推送。
     """
     current = _runtime_or_raise(runtime)
-    mode = rag_embedding_mode()
-    if mode == "missing":
+    if rag_embedding_mode() == "missing":
         raise AppError(
             AI_UNAVAILABLE, "RAG 表结构未初始化，请先重启服务执行 init_db", retryable=False
         )
@@ -196,7 +213,9 @@ def ingest_tutorial_chunks(
         chunk["content_sha"] = content_sha(chunk["content"], current.name)
         chunk["created_at"] = stamp
         chunk["embedding"] = vector
-    written = repository.rag_write_chunks(built, mode=mode, replace_kind="tutorial")
+    written = _store_or_raise().write(
+        built, kind="tutorial", embedder=current.name, dim=current.dim
+    )
     repository.rag_state_put(
         current.name, current.dim, repository.rag_chunk_counts()["total"], _now_iso()
     )
@@ -219,11 +238,21 @@ def index_status() -> dict[str, Any]:
         notice = "RAG 索引尚未构建：先重建题库索引，再从学堂页推送教程正文"
     elif stale:
         notice = "部分索引与当前 embedding 配置不一致，请重建索引"
+    # r117：向量后端是派生索引，对账结论单独报告 ——「元数据齐了但 faiss 文件没跟上」
+    # 这种状态，旧口径（只看 rag_state）会误报健康。
+    handle = resolve_vector_store()
+    vector_notice = ""
+    if handle.store is not None and handle.ready:
+        vector_notice = handle.store.notice(embedder=runtime.name, dim=runtime.dim)
+    elif handle.reason:
+        vector_notice = handle.reason
     return {
         "built": state is not None or counts["total"] > 0,
         "embedder": runtime.name,
         "dim": runtime.dim,
         "engine": rag_embedding_mode(),
+        "vector_mode": handle.mode,
+        "vector_notice": vector_notice,
         "chunk_count": counts["total"],
         "question_chunks": counts.get("question", 0),
         "tutorial_chunks": counts.get("tutorial", 0),

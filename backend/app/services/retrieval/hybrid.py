@@ -15,13 +15,12 @@
 
 from __future__ import annotations
 
-import json
 import logging
 from typing import Any
 
 from app.core import repository
-from app.core.db import rag_embedding_mode
 from app.services.retrieval.embeddings import resolve_embedder
+from app.services.retrieval.vector_backends import resolve_vector_store
 
 logger = logging.getLogger("app.rag.hybrid")
 
@@ -92,41 +91,29 @@ def rrf_fuse(ranked_lists: list[list[str]], *, top_k: int, k: int = RRF_K) -> li
     return fused[:top_k]
 
 
-def _embedding(value: Any) -> list[float]:
-    """PG array 直接返回 list；SQLite 热副本中的向量是 JSON 文本。"""
-    if isinstance(value, str):
-        parsed = json.loads(value)
-        return [float(item) for item in parsed] if isinstance(parsed, list) else []
-    return [float(item) for item in value]
-
-
 def _semantic_leg(
-    query: str, *, embedder_name: str, top_k: int, kinds: list[str] | None = None
-) -> tuple[list[dict[str, Any]], str]:
-    """向量腿：pgvector 索引内算，或降级为「全量取回 + Python 余弦」。
+    query: str, *, embedder_name: str, dim: int, top_k: int, kinds: list[str] | None = None
+) -> tuple[list[dict[str, Any]], str, str]:
+    """向量腿：分派给 `VECTOR_MODE` 选中的后端（r117）。
 
-    返回 `(rows, engine)`；`engine` 如实进响应（`pgvector` / `python-cosine`），
-    不把降级路径伪装成主路径。
+    返回 `(rows, engine, notice)`。`engine` 是**配置的**引擎名（pgvector / python-cosine /
+    faiss / milvus），即使没就绪也如实报告「配的是什么」；`notice` 非空 = 语义腿没跑成，
+    上层必须把它带进响应（「能明确说清为什么没有结果」比「抛错」可用）。
     """
     runtime = resolve_embedder()
     query_vec = runtime.embedder.embed([query])[0]
-    mode = rag_embedding_mode()
-    if mode == "pgvector":
-        rows = repository.rag_vector_search(
-            query_vec, embedder=embedder_name, top_k=top_k, mode=mode, kinds=kinds
-        )
-        return rows, "pgvector"
-    scanned = repository.rag_array_scan(embedder=embedder_name, kinds=kinds)
-    scored = [
-        (repository.rag_cosine(query_vec, _embedding(row["embedding"])), row) for row in scanned
-    ]
-    scored.sort(key=lambda pair: (-pair[0], pair[1]["id"]))
-    rows = []
-    for score, row in scored[:top_k]:
-        item = {key: value for key, value in row.items() if key != "embedding"}
-        item["score"] = score
-        rows.append(item)
-    return rows, "python-cosine"
+    handle = resolve_vector_store()
+    store = handle.store
+    if store is None or not handle.ready:
+        return [], handle.engine, handle.reason
+    rows = store.search(
+        query_vec,
+        embedder=embedder_name,
+        dim=dim,
+        top_k=top_k,
+        kinds=kinds,
+    )
+    return rows, handle.engine, store.notice(embedder=embedder_name, dim=dim)
 
 
 def _item(chunk: dict[str, Any], score: float, *, snippet_chars: int = 160) -> dict[str, Any]:
@@ -183,12 +170,15 @@ def search_chunks(
 
     semantic_rows: list[dict[str, Any]] = []
     if mode in ("semantic", "hybrid") and state is not None and state["embedder"] == runtime.name:
-        semantic_rows, engine = _semantic_leg(
+        semantic_rows, engine, vector_notice = _semantic_leg(
             needle,
             embedder_name=state["embedder"],
+            dim=int(runtime.dim),
             top_k=size * _LEG_WIDEN,
             kinds=effective_kinds,
         )
+        if vector_notice:
+            notices.append(vector_notice)
 
     lexical_rows: list[dict[str, Any]] = []
     if mode in ("keyword", "hybrid"):

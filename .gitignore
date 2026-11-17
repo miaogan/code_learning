@@ -47,6 +47,8 @@ backend/pytest-cache-files-*/
 backend/.test-scaffold.db
 *.db
 *.sqlite3
+# r117：运行期数据目录（SQLite 单机库 + faiss 向量索引），含业务与索引数据，绝不入库
+backend/data/
 # SQLite 旁路文件：`*.db` 匹配不到 `app.db-wal` / `app.db-shm`（WAL 模式或崩溃残留会留在库里）
 *.db-wal
 *.db-shm
