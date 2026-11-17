@@ -185,7 +185,13 @@ def test_complete_replica_preserves_history_and_replays_offline_writes(
     assert db.pending_operations() == []
 
 
-def test_sqlite_rag_json_vectors_feedback_and_replay(replica: str) -> None:
+def test_sqlite_rag_json_vectors_feedback_and_replay(
+    replica: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # r117：装了 faiss 后 `auto` 会把单机场景分派给 faiss。本用例要测的是「PG 挂了、
+    # 副本继续用 JSON 向量服务」这条**特定**路径，所以显式钉住 sqlite 档。
+    monkeypatch.setenv("VECTOR_MODE", "sqlite")
+    get_settings.cache_clear()
     repository.insert_question(_question("rag-q1", "数据库慢查询如何排查？"))
     indexer.rebuild_question_index()
     db.sync_sqlite_from_pg()
@@ -231,6 +237,9 @@ def test_sqlite_rag_json_vectors_feedback_and_replay(replica: str) -> None:
         ).fetchall()
         assert len(embeddings) == 1
         assert len(embeddings[0][0]) > 0
+    # 环境由 monkeypatch 还原，但 Settings 快照还留着本用例的 VECTOR_MODE：显式失效，
+    # 避免串到下一个用例（其它用例不显式清缓存时默认档会被它污染）。
+    get_settings.cache_clear()
 
 
 def _profile(profile_id: str = "offline-profile", resume_id: str = "offline-resume") -> Profile:
