@@ -516,7 +516,15 @@ def resolve_vector_store(settings: Settings | None = None) -> VectorHandle:
         mode = _resolve_auto()
 
     if mode in ("pgvector", "sqlite"):
-        store: VectorStore = _DbStore(mode=rag_embedding_mode())
+        # `rag_embedding_mode()` 要开库连接：PG 不可达时它会抛 `database_unavailable`。
+        # resolve **永不 raise** 是本模块的第一不变量 —— 折成 ready=False，等下一次
+        # 检索 / 建索引时重新 resolve（`search_chunks` 每次都现 resolve，自愈）。
+        try:
+            store: VectorStore = _DbStore(mode=rag_embedding_mode())
+        except AppError as exc:
+            return VectorHandle(
+                mode=mode, engine="", store=None, ready=False, reason=exc.message
+            )
         return VectorHandle(
             mode=mode, engine=store.engine, store=store, ready=True, reason=""
         )

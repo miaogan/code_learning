@@ -69,6 +69,7 @@ from app.services import radar as radar_service, rate_limit
 from app.services.ai.ai import close_ai_pool
 from app.services.assessment import question_bank
 from app.services.retrieval import indexer as rag_indexer
+from app.services.retrieval.vector_backends import resolve_vector_store
 
 APP_VERSION = "0.4.0"
 
@@ -217,23 +218,104 @@ async def _supervise_standalone() -> None:
     )
 
 
-async def _report_cache() -> None:
+async def _report_cache() -> str:
     """打印缓存层结论：优先 Redis，连不上则进程内缓存（功能不中断，只是不跨进程共享）。
 
     和数据库一样，用户需要**看得出实际用了谁**：`memory` 与 `degraded` 在业务上都还能跑，
     但前者是「本来就没配」、后者是「配了但连不上」，运维处理方式完全不同。
+    返回探活结果（`up` / `memory` / `down`），供启动清单汇总——探活失败返回 `unknown`，
+    不让一次异常把整个清单弄丢。
     """
     try:
         state = await asyncio.to_thread(redis_cache.status)
     except Exception as exc:  # noqa: BLE001 - 探活失败只影响这行日志
         cache_logger.warning("cache.probe.failed error=%s", type(exc).__name__)
-        return
+        return "unknown"
     if state == "up":
         cache_logger.info("[缓存层] Redis 可用 → 使用 Redis（限流 / 会话 / 读缓存跨进程共享）")
     elif state == "memory":
         cache_logger.info("[缓存层] 未配置 Redis → 使用进程内缓存（仅单进程有效）")
     else:
         cache_logger.warning("[缓存层] Redis 不可用 → 已降级为进程内缓存（恢复后自动切回）")
+    return str(state)
+
+
+def _vector_label(settings: Settings) -> tuple[str, str, bool]:
+    """向量库这一项的 `(key, 中文说明, 是否就绪)`。
+
+    Milvus 地址剥掉凭据再打印（URI 里可能带 `user:pass@host`），地址本身是运维自己的
+    配置、可以出现，密码不行 —— 与「错误文案不含端点 / Key」同一口径。
+    """
+    handle = resolve_vector_store(settings)
+    if not handle.ready or handle.store is None:
+        return handle.mode, f"{handle.mode} 未就绪（{handle.reason}）", False
+    if handle.mode == "faiss":
+        return "faiss", f"faiss（{settings.vector_faiss_dir}）", True
+    if handle.mode == "milvus":
+        parsed = urlparse(settings.vector_milvus_uri.strip())
+        host = parsed.netloc.split("@", 1)[-1] or parsed.netloc
+        return "milvus", f"Milvus（{parsed.scheme}://{host}）", True
+    if handle.mode == "pgvector":
+        return "pgvector", "pgvector（向量存业务库）", True
+    return "sqlite", "SQLite JSON 列（向量存业务库）", True
+
+
+def _report_runtime_summary(cache_state: str) -> None:
+    """打印规范化的「启用了哪些存储组件」清单（启动结论的收口行）。
+
+    `[数据层]` / `[缓存层]` 各自的叙述回答「**为什么**用它」，这一行回答用户最先要问的
+    「**到底**启用了哪几个库」。固定格式两行：一行结构化 key（可 grep / 可告警），
+    一行中文清单（可直接读）；顺序固定 db → cache → vector，新增组件在行尾追加。
+
+    两行同级别：全部就绪 INFO，向量库未就绪 WARNING（faiss 没装 / Milvus 地址没填
+    这类配置问题必须在启动时可见，而不是等到第一次检索才暴露）。
+
+    **本函数绝不抛异常**：它跑在恢复循环里，任何一项探活失败（比如 PG 正在故障窗口）
+    都只降级成那一项的「探活失败」说明，绝不打断 `_recover_database` 的重试。
+    """
+    try:
+        db_key, db_label = _db_label()
+    except Exception:  # noqa: BLE001 - 清单是旁路，绝不影响恢复主流程
+        db_key, db_label = "unknown", "数据层探活失败（见上方错误日志）"
+    cache_key, cache_label = {
+        "up": ("redis", "Redis（限流 / 会话 / 读缓存跨进程共享）"),
+        "memory": ("memory", "进程内缓存（未配置 Redis，仅单进程有效）"),
+        "down": ("memory", "进程内缓存（Redis 不可用，已降级，恢复后自动切回）"),
+    }.get(cache_state, ("memory", "进程内缓存（探活失败，仅单进程有效）"))
+    try:
+        vector_key, vector_label, vector_ready = _vector_label(get_settings())
+    except Exception as exc:  # noqa: BLE001
+        vector_key, vector_label, vector_ready = "unknown", f"探活失败（{_exc_brief(exc)}）", False
+
+    logger = logging.getLogger("app.runtime")
+    level = logging.INFO if vector_ready else logging.WARNING
+    logger.log(
+        level,
+        "[启动清单] runtime.components db=%s cache=%s vector=%s",
+        db_key,
+        cache_key,
+        vector_key,
+    )
+    logger.log(
+        level,
+        "[启动清单] 说明: 数据库=%s；缓存=%s；向量库=%s",
+        db_label,
+        cache_label,
+        vector_label,
+    )
+
+
+def _db_label() -> tuple[str, str]:
+    """数据层这一项的 `(key, 中文说明)`；异常由调用方降级，不在内层兜。"""
+    backend = db.active_backend()
+    if backend == "postgresql":
+        replica = bool(db.runtime_state()["replica_ready"])
+        replica_label = "SQLite 完整副本就绪" if replica else "副本未就绪"
+        return "postgresql", f"PostgreSQL 权威主库（{replica_label}）"
+    path = get_settings().sqlite_path
+    if db.is_standalone():
+        return "sqlite", f"SQLite 单机库（{path}）"
+    return "sqlite", f"SQLite 完整副本接管（{path}，PG 恢复后回切）"
 
 
 def _report_ai_endpoints(settings: Settings) -> None:
@@ -293,7 +375,8 @@ async def _recover_database(ready: asyncio.Event | None = None) -> None:
             ready.set()
 
     # 缓存层结论紧跟着数据库结论打印：两件事都是「实际用了谁」，放在一起读最省事。
-    await _report_cache()
+    cache_state = await _report_cache()
+    _report_runtime_summary(cache_state)
 
     while True:
         # 本轮预探活是否真的拿到 PG 应答：except 分支据此区分「主库健康、只是副本坏了」
