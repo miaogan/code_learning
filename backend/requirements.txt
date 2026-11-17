@@ -10,7 +10,7 @@ python-docx>=1.1
 # r23：用户自带 API Key 的密文存储（Fernet）
 cryptography>=42.0
 # r98：数据层 PostgreSQL（二进制包免编译，slim 镜像可直接装）
-psycopg[binary]>=3.2
+psycopg[binary]>=3.3.9
 psycopg-pool>=3.2
 # r98：限流窗口 / 会话缓存 / 读缓存 / 分布式锁的共享层
 redis>=5.0
