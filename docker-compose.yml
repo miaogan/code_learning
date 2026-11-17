@@ -162,9 +162,11 @@ services:
   # 配套精排器，中文效果与体积的平衡点；large（560M）在 2 vCPU / 3.6GB 上太重。
   # 资源账（2026-11-17 实测）：宿主已用 1.1G / 可用 2.5G，本容器实测常驻 ~1.3G，
   # 加完仍留 ~1.2G 余量 + 1.9G swap 兜底。
-  #   cpus 1.0 / mem_limit 1536m / memswap_limit 2g / pids_limit 256：
-  #   口径与 embedder 一致，但内存限额放宽——reranker 权重 fp32 ~1.1G，
-  #   1g 限额会被 cgroup OOM 误杀。
+  #   cpus 1.0 / mem_limit 2g / memswap_limit 2560m / pids_limit 256：
+  #   口径与 embedder 一致，但内存限额放宽——reranker ONNX 权重 ~1.1G，
+  #   加上 runtime 装载开销实测 >1.5G（首次 1536m 限额被 cgroup 反复 OOM，
+  #   RestartCount 52，见任务夹 verify.md），2g 起步；宿主账：已用 1.1G +
+  #   reranker ~1.7G ≈ 2.8G，仍留余量 + 1.9G swap 兜底。
   # 不发布宿主端口：只有 compose 内网可达，公网零暴露面。
   reranker:
     image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.8
@@ -184,8 +186,8 @@ services:
     volumes:
       - skillcoach-rerankcache:/data
     cpus: '1.0'
-    mem_limit: 1536m
-    memswap_limit: 2g
+    mem_limit: 2g
+    memswap_limit: 2560m
     pids_limit: 256
 
   frontend:

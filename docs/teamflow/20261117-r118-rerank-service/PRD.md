@@ -7,7 +7,7 @@ r100 检索管线是「双腿召回 + RRF 融合 + 反馈加权重排」，**没
 ## 方案
 
 - `docker-compose.yml` 新增 `reranker` 服务：`profiles: ["rerank"]`（默认不启动，与 embedder 的 embed 档同构），模型 `BAAI/bge-reranker-base`（278M 参数交叉编码器，bge-small-zh-v1.5 的配套精排器；large 560M 在本机太重）。
-- 资源限额与 embedder 同口径但内存放宽：`cpus 1.0` / `mem_limit 1536m` / `memswap_limit 2g` / `pids_limit 256`——reranker 权重 fp32 ~1.1G，1g 限额会被 cgroup OOM 误杀；加完整机仍留 ~1.2G 余量。
+- 资源限额与 embedder 同口径但内存放宽：`cpus 1.0` / `mem_limit 2g` / `memswap_limit 2560m` / `pids_limit 256`——ONNX 权重 ~1.1G 加 runtime 装载开销实测 >1.5G（首版 1536m 限额被 cgroup 反复 OOM，RestartCount 52），2g 起步；加完整机已用 ~2.8G，仍留余量 + 1.9G swap 兜底。
 - 模型缓存落命名卷 `skillcoach-rerankcache`（HF_HOME=/data），容器重建不重下；不发布宿主端口，仅 compose 内网可达，公网零暴露。
 - 启动方式（生产）：`docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file deploy.env --profile rerank up -d reranker`。
 
