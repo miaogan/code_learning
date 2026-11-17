@@ -9,12 +9,14 @@
     python -m app.admin_cli disable --email a@b.com      # --undo 启用
     python -m app.admin_cli reset-password --email a@b.com
     python -m app.admin_cli list
+    python -m app.admin_cli doctor      # 只读自查：配置来源 / 数据层 / AI 端点策略（无副作用）
 """
 
 import argparse
 import secrets
 import sys
 import uuid
+from pathlib import Path
 
 from app.core import db, repository
 from app.core.auth import hash_password, normalize_email
@@ -136,6 +138,70 @@ def _list(args: argparse.Namespace) -> int:
     return 0
 
 
+def _doctor(_args: argparse.Namespace) -> int:
+    """只读自查：打印「这套部署实际会怎么跑」，并直接回答「能不能填内网地址」。
+
+    内网部署者手里通常没有 docker / 观测平台，也没有人帮他看日志 —— 一条命令把
+    配置来源、数据层选择、AI 端点策略、缓存形态和结论打全，比让他翻五个文件快得多。
+
+    **刻意只读**：不连库、不建库、不改任何状态。自查命令一旦有副作用，
+    它给出的结论就不可信了（比如顺手创建了一个空 SQLite 库，下次启动就会走单机）。
+    """
+    from app.core.config import get_settings
+
+    settings = get_settings()
+    env_file = Path(str(settings.model_config.get("env_file") or ".env")).resolve()
+
+    print("== 部署自查 ==")
+    print(f"工作目录        : {Path.cwd()}")
+    print(f"Python          : {sys.version.split()[0]}")
+    print(f"配置文件        : {env_file}（{'存在' if env_file.exists() else '不存在'}）")
+    print("  · .env 按进程工作目录解析：必须在 backend/ 下启动才能读到它")
+    print(f"DB_MODE         : {settings.db_mode}")
+
+    pg_ok = db.probe_postgresql_quiet()
+    marker = db.sqlite_marker("complete")
+    sqlite_path = Path(settings.sqlite_path).resolve()
+    if pg_ok:
+        db_line = "PostgreSQL 可达 → 优先使用 PostgreSQL"
+    elif marker == "1":
+        db_line = f"SQLite 已有权威库 → {sqlite_path}"
+    elif db.has_sqlite_data():
+        db_line = "SQLite 有数据但缺权威标记 → 启动会被拒绝（需 DB_MODE=sqlite 显式声明）"
+    else:
+        db_line = f"无 PostgreSQL、SQLite 为空 → 首次启动新建单机库 {sqlite_path}"
+    print(f"数据层          : {db_line}")
+
+    runtime = settings.resolve_ai()
+    print(f"服务端 AI 档位  : provider={runtime.provider or '(legacy)'} model={runtime.model or '(空)'}")
+    print(f"                  端点={runtime.base_url or '(空)'} 就绪={'是' if runtime.ready else '否'}")
+    if not runtime.ready and runtime.reason:
+        print(f"                  原因：{runtime.reason}")
+    print("                  注：服务端档位填内网地址不受 SSRF 门禁限制（管理员配置视为可信）")
+
+    try:
+        from app.core import redis_cache
+
+        redis_state = redis_cache.status()
+    except Exception as exc:  # noqa: BLE001 - 自查命令不能因为探活失败就没有输出
+        redis_state = f"探活失败（{type(exc).__name__}）"
+    print(f"缓存层          : {redis_state}（memory = 未配置 Redis，进程内缓存）")
+    radar = "离线样本（不访问上游）" if settings.radar_offline else f"会访问公网（调度={settings.radar_schedule}）"
+    print(f"雷达采集        : {radar}")
+
+    print()
+    if settings.ai_allow_private_endpoints:
+        print("结论：用户自带 AI 端点【可以】填内网地址 ✅（私网 / 环回放行；云元数据仍拒绝）")
+        return 0
+    print("结论：用户自带 AI 端点【不能】填内网地址 ❌（只允许公网地址）")
+    print(f"      要放行：在 {env_file} 里加一行 AI_ALLOW_PRIVATE_ENDPOINTS=true，然后重启后端进程")
+    if not env_file.exists():
+        print("      注意：这个文件还不存在 —— env_file 路径按工作目录解析，确认启动时 cwd 是 backend/")
+    print("      不想改开关：把内网模型写进服务端档位（AI_BASE_URL 或 AI_PROVIDER 对应档），")
+    print("      那条通道不受 SSRF 门禁约束。")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="产品管理员命令（r23）")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -168,8 +234,13 @@ def main(argv: list[str] | None = None) -> int:
     listing = sub.add_parser("list", help="列出全部用户")
     listing.set_defaults(func=_list)
 
+    # 只读自查：不建库、不写库，因此**不走** `_prepare_database()`（那会 bootstrap 并可能建库）。
+    doctor = sub.add_parser("doctor", help="只读自查：配置来源 / 数据层 / AI 端点策略")
+    doctor.set_defaults(func=_doctor)
+
     args = parser.parse_args(argv)
-    _prepare_database()
+    if args.command != "doctor":
+        _prepare_database()
     code = args.func(args)
     if code == 0 and args.command in _MUTATING_COMMANDS:
         _sync_replica()

@@ -177,6 +177,28 @@ def test_startup_logs_policy_when_disabled(caplog: pytest.LogCaptureFixture) -> 
     assert any("AI_ALLOW_PRIVATE_ENDPOINTS=true" in text for text in messages)
 
 
+def test_doctor_reports_actionable_conclusion(capsys: pytest.CaptureFixture[str]) -> None:
+    """`admin_cli doctor` 是内网部署者的自查入口：必须给出「能不能填内网地址」的结论。
+
+    要求两件事：**只读**（不建库、不连库改状态）与**说人话**（结论 + 下一步）。
+    """
+    from app import admin_cli
+
+    assert admin_cli.main(["doctor"]) == 0
+    out = capsys.readouterr().out
+    assert "结论：" in out and "不能" in out
+    assert "AI_ALLOW_PRIVATE_ENDPOINTS=true" in out
+
+
+@pytest.mark.usefixtures("intranet_env")
+def test_doctor_says_yes_when_enabled(capsys: pytest.CaptureFixture[str]) -> None:
+    from app import admin_cli
+
+    assert admin_cli.main(["doctor"]) == 0
+    out = capsys.readouterr().out
+    assert "可以" in out
+
+
 # --- 零遥测守卫 -----------------------------------------------------------------
 
 #: 统计 / 崩溃上报 / 外部静态资源域名。命中即失败 —— 内网气隙环境里这些请求
