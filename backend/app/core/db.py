@@ -112,6 +112,10 @@ recovery_thread: threading.Thread | None = None
 _recovery_depth: contextvars.ContextVar[int] = contextvars.ContextVar(
     "db_recovery_depth", default=0
 )
+#: 主库结构维护期间关闭镜像记录：见 `suppress_mirror()`。
+_mirror_suppressed: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "db_mirror_suppressed", default=False
+)
 
 
 class _Transaction:
@@ -224,6 +228,8 @@ def _operation(sql: str, params: Sequence[Any] | None) -> dict[str, Any]:
 
 
 def _record_write(sql: str, params: Sequence[Any] | None) -> None:
+    if _mirror_suppressed.get():
+        return
     if not _WRITE_RE.match(sql):
         return
     # 内部同步表只由本层直接写，不进入离线日志，避免重放后再次制造新操作。
@@ -1098,6 +1104,30 @@ def standalone_bootstrap_allowed() -> bool:
     return not has_sqlite_data()
 
 
+def sqlite_marker(key: str) -> str | None:
+    """读 SQLite 里 `_sync_state` 的一条标记；库 / 表不存在或读不了时返回 None。
+
+    这是「这个库是什么」的唯一判据：
+    - `complete=1`：由 PG 同步出来的完整副本（或已确立的单机权威库）；
+    - `standalone=1`：单机权威库，没有 PG 可回放。
+    """
+    if not _sqlite_path().exists():
+        return None
+    try:
+        with closing(_open_sqlite()) as raw:
+            if raw.execute(
+                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = '_sync_state'"
+            ).fetchone() is None:
+                return None
+            row = raw.execute(
+                "SELECT value FROM _sync_state WHERE key = ?", (key,)
+            ).fetchone()
+    except sqlite3.Error as exc:
+        _note_sqlite_failure(exc)
+        return None
+    return None if row is None else str(row["value"])
+
+
 #: 副本故障日志节流：磁盘写满时每个请求都会失败，不能一请求一条日志。
 _last_sqlite_failure_at = 0.0
 
@@ -1160,6 +1190,28 @@ def _offline_log_enabled() -> bool:
     对象 —— 继续记录等于给每一笔业务写附一条永远无法消费的垃圾。
     """
     return not _standalone
+
+
+@contextmanager
+def suppress_mirror() -> Iterator[None]:
+    """窗口内不把写语句记入副本镜像 / 离线日志。
+
+    只给**主库结构维护**用（`init_db()` 里的建表、存量收敛、ID 游标播种）：这些语句
+    不需要逐条镜像 —— 副本与主库的对齐由 `sync_sqlite_from_pg()` 整体重建完成。
+    逐条镜像是错的，有两个真实原因：
+
+    - 语句里有纯 PG 方言（`to_char(now() …)`、`to_regclass`），SQLite 解析不了；
+    - `INSERT … SELECT … ON CONFLICT DO NOTHING` 这种形态 SQLite 语法上就不接受
+      （upsert 不能挂在 `INSERT … SELECT` 上，报 `near "DO": syntax error`）。
+
+    镜像失败会被记成 `db.replica_stale` 并把 `replica_ready` 打回 False —— 一次启动
+    就能让 `/health` 谎报降级、并触发一整轮无谓的副本重建。维护语句不进日志即可断根。
+    """
+    token = _mirror_suppressed.set(True)
+    try:
+        yield
+    finally:
+        _mirror_suppressed.reset(token)
 
 
 @contextmanager
@@ -1437,6 +1489,138 @@ def activate_standalone_sqlite(*, bootstrap: bool = False) -> None:
     if bootstrap:
         mark_standalone_baseline()
     activate_sqlite()
+
+
+def _report_backend(backend: str, summary: str) -> None:
+    """打印「本进程最终用了哪个库」。
+
+    格式刻意同时满足两种读者：`db.backend.selected` 是结构化 key（可 grep / 可告警），
+    后半句是可直接读的中文结论。服务进程与 `admin_cli` 都调它 —— 同一种状态不允许
+    有第二种说法，否则排查时要在两种措辞之间做翻译。
+    """
+    logger.info("[数据层] db.backend.selected backend=%s %s", backend, summary)
+
+
+def _report_sqlite_path() -> str:
+    return str(_sqlite_path())
+
+
+def bootstrap() -> str:
+    """为一个进程选定权威库、建表，并打印结论；返回 `postgresql` 或 `sqlite`。
+
+    **这是服务进程与 `admin_cli` 共用的唯一入口。** 两条路径的判定必须逐条一致，
+    否则就会出现「服务起来了、建号命令却连不上库」的割裂 —— 上一版正是只给服务加了
+    单机模式、CLI 却仍在 `init_db()` 里硬连 PG，而全量测试覆盖不到独立进程。
+
+    判定顺序（每一步都打印结论，运维一眼能看出用的是哪个库）：
+
+    1. `DB_MODE=sqlite`：显式声明单机，**不探测 PG**，直接接管或新建；
+    2. PG 连得上 → PG 是权威主库（`DB_MODE=postgres` 时连不上就直接抛错，不降级）；
+    3. PG 连不上、SQLite 有 `complete=1` → 立即接管：有 `standalone=1` 是单机库，
+       否则是 PG 完整副本（PG 恢复后由守护循环回切）；
+    4. PG 连不上、SQLite 空库 / 不存在 → 等 `DB_STANDALONE_GRACE_S` 再确认一次
+       （排除「compose 里 PG 比 backend 晚几秒就绪」），仍不通才新建单机库；
+    5. PG 连不上、SQLite 有数据但**没有** `complete` 标记 → 抛错拒绝：来历不明的
+       半份副本，拿它顶替主库等于静默丢数据。
+
+    第 4 步是唯一「不可逆」的动作（新建的库不会再自动切回 PG），所以只有它需要等。
+    """
+    settings = get_settings()
+    mode = str(settings.db_mode or "").strip().lower()
+
+    if mode == "sqlite":
+        _bootstrap_sqlite_only(trust_user=True)
+        _report_backend(
+            "sqlite",
+            f"DB_MODE=sqlite 显式指定 → 使用 SQLite 单机库：{_report_sqlite_path()}",
+        )
+        return "sqlite"
+
+    if probe_postgresql_quiet():
+        init_db()
+        activate_postgresql()
+        _report_backend("postgresql", "PostgreSQL 可用 → 使用 PostgreSQL 作为权威主库")
+        return "postgresql"
+
+    if mode == "postgres":
+        # 显式要求 PG 时不降级：让故障如实暴露，而不是悄悄换成另一个库。
+        raise RuntimeError(
+            "DB_MODE=postgres 但 PostgreSQL 连不上；拒绝降级到 SQLite"
+        )
+
+    marker_complete = sqlite_marker("complete")
+    if marker_complete == "1":
+        activate_sqlite()
+        if is_standalone():
+            _report_backend(
+                "sqlite",
+                f"PostgreSQL 不可用 → 使用 SQLite 单机库：{_report_sqlite_path()}",
+            )
+        else:
+            _report_backend(
+                "sqlite", "PostgreSQL 不可用 → 由 SQLite 完整副本接管（PG 恢复后自动回切）"
+            )
+        return "sqlite"
+
+    if has_sqlite_data():
+        raise RuntimeError(
+            "SQLite 里有数据但缺少权威标记（complete），可能是同步中断留下的半份副本，"
+            "拒绝接管。请删除该文件重新开始；若确认它就是你的单机数据，"
+            "请显式设置 DB_MODE=sqlite 声明它为权威库"
+        )
+
+    # 空库 / 无库：唯一不可逆的一步，给 PG 最后一次机会。
+    grace = max(0.0, float(settings.db_standalone_grace_s))
+    if grace > 0:
+        # 自解释的日志：只写 timeout_s 会让人以为「卡住了」，这里说清楚在等什么、等不到会怎样。
+        logger.info(
+            "db.bootstrap.waiting_postgres timeout_s=%s "
+            "说明: 先等 PostgreSQL 就绪，超时后自动切换到 SQLite 单机库",
+            grace,
+        )
+        deadline = time.monotonic() + grace
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            time.sleep(min(1.0, remaining))
+            if probe_postgresql_quiet():
+                init_db()
+                activate_postgresql()
+                _report_backend(
+                    "postgresql", "PostgreSQL 在等待后可用 → 使用 PostgreSQL 作为权威主库"
+                )
+                return "postgresql"
+
+    _bootstrap_sqlite_only()
+    _report_backend(
+        "sqlite",
+        f"PostgreSQL 不可用且没有既有数据 → 已新建 SQLite 单机库：{_report_sqlite_path()}",
+    )
+    return "sqlite"
+
+
+def _bootstrap_sqlite_only(*, trust_user: bool = False) -> None:
+    """把 SQLite 立为权威库：空库则新建（打标记），已有权威库则沿用。
+
+    `trust_user=True`（`DB_MODE=sqlite` 显式声明）时，即便库里有数据但缺标记也接管 ——
+    用户已经明确说了「这个库就是权威库」，此时拒绝反而让升级来的老库无法使用。
+    自动降级路径绝不带这个参数：那里的「无标记」意味着来历不明，必须拒绝。
+    """
+    if sqlite_marker("complete") == "1":
+        activate_sqlite()
+        return
+    if not standalone_bootstrap_allowed():
+        if not trust_user:
+            raise RuntimeError(
+                "SQLite 里有数据但缺少权威标记（complete），拒绝接管；"
+                "请删除该文件重新开始，或确认数据无误后用 DB_MODE=sqlite 显式声明"
+            )
+        logger.warning("db.standalone.trusting_unmarked_sqlite path_kind=explicit_db_mode")
+        mark_standalone_baseline()
+        activate_sqlite()
+        return
+    activate_standalone_sqlite(bootstrap=True)
 
 
 def activate_postgresql() -> None:
@@ -1822,6 +2006,9 @@ def _init_pg_schema() -> None:
         conn.executescript(COACH_RUNS_SCHEMA)         # 25. 教练 Agent 编排轨迹
         conn.executescript(RAG_FEEDBACK_SCHEMA)       # 26. 召回反馈（点赞 / 点踩）
         conn.executescript(SYNC_SCHEMA)               # 27. SQLite 副本 / 离线重放回执
+        # 28. ID 游标按现有最大 id 播种。`INSERT … SELECT … ON CONFLICT` 是 PG 形态，
+        #     SQLite 语法上不接受 —— 所以这里天然不能进副本镜像日志，
+        #     由 `init_db()` 的 `suppress_mirror()` 保证（副本侧靠 `_sync_id_allocations()` 对齐）。
         for table, column in (("radar_snapshots", "id"), ("radar_assessments", "id"), ("radar_runs", "run_id")):
             conn.execute(
                 "INSERT INTO _id_allocations (kind, next_id) "
@@ -1832,8 +2019,12 @@ def _init_pg_schema() -> None:
 
 
 def init_db() -> None:
-    """明确在 PostgreSQL 上建表；不改变业务活动库或可用状态。"""
-    with recovery():
+    """明确在 PostgreSQL 上建表；不改变业务活动库或可用状态。
+
+    结构维护整段关掉镜像（`suppress_mirror()`）：副本靠 `sync_sqlite_from_pg()` 整体
+    对齐，这些 DDL / 存量收敛语句逐条镜像只会失败并把 `/health` 打成降级。
+    """
+    with recovery(), suppress_mirror():
         _init_pg_schema()
 
 

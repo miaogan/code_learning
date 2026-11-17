@@ -16,15 +16,8 @@ import secrets
 import sys
 import uuid
 
-from app.core import repository
+from app.core import db, repository
 from app.core.auth import hash_password, normalize_email
-from app.core.config import get_settings
-from app.core.db import (
-    activate_standalone_sqlite,
-    init_db,
-    refresh_replica,
-    standalone_bootstrap_allowed,
-)
 from app.services.ai.user_ai import KEY_MODE_OWN, KEY_MODE_SHARED
 
 _MODES = (KEY_MODE_OWN, KEY_MODE_SHARED)
@@ -186,15 +179,11 @@ def main(argv: list[str] | None = None) -> int:
 def _prepare_database() -> None:
     """把 CLI 这个**独立进程**接到正确的权威库上，再执行业务命令。
 
-    单机模式（`DB_MODE=sqlite`）下没有 PG：SQLite 就是权威库，直接接管 —— 绝不能调
-    `init_db()`，它强制走 PG 连接，在没有 PG 的环境里会让「建号」这种离线操作直接失败。
-    库通常已由后端服务建好；若还没有，`bootstrap=True` 会在空目录上建一份（含权威标记），
-    之后服务启动会认它是单机库而不是「待回放的离线副本」。
+    直接复用 `db.bootstrap()` —— 与后端服务启动是**同一套判定**：优先 PostgreSQL，
+    不可用则接管 SQLite（完整副本 / 单机库），空库则新建单机库。这里不再自己判断一次，
+    否则「服务起来了、建号却连不上库」这种割裂会反复出现。
     """
-    if get_settings().is_sqlite_mode:
-        activate_standalone_sqlite(bootstrap=standalone_bootstrap_allowed())
-        return
-    init_db()
+    db.bootstrap()
 
 
 def _sync_replica() -> None:
@@ -203,12 +192,12 @@ def _sync_replica() -> None:
     这是单进程约束下唯一诚实的做法：服务进程察觉不到别处的写入，副本会不会落后
     只能由写入方负责。失败不算命令失败——PG 已经是事实源，下一次后端恢复会整库重建。
     """
-    if get_settings().is_sqlite_mode:
+    if db.is_standalone():
         # 单机模式下 SQLite 本身就是权威库，没有「副本」要补；打印「已同步 0 张表」
         # 只会让人以为同步出了问题。
         return
     try:
-        counts = refresh_replica()
+        counts = db.refresh_replica()
     except Exception as exc:  # noqa: BLE001 - 副本同步失败不该把已完成的写库翻成失败
         print(
             f"警告：兜底副本同步失败（{type(exc).__name__}），"
