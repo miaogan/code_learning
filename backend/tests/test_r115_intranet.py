@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import re
 from pathlib import Path
@@ -24,6 +25,7 @@ from typing import Any
 
 import pytest
 
+from app import main
 from app.core.config import get_settings
 from app.core.errors import AppError
 from app.services.ai.user_ai import (
@@ -129,6 +131,50 @@ def test_test_connection_reaches_private_endpoint(monkeypatch: pytest.MonkeyPatc
     )
     assert (ok, message) == (True, "连接成功")
     assert seen["base_url"] == "http://192.168.1.20:11434/v1"
+
+
+@pytest.mark.parametrize("raw", ("", "  ", " true ", "\ttrue\n", "True", "1", "on"))
+def test_switch_tolerates_blank_and_padded_values(
+    raw: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`.env` 里写空的 / 带空白的值都不许把进程打挂。
+
+    真实踩点：运维照 `.env.example` 抄完顺手清空一行（`AI_ALLOW_PRIVATE_ENDPOINTS=`），
+    或从文档复制时把 `" true "` 的空白一起带进来 —— pydantic 的 bool 解析不做 trim，
+    两种都会在 `Settings()` 构造期抛 `ValidationError`，服务直接起不来。
+    """
+    monkeypatch.setenv("AI_ALLOW_PRIVATE_ENDPOINTS", raw)
+    get_settings.cache_clear()
+    try:
+        value = get_settings().ai_allow_private_endpoints
+    finally:
+        get_settings.cache_clear()
+    assert value is (raw.strip() != "")
+
+
+def test_public_mode_message_says_how_to_enable() -> None:
+    """默认档拒绝时必须给出下一步 —— 只报「不允许」会让内网用户无从判断是没设对还是没生效。"""
+    with pytest.raises(AppError) as exc:
+        validate_ai_base_url("http://10.0.0.5:8000/v1")
+    assert "AI_ALLOW_PRIVATE_ENDPOINTS" in exc.value.message
+
+
+@pytest.mark.usefixtures("intranet_env")
+def test_startup_logs_policy_when_enabled(caplog: pytest.LogCaptureFixture) -> None:
+    with caplog.at_level(logging.INFO, logger="app.security"):
+        main._report_ai_endpoints(get_settings())
+    assert any("security.ai_private_endpoints=on" in record.getMessage() for record in caplog.records)
+    # 内网放开了、雷达还在联外：必须顺手提醒（这是气隙环境最容易漏的一条）。
+    assert any("RADAR_OFFLINE" in record.getMessage() for record in caplog.records)
+
+
+def test_startup_logs_policy_when_disabled(caplog: pytest.LogCaptureFixture) -> None:
+    """关闭态也要打印：用户设了却没生效时，这是唯一能一眼看出来的地方。"""
+    with caplog.at_level(logging.INFO, logger="app.security"):
+        main._report_ai_endpoints(get_settings())
+    messages = [record.getMessage() for record in caplog.records]
+    assert any("security.ai_private_endpoints=off" in text for text in messages)
+    assert any("AI_ALLOW_PRIVATE_ENDPOINTS=true" in text for text in messages)
 
 
 # --- 零遥测守卫 -----------------------------------------------------------------

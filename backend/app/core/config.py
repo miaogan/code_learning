@@ -60,51 +60,10 @@ _PROFILE_FIELDS: dict[str, tuple[str, str, str, str, str]] = {
 #: 导致生产容器 Key 缺失时 /health 仍报 ai_configured=true，直到 judge --live 才暴露。
 KEY_REQUIRED_PROVIDERS: frozenset[str] = frozenset({"deepseek"})
 
-#: 数值型档位字段：`.env` 里写成 `KEY=`（空值）时**按「没写」处理**，回落字段默认值。
-#: 不做这一步，空串会进 `float` / `int` 校验并在 `Settings()` 构造期抛 `ValidationError` —— 那会把
-#: 整个进程（和整批用例）打挂，恰好违反上面第 1 条不变量「配置错只置 ready=False，不许炸进程」。
-#: 只处理数值型：字符串字段的「空值＝继承 / 未配置」语义由 `resolve_ai` 自己解释，不能被吞掉。
-_NUMERIC_ENV_FIELDS: tuple[str, ...] = (
-    "ai_timeout_s",
-    "ai_max_retries",
-    "ai_deepseek_timeout_s",
-    "ai_lmstudio_timeout_s",
-    "ai_vision_timeout_s",
-    "login_max_failures",
-    "login_lockout_minutes",
-    "rate_limit_window_s",
-    "rate_limit_auth_per_window",
-    "rate_limit_api_per_window",
-    "breaker_max_inflight",
-    "breaker_window_s",
-    "breaker_min_requests",
-    "breaker_error_ratio",
-    "breaker_open_s",
-    "radar_fetch_timeout_s",
-    "radar_fetch_max_bytes",
-    "radar_run_max_techs",
-    "radar_min_stars",
-    "radar_max_assess_per_round",
-    "radar_assess_timeout_s",
-    "radar_gen_timeout_s",
-    "radar_gen_max_questions",
-    "radar_job_stale_minutes",
-    "radar_translate_timeout_s",
-    "db_pool_timeout_s",
-    "db_recovery_interval_s",
-    "db_standalone_grace_s",
-    "db_request_timeout_s",
-    "memory_cache_max_entries",
-    "radar_translate_batch",
-    "ai_embed_timeout_s",
-    "ai_embed_dim",
-    "ai_embed_batch",
-    "jobs_stream_poll_s",
-    "jobs_stream_heartbeat_s",
-    "jobs_stream_max_s",
-    "rag_chunk_tokens",
-    "rag_chunk_overlap",
-)
+#: 空值 / 带空白的环境变量：数值与布尔字段按「没写」或「去掉空白」处理，绝不在构造期抛错。
+#: 判据是**字段类型**而不是手工清单（见 `_tolerate_padded_env`）—— 清单漏一个字段，
+#: 就等于留一个「运维清空一行 .env，整个进程起不来」的坑。字符串字段不受影响：
+#: 「空值＝继承 / 未配置」的语义由 `resolve_ai` 自己解释，不能被吞掉。
 
 #: r41：视觉档未开通时的**唯一**中文说明（图片入口直接透传，不静默降级成 PDF 提示）。
 VISION_UNCONFIGURED_REASON = "图片识别未开通，请改用 PDF 上传"
@@ -154,19 +113,34 @@ class Settings(BaseSettings):
 
     @model_validator(mode="before")
     @classmethod
-    def _blank_numeric_env_uses_default(cls, data: Any) -> Any:
-        """`AI_*_TIMEOUT_S=` / `AI_MAX_RETRIES=` 这类空值按「未设置」处理（回落字段默认值）。
+    def _tolerate_padded_env(cls, data: Any) -> Any:
+        """空值 / 带空白的数值与布尔环境变量：按「没写」或「去掉空白」处理。
 
-        `pydantic-settings` 默认把空串当输入值，`float("")` / `int("")` 会在构造期抛错。运维照
-        `.env.example` 抄完顺手清空一行的概率不低，那时后端不该起不来 —— 与「解析永不 raise」同一口径。
+        三种真实踩过的形态，任何一种都不该让进程起不来：
+
+        - `AI_TIMEOUT_S=`（照 `.env.example` 抄完顺手清空）—— 空串进 `float()` 直接抛；
+        - `COOKIE_SECURE=` —— 空串进 `bool` 校验同样抛；
+        - `AI_ALLOW_PRIVATE_ENDPOINTS=" true "`（从文档复制带上了空格）—— pydantic 的
+          bool 解析**不做 trim**，`' true '` 一样抛。
+
+        判据是**字段类型**：`int` / `float` / `bool` 一律容错，`str` 不动 ——
+        「空值＝继承 / 未配置」的语义由 `resolve_ai` 自己解释，不能被这里吞掉。
         """
         if not isinstance(data, dict):
             return data
-        blank = [name for name in _NUMERIC_ENV_FIELDS if str(data.get(name, "")).strip() == ""
-                 and data.get(name) is not None]
-        if not blank:
-            return data
-        return {name: value for name, value in data.items() if name not in blank}
+        cleaned = dict(data)
+        for name, value in data.items():
+            if not isinstance(value, str):
+                continue
+            annotation = getattr(cls.model_fields.get(name), "annotation", None)
+            if annotation not in (int, float, bool):
+                continue
+            text = value.strip()
+            if not text:
+                cleaned.pop(name, None)          # 空值＝没写，回落字段默认值
+            elif annotation is bool:
+                cleaned[name] = text             # 布尔去掉首尾空白；数值留给 pydantic 解析
+        return cleaned
 
     # --- AI 全局（legacy：`AI_PROVIDER` 为空时逐字沿用 r8 语义） -----------------
     ai_base_url: str = "https://api.openai.com/v1"

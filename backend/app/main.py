@@ -20,7 +20,7 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core import db, redis_cache, repository
-from app.core.config import get_settings
+from app.core.config import Settings, get_settings
 from app.core.db import close_pool, init_db
 from app.core.errors import (
     FORBIDDEN,
@@ -116,16 +116,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         logging.getLogger(__name__).warning("production.config_warning=%s", warning)
     # 主动放宽的安全策略必须留在启动日志里（与 `[数据层]` / `[缓存层]` 同一口径）：
     # 静悄悄放行私网端点，等于让「谁能访问哪段网络」这件事失去可追溯性。
-    if settings.ai_allow_private_endpoints:
-        security_logger.warning(
-            "[安全] AI_ALLOW_PRIVATE_ENDPOINTS=true → 用户自带 AI 端点可指向私网 / 环回地址"
-            "（内网部署专用；公网部署等于放开内网端口探测）"
-        )
-        if not settings.radar_offline and settings.radar_schedule.strip().lower() != "off":
-            security_logger.warning(
-                "[安全] 内网放行已开，但雷达采集仍会访问公网（GitHub / arXiv / Hacker News 等）："
-                "内网 / 气隙环境请设 RADAR_OFFLINE=true 或 RADAR_SCHEDULE=off"
-            )
+    _report_ai_endpoints(settings)
 
     # PG / Redis 都是可恢复的**运行时**依赖：不在 Web 启动路径上同步连库。
     db.reset_runtime()
@@ -243,6 +234,33 @@ async def _report_cache() -> None:
         cache_logger.info("[缓存层] 未配置 Redis → 使用进程内缓存（仅单进程有效）")
     else:
         cache_logger.warning("[缓存层] Redis 不可用 → 已降级为进程内缓存（恢复后自动切回）")
+
+
+def _report_ai_endpoints(settings: Settings) -> None:
+    """打印「用户自带 AI 端点」的放行策略。
+
+    主动放宽的安全策略必须留痕（与 `[数据层]` / `[缓存层]` 同一口径）：静悄悄放行私网端点，
+    等于让「谁能访问哪段网络」失去可追溯性。
+
+    **两档都打印**：只打印开启态时，「设了却没生效」（写在 `deploy.env`、没重建容器、
+    跑的是旧镜像）会毫无线索 —— 内网部署实际就卡在这里，用户只能看到一句「不允许指向内网」。
+    """
+    if settings.ai_allow_private_endpoints:
+        security_logger.warning(
+            "[安全] security.ai_private_endpoints=on 说明: 用户自带 AI 端点可指向私网 / 环回地址"
+            "（内网部署专用；公网部署等于放开内网端口探测）"
+        )
+        if not settings.radar_offline and settings.radar_schedule.strip().lower() != "off":
+            security_logger.warning(
+                "[安全] 内网放行已开，但雷达采集仍会访问公网（GitHub / arXiv / Hacker News 等）："
+                "内网 / 气隙环境请设 RADAR_OFFLINE=true 或 RADAR_SCHEDULE=off"
+            )
+        return
+    security_logger.info(
+        "[安全] security.ai_private_endpoints=off 说明: 用户自带 AI 端点只能指向公网地址；"
+        "要填内网地址（如 http://10.x:8000/v1）需在 backend/.env 设 "
+        "AI_ALLOW_PRIVATE_ENDPOINTS=true 并重建容器"
+    )
 
 
 async def _recover_database(ready: asyncio.Event | None = None) -> None:
