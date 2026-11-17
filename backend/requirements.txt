@@ -25,3 +25,11 @@ langgraph>=1.2
 # r103：RAG 文本切分（只用 node_parser 的 SentenceSplitter；未装时自研切分兜底，
 # 检索/嵌入/融合全部走自研，不引入 langchain 模型抽象）
 llama-index-core>=0.14
+
+# ---- r117 向量检索后端（可选依赖：缺哪个档就不可用，进程照常起，给中文提示）----
+# faiss-cpu：VECTOR_MODE=faiss 的文件型向量索引（16.6MB wheel，仅依赖 numpy + packaging）。
+#   wheel 是平台专属（cp39-abi3），内网离线安装要按目标平台分别准备（服务器 linux x86_64）。
+faiss-cpu>=1.11 ; python_version >= "3.10"
+# pymilvus：VECTOR_MODE=milvus 连内网 Milvus（纯 Python，会带 grpcio / pandas）。
+#   用本地 PersistentClient（faiss / sqlite 档）时完全用不到，可不装。
+pymilvus>=3.0 ; python_version >= "3.10"

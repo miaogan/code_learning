@@ -22,7 +22,7 @@ from dataclasses import dataclass, field, replace
 from functools import lru_cache
 from typing import Any, Literal, get_args
 
-from pydantic import model_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 #: `json_mode` 闭集（唯一出处；`services/ai.py` 的投影表必须与它键集相等）。
@@ -218,6 +218,25 @@ class Settings(BaseSettings):
     #: prose 切分的 token 上限与重叠（llama SentenceSplitter 直接生效；native 以字符近似）。
     rag_chunk_tokens: int = 320
     rag_chunk_overlap: int = 48
+
+    # --- r117 向量检索后端（与 DB_MODE 同构的三选一 + 自动档） -----------------
+    #: `auto`：pgvector 可用则用 pgvector，否则装了 faiss 用 faiss，最后回落 sqlite。
+    #: 显式档位不可用时**启动即报错**（Literal 校验 + resolve 时中文原因），不静默换档。
+    vector_mode: Literal["auto", "pgvector", "sqlite", "faiss", "milvus"] = "auto"
+    #: faiss 索引目录：每个 kind 一个 `<kind>.faiss`（向量）+ `<kind>.json`（ord→chunk_id 映射）。
+    #: 默认跟 sqlite_path 同根（`data/`），备份业务库时一起拷走。
+    vector_faiss_dir: str = "data/rag-vectors"
+    #: Milvus 远端地址（内网 standalone 常见 `http://milvus:19530`）；留空 = 该档未配置。
+    vector_milvus_uri: str = ""
+    #: Milvus collection 名；留空用内置默认。
+    vector_milvus_collection: str = ""
+
+    @field_validator("vector_mode", mode="before")
+    @classmethod
+    def _strip_vector_mode(cls, value: Any) -> Any:
+        """`VECTOR_MODE= auto`（复制带空格）是经典脚枪：Literal 校验会直接拒，
+        错误信息又只有「not one of ...」——先剥空白，让「写对了但带了空格」能启动。"""
+        return value.strip() if isinstance(value, str) else value
 
     # --- r102 实时推送（SSE）-------------------------------------------------
     #: 任务进度流的服务端轮询间隔（秒）：推送是「有变化才发」，但底层仍要查库。
