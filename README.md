@@ -149,6 +149,41 @@ docker compose ps        # backend 的 STATUS 应带 (healthy)
   ```
   完整顺序、验收命令、排障表、安全清单见 [公网部署手册](./docs/teamflow/20261112-r97-public-deploy/DEPLOY.md)。
 
+## 内网 / 气隙部署（默认零遥测）
+
+系统**不含任何遥测**：没有统计 SDK、没有崩溃上报、没有更新检查、没有外部 CDN / 字体 / 图标，
+入口 HTML 完全自包含（`frontend/index.html` 只有本地 `/src/main.tsx`）。这一点由
+`backend/tests/test_r115_intranet.py` 里的守卫用例持续断言，不是口头承诺。
+
+运行期的出网点只有四处，且每一处都能指向内网或整体关掉：
+
+| 出网点 | 什么时候会出网 | 内网怎么处理 |
+|---|---|---|
+| 业务 LLM（`app/services/ai/ai.py`） | 每次 AI 调用 | `AI_BASE_URL` / `AI_PROVIDER` 档位指向内网模型（管理员可填私网地址，无限制） |
+| 用户自带 LLM（设置页填写） | 用户点「测试连接」或用自己的 Key | 设 `AI_ALLOW_PRIVATE_ENDPOINTS=true` 才允许填 `http://10.x` / `http://localhost:11434` |
+| 远端 embedding（`retrieval/embeddings.py`） | `AI_EMBED_MODEL` 非空时 | 留空＝离线哈希 embedder（零网络），或把 `AI_EMBED_BASE_URL` 指向内网 TEI |
+| 技术雷达采集（`radar/sources.py`） | 定时 / 手动采集 | `RADAR_OFFLINE=true`（只读本地样本）或 `RADAR_SCHEDULE=off`（只允许手动） |
+
+内网环境的最小配置：
+
+```bash
+# backend/.env
+AI_PROVIDER=lmstudio                       # 或 deepseek 档改指向内网 OpenAI 兼容端点
+AI_LMSTUDIO_BASE_URL=http://10.0.0.5:8000/v1
+AI_LMSTUDIO_MODEL=qwen2.5-32b
+AI_ALLOW_PRIVATE_ENDPOINTS=true            # 允许用户自带端点填内网地址
+RADAR_OFFLINE=true                         # 关掉唯一会主动访问公网的采集链路
+RAG_SEED_TUTORIALS=false                   # 不填不会挂，但启动会因连不上 embedding 而慢
+```
+
+> `AI_ALLOW_PRIVATE_ENDPOINTS` 打开后**仍然拒绝**云元数据地址与链路本地段（`169.254.0.0/16`、
+> `100.100.100.200`、`metadata.google.internal` 等）—— 内网机器常常就是云主机，这是刻意保留的硬边界。
+> 启动日志会打一条 `[安全] AI_ALLOW_PRIVATE_ENDPOINTS=true …` 留痕。
+
+构建期需要能访问 pip / npm 源（或用内网镜像：`--build-arg PIP_INDEX_URL=… / NPM_REGISTRY=…`）；
+embedder 容器首次启动会下载模型（`--profile embed` 才启动，可预置 `skillcoach-embedcache` 卷离线带入）。
+完整审计与验收命令见 [内网 / 气隙部署说明](./docs/teamflow/20261117-r115-intranet-airgap/README.md)。
+
 ## 自检命令
 
 | 位置 | 命令 | 期望 |
