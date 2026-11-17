@@ -99,7 +99,7 @@ CREATE INDEX IF NOT EXISTS idx_reports_created ON reports (created_at DESC);
 
 ### 2.1 各端点内部逻辑（判定规则写死，避免实现自由发挥）
 
-- **画像**：`documents.text` → 截断 12k 字（超出追加「（已截取前 12000 字）」）→ `complete_model(PROFILE_SYSTEM, 正文, ProfileDraft)` → `verify_quotes(draft, text)`：每条 `source_quote` 去空白后须能在正文里定位（同文包含匹配，允许跨行合并空白）；命中失败 → 抛 `AI_SCHEMA_INVALID`（`ai.py` 已重试 1 次）⇒ anti-goal 1「无源之词」在入库前被拦。
+- **画像**：`documents.text` → 截断 12k 字（超出追加「（已截取前 12000 字）」）→ `complete_model(PROFILE_SYSTEM, 正文, ProfileDraft)` → `verify_quotes(draft, text)`：每条 `source_quote` 归一化（NFKC + 去 `Cf` 不可见字符 + 去空白）后须能在正文里定位（同文包含匹配，允许跨行合并空白、允许尾部省略号）；命中失败走「补抽一次 → 逐条剔除 → 一条不剩才抛 `AI_SCHEMA_INVALID`」⇒ anti-goal 1「无源之词」在入库前被拦。**原文「`ai.py` 已重试 1 次」不成立**：`ai.py` 的重试只覆盖「JSON 解析失败 / 契约校验失败」，`verify_quotes` 在 `complete_model` 返回之后才跑，一次都没被重试过 —— 这正是 r116 修的「同一份简历有时成功有时失败」。
 - **面试出题**：`InterviewDraft{questions: list[InterviewQuestion]}` → 校验 `len>=8`、`technical>=5`、`project>=3`、`challenge<=2`（≤20% 向上取整）、`prompt` 去重 → 不满足即 502 中文「本次出题不合格，请重试」（**不做静默补题**：补题=题目与简历脱节，anti-goal 2）。
 - **面试评分**：`timeout_s=14` 调 `ScoreDraft{score: 0–10, comment<=120字}` → 回写 payload（`answer/score/comment/answered_at/elapsed_s`）→ `answered_count==total` 时 `status=completed`。重复提交同一题=重答，覆盖旧分（幂等）。
 - **笔试组卷**：读 `seed/questions.json`，按 `profile.tech_stack + target_role` 命中的 `direction` 排序取题；客观题（`single`/`multiple`）先取满 ≥8，再补 `text` 至 ≥10、≤12；`challenge` 占比 ≤20%；方向题不足则跨方向补齐（**题量优先于方向纯度**，且这不是 AI 出题所以不会与简历脱节）。`started_at=now(UTC)` 入 payload。
