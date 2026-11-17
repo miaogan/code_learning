@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+import logging
 import sqlite3
 import uuid
 from collections.abc import Iterator
@@ -43,16 +44,17 @@ def _create_user(email: str = EMAIL) -> str:
     return user_id
 
 
-@pytest.fixture()
-def standalone_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
-    """把运行环境切成「没有 PG、没有 Redis、没有既有数据目录」。
+def _prepare_env(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, mode: str
+) -> Path:
+    """把环境切成「没有 PG、没有 Redis、没有既有数据目录」。
 
-    `DATABASE_URL` 指到 127.0.0.1:1（通常无监听）：`connect_timeout=2`，首次探测会
-    快速失败而不会把用例拖成几十秒。宽限期设 0 —— 这条路走的是 `DB_MODE=sqlite`
-    显式模式，本来就不该等 PG；auto 模式的宽限期另有专门用例。
+    `DATABASE_URL` 指到 127.0.0.1:1（通常无监听）：`connect_timeout=1`，首次探测会
+    快速失败而不会把用例拖成几十秒。宽限期设 0 —— 用例要的是「判定逻辑」而不是
+    「等满 15s」，真实宽限期另有一条断言日志的用例覆盖。
     """
     sqlite_path = tmp_path / "standalone.db"
-    monkeypatch.setenv("DB_MODE", "sqlite")
+    monkeypatch.setenv("DB_MODE", mode)
     monkeypatch.setenv("DATABASE_URL", "postgresql://nobody:nobody@127.0.0.1:1/nodb")
     monkeypatch.setenv("SQLITE_PATH", str(sqlite_path))
     monkeypatch.setenv("REDIS_URL", "")
@@ -62,12 +64,33 @@ def standalone_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[
     get_settings.cache_clear()
     db.close_pool()
     db.reset_runtime()
+    return sqlite_path
+
+
+def _cleanup_env() -> None:
+    db.close_pool()
+    db.reset_runtime()
+    get_settings.cache_clear()
+
+
+@pytest.fixture()
+def standalone_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
+    """显式声明单机模式（`DB_MODE=sqlite`）：不探测 PG。"""
+    path = _prepare_env(tmp_path, monkeypatch, mode="sqlite")
     try:
-        yield sqlite_path
+        yield path
     finally:
-        db.close_pool()
-        db.reset_runtime()
-        get_settings.cache_clear()
+        _cleanup_env()
+
+
+@pytest.fixture()
+def auto_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
+    """默认档（`DB_MODE=auto`）：用户什么都不配时的真实路径 —— 优先 PG，不可用自动切 SQLite。"""
+    path = _prepare_env(tmp_path, monkeypatch, mode="auto")
+    try:
+        yield path
+    finally:
+        _cleanup_env()
 
 
 def test_cold_start_without_postgres_or_redis(standalone_env: Path) -> None:
@@ -154,12 +177,12 @@ def test_existing_data_without_complete_marker_is_still_rejected(
         db.activate_sqlite()
 
 
-def test_runtime_failure_never_becomes_standalone(standalone_env: Path) -> None:
-    """运行中故障不得把主库悄悄变成单机库（`allow_bootstrap=False` 的路径）。
+def test_running_failure_takes_over_as_replica_not_standalone(standalone_env: Path) -> None:
+    """运行中 PG 故障只能按**副本**接管，绝不能升格成单机权威库。
 
     这条对应真实风险：生产 PG 抖动几秒，如果顺手立一个单机库，就再也不会自动切回 PG，
-    数据会留在本地文件里形成分叉。所以 `allow_bootstrap=False` 时只能按**副本**接管
-    （`mode=online`、`is_standalone=False`），绝不能升格为权威主库。
+    数据会留在本地文件里形成分叉。启动时的决策由 `db.bootstrap()` 一次做完，运行中
+    只允许「用已有副本顶着」这一种动作。
     """
     db.activate_standalone_sqlite(bootstrap=True)
     _create_user()
@@ -169,9 +192,8 @@ def test_runtime_failure_never_becomes_standalone(standalone_env: Path) -> None:
         raw.commit()
     db.reset_runtime()
 
-    from app.main import _activate_fallback  # 局部 import：只验这个决策函数的行为
+    db.activate_sqlite()
 
-    assert _activate_fallback(False) is False, "没有允许 bootstrap 就不该新建单机库"
     assert db.active_backend() == "sqlite"
     assert db.is_standalone() is False, "副本形态不能被当成单机权威库"
     assert db.runtime_state()["mode"] == "online"
@@ -219,3 +241,99 @@ def test_admin_cli_bootstraps_empty_directory(standalone_env: Path) -> None:
         keys = {row[0] for row in raw.execute("SELECT key FROM _sync_state")}
     assert {"complete", "standalone"} <= keys
     assert db.has_sqlite_data() is True
+
+
+# --- 默认档（DB_MODE=auto）：用户什么都不配时的真实路径 ---------------------------
+
+
+def test_auto_mode_falls_back_to_sqlite_and_prints_choice(
+    auto_env: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """不设 DB_MODE：PG 不可达 → 自动切 SQLite，并打印「实际用了哪个库」。
+
+    这是用户最关心的那条路：不改任何配置，也能起来并看得见结论。
+    """
+    caplog.set_level(logging.INFO, logger="app.db")
+    backend = db.bootstrap()
+
+    assert backend == "sqlite"
+    assert db.is_standalone() is True
+    messages = [record.getMessage() for record in caplog.records]
+    assert any("db.backend.selected" in m for m in messages), messages
+    assert any("PostgreSQL 不可用" in m for m in messages), messages
+
+
+def test_auto_mode_prefers_postgres_when_available(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """PG 可用时必须优先 PG —— 「优先 pgsql」是这个功能的硬要求。
+
+    这里连的是会话级测试库（`TEST_DATABASE_URL`，conftest 已建好表），
+    `init_db()` 的 DDL 全部幂等，不会污染结构。
+    """
+    monkeypatch.setenv("DB_MODE", "auto")
+    monkeypatch.setenv("SQLITE_PATH", str(tmp_path / "unused.db"))
+    get_settings.cache_clear()
+    db.close_pool()
+    db.reset_runtime()
+
+    caplog.set_level(logging.INFO, logger="app.db")
+    backend = db.bootstrap()
+
+    assert backend == "postgresql"
+    assert db.active_backend() == "postgresql"
+    assert db.is_standalone() is False
+    messages = [record.getMessage() for record in caplog.records]
+    assert any("PostgreSQL 可用" in m for m in messages), messages
+
+
+def test_explicit_postgres_mode_never_falls_back(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`DB_MODE=postgres` 连不上就报错，不能偷偷换成 SQLite。"""
+    path = _prepare_env(tmp_path, monkeypatch, mode="postgres")
+    del path
+    with pytest.raises(RuntimeError, match="拒绝降级"):
+        db.bootstrap()
+    assert db.active_backend() == "postgresql"
+    assert db.is_standalone() is False
+
+
+def test_bootstrap_rejects_unmarked_data_with_actionable_hint(
+    auto_env: Path,
+) -> None:
+    """有数据却缺权威标记时，报错必须给出可执行的处理方式。
+
+    只说「拒绝」会让用户卡死：他手上这份数据很可能是自己的单机库（旧版本留下的）。
+    这里必须用 `auto` 档 —— 显式 `DB_MODE=sqlite` 是「用户已经声明这就是权威库」，
+    会走信任路径接管，不抛错（另有用例覆盖）。
+    """
+    db.activate_standalone_sqlite(bootstrap=True)
+    _create_user()
+    with sqlite3.connect(auto_env) as raw:
+        raw.execute("DELETE FROM _sync_state WHERE key IN ('complete', 'standalone')")
+        raw.commit()
+    db.reset_runtime()
+
+    with pytest.raises(RuntimeError, match="DB_MODE=sqlite"):
+        db.bootstrap()
+
+
+def test_explicit_sqlite_mode_trusts_unmarked_data(standalone_env: Path) -> None:
+    """显式声明 `DB_MODE=sqlite` 时接管无标记的库：用户已经说了这就是权威库。
+
+    典型场景是从 r98 之前升级上来的老 `app.db`（没有 `_sync_state` 表），
+    它的数据是真的，不该被当成「来历不明」永久拒绝。
+    """
+    db.activate_standalone_sqlite(bootstrap=True)
+    _create_user()
+    with sqlite3.connect(standalone_env) as raw:
+        raw.execute("DELETE FROM _sync_state WHERE key IN ('complete', 'standalone')")
+        raw.commit()
+    db.reset_runtime()
+
+    assert db.bootstrap() == "sqlite"
+    assert db.is_standalone() is True
+    # 接管后必须补上标记，否则下次启动又会走到「无标记」分支。
+    assert db.sqlite_marker("complete") == "1"
+    assert db.sqlite_marker("standalone") == "1"

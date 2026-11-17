@@ -36,6 +36,9 @@ def unavailable_dependencies(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) ->
     monkeypatch.setenv("DATABASE_URL", "postgresql://postgres:postgres@127.0.0.1:1/sc_app")
     monkeypatch.setenv("REDIS_URL", "redis://127.0.0.1:1/0")
     monkeypatch.setenv("DB_RECOVERY_INTERVAL_S", "0.05")
+    # r114：宽限期决定「要不要等 PG 才建单机库」。用例本身在验判定逻辑，
+    # 不该真等 15s；真实宽限期的行为由 test_db_standalone 的日志断言覆盖。
+    monkeypatch.setenv("DB_STANDALONE_GRACE_S", "0")
     monkeypatch.setenv("RADAR_SCHEDULE", "off")
     monkeypatch.setenv("SQLITE_PATH", str(tmp_path / "no-replica" / "fallback.db"))
     get_settings.cache_clear()
@@ -653,18 +656,22 @@ def test_recovery_excludes_business_transactions(replica: str) -> None:
 def test_first_outage_without_replica_does_not_block_lifespan(
     unavailable_dependencies: None,
 ) -> None:
+    """首次启动连不上 PG 且没有副本：不阻塞启动，自动落到 SQLite 单机库。
+
+    r114 起此处行为变了：这正是「这台机器没有 PG」的典型场景，宽限期一过就建单机库
+    （用户要的开箱能跑）。但**启动不能被那次等待卡住** —— lifespan 最多等 2.5s 就放流量。
+    """
     started = time.monotonic()
     with TestClient(app) as client:
         body = client.get("/health").json()
-        assert body["status"] == "degraded"
-        assert body["db"] == "postgresql"
-        assert body["db_status"] == "degraded"
-        assert body["redis_status"] == "degraded"
+        assert body["db"] == "sqlite"
+        # 单机模式下没有「副本」这个概念
+        assert body["db_replica"] == "na"
         business = client.post(
             "/api/auth/login", json={"email": "member@example.com", "password": "bad-password"}
         )
-        assert business.status_code == 503
-        assert business.json()["error"]["code"] == "DATABASE_UNAVAILABLE"
+        # 库可用时登录失败是账号/口令问题（401/422），不该再是「数据服务不可用」
+        assert business.status_code != 503
         assert "127.0.0.1" not in business.text
     assert time.monotonic() - started < 8.0
 
@@ -810,7 +817,11 @@ def test_unreachable_pg_skips_exclusive_recovery_window(
 
     entered: list[int] = []
     monkeypatch.setattr(db, "ping_postgresql", unavailable)
-    monkeypatch.setattr("app.main._initialize_database", lambda: entered.append(1))
+    # r114：启动决策已由 `db.bootstrap()` 完成，这里直接固定成「副本接管」，
+    # 让用例只测「恢复循环不会抢占写锁去跑初始化」这一件事。
+    monkeypatch.setattr(db, "bootstrap", lambda: "sqlite")
+    monkeypatch.setattr("app.main._seed_business_data", lambda **_: None)
+    monkeypatch.setattr("app.main._initialize_pg_database", lambda: entered.append(1))
 
     async def verify() -> None:
         task = asyncio.create_task(_recover_database())
@@ -841,6 +852,9 @@ def test_database_recovery_retries_until_initialization_succeeds(
     attempts = 0
     # 预探活只负责判断 PG 是否值得进入恢复窗口；本用例单独验证初始化重试。
     monkeypatch.setattr(db, "ping_postgresql", lambda: None)
+    # 启动决策固定为「PG 已选定」：这个用例测的是恢复窗口里的重试，不是选库。
+    monkeypatch.setattr(db, "bootstrap", lambda: "postgresql")
+    monkeypatch.setattr("app.main._seed_business_data", lambda **_: None)
 
     def eventually_available() -> None:
         nonlocal attempts
@@ -848,7 +862,7 @@ def test_database_recovery_retries_until_initialization_succeeds(
         if attempts == 1:
             raise psycopg.OperationalError("simulated unavailable")
 
-    monkeypatch.setattr("app.main._initialize_database", eventually_available)
+    monkeypatch.setattr("app.main._initialize_pg_database", eventually_available)
 
     async def verify_retry() -> None:
         task = asyncio.create_task(_recover_database())
@@ -882,7 +896,10 @@ def test_lifespan_waits_for_recovery_worker_before_closing_pool(
         db.close_pool()
 
     monkeypatch.setattr(db, "ping_postgresql", lambda: None)
-    monkeypatch.setattr("app.main._initialize_database", slow_initialize)
+    # 启动决策固定成「PG 已选定」，让恢复窗口立刻拿到 slow_initialize 这个阻塞点。
+    monkeypatch.setattr(db, "bootstrap", lambda: "postgresql")
+    monkeypatch.setattr("app.main._seed_business_data", lambda **_: None)
+    monkeypatch.setattr("app.main._initialize_pg_database", slow_initialize)
     monkeypatch.setattr("app.main.close_pool", checked_close_pool)
     monkeypatch.setenv("RADAR_SCHEDULE", "off")
     get_settings.cache_clear()
@@ -902,9 +919,14 @@ def test_lifespan_waits_for_recovery_worker_before_closing_pool(
     assert closed_after_worker == [True]
 
 
-def test_real_pg_recovers_without_restarting_app(
+def test_pg_arriving_within_grace_period_still_wins(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
+    """PG 比 backend 晚几秒就绪时，宽限期内连上就仍用 PG，不留下单机库。
+
+    这是 `DB_STANDALONE_GRACE_S` 存在的理由：容器编排里 postgres 常常比 backend 晚几秒
+    启动。若第一次探测失败就急着重库，就再也不会切回 PG，数据会留在本地文件里形成分叉。
+    """
     from tests.conftest import EMPTY_DSN, _ensure_database_exists, _reset_schema
 
     _ensure_database_exists(EMPTY_DSN)
@@ -912,22 +934,30 @@ def test_real_pg_recovers_without_restarting_app(
     monkeypatch.setenv("SQLITE_PATH", str(tmp_path / "no-replica" / "fallback.db"))
     monkeypatch.setenv("DATABASE_URL", "postgresql://postgres:postgres@127.0.0.1:1/sc_app")
     monkeypatch.setenv("REDIS_URL", "memory://")
-    monkeypatch.setenv("DB_RECOVERY_INTERVAL_S", "0.1")
+    monkeypatch.setenv("DB_STANDALONE_GRACE_S", "3")
     monkeypatch.setenv("RADAR_SCHEDULE", "off")
     get_settings.cache_clear()
     db.close_pool()
+
+    real_probe = db.probe_postgresql_quiet
+    attempts = {"n": 0}
+
+    def probe_after_first() -> bool:
+        """第一次探测失败（PG 还没起来），宽限期内的下一次用真实探测连空库。"""
+        attempts["n"] += 1
+        if attempts["n"] == 1:
+            return False
+        monkeypatch.setenv("DATABASE_URL", EMPTY_DSN)
+        get_settings.cache_clear()
+        return real_probe()
+
+    monkeypatch.setattr(db, "probe_postgresql_quiet", probe_after_first)
     try:
-        with TestClient(app) as client:
-            assert client.get("/health").json()["db_status"] == "degraded"
-            monkeypatch.setenv("DATABASE_URL", EMPTY_DSN)
-            get_settings.cache_clear()
-            for _ in range(150):
-                if client.get("/health").json()["db_status"] == "up":
-                    break
-                time.sleep(0.1)
-            assert client.get("/health").json()["db_status"] == "up"
-            with db.connection() as conn:
-                assert conn.execute("SELECT COUNT(*) AS n FROM questions").fetchone()["n"] > 0
+        assert db.bootstrap() == "postgresql"
+        assert db.active_backend() == "postgresql"
+        assert db.is_standalone() is False
+        # 关键：没有顺手留下一个单机库（那会让下次启动走上单机，再也回不到 PG）。
+        assert db.sqlite_marker("standalone") is None
     finally:
         db.close_pool()
         get_settings.cache_clear()
