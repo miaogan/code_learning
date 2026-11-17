@@ -176,6 +176,16 @@ RADAR_OFFLINE=true                         # 关掉唯一会主动访问公网�
 RAG_SEED_TUTORIALS=false                   # 不填不会挂，但启动会因连不上 embedding 而慢
 ```
 
+没有 PostgreSQL / Redis 也一样跑（`DB_MODE` 留空即自动降级到 SQLite 单机库，见上一节），
+所以「内网单机」是最常见的组合：**不设 `DB_MODE`、不装 PG/Redis**，只填上面的 AI 三项即可。
+
+改完先自查，再重启进程：
+
+```bash
+cd backend
+python -m app.admin_cli doctor      # 只读：配置来源 / 数据层 / 缓存 / AI 端点策略 + 明确结论
+```
+
 > `AI_ALLOW_PRIVATE_ENDPOINTS` 打开后**仍然拒绝**云元数据地址与链路本地段（`169.254.0.0/16`、
 > `100.100.100.200`、`metadata.google.internal` 等）—— 内网机器常常就是云主机，这是刻意保留的硬边界。
 > 启动日志会打一条 `[安全] security.ai_private_endpoints=on|off …` 留痕，**两档都打印**：

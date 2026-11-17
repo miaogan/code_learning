@@ -104,27 +104,59 @@ except Exception as exc: print(exc)          # 仍然拒绝（元数据）
 - 内网放行只管「用户自带端点」；服务端配置（`AI_*`、`AI_EMBED_*`）从来不受 SSRF 门禁约束，
   管理员向来可以直接填内网地址。
 
-## 7. 「设了开关还是报不允许指向内网」——四种真实原因
+## 7. 「设了开关还是报不允许指向内网」——先分清三种可能
 
-上线当天用户就反馈设了开关仍然报 `API 地址不允许指向本机、内网或云元数据地址`。
-文案由 `_SSRF_MESSAGE` 唯一产出，说明进程里读到的仍是 `false`。按出现频率排：
+文案由 `_SSRF_MESSAGE` 唯一产出，说明进程里读到的仍是 `false`。**别急着改配置，先确认代码版本**：
+
+```bash
+cd backend
+python -c "from app.core.config import get_settings as g; print(g().ai_allow_private_endpoints)"
+```
+
+| 输出 | 含义 | 动作 |
+|---|---|---|
+| `AttributeError: ai_allow_private_endpoints` | **这台机器还是 r115 之前的代码**（该字段不存在）。内网环境往往是离线拷贝的代码包，最容易停在这一步 | 更新代码（见下） |
+| `False` | 代码是新的，开关没生效 | 按下一段四种原因排查 |
+| `True` | 开关已生效 | 报错来自旧进程 / 旧标签页 / 另一台机器 |
+
+一条命令看全部（r115 起）：`python -m app.admin_cli doctor`（只读，不建库不连库改状态）
+
+```
+== 部署自查 ==
+工作目录        : /opt/skillcoach/backend
+配置文件        : /opt/skillcoach/backend/.env（存在）
+DB_MODE         : auto
+数据层          : 无 PostgreSQL、SQLite 为空 → 首次启动新建单机库 /opt/skillcoach/backend/data/app-fallback.db
+服务端 AI 档位  : provider=lmstudio model=qwen2.5-32b  端点=http://10.0.0.5:8000/v1 就绪=是
+缓存层          : memory（未配置 Redis，进程内缓存）
+雷达采集        : 会访问公网（调度=inapp）
+
+结论：用户自带 AI 端点【不能】填内网地址 ❌（只允许公网地址）
+      要放行：在 …/backend/.env 里加一行 AI_ALLOW_PRIVATE_ENDPOINTS=true，然后重启后端进程
+```
+
+开关设了但仍是 `off` 的四种原因，按出现频率排：
 
 | # | 原因 | 怎么确认 | 怎么修 |
 |---|---|---|---|
 | 1 | 写在 `deploy.env` 里 | compose 的 `env_file` 只指向 `backend/.env`；`--env-file deploy.env` **只用于 compose 变量插值，不注入容器** | 挪到 `backend/.env` |
 | 2 | 改了没重建容器 | `docker inspect` 里看不到这个变量 | `docker compose up -d`（`restart` 不会更新容器环境变量） |
-| 3 | 跑的是旧镜像 / 旧代码 | 启动日志里没有 `security.ai_private_endpoints=` 这行 | `git pull` 后 `docker compose up -d --build` |
-| 4 | 从源码起但 cwd 不对 | `.env` 是**按进程 cwd** 解析的 | 在 `backend/` 目录下启动 uvicorn |
+| 3 | 跑的是旧镜像 / 旧代码 | `doctor` 里没有「用户自带 AI 端点」这一行 | 更新代码后重建 |
+| 4 | 从源码起但 cwd 不对 | `doctor` 打印的「配置文件」路径不是你改的那个 `.env` | 在 `backend/` 目录下启动 |
 
-一条命令自查（在部署机上）：
+### 内网 / 离线机器怎么更新代码
+
+内网机器上不了 GitHub，用 bundle 搬运（有网机器在仓库里执行）：
 
 ```bash
-docker compose exec backend python -c \
-  "from app.core.config import get_settings as g; print('on' if g().ai_allow_private_endpoints else 'off')"
-
-# 再对一眼启动日志里的策略行
-docker compose logs backend | grep security.ai_private_endpoints
+git bundle create /tmp/skillcoach.bundle dev      # 产出单文件，含完整历史
+# 拷进内网机器后：
+git pull /path/to/skillcoach.bundle dev           # 或 git clone 该 bundle 到新目录
 ```
+
+只关心这次修复的话，最小改动是四个文件：`app/core/config.py`、`app/services/ai/user_ai.py`、
+`app/main.py`、`app/admin_cli.py`（外加 `tests/test_r115_intranet.py` 用于自证）。
+更新后**必须重启后端进程**，配置只在进程启动时读一次。
 
 ### 为此做的三处改动（不只是文档）
 
