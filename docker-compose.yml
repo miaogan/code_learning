@@ -153,6 +153,41 @@ services:
     memswap_limit: 1536m
     pids_limit: 256
 
+  # r118 本地 rerank 精排服务（可选档，默认**不启动**：必须显式 --profile rerank）。
+  # 形态：与 embedder 同一个 TEI 镜像，换挂 reranker 模型即多出 POST /rerank 端点
+  # （query + docs → 按 query-doc 相关性重排分数）。检索管线（r100）在 RRF 融合后
+  # 调用它做精排；后端把 AI_RERANK_BASE_URL 指向 http://reranker:8080 即可。
+  #
+  # 选型 BAAI/bge-reranker-base（278M 参数，交叉编码器）：bge-small-zh-v1.5 的
+  # 配套精排器，中文效果与体积的平衡点；large（560M）在 2 vCPU / 3.6GB 上太重。
+  # 资源账（2026-11-17 实测）：宿主已用 1.1G / 可用 2.5G，本容器实测常驻 ~1.3G，
+  # 加完仍留 ~1.2G 余量 + 1.9G swap 兜底。
+  #   cpus 1.0 / mem_limit 1536m / memswap_limit 2g / pids_limit 256：
+  #   口径与 embedder 一致，但内存限额放宽——reranker 权重 fp32 ~1.1G，
+  #   1g 限额会被 cgroup OOM 误杀。
+  # 不发布宿主端口：只有 compose 内网可达，公网零暴露面。
+  reranker:
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.8
+    profiles: ["rerank"]
+    restart: unless-stopped
+    command:
+      - '--model-id'
+      - '${RERANK_MODEL_ID:-BAAI/bge-reranker-base}'
+      - '--port'
+      - '8080'
+      - '--auto-truncate'
+      - '--max-client-batch-size'
+      - '32'
+    environment:
+      # 模型缓存落在命名卷里：容器重建不重新下载（bge-reranker-base ~1.1GB）。
+      - HF_HOME=/data
+    volumes:
+      - skillcoach-rerankcache:/data
+    cpus: '1.0'
+    mem_limit: 1536m
+    memswap_limit: 2g
+    pids_limit: 256
+
   frontend:
     build:
       context: ./frontend
@@ -177,6 +212,8 @@ services:
 volumes:
   # r104 embedding 模型缓存（HF_HOME）：容器重建复用，不重复下载。
   skillcoach-embedcache:
+  # r118 reranker 模型缓存（HF_HOME）：容器重建复用，不重复下载（~1.1GB）。
+  skillcoach-rerankcache:
   # PostgreSQL 的数据目录。docker compose down 保留数据，down -v 才删除
   # （备份/恢复见 DEPLOY.md：pg_dump -Fc，不要直接拷数据目录）。
   skillcoach-pgdata:
