@@ -178,7 +178,13 @@ RAG_SEED_TUTORIALS=false                   # 不填不会挂，但启动会因�
 
 > `AI_ALLOW_PRIVATE_ENDPOINTS` 打开后**仍然拒绝**云元数据地址与链路本地段（`169.254.0.0/16`、
 > `100.100.100.200`、`metadata.google.internal` 等）—— 内网机器常常就是云主机，这是刻意保留的硬边界。
-> 启动日志会打一条 `[安全] AI_ALLOW_PRIVATE_ENDPOINTS=true …` 留痕。
+> 启动日志会打一条 `[安全] security.ai_private_endpoints=on|off …` 留痕，**两档都打印**：
+> 设了却没生效时，这行日志是唯一能一眼看出来的地方。
+>
+> 改了不生效的三个常见原因：① 写在 `deploy.env` 里（compose 只把 `backend/.env` 注入容器，
+> `--env-file` 仅用于 compose 变量插值）；② 只 `restart` 没重建容器（`docker compose up -d`）；
+> ③ 从源码起但不在 `backend/` 目录（`.env` 按进程 cwd 解析）。自查：
+> `docker compose exec backend python -c "from app.core.config import get_settings as g; print(g().ai_allow_private_endpoints)"`
 
 构建期需要能访问 pip / npm 源（或用内网镜像：`--build-arg PIP_INDEX_URL=… / NPM_REGISTRY=…`）；
 embedder 容器首次启动会下载模型（`--profile embed` 才启动，可预置 `skillcoach-embedcache` 卷离线带入）。

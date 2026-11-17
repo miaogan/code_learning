@@ -103,3 +103,37 @@ except Exception as exc: print(exc)          # 仍然拒绝（元数据）
 - 开关是**全局**的：打开后所有登录用户都能填私网端点。公网部署不要打开。
 - 内网放行只管「用户自带端点」；服务端配置（`AI_*`、`AI_EMBED_*`）从来不受 SSRF 门禁约束，
   管理员向来可以直接填内网地址。
+
+## 7. 「设了开关还是报不允许指向内网」——四种真实原因
+
+上线当天用户就反馈设了开关仍然报 `API 地址不允许指向本机、内网或云元数据地址`。
+文案由 `_SSRF_MESSAGE` 唯一产出，说明进程里读到的仍是 `false`。按出现频率排：
+
+| # | 原因 | 怎么确认 | 怎么修 |
+|---|---|---|---|
+| 1 | 写在 `deploy.env` 里 | compose 的 `env_file` 只指向 `backend/.env`；`--env-file deploy.env` **只用于 compose 变量插值，不注入容器** | 挪到 `backend/.env` |
+| 2 | 改了没重建容器 | `docker inspect` 里看不到这个变量 | `docker compose up -d`（`restart` 不会更新容器环境变量） |
+| 3 | 跑的是旧镜像 / 旧代码 | 启动日志里没有 `security.ai_private_endpoints=` 这行 | `git pull` 后 `docker compose up -d --build` |
+| 4 | 从源码起但 cwd 不对 | `.env` 是**按进程 cwd** 解析的 | 在 `backend/` 目录下启动 uvicorn |
+
+一条命令自查（在部署机上）：
+
+```bash
+docker compose exec backend python -c \
+  "from app.core.config import get_settings as g; print('on' if g().ai_allow_private_endpoints else 'off')"
+
+# 再对一眼启动日志里的策略行
+docker compose logs backend | grep security.ai_private_endpoints
+```
+
+### 为此做的三处改动（不只是文档）
+
+1. **启动日志两档都打印**（`security.ai_private_endpoints=on|off`）。原来只在开启时打印，
+   于是「设了却没生效」没有任何线索 —— 这正是上面第 1～4 种原因最难排除的地方。
+2. **拒绝文案给出下一步**：`…（内网部署可设 AI_ALLOW_PRIVATE_ENDPOINTS=true 放行私网端点，改动后需重启服务）`。
+   只报「不允许」会让用户无从判断是没设对还是没生效。
+3. **空值 / 带空白的布尔值不再炸进程**：排查中发现 `AI_ALLOW_PRIVATE_ENDPOINTS=`（照
+   `.env.example` 抄完清空一行）和 `" true "`（复制带空格）都会在 `Settings()` 构造期抛
+   `ValidationError`，服务直接起不来。原来的容错只在**手工维护的数值字段清单**上，
+   现在改成按字段类型判断（`_tolerate_padded_env`）：`int` / `float` / `bool` 一律容错，
+   字符串字段不动（「空值＝继承」的语义要留给 `resolve_ai` 解释）。
