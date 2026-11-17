@@ -90,15 +90,51 @@ def test_generate_profile_returns_five_dimensions(
     assert profile_service.PROFILE_SYSTEM in fake_ai.calls[0][0]
 
 
-def test_generate_profile_blocks_hallucinated_quote(
+def test_generate_profile_drops_hallucinated_quote(
     tmp_db: Any, resume_text: str, fake_ai: Any, draft_payload: dict[str, Any]
 ) -> None:
+    """anti-goal 1（r116 口径）：编造的那一条**不入库**，其余合规条目照常落库。
+
+    r3 的实现是「任一条不合格就整份 502」，实测会让失败率随条目数指数放大
+    （`(1-p)^N`），表现为「同一份简历有时成功有时失败」。改为逐条剔除后，
+    anti-goal 1 的字面要求（画像里不出现无源之词）仍然满足，但不再牵连整份。
+    """
+    draft_payload["skills"] = [
+        {"name": "K8s", "source_quote": INVENTED_QUOTE},
+        {"name": "React", "source_quote": "React TypeScript Python SQLite"},
+    ]
+    fake_ai.responder = lambda _model_cls, _user: draft_payload
+
+    profile = asyncio.run(
+        profile_service.generate_profile("res-1", resume_text, client=fake_ai)
+    )
+
+    names = [skill.name for skill in profile.skills]
+    assert names == ["React"], f"编造条目必须被剔除、合规条目必须保留，实际 {names}"
+    assert all(_squash(skill.source_quote) in _squash(resume_text) for skill in profile.skills)
+
+
+def test_generate_profile_blocks_when_nothing_is_sourced(
+    tmp_db: Any, resume_text: str, fake_ai: Any, draft_payload: dict[str, Any]
+) -> None:
+    """整体编造（一条都站不住）仍必须 502 —— 那不是抄写偏差，重试才有意义。"""
     draft_payload["skills"] = [{"name": "K8s", "source_quote": INVENTED_QUOTE}]
+    draft_payload["projects"] = [
+        {
+            "name": "推荐系统",
+            "role": None,
+            "period": None,
+            "bullets": [],
+            "source_quote": INVENTED_QUOTE,
+        }
+    ]
     fake_ai.responder = lambda _model_cls, _user: draft_payload
 
     with pytest.raises(AppError) as excinfo:
         asyncio.run(profile_service.generate_profile("res-1", resume_text, client=fake_ai))
     assert excinfo.value.code == AI_SCHEMA_INVALID
+    assert excinfo.value.status == 502
+    assert excinfo.value.retryable is True
 
 
 def test_generate_profile_truncates_long_text(
