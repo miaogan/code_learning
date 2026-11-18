@@ -149,15 +149,12 @@ export default function App() {
           {/* r83 §11：外层 <aside> 保持撑满整列（右侧分隔线不断），sticky 交给这层，
               导航才不会随页面滚走。见 base.css .sc-sidebar-inner。 */}
           <div className="sc-sidebar-inner">
-            {/* r126 迭代四：「流程」常驻展开（标题 + 5 步竖排直接躺在侧栏，
+            {/* r126 迭代四：「流程」常驻展开（Stepper 竖排自带「流程」标题，
                 日常主路径零操作直达）；「工具 / 设置」保留向右级联浮层折叠。
                 hover 停留 300ms 也可展开（互斥、带收起缓冲，见 NavSection）。
                 工具大区内部保留 5 个语义分组二级折叠。 */}
             <NavSectionGroup>
-              <div className="sc-navsection sc-navsection-static">
-                <span className="sc-nav-label">流程</span>
-                <Stepper steps={steps} orientation="vertical" />
-              </div>
+              <Stepper steps={steps} orientation="vertical" />
               <NavSection
                 sectionId="tools"
                 label="工具"
