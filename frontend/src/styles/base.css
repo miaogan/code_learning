@@ -11991,6 +11991,15 @@ a.sc-radar-name--link:hover .sc-radar-ext {
 .sc-navsection {
   position: relative;
 }
+/* 迭代四：「流程」不再折叠——静态分区（标题 + 5 步竖排常驻侧栏），
+   与下方「工具 / 设置」两个浮层分区之间用 .sc-sidebar-inner 的 gap 隔开。 */
+.sc-navsection-static {
+  display: flex;
+  flex-direction: column;
+}
+.sc-navsection-static .sc-nav-label {
+  margin-bottom: var(--sp-1);
+}
 /* 浮层面板：absolute 锚到分区头部右侧，盖在主区上；面板本体是 wrapper 的
    DOM 子节点，鼠标滑进面板不触发 wrapper 的 mouseleave（hover 隧道）。 */
 .sc-navsection-body {

@@ -149,19 +149,15 @@ export default function App() {
           {/* r83 §11：外层 <aside> 保持撑满整列（右侧分隔线不断），sticky 交给这层，
               导航才不会随页面滚走。见 base.css .sc-sidebar-inner。 */}
           <div className="sc-sidebar-inner">
-            {/* r126 迭代：折叠上移到「流程 / 工具 / 设置」三大区。默认全部收起，
-                当前路由所在大区自动展开；hover 停留 300ms 也可展开（互斥、带收起
-                缓冲，见 NavSection）。工具大区内部保留 5 个语义分组二级折叠。 */}
+            {/* r126 迭代四：「流程」常驻展开（标题 + 5 步竖排直接躺在侧栏，
+                日常主路径零操作直达）；「工具 / 设置」保留向右级联浮层折叠。
+                hover 停留 300ms 也可展开（互斥、带收起缓冲，见 NavSection）。
+                工具大区内部保留 5 个语义分组二级折叠。 */}
             <NavSectionGroup>
-              <NavSection
-                sectionId="flow"
-                label="流程"
-                activeInside={STEP_BASE.some((step) =>
-                  step.to === '/' ? pathname === '/' : isRouteActive(pathname, step.to),
-                )}
-              >
+              <div className="sc-navsection sc-navsection-static">
+                <span className="sc-nav-label">流程</span>
                 <Stepper steps={steps} orientation="vertical" />
-              </NavSection>
+              </div>
               <NavSection
                 sectionId="tools"
                 label="工具"
