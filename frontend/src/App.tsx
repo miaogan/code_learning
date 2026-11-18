@@ -32,6 +32,7 @@ import UploadPage from './pages/UploadPage'
 import VersionsPage from './pages/VersionsPage'
 import ArchivePage from './pages/ArchivePage'
 import { GITHUB_AVATAR_URL, GITHUB_OWNER, GITHUB_REPO_URL, PRODUCT_NAME, PRODUCT_TAGLINE } from './lib/brand'
+import { TOOL_GROUPS, TOOL_ITEMS } from './lib/navGroups'
 import { resetResumePrompt } from './lib/resumePrompt'
 import { logout, startAuth, useAuth } from './state/auth'
 import { dismissKeyRequired } from './state/aiGate'
@@ -44,23 +45,6 @@ const STEP_BASE = [
   { key: 'exam', label: '科考', to: '/exam' },
   { key: 'report', label: '医案', to: '/report' },
 ] as const
-
-/** 侧栏「工具」组：日常使用的非线性出口，不混进步骤（DESIGN §1.1）。 */
-const TOOL_ITEMS = [
-  { key: 'search', label: '检索', to: '/search' },
-  { key: 'coach', label: '讲席', to: '/coach' },
-  { key: 'learn', label: '学堂', to: '/learn' },
-  { key: 'practice', label: '演武', to: '/practice' },
-  { key: 'mirror', label: '镜试', to: '/mirror' },
-  { key: 'history', label: '战绩', to: '/history' },
-  { key: 'polish', label: '修文', to: '/polish' },
-  { key: 'versions', label: '校勘', to: '/versions' },
-  { key: 'archive', label: '卷宗', to: '/archive' },
-  { key: 'jd', label: '对岗', to: '/jd' },
-  { key: 'leap', label: '跃迁', to: '/leap' },
-  { key: 'pioneer', label: '先锋', to: '/pioneer' },
-  { key: 'guozijian', label: '国子监', to: '/guozijian' },
-]
 
 /** 侧栏「设置」组：只读看板（评鉴 / 考工）与账号 / AI 配置，从工具组里分出来。 */
 const SETTINGS_ITEMS = [
@@ -165,7 +149,7 @@ export default function App() {
               导航才不会随页面滚走。见 base.css .sc-sidebar-inner。 */}
           <div className="sc-sidebar-inner">
             <Stepper steps={steps} orientation="vertical" />
-            <ToolNav items={TOOL_ITEMS} />
+            <ToolNav groups={[...TOOL_GROUPS]} />
             <ToolNav items={SETTINGS_ITEMS} label="设置" />
           </div>
         </aside>

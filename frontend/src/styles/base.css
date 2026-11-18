@@ -11976,3 +11976,61 @@ a.sc-radar-name--link:hover .sc-radar-ext {
   font-size: var(--fs-meta);
   line-height: var(--lh-meta);
 }
+
+/* --- r126 侧栏多级菜单：工具项折进可折叠分组，侧栏不再内部滚动 --------------- */
+.sc-toolnav.is-grouped {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+.sc-toolnav-group {
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: calc(var(--sp-2) * 2 + var(--lh-small));
+  padding: 0 var(--sp-3) 0 calc(var(--sp-3) + 24px + var(--sp-2));
+  border: none;
+  border-left: 2px solid transparent;
+  border-radius: 2px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.sc-toolnav-group:hover {
+  background: var(--overlay-04);
+  color: var(--text-primary);
+}
+.sc-toolnav-group.is-active {
+  color: var(--text-primary);
+}
+.sc-toolnav-group-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sc-toolnav-chevron {
+  flex: 0 0 auto;
+  margin-left: var(--sp-2);
+  color: var(--text-tertiary);
+  font-size: var(--fs-meta, var(--fs-small));
+}
+/* 子项在组头基础上再缩一层：与组头文字列对齐（24px 编号列 + 2px 竖条不重画，
+   仅把文字推进去），当前态沿用 .sc-toolnav-item.is-active 的竖条 + tint 底。 */
+.sc-toolnav-group-body {
+  display: flex;
+  flex-direction: column;
+  padding-left: calc(24px + var(--sp-2) * 2);
+}
+.sc-toolnav-group-body .sc-toolnav-item {
+  padding-left: var(--sp-3);
+  font-size: var(--fs-small);
+}
