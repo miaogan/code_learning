@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { NavSection } from './NavSection'
+import { NavSection, NavSectionGroup } from './NavSection'
 import { isRouteActive } from '../../lib/navGroups'
 
 export interface ToolNavItem {
@@ -67,25 +67,27 @@ export function ToolNav({ items, groups, label = '工具', orientation = 'vertic
     return (
       <nav className="sc-toolnav is-vertical is-grouped" aria-label={label || '工具'}>
         {label ? <span className="sc-nav-label">{label}</span> : null}
-        {groups.map((group) => (
-          <NavSection
-            key={group.key}
-            sectionId={`tool-group-${group.key}`}
-            label={group.label}
-            activeInside={group.items.some((item) => isRouteActive(pathname, item.to))}
-          >
-            {group.items.map((item) => (
-              <Link
-                key={item.key}
-                to={item.to}
-                className={itemClasses(isRouteActive(pathname, item.to))}
-                aria-current={isRouteActive(pathname, item.to) ? 'page' : undefined}
-              >
-                {item.label}
-              </Link>
-            ))}
-          </NavSection>
-        ))}
+        <NavSectionGroup>
+          {groups.map((group) => (
+            <NavSection
+              key={group.key}
+              sectionId={`tool-group-${group.key}`}
+              label={group.label}
+              activeInside={group.items.some((item) => isRouteActive(pathname, item.to))}
+            >
+              {group.items.map((item) => (
+                <Link
+                  key={item.key}
+                  to={item.to}
+                  className={itemClasses(isRouteActive(pathname, item.to))}
+                  aria-current={isRouteActive(pathname, item.to) ? 'page' : undefined}
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </NavSection>
+          ))}
+        </NavSectionGroup>
       </nav>
     )
   }
