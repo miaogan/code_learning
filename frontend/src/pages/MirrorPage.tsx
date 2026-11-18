@@ -8,6 +8,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 
 import { ApiError, api } from '../api/client'
 import type { MirrorCard, MirrorSuggestion } from '../api/types'
@@ -85,7 +86,12 @@ function MirrorCardBody({ card }: { card: MirrorCard }) {
           <h3 className="sc-mirror-block-title">缺失信息（待你补充，AI 不会代填）</h3>
           <ul className="sc-mirror-list sc-mirror-missing">
             {card.missing_info.map((item) => (
-              <li key={item}>{item}</li>
+              <li className="sc-mirror-missing-row" key={item}>
+                <span>{item}</span>
+                <Link className="sc-mirror-missing-go" to="/polish" state={{ mirrorMissing: item }}>
+                  去修文补写 →
+                </Link>
+              </li>
             ))}
           </ul>
         </section>

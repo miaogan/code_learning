@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { ApiError, api } from '../api/client'
-import type { PolishSection, PolishSuggestion } from '../api/types'
+import type { PolishSection, PolishSuggestion, PolishUserFact } from '../api/types'
 import { ComposePreview } from '../components/polish/ComposePreview'
 import { SegTabs } from '../components/polish/SegTabs'
 import { SuggestionCard, type SuggestionState } from '../components/polish/SuggestionCard'
@@ -23,6 +23,11 @@ import {
   focusNotice,
   parseFocusParams,
 } from '../lib/polishFocus'
+import {
+  collectMissingFacts,
+  mirrorMissingFromState,
+  toUserFacts,
+} from '../lib/mirrorFacts'
 import { useAsync } from '../lib/useAsync'
 
 /** 建议生成三段文案（DESIGN §0.6：AI 等待必须有文字步进）。 */
@@ -141,6 +146,25 @@ export default function PolishPage() {
     typeof window === 'undefined' ? true : window.matchMedia('(min-width: 1320px)').matches,
   )
 
+  // --- r131 镜试缺项回灌：收集 → 编写 → user_facts 织入润色 ---------------------
+  // 缺失信息来自镜试复盘卡（只读投影，零 AI 调用）；AI 失败不影响润色主流程。
+  const mirrorAsync = useAsync((signal) => api.mirrorCards(10, signal), [])
+  const missingItems = useMemo(
+    () => collectMissingFacts(mirrorAsync.data?.items ?? []),
+    [mirrorAsync.data],
+  )
+  /** 当前展开编写框的缺项文本（同一时刻只编辑一条）。 */
+  const [draftFor, setDraftFor] = useState<string | null>(null)
+  const [draftText, setDraftText] = useState('')
+  const [draftSection, setDraftSection] = useState<PolishSection | null>(null)
+  /** 已确认的补写内容（随「开始分析 / 重跑」一起发给服务端）。 */
+  const [facts, setFacts] = useState<PolishUserFact[]>([])
+  const [factError, setFactError] = useState<string | null>(null)
+  // 存为简历新版本（r131）
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [saved, setSaved] = useState<{ resumeId: string; profiling: boolean } | null>(null)
+
   const mountedRef = useRef(true)
   const profileInitializedRef = useRef(false)
 
@@ -179,6 +203,20 @@ export default function PolishPage() {
     const timer = window.setInterval(() => setAnalyzeElapsed((value) => value + 1), 1000)
     return () => window.clearInterval(timer)
   }, [analyzing])
+
+  // 镜试页「去修文补写」带来的缺项：缺项列表到位后自动展开对应编写框（只做一次）。
+  const mirrorFocusAppliedRef = useRef(false)
+  useEffect(() => {
+    if (mirrorFocusAppliedRef.current || missingItems.length === 0) return
+    const wanted = mirrorMissingFromState(state)
+    mirrorFocusAppliedRef.current = true
+    if (wanted === null) return
+    const hit = missingItems.find((item) => item.text === wanted)
+    if (hit === undefined) return
+    setDraftFor(hit.text)
+    setDraftText('')
+    setDraftSection(null)
+  }, [missingItems, state])
 
   useEffect(() => {
     if (!generating) return
@@ -274,8 +312,13 @@ export default function PolishPage() {
     setGenError(null)
     setExportError(null)
     setChangedNotice(false)
+    setSaved(null)
+    setSaveError(null)
     try {
-      const response = await api.polishSuggestions(profile.resume_id, { target_role: role })
+      const response = await api.polishSuggestions(profile.resume_id, {
+        target_role: role,
+        user_facts: facts.length > 0 ? toUserFacts(facts) : undefined,
+      })
       if (!mountedRef.current) return
       const previous = new Map(
         suggestions.map((item) => [item.original_text, states[item.id] ?? 'pending'] as const),
@@ -372,6 +415,60 @@ export default function PolishPage() {
     setRoleInput(profile?.target_role ?? '')
   }
 
+  // --- r131 镜试缺项补写 -------------------------------------------------------
+
+  const openDraft = (text: string) => {
+    setDraftFor(draftFor === text ? null : text)
+    setDraftText('')
+    setDraftSection(null)
+    setFactError(null)
+  }
+
+  const commitDraft = () => {
+    const text = draftText.trim()
+    if (text.length < 2) {
+      setFactError('先写一点内容再添加（至少 2 个字）')
+      return
+    }
+    if (facts.length >= 6) {
+      setFactError('一次润色最多带 6 条补写内容')
+      return
+    }
+    setFacts((prev) => [...prev, { text, section: draftSection }])
+    setDraftFor(null)
+    setDraftText('')
+    setDraftSection(null)
+    setFactError(null)
+  }
+
+  const removeFact = (text: string) => {
+    setFacts((prev) => prev.filter((fact) => fact.text !== text))
+  }
+
+  /** 成稿存为简历新版本（r131）：落库后立即触发画像异步任务，跳校勘页查看。 */
+  const saveVersion = async () => {
+    if (full === null || profile === null || saving) return
+    setSaving(true)
+    setSaveError(null)
+    try {
+      const result = await api.savePolishVersion(profile.resume_id, full.markdown)
+      let profiling = false
+      try {
+        await api.generateProfileAsync(result.resume_id)
+        profiling = true
+      } catch {
+        profiling = false // 画像任务受理失败不回滚版本；提示里给手动路径
+      }
+      if (!mountedRef.current) return
+      setSaved({ resumeId: result.resume_id, profiling })
+    } catch (error) {
+      if (!mountedRef.current) return
+      setSaveError(errorMessage(error, '保存新版本失败，请稍后重试'))
+    } finally {
+      if (mountedRef.current) setSaving(false)
+    }
+  }
+
   const profileMissing = profileAsync.error?.status === 404
   // 画像已取到就不再 pending：按 status 判定会在重载时把整个润色工作区换成一帧 loader。
   const profilePending = profile === null && profileAsync.status !== 'error'
@@ -424,6 +521,101 @@ export default function PolishPage() {
               }}
               onReset={resetRole}
             />
+
+            {missingItems.length > 0 ? (
+              <Card className="sc-polish-facts-card">
+                <div className="sc-polish-facts-head">
+                  <h2 className="sc-polish-facts-title">镜试缺项补写</h2>
+                  <span className="sc-meta-line">
+                    镜试复盘发现简历缺这些信息；补写后 AI 会把它们织进润色建议
+                  </span>
+                </div>
+                <ul className="sc-polish-facts-list">
+                  {missingItems.map((item) => {
+                    const committed = facts.some((fact) => fact.text === item.text)
+                    return (
+                      <li className="sc-polish-fact-item" key={item.text}>
+                        <div className="sc-polish-fact-row">
+                          <span className="sc-polish-fact-text">{item.text}</span>
+                          {committed ? (
+                            <span className="sc-chip">已补写</span>
+                          ) : (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openDraft(item.text)}
+                            >
+                              {draftFor === item.text ? '收起' : '补写'}
+                            </Button>
+                          )}
+                        </div>
+                        {draftFor === item.text ? (
+                          <div className="sc-polish-fact-form">
+                            <textarea
+                              className="sc-polish-fact-textarea"
+                              value={draftText}
+                              onChange={(event) => setDraftText(event.target.value)}
+                              placeholder="把你真实做过 / 测过 / 上线的内容写在这里——AI 只会织入你写的事实，自己编的部分照拦。"
+                              maxLength={500}
+                              rows={3}
+                            />
+                            <div className="sc-polish-fact-formrow">
+                              <select
+                                className="sc-polish-fact-select"
+                                value={draftSection ?? ''}
+                                onChange={(event) =>
+                                  setDraftSection(
+                                    event.target.value === '' ? null : (event.target.value as PolishSection),
+                                  )
+                                }
+                              >
+                                <option value="">归属部分：自动判断</option>
+                                <option value="project">项目经历</option>
+                                <option value="experience">工作经历</option>
+                                <option value="education">教育经历</option>
+                                <option value="summary">技能概述</option>
+                              </select>
+                              <Button
+                                type="button"
+                                size="sm"
+                                onClick={commitDraft}
+                                disabled={draftText.trim().length < 2}
+                              >
+                                添加到本次润色
+                              </Button>
+                            </div>
+                          </div>
+                        ) : null}
+                      </li>
+                    )
+                  })}
+                </ul>
+                {facts.length > 0 ? (
+                  <div className="sc-polish-facts-committed">
+                    <span className="sc-meta-line">
+                      本次润色将携带 {facts.length} 条补写内容；点「开始分析 / 重新分析」后生效
+                    </span>
+                    <div className="sc-polish-facts-chips">
+                      {facts.map((fact) => (
+                        <span className="sc-polish-fact-chip" key={fact.text}>
+                          {fact.text}
+                          <button
+                            type="button"
+                            className="sc-polish-fact-remove"
+                            aria-label={`移除补写内容：${fact.text}`}
+                            onClick={() => removeFact(fact.text)}
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+                {factError !== null ? <p className="sc-polish-warn">{factError}</p> : null}
+              </Card>
+            ) : null}
 
             {analyzing ? (
               <PhaseLoader
@@ -620,11 +812,39 @@ export default function PolishPage() {
                       <Button onClick={() => void exportMarkdown()} loading={exporting}>
                         导出 .md
                       </Button>
+                      <Button
+                        variant="secondary"
+                        onClick={() => void saveVersion()}
+                        loading={saving}
+                        disabled={stale || generating}
+                      >
+                        存为简历新版本
+                      </Button>
                       <Button variant="ghost" onClick={() => void generateFull()} disabled={generating}>
                         重新生成
                       </Button>
                     </div>
-                    <p className="sc-polish-hint">导出文本与页面成稿同源（服务端 markdown，单源零变换）</p>
+                    <p className="sc-polish-hint">
+                      {stale
+                        ? '采纳状态已变更：先重新生成成稿，再保存新版本'
+                        : '导出文本与页面成稿同源（服务端 markdown，单源零变换）'}
+                    </p>
+                    {saved !== null ? (
+                      <p className="sc-polish-note" role="status">
+                        已存为简历新版本，{' '}
+                        <Link to="/versions">去校勘页查看 →</Link>
+                        {saved.profiling
+                          ? '；新版本的画像正在后台生成，完成后站内各处（镜试证据 / 岗位对标）会自动用上新简历。'
+                          : '；画像任务触发失败，可到校勘页手动生成。'}
+                      </p>
+                    ) : null}
+                    {saveError !== null ? (
+                      <InlineError
+                        message={saveError}
+                        onRetry={() => void saveVersion()}
+                        retryLabel="重新保存"
+                      />
+                    ) : null}
                   </>
                 )}
               </div>

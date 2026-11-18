@@ -11921,6 +11921,137 @@ a.sc-radar-name--link:hover .sc-radar-ext {
 .sc-mirror-missing {
   color: var(--text-secondary);
 }
+/* r131：缺项行 + 「去修文补写」跳转链接 */
+.sc-mirror-missing-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+.sc-mirror-missing-go {
+  flex-shrink: 0;
+  color: var(--accent);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  text-decoration: none;
+}
+.sc-mirror-missing-go:hover {
+  text-decoration: underline;
+}
+/* r131：修文页「镜试缺项补写」面板 */
+.sc-polish-facts-card {
+  margin-top: var(--sp-4);
+}
+.sc-polish-facts-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+}
+.sc-polish-facts-title {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--fs-section);
+  line-height: var(--lh-section);
+}
+.sc-polish-facts-list {
+  list-style: none;
+  margin: var(--sp-3) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--sp-2);
+}
+.sc-polish-fact-item {
+  padding: var(--sp-2) 0;
+  border-bottom: 1px solid var(--border-hair);
+}
+.sc-polish-fact-item:last-child {
+  border-bottom: none;
+}
+.sc-polish-fact-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+.sc-polish-fact-text {
+  color: var(--text-secondary);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+}
+.sc-polish-fact-form {
+  margin-top: var(--sp-2);
+  display: grid;
+  gap: var(--sp-2);
+}
+.sc-polish-fact-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border-hair);
+  border-radius: var(--radius-8);
+  background: var(--bg-inset);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  resize: vertical;
+}
+.sc-polish-fact-formrow {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+}
+.sc-polish-fact-select {
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border-hair);
+  border-radius: var(--radius-8);
+  background: var(--bg-inset);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+}
+.sc-polish-facts-committed {
+  margin-top: var(--sp-3);
+  display: grid;
+  gap: var(--sp-2);
+}
+.sc-polish-facts-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+.sc-polish-fact-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-1) var(--sp-2);
+  border: 1px solid var(--border-hair);
+  border-radius: var(--radius-8);
+  color: var(--text-secondary);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  max-width: 32ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sc-polish-fact-remove {
+  border: none;
+  background: none;
+  color: var(--text-tertiary);
+  font: inherit;
+  font-size: var(--fs-small);
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+.sc-polish-fact-remove:hover {
+  color: var(--text-primary);
+}
 .sc-mirror-evidence {
   list-style: none;
   margin: 0;

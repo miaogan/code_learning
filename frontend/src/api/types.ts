@@ -710,6 +710,21 @@ export interface PolishSuggestion {
 
 export interface PolishRequest {
   target_role?: string | null
+  /** r131 镜试缺项补写：候选人亲口补充的事实，润色可织入（AI 自行发明仍然拦）。 */
+  user_facts?: PolishUserFact[]
+}
+
+export interface PolishUserFact {
+  text: string
+  /** 空 = 交给模型按内容自判。 */
+  section: PolishSection | null
+}
+
+/** r131：修文成稿存为简历新版本的返回（新 documents 行）。 */
+export interface PolishSaveVersionResult {
+  resume_id: string
+  chars: number
+  sections: number
 }
 
 export interface PolishResponse {

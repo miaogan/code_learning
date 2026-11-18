@@ -43,6 +43,7 @@ import type {
   PolishFullResponse,
   PolishRequest,
   PolishResponse,
+  PolishSaveVersionResult,
   PracticeAnswerRequest,
   PracticeAnswerResult,
   PracticeLanguageFilter,
@@ -486,6 +487,13 @@ export const api = {
     request<PolishFullResponse>(
       `/api/resumes/${encodeURIComponent(resumeId)}/polish/full`,
       jsonInit('POST', payload),
+    ),
+
+  /** r131：把成稿存为简历新版本（落 documents；画像任务由调用方接着触发）。 */
+  savePolishVersion: (resumeId: string, markdown: string): Promise<PolishSaveVersionResult> =>
+    request<PolishSaveVersionResult>(
+      `/api/resumes/${encodeURIComponent(resumeId)}/polish/save-version`,
+      jsonInit('POST', { markdown }),
     ),
 
   latestProfile: (signal?: AbortSignal): Promise<Profile> =>
