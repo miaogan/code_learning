@@ -11976,6 +11976,34 @@ a.sc-radar-name--link:hover .sc-radar-ext {
   font-size: var(--fs-meta);
   line-height: var(--lh-meta);
 }
+/* r128 布局：左主栏（提问 + 当前复盘）+ 右栏历史复盘。
+   窄屏默认上下堆叠（右栏就是原来的底部历史区）；≥1024 才切成两栏。 */
+.sc-mirror-layout {
+  display: flex;
+  flex-direction: column;
+}
+.sc-mirror-main {
+  min-width: 0;
+}
+.sc-mirror-side-card {
+  margin-top: var(--sp-4);
+}
+
+@media (min-width: 1024px) {
+  .sc-mirror-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    gap: var(--sp-5);
+    align-items: start;
+  }
+  /* 右栏吸顶：滚主栏时历史始终在手边；超高时栏内自滚，不撑长页面。 */
+  .sc-mirror-side-card {
+    position: sticky;
+    top: calc(var(--topbar-h) + var(--sp-4));
+    max-height: calc(100vh - var(--topbar-h) - var(--sp-8));
+    overflow-y: auto;
+  }
+}
 
 /* --- r127 导航重构：工具上移顶栏，侧栏只留流程 --------------------------------
    r126 的折叠/浮层整体退役（.sc-navsection 等样式已删）。侧栏回归 r83 形态

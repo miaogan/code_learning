@@ -272,80 +272,92 @@ export default function MirrorPage() {
         </p>
       </header>
 
-      <Card className="sc-mirror-form-card">
-        <form onSubmit={submit}>
-          <label className="sc-mirror-label" htmlFor="mirror-question">
-            向自己提问（留空则让 AI 直接出题并复盘）
-          </label>
-          <textarea
-            id="mirror-question"
-            className="sc-mirror-textarea"
-            value={question}
-            onChange={(event) => setQuestion(event.target.value)}
-            placeholder="例如：这个项目的 QPS 是怎么测出来的？如果流量翻十倍会发生什么？"
-            maxLength={1000}
-            rows={4}
-          />
-          <div className="sc-mirror-actions">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              loading={busy && busyLabel.includes('出题')}
-              onClick={() => void loadSuggestions()}
-            >
-              AI 推荐问题
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => void runAsk(null, 'recommended')}
-              loading={busy && busyLabel.includes('出题并生成')}
-            >
-              AI 出题并复盘
-            </Button>
-            <Button type="submit" loading={busy && !busyLabel.includes('出题')}>
-              生成复盘
-            </Button>
-          </div>
-        </form>
-      </Card>
-
-      {busy ? <PhaseLoader phases={['读取简历', 'AI 生成', '证据校验']} active={1} /> : null}
-      {error ? <InlineError message={error} /> : null}
-
-      {suggestions !== null && suggestions.length > 0 ? (
-        <SuggestionList
-          items={suggestions}
-          onPick={(picked) => void runAsk(picked, 'recommended')}
-        />
-      ) : null}
-
-      {current ? <MirrorCardBody card={current} /> : null}
-
-      {history.length > 0 ? (
-        <section className="sc-mirror-block">
-          <h2 className="sc-mirror-subtitle">历史复盘（{history.length} 条，按账号隔离保存）</h2>
-          <ul className="sc-mirror-history">
-            {history.map((item) => (
-              <li key={item.id}>
-                <button
+      {/* 左主栏 = 提问与当前复盘；右栏 = 历史复盘（窄屏退化成上下堆叠）。 */}
+      <div className="sc-mirror-layout">
+        <div className="sc-mirror-main">
+          <Card className="sc-mirror-form-card">
+            <form onSubmit={submit}>
+              <label className="sc-mirror-label" htmlFor="mirror-question">
+                向自己提问（留空则让 AI 直接出题并复盘）
+              </label>
+              <textarea
+                id="mirror-question"
+                className="sc-mirror-textarea"
+                value={question}
+                onChange={(event) => setQuestion(event.target.value)}
+                placeholder="例如：这个项目的 QPS 是怎么测出来的？如果流量翻十倍会发生什么？"
+                maxLength={1000}
+                rows={4}
+              />
+              <div className="sc-mirror-actions">
+                <Button
                   type="button"
-                  className={`sc-mirror-history-item ${current?.id === item.id ? 'is-active' : ''}`}
-                  onClick={() => setCurrent(item)}
+                  variant="ghost"
+                  size="sm"
+                  loading={busy && busyLabel.includes('出题')}
+                  onClick={() => void loadSuggestions()}
                 >
-                  <span className="sc-mirror-history-q">{item.question}</span>
-                  <span className="sc-mirror-history-meta">
-                    {item.origin === 'custom' ? '自拟' : 'AI 推荐'} · {formatWhen(item.created_at)}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : (
-        <p className="sc-mirror-note">还没有复盘记录。提一个问题或让 AI 出题，就会在这里保存。</p>
-      )}
+                  AI 推荐问题
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => void runAsk(null, 'recommended')}
+                  loading={busy && busyLabel.includes('出题并生成')}
+                >
+                  AI 出题并复盘
+                </Button>
+                <Button type="submit" loading={busy && !busyLabel.includes('出题')}>
+                  生成复盘
+                </Button>
+              </div>
+            </form>
+          </Card>
+
+          {busy ? <PhaseLoader phases={['读取简历', 'AI 生成', '证据校验']} active={1} /> : null}
+          {error ? <InlineError message={error} /> : null}
+
+          {suggestions !== null && suggestions.length > 0 ? (
+            <SuggestionList
+              items={suggestions}
+              onPick={(picked) => void runAsk(picked, 'recommended')}
+            />
+          ) : null}
+
+          {current ? <MirrorCardBody card={current} /> : null}
+        </div>
+
+        <aside className="sc-mirror-side">
+          <Card className="sc-mirror-side-card">
+            <h2 className="sc-mirror-subtitle">历史复盘</h2>
+            {history.length > 0 ? (
+              <>
+                <p className="sc-mirror-note">
+                  {history.length} 条 · 按账号隔离保存，点一条即可回看
+                </p>
+                <ul className="sc-mirror-history">
+                  {history.map((item) => (
+                    <li key={item.id}>
+                      <button
+                        type="button"
+                        className={`sc-mirror-history-item ${current?.id === item.id ? 'is-active' : ''}`}
+                        onClick={() => setCurrent(item)}
+                      >
+                        <span className="sc-mirror-history-q">{item.question}</span>
+                        <span className="sc-mirror-history-meta">
+                          {item.origin === 'custom' ? '自拟' : 'AI 推荐'} · {formatWhen(item.created_at)}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : (
+              <p className="sc-mirror-note">还没有复盘记录。提一个问题或让 AI 出题，就会在这里保存。</p>
+            )}
+          </Card>
+        </aside>
+      </div>
     </div>
   )
 }
