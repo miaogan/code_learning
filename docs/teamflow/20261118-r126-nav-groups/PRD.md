@@ -4,36 +4,36 @@
 
 工具页累计 13 个（r3 以来逐步新增），侧栏「工具」组始终平铺，条目高度超出视口后侧栏内部出现滚动条。用户明确反馈：**不喜欢左侧菜单有滚动条，希望做成多级菜单**；首轮把工具项折成 5 个语义分组后用户再反馈：**点开分组仍会出现滚动条，折叠要上移到「流程 / 工具 / 设置」层级**。
 
-## 方案（迭代三终态：hover 停留展开 + 点击保底）
+## 方案（迭代三终态：向右级联浮层）
 
-折叠层级保持在「流程 / 工具 / 设置」三大区 + 工具区 5 个二级分组不变；触发方式从纯点击升级为 **hover 停留展开 + 点击保底**。
+折叠层级保持「流程 / 工具 / 设置」三大区 + 工具区 5 个二级分组不变；呈现方式从**下推手风琴**升级为**向右级联浮层**（类 Windows 开始菜单 / 管理后台多级浮出导航）：
 
-业界口径（本次落地前调研）：
-- **NN/g《Menu Design》**：hover 子菜单对触屏 / 键盘不可用，必须保留点击通道；hover 菜单建议 0.3–0.5s 停留延迟。
-- **Baymard Institute 2025**：61% 的网站 hover 菜单没有停留延迟，鼠标路过就弹出——闪烁与误触是 hover 菜单的第一大坑。
-- **Drupal 侧栏可用性评审（2026-02）**：hover + click 混用会打架（hover 先展开、点击又收起）；纵向扫过侧栏会让多个区轮流开合、布局抖动。结论：hover 展开需互斥（同时只开一个），且点击要能压过 hover。
+- 大区头常驻侧栏（仅三行），hover 停留 / 点击后向右浮出面板（`position: absolute; left: calc(100% + sp-2)`，`--elev-2` 阴影 + `--radius-8`，z-index 60——高于 topbar 10 / toast 20、低于 modal 80，沿用既有裸值约定）；
+- 工具面板内的 5 个分组头再向右级联一层（嵌套 `.sc-navsection` 天然锚到各自头部），形成「侧栏 → 面板 → 子面板」的层次；
+- 浮层不挤占布局，侧栏任何状态下都无滚动条；
+- `.sc-sidebar-inner` 的 `overflow-y: auto`（r83 内部自滚兜底）会裁掉浮层——侧栏内容收敛为三行后兜底不再需要，本块放开为 `overflow: visible`。
 
-落地规则（`NavSection` / `NavSectionGroup`）：
-1. **hover 展开**：鼠标进入分区停留 `300ms` 才展开（`matchMedia('(hover: hover) and (pointer: fine)')` 才启用，触屏不生效）；移出 `350ms` 后收起——滑进展开的内容区不会收，缓冲期内返回也不闪。
-2. **hover 互斥**：同一侧栏（含工具区二级分组）同一时刻只有一个 hover 展开的分区，杜绝纵向扫过时布局抖动（`NavSectionGroup` context 协调）。
-3. **点击保底且优先**：点击仍可开合；点击收起时清掉在途 hover 计时并连 hover 态一起收，避免「点了收起又被 hover 弹开」。
-4. **路由激活强制展开**：当前页所在大区/分组始终展开（pinned 与 hover 之外第三来源）。
+触发规范（迭代二调研结论，维持不变）：hover 停留 300ms 展开、移出 350ms 收起（面板是 wrapper 的 DOM 子节点，滑进面板不触发离开）、同级互斥；点击保底且压过 hover；触屏经 `(hover: hover) and (pointer: fine)` 门控。新增三条浮层专属规则：
 
-| 大区 | 内容 |
+1. **`activeInside` 不再强制展开面板**——浮层盖在主区上方，常开会挡内容；「当前位置」改由大区头高亮 + 面板内条目高亮承载；
+2. **点击面板内链接跳转后自动收起**（面板 onClick 捕获 `<a>`）；
+3. **pinned 与 hover 都互斥**（`NavSectionGroup` 双通道协调：`openId` / `pinnedId`）——点击面板外收起 pinned 浮层，杜绝两个浮层叠加。
+
+| 大区 | 面板内容 |
 |---|---|
 | 流程 | 5 步线性流程（Stepper 原样） |
-| 工具 | 13 个工具项按 5 个语义分组二级折叠：文房（检索/讲席/修文）、研习（学堂/演武/镜试）、岗途（对岗/跃迁）、雷达（先锋/国子监）、卷藏（战绩/卷宗/校勘） |
+| 工具 | 5 个分组头级联出二级面板：文房（检索/讲席/修文）、研习（学堂/演武/镜试）、岗途（对岗/跃迁）、雷达（先锋/国子监）、卷藏（战绩/卷宗/校勘） |
 | 设置 | 评鉴 / 考工 / 典制 |
 
-`<1024` 顶部横向工具条**保持平铺**（平铺清单由分组推导，两处入口同源）；样式全部走 token。
+`<1024` 顶部横向工具条**保持平铺**（平铺清单由分组推导，两处入口同源）；样式全部走 token（尺寸用 `calc(var(--sp-*) * n)` 组合，无裸值）。
 
 ## 改动清单
 
 - `frontend/src/lib/navGroups.ts`（新增）：`TOOL_GROUPS` / `TOOL_ITEMS` / `isRouteActive`，分组与激活判定的唯一数据源。
-- `frontend/src/components/ui/NavSection.tsx`（新增）：折叠分区组件——hover 停留展开（300ms/350ms 延迟、互斥、`(hover: hover) and (pointer: fine)` 门控）+ 点击保底 + 路由激活强制展开；`NavSectionGroup` 提供同级互斥协调。
+- `frontend/src/components/ui/NavSection.tsx`（新增）：浮层分区组件——hover 停留展开（300ms/350ms、互斥、`(hover: hover) and (pointer: fine)` 门控）+ 点击保底（pinned 走 context 互斥、面板外点击收起、面板内点链接自动收起）；`NavSectionGroup` 提供同级双通道（openId / pinnedId）协调。
 - `frontend/src/components/ui/ToolNav.tsx`：支持 `groups` prop（二级分组复用 NavSection/NavSectionGroup）与空 `label`（大区头已承担标题）；horizontal 平铺回退不变。
 - `frontend/src/App.tsx`：侧栏改为三个 `NavSection`（流程 / 工具 / 设置），包在 `NavSectionGroup` 内；删除内联 `TOOL_ITEMS`，改 import。
-- `frontend/src/styles/base.css`：`.sc-navsection-body`、大区头与二级缩进层级、`.sc-sidebar-inner` flex 纵排；全部走 token，无裸值。
+- `frontend/src/styles/base.css`：`.sc-navsection`（relative 锚点）/ `.sc-navsection-body`（absolute 向右浮出，二级再级联）、大区头样式、`.sc-sidebar-inner` 放开 overflow（r83 兜底退役）；全部走 token，无裸值。
 - `frontend/src/test/navGroups.test.ts`（新增）：分组唯一性 / 平铺同源 / 路由契约 / `isRouteActive` 前缀粘边与首页全等共 8 例（hover 延迟与互斥属组件行为，仓库无 testing-library，靠 CI 手测覆盖）。
 
 ## 验收

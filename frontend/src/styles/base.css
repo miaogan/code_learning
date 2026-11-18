@@ -11977,19 +11977,43 @@ a.sc-radar-name--link:hover .sc-radar-ext {
   line-height: var(--lh-meta);
 }
 
-/* --- r126 侧栏多级菜单：流程/工具/设置三大区折叠，任意时刻不出滚动条 -------- */
-/* 三个大区头纵向排布，区与区之间留呼吸 */
+/* --- r126 侧栏多级菜单（迭代三）：向右级联浮层 --------------------------------
+   大区头常驻侧栏（仅三行），hover/点击后向右浮出面板；工具区二级分组在面板内
+   再向右级联（.sc-navsection 嵌套 → absolute 锚到各自头部）。浮层不挤占布局，
+   侧栏无滚动条。浮层被 .sc-sidebar-inner 的 overflow-y:auto 裁掉——侧栏内容
+   收敛为三个大区头后内部自滚兜底不再需要，本块放开为 visible。 */
 .sc-sidebar-inner {
   display: flex;
   flex-direction: column;
   gap: var(--sp-2);
+  overflow: visible;
 }
+.sc-navsection {
+  position: relative;
+}
+/* 浮层面板：absolute 锚到分区头部右侧，盖在主区上；面板本体是 wrapper 的
+   DOM 子节点，鼠标滑进面板不触发 wrapper 的 mouseleave（hover 隧道）。 */
 .sc-navsection-body {
+  position: absolute;
+  left: calc(100% + var(--sp-2));
+  top: calc(var(--sp-2) * -1);
+  min-width: calc(var(--sp-4) * 12); /* 192px：容纳步骤编号 + 文案 */
+  z-index: 60; /* 高于 topbar 10 / toast 20、低于 modal 80；沿用既有裸值约定 */
   display: flex;
   flex-direction: column;
-  padding: var(--sp-1) 0;
+  padding: var(--sp-2);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-8);
+  box-shadow: var(--elev-2);
 }
-/* 大区头：靠侧栏文字列起点，不再对齐步骤编号列（编号列已收进「流程」区内） */
+/* 二级级联：面板内的分区面板再向右展开一层，形成层次 */
+.sc-navsection-body .sc-navsection-body {
+  left: 100%;
+  top: calc(var(--sp-1) * -1);
+  min-width: calc(var(--sp-4) * 10); /* 160px：仅条目文案 */
+}
+/* 大区头：靠侧栏文字列起点 */
 .sc-toolnav-group {
   width: 100%;
   box-sizing: border-box;
@@ -12030,15 +12054,15 @@ a.sc-radar-name--link:hover .sc-radar-ext {
   color: var(--text-tertiary);
   font-size: var(--fs-meta, var(--fs-small));
 }
-/* 二级（大区内）：组头/条目整体再缩一层，层级一眼可辨 */
-.sc-navsection-body .sc-toolnav-group {
-  padding-left: calc(var(--sp-3) + var(--sp-4));
-}
+/* 面板内的行：统一贴面板内边距起排（浮层不需要侧栏那种深层缩进） */
+.sc-navsection-body .sc-toolnav-group,
 .sc-navsection-body .sc-toolnav-item {
-  padding-left: calc(var(--sp-3) + var(--sp-4) + var(--sp-2));
+  width: 100%;
+  box-sizing: border-box;
+  padding-left: var(--sp-3);
   font-size: var(--fs-small);
 }
-/* 工具分组容器收进大区后不再自带顶部间距（大区体已留白） */
+/* 工具分组容器收进浮层后不再自带顶部间距 */
 .sc-navsection-body .sc-toolnav {
   margin-top: 0;
   padding-top: 0;
