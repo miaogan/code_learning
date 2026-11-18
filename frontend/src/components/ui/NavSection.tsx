@@ -105,8 +105,14 @@ export function NavSection({ label, sectionId, activeInside, children }: NavSect
   const closeTimer = useRef<number | null>(null)
 
   // 互斥协调：别的分区请求 hover 展开时，收掉本区的 hover 态（pinned 不动）。
+  // 子分区（openId 以本区 id + '/' 开头）不算「别的分区」——父面板 hover 打开、
+  // 鼠标移入子分组时 openId 会变成子分区 id，父面板必须保持展开承接级联。
   useEffect(() => {
-    if (openId !== null && openId !== sectionId) {
+    if (
+      openId !== null &&
+      openId !== sectionId &&
+      !openId.startsWith(`${sectionId}/`)
+    ) {
       setHoverOpen(false)
     }
   }, [openId, sectionId])
@@ -118,11 +124,12 @@ export function NavSection({ label, sectionId, activeInside, children }: NavSect
       if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
         setContextPinned(null)
         setHoverOpen(false)
+        requestClose(sectionId)
       }
     }
     document.addEventListener('pointerdown', onDocPointerDown)
     return () => document.removeEventListener('pointerdown', onDocPointerDown)
-  }, [pinned, setContextPinned])
+  }, [pinned, setContextPinned, requestClose, sectionId])
 
   useEffect(() => {
     return () => {
@@ -160,7 +167,12 @@ export function NavSection({ label, sectionId, activeInside, children }: NavSect
     }, CLOSE_DELAY_MS)
   }
 
-  const expanded = pinned || hoverOpen
+  const open = pinned || hoverOpen
+  // 迭代五：**可见性统一互斥**——hover 打开其它分区（含其子分区）时，本区面板
+  // （含 pinned 面板）暂时让位，杜绝「点开一个再悬停另一个出现两个浮层相互覆盖」；
+  // hover 离开后 openId 清空，pinned 面板自动恢复，用户的点击意图不丢。
+  const visible =
+    open && (openId === null || openId === sectionId || openId.startsWith(`${sectionId}/`))
 
   const toggle = (): void => {
     // 点击意图优先：清掉在途 hover 计时；点收起时连 hover 态一起收，
@@ -168,7 +180,15 @@ export function NavSection({ label, sectionId, activeInside, children }: NavSect
     // pinned 走 context 互斥——同一时刻最多一个点击固定的浮层。
     clearTimers()
     setHoverOpen(false)
-    setContextPinned(pinned || hoverOpen ? null : sectionId)
+    if (pinned || hoverOpen) {
+      setContextPinned(null)
+      requestClose(sectionId)
+    } else {
+      setContextPinned(sectionId)
+      // 同时占住 hover 通道：若别的分区正被 hover 展开，其 hoverOpen 会被
+      // 各自的互斥 effect 清掉，本区面板立即可见，而不是等到它 hover 离开。
+      requestOpen(sectionId)
+    }
   }
 
   // 面板内点链接（导航）→ 收起浮层；点面板内非链接区域不收。
@@ -177,6 +197,7 @@ export function NavSection({ label, sectionId, activeInside, children }: NavSect
       clearTimers()
       setContextPinned(null)
       setHoverOpen(false)
+      requestClose(sectionId)
     }
   }
 
@@ -191,16 +212,16 @@ export function NavSection({ label, sectionId, activeInside, children }: NavSect
         type="button"
         className={activeInside ? 'sc-toolnav-group is-active' : 'sc-toolnav-group'}
         onClick={toggle}
-        aria-expanded={expanded}
+        aria-expanded={visible}
         aria-haspopup="true"
         aria-controls={`sc-navsection-${sectionId}`}
       >
         <span className="sc-toolnav-group-label">{label}</span>
         <span className="sc-toolnav-chevron" aria-hidden="true">
-          {expanded ? '▾' : '▸'}
+          {visible ? '▾' : '▸'}
         </span>
       </button>
-      {expanded ? (
+      {visible ? (
         <div
           className="sc-navsection-body"
           id={`sc-navsection-${sectionId}`}

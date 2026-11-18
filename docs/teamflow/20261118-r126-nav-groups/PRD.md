@@ -34,3 +34,15 @@
 
 - 「流程」常驻展开（迭代四调整，用户明确要求）；「工具 / 设置」折叠浮层。
 - 不改任何页面路由与 `to` 值；纯导航组织形式变化。
+
+## 迭代五：浮层可见性统一互斥（2026-11-18 用户反馈修复）
+
+用户反馈：**点开一个二级菜单（pinned）后鼠标移到另一个，出现两个浮层相互覆盖**。根因两个：
+1. pinned 与 hover 是两条独立通道互不感知——pinned 面板挂着的同时 hover 又亮出另一个面板；
+2. 工具面板内的二级分组自包了一层 `NavSectionGroup`（独立 context），两层各自互斥、跨层不协调。
+
+修复（`NavSection` / `ToolNav`）：
+- **可见性统一互斥**：面板可见 = 自身 open（pinned 或 hover）且（openId 为空 或 openId 是自己 或 openId 是自己的子分区 `tools/group-*`）。hover 打开别的分区时 pinned 面板暂时让位；hover 离开（openId 清空）后 pinned 面板自动恢复，点击意图不丢。
+- **点击时同时占住 hover 通道**（`requestOpen(sectionId)`）：其它分区正被 hover 展开时其 hoverOpen 被各自 effect 清掉，点击的分区立即可见。
+- **二级分组与外层共用同一 context**：ToolNav 分组分支去掉自包 `NavSectionGroup`；新增 `sectionPrefix` prop，分组 NavSection 的 id 变成层级式 `tools/group-<key>`，父面板靠前缀识别「打开的是我的子分区」而不让位。
+- **互斥 effect 放行子分区**：父面板 hover 打开、鼠标移入子分组时 openId 变为子分区 id，父面板的 hoverOpen 不被清（否则整个面板连带子面板一起消失）。

@@ -160,8 +160,10 @@ export default function App() {
                 label="工具"
                 activeInside={TOOL_ITEMS.some((item) => isRouteActive(pathname, item.to))}
               >
-                {/* 外层大区头已承担「工具」标题，label 传空隐藏内层组标题。 */}
-                <ToolNav groups={[...TOOL_GROUPS]} label="" />
+                {/* 外层大区头已承担「工具」标题，label 传空隐藏内层组标题；
+                    sectionPrefix 让二级分区的 openId 变成层级式（tools/group-*），
+                    NavSection 的互斥可见性才能识别「打开的是本大区的子分区」。 */}
+                <ToolNav groups={[...TOOL_GROUPS]} label="" sectionPrefix="tools" />
               </NavSection>
               <NavSection
                 sectionId="settings"

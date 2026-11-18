@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { NavSection, NavSectionGroup } from './NavSection'
+import { NavSection } from './NavSection'
 import { isRouteActive } from '../../lib/navGroups'
 
 export interface ToolNavItem {
@@ -27,6 +27,13 @@ export interface ToolNavProps {
    * `horizontal` = <1024 收起侧栏后的顶部 40 高工具条（同一份 items，不给下游再造一遍）。
    */
   orientation?: 'vertical' | 'horizontal'
+  /**
+   * 分组 NavSection 的 id 前缀（层级式：`<前缀>/group-<key>`）。
+   * 分组渲染在外层 NavSection 浮层面板内时必须传（如 "tools"）——
+   * NavSection 的互斥可见性靠 `openId.startsWith(父id + '/')` 识别「打开的是我的子分区」，
+   * 平铺 id 会导致 hover 子分组时把整个父面板判定为应让位而整体消失。
+   */
+  sectionPrefix?: string
 }
 
 const itemClasses = (active: boolean): string =>
@@ -40,7 +47,13 @@ const itemClasses = (active: boolean): string =>
  * 2. 当前项样式复用 Stepper 的 current 态（`--accent` 文字 + 左 2px 竖条 + `--accent-tint` 底）；
  * 3. 只用 `useLocation()` 判当前项（不读 state、不新增全局 store），与 `Stepper` 的判定口径一致。
  */
-export function ToolNav({ items, groups, label = '工具', orientation = 'vertical' }: ToolNavProps) {
+export function ToolNav({
+  items,
+  groups,
+  label = '工具',
+  orientation = 'vertical',
+  sectionPrefix,
+}: ToolNavProps) {
   const { pathname } = useLocation()
 
   if (orientation === 'horizontal') {
@@ -67,27 +80,27 @@ export function ToolNav({ items, groups, label = '工具', orientation = 'vertic
     return (
       <nav className="sc-toolnav is-vertical is-grouped" aria-label={label || '工具'}>
         {label ? <span className="sc-nav-label">{label}</span> : null}
-        <NavSectionGroup>
-          {groups.map((group) => (
-            <NavSection
-              key={group.key}
-              sectionId={`tool-group-${group.key}`}
-              label={group.label}
-              activeInside={group.items.some((item) => isRouteActive(pathname, item.to))}
-            >
-              {group.items.map((item) => (
-                <Link
-                  key={item.key}
-                  to={item.to}
-                  className={itemClasses(isRouteActive(pathname, item.to))}
-                  aria-current={isRouteActive(pathname, item.to) ? 'page' : undefined}
-                >
-                  {item.label}
-                </Link>
-              ))}
-            </NavSection>
-          ))}
-        </NavSectionGroup>
+        {/* 不再自包 NavSectionGroup（r126 迭代五）：分组 NavSection 必须与外层
+            大区共用同一 context，hover/pinned 互斥才能跨层协调。 */}
+        {groups.map((group) => (
+          <NavSection
+            key={group.key}
+            sectionId={sectionPrefix ? `${sectionPrefix}/group-${group.key}` : `tool-group-${group.key}`}
+            label={group.label}
+            activeInside={group.items.some((item) => isRouteActive(pathname, item.to))}
+          >
+            {group.items.map((item) => (
+              <Link
+                key={item.key}
+                to={item.to}
+                className={itemClasses(isRouteActive(pathname, item.to))}
+                aria-current={isRouteActive(pathname, item.to) ? 'page' : undefined}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </NavSection>
+        ))}
       </nav>
     )
   }
