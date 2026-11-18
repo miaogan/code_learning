@@ -86,6 +86,21 @@ async def upload_resume(
 # --- 版本对比（r60）-----------------------------------------------------------
 
 
+@router.delete(
+    "/{resume_id}",
+    status_code=204,
+    summary="删除一份简历版本（级联删其画像 / 画像任务 / 简历时间线事件，r129）",
+)
+def delete_version(resume_id: str) -> None:
+    """正文是最敏感的个人数据，删版本必须连画像一起清（repository.delete_document）。
+
+    历史测评成绩是快照、保留；若被删的是当前最新画像的来源，latest 画像随之消失，
+    各功能自然回到「先上传简历」的门禁态——前端确认框会把这一点说清楚。
+    """
+    if repository.delete_document(resume_id) == 0:
+        raise AppError(NOT_FOUND, "没有找到这份简历，可能已被删除", status=404)
+
+
 @router.get(
     "",
     response_model=list[ResumeVersionSummary],

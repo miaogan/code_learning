@@ -867,6 +867,19 @@ CREATE INDEX IF NOT EXISTS idx_rag_feedback_chunk ON rag_feedback (chunk_id, ver
 """
 
 
+#: r129 错题本「移出」：不动作答事件（统计与熟练度口径不变），只记「用户明知这一错仍移出」。
+#: 语义：dismissed_at 只掩盖**不晚于它**的错——之后再答错（新事实）会重新进错题本；
+#: 主键即唯一约束，重复移出＝刷新时间戳。
+WRONG_BOOK_SCHEMA = """
+CREATE TABLE IF NOT EXISTS wrong_book_dismissals (
+    user_id      TEXT NOT NULL DEFAULT 'default',
+    question_id  TEXT NOT NULL,
+    dismissed_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, question_id)
+);
+"""
+
+
 def _try_create_vector() -> bool:
     """尽力创建 pgvector 扩展（幂等），失败只记日志——与 `_try_create_trgm` 同一模式。
 
@@ -1763,7 +1776,7 @@ def initialize_sqlite() -> None:
             SCHEMA, R23_SCHEMA, SCHEMA_INDEXES, R23_INDEXES, R42_SCHEMA, R42_INDEXES,
             R51_SCHEMA, R61_SCHEMA, radar_schema, R67_INDEXES, R77_SCHEMA, R77_INDEXES,
             R80_SCHEMA, R81_SCHEMA, R81_INDEXES, R100_SCHEMA, COACH_RUNS_SCHEMA,
-            RAG_FEEDBACK_SCHEMA, MIRROR_SCHEMA, SYNC_SCHEMA,
+            RAG_FEEDBACK_SCHEMA, MIRROR_SCHEMA, WRONG_BOOK_SCHEMA, SYNC_SCHEMA,
         ):
             conn.executescript(script)
         for columns in (_ADDED_COLUMNS, _R23_ADDED_COLUMNS, _R61_ADDED_COLUMNS, _R67_ADDED_COLUMNS):
@@ -2024,7 +2037,8 @@ def _init_pg_schema() -> None:
         conn.executescript(COACH_RUNS_SCHEMA)         # 25. 教练 Agent 编排轨迹
         conn.executescript(RAG_FEEDBACK_SCHEMA)       # 26. 召回反馈（点赞 / 点踩）
         conn.executescript(MIRROR_SCHEMA)             # 27. 镜试复盘卡（r125，反向面试）
-        conn.executescript(SYNC_SCHEMA)               # 28. SQLite 副本 / 离线重放回执
+        conn.executescript(WRONG_BOOK_SCHEMA)         # 28. 错题本移出标记（r129）
+        conn.executescript(SYNC_SCHEMA)               # 29. SQLite 副本 / 离线重放回执
         # 28. ID 游标按现有最大 id 播种。`INSERT … SELECT … ON CONFLICT` 是 PG 形态，
         #     SQLite 语法上不接受 —— 所以这里天然不能进副本镜像日志，
         #     由 `init_db()` 的 `suppress_mirror()` 保证（副本侧靠 `_sync_id_allocations()` 对齐）。

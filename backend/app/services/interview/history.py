@@ -22,6 +22,7 @@ from collections.abc import Sequence
 from typing import Any
 
 from app.core import repository
+from app.core.errors import NOT_FOUND, AppError
 from app.schemas import InterviewSettings, Report, RunSummary
 from app.services.report import rules
 
@@ -166,3 +167,13 @@ def list_history(
             )
         )
     return summaries, total
+
+
+def delete_item(run_id: str) -> None:
+    """删一场测评（面试或笔试）并级联清时间线事件与该场次作答事件（r129）。
+
+    场次不存在（或不是 interview / exam）一律 404；作答事件随场次一起删，
+    练习统计与错题本不会留下「幽灵错题」。
+    """
+    if repository.delete_run(run_id, kinds=(INTERVIEW_KIND, EXAM_KIND)) == 0:
+        raise AppError(NOT_FOUND, "没有找到这条测评记录，可能已被删除", status=404)

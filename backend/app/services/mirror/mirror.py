@@ -509,6 +509,17 @@ def list_cards(limit: int = 50) -> list[dict[str, Any]]:
     return repository.list_mirror_cards(limit)
 
 
+def delete_card(card_id: str) -> None:
+    """删一条复盘；不存在（或别人的）一律 404，不区分两种情况。"""
+    if repository.delete_mirror_card(card_id) == 0:
+        raise AppError(NOT_FOUND, "没有找到这条复盘，可能已被删除", status=404)
+
+
+def clear_cards() -> int:
+    """清空本账号全部复盘，返回删除条数。"""
+    return repository.delete_mirror_cards()
+
+
 def card_from_row(row: dict[str, Any]) -> MirrorCard:
     """repository 行 → 契约模型。AI 草稿里若带了多余的 question 字段在这里被丢弃。"""
     payload = dict(row["payload"])

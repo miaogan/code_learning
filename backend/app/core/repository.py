@@ -2868,6 +2868,105 @@ def public_table_count() -> int:
     return int(row["n"])
 
 
+# --- r129 历史记录删除（单条移出 / 清空）---------------------------------------
+#
+# 口径（与各模块语义对齐，见 AGENTS.md r129）：
+# - 镜试复盘：纯旁路数据，单条 / 全清都直接删，不牵连任何业务表。
+# - 测评场次（runs）：删 run 的同时**同一事务**级联删成长时间线事件与该场次作答事件
+#   ——统计 / 错题本 / 时间线都由这三张表派生，只删 run 会留下「幽灵错题 / 孤儿时间线」。
+#   `kinds` 白名单防误删（runs 表是共享承载，镜试等旁路数据没有 run 行）。
+# - 错题本「移出」：**不动作答事件**（练习统计与熟练度口径不变），只记一条移出标记；
+#   之后再答错是新事实，会重新进错题本（dismissed_at 只掩盖不晚于它的错）。
+# - 简历版本：正文是最敏感的个人数据，删版本必须级联清画像 / 画像任务 / 简历时间线事件；
+#   历史成绩是快照、保留（各投影处对画像缺失已容忍）。
+
+
+def delete_mirror_card(card_id: str) -> int:
+    """删掉一条镜试复盘（id + 账号双条件），返回删除条数（0 = 不存在或别人的）。"""
+    with connection() as conn:
+        cursor = conn.execute(
+            "DELETE FROM mirror_cards WHERE id = ? AND user_id = ?", (card_id, _uid())
+        )
+        return max(cursor.rowcount, 0)
+
+
+def delete_mirror_cards() -> int:
+    """清空本账号全部镜试复盘，返回删除条数（简历 / 画像等业务数据不动）。"""
+    with connection() as conn:
+        cursor = conn.execute("DELETE FROM mirror_cards WHERE user_id = ?", (_uid(),))
+        return max(cursor.rowcount, 0)
+
+
+def delete_run(run_id: str, *, kinds: Sequence[str]) -> int:
+    """删一场测评并级联清时间线与作答事件；返回 1 = 已删，0 = 不存在 / 不在白名单。"""
+    placeholders = ", ".join("?" for _ in kinds)
+    with connection() as conn:
+        cursor = conn.execute(
+            f"DELETE FROM runs WHERE id = ? AND user_id = ? AND kind IN ({placeholders})",
+            (run_id, _uid(), *kinds),
+        )
+        if cursor.rowcount == 0:
+            return 0
+        conn.execute(
+            "DELETE FROM timeline_events WHERE user_id = ? AND ref_id = ? "
+            "AND type IN ('interview', 'exam')",
+            (_uid(), run_id),
+        )
+        conn.execute(
+            "DELETE FROM question_attempts WHERE user_id = ? AND run_id = ?",
+            (_uid(), run_id),
+        )
+        return 1
+
+
+def wrong_dismissal_map() -> dict[str, str]:
+    """`question_id → dismissed_at`：错题本与统计据此掩盖「明知仍错但已移出」的题。"""
+    with connection() as conn:
+        rows = conn.execute(
+            "SELECT question_id, dismissed_at FROM wrong_book_dismissals WHERE user_id = ?",
+            (_uid(),),
+        ).fetchall()
+    return {str(row["question_id"]): str(row["dismissed_at"]) for row in rows}
+
+
+def dismiss_wrong_question(question_id: str) -> None:
+    """记「移出错题本」；重复移出＝刷新时间戳（唯一键 upsert）。"""
+    with connection() as conn:
+        conn.execute(
+            "INSERT INTO wrong_book_dismissals (user_id, question_id, dismissed_at) "
+            "VALUES (?, ?, ?) ON CONFLICT(user_id, question_id) "
+            "DO UPDATE SET dismissed_at = excluded.dismissed_at",
+            (_uid(), question_id, _now()),
+        )
+
+
+def delete_document(document_id: str) -> int:
+    """删一份简历版本并级联清画像 / 画像任务 / 简历时间线；返回删除的画像条数。
+
+    0 = 简历不存在或别人的（路由层据此 404）。画像缓存一并失效。
+    """
+    with connection() as conn:
+        cursor = conn.execute(
+            "DELETE FROM documents WHERE id = ? AND user_id = ?", (document_id, _uid())
+        )
+        if cursor.rowcount == 0:
+            return 0
+        profiles = conn.execute(
+            "DELETE FROM profiles WHERE user_id = ? AND document_id = ?",
+            (_uid(), document_id),
+        ).rowcount
+        conn.execute(
+            "DELETE FROM profile_jobs WHERE user_id = ? AND document_id = ?",
+            (_uid(), document_id),
+        )
+        conn.execute(
+            "DELETE FROM timeline_events WHERE user_id = ? AND type = 'resume' AND ref_id = ?",
+            (_uid(), document_id),
+        )
+    _invalidate_profiles()
+    return max(profiles, 0)
+
+
 def question_chunk_rows() -> list[dict[str, Any]]:
     """题库 chunk 的取数入口（索引重建用）：只取检索需要的列，`answer` 永不外出。"""
     with connection() as conn:

@@ -15,6 +15,7 @@ from fastapi import APIRouter, Depends
 from app.core.errors import GUARDRAIL_BLOCKED, AppError
 from app.deps import CurrentUser, current_user
 from app.schemas import (
+    ClearResult,
     MirrorAskRequest,
     MirrorCard,
     MirrorCardList,
@@ -57,3 +58,13 @@ def cards(limit: int = 50) -> MirrorCardList:
     return MirrorCardList(
         items=[mirror_service.card_from_row(row) for row in rows]
     )
+
+
+@router.delete("/cards/{card_id}", status_code=204, summary="删除一条复盘（r129）")
+def delete_card(card_id: str) -> None:
+    mirror_service.delete_card(card_id)
+
+
+@router.delete("/cards", response_model=ClearResult, summary="清空全部复盘（r129）")
+def clear_cards() -> ClearResult:
+    return ClearResult(deleted=mirror_service.clear_cards())

@@ -562,10 +562,16 @@ def stats(
         sub_direction=focus_sub,
     )
     hit = sum(1 for question in focused if str(question.get("id") or "") not in proficient)
+    # r129：wrong_total 与错题本同一口径——「明知仍错但已移出」的题两边都不数，
+    # 否则统计里的错题数和错题本条目数会对不上（前端两个数字打架）。
+    dismissals = repository.wrong_dismissal_map()
     wrong_total = sum(
         1
         for question in pool
         if (index.get(str(question.get("id") or "")) or {}).get("last_correct") is False
+        and not _dismissed_after_wrong(
+            dismissals, str(question.get("id") or ""), index.get(str(question.get("id") or "")) or {}
+        )
     )
     return {
         "total": len(pool),
@@ -587,11 +593,15 @@ def wrong_book(
     """
     language = _choices(language)
     index = attempt_index()
+    # r129：已移出的题不再列出——但只掩盖「移出前」的错，之后再答错会重新进错题本。
+    dismissals = repository.wrong_dismissal_map()
     items: list[dict[str, Any]] = []
     for question in question_bank.practice_pool():
         question_id = str(question.get("id") or "")
         entry = index.get(question_id)
         if entry is None or entry["last_correct"] is not False:
+            continue
+        if _dismissed_after_wrong(dismissals, question_id, entry):
             continue
         current = str(question.get("language") or "")
         if not _matches_choice(current, language):
@@ -622,3 +632,56 @@ def wrong_book(
     size = max(1, limit)
     offset = (max(1, page) - 1) * size
     return {"items": items[offset : offset + size], "total": total}
+
+
+# --- 错题本移出（r129）---------------------------------------------------------
+
+
+def _dismissed_after_wrong(
+    dismissals: dict[str, str], question_id: str, entry: dict[str, Any]
+) -> bool:
+    """移出标记是否掩盖当前这一错：`dismissed_at` 不早于最近一次答错才算掩盖。
+
+    时间都是 `datetime.now(UTC).isoformat()` 同一格式，字符串比较即时间比较。
+    之后再答错是新事实（dismissed_at < last_answered_at），会重新进错题本——
+    「移出」只针对用户当时看到的那一错，不是永久拉黑。
+    """
+    dismissed_at = dismissals.get(question_id)
+    if dismissed_at is None:
+        return False
+    return str(dismissed_at) >= str(entry.get("last_answered_at") or "")
+
+
+def dismiss_wrong(question_id: str) -> None:
+    """把一题移出错题本（r129）。只对「当前确实在错题本里」的题生效，否则 404。
+
+    只写移出标记，**不动作答事件**：练习统计、熟练度窗口的历史口径都不变。
+    """
+    target = str(question_id or "").strip()
+    index = attempt_index()
+    entry = index.get(target)
+    if entry is None or entry.get("last_correct") is not False:
+        raise AppError(NOT_FOUND, "这道题不在错题本里，可能已被移出或已答对", status=404)
+    # 「当前在错题本里」要看**错题本视图**而不是裸作答索引：已移出的题（dismissed_at
+    # 晚于最近答错）虽然作答事件还在，但对用户而言已不在错题本，再删一次应 404。
+    if _dismissed_after_wrong(repository.wrong_dismissal_map(), target, entry):
+        raise AppError(NOT_FOUND, "这道题不在错题本里，可能已被移出或已答对", status=404)
+    repository.dismiss_wrong_question(target)
+
+
+def clear_wrong_book() -> int:
+    """清空错题本：把当前所有未掩盖的错题逐一标记移出，返回本次移出条数。
+
+    同样只写标记不删事件；之后再答错（新事实）仍会重新进错题本。
+    """
+    index = attempt_index()
+    dismissals = repository.wrong_dismissal_map()
+    count = 0
+    for question_id, entry in index.items():
+        if entry.get("last_correct") is not False:
+            continue
+        if _dismissed_after_wrong(dismissals, question_id, entry):
+            continue
+        repository.dismiss_wrong_question(question_id)
+        count += 1
+    return count

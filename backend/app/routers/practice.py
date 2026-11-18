@@ -15,6 +15,7 @@ from fastapi import APIRouter, Depends, Query
 
 from app.deps import current_user
 from app.schemas import (
+    ClearResult,
     PracticeAnswerRequest,
     PracticeAnswerResult,
     PracticeDifficultyFilter,
@@ -83,3 +84,21 @@ def get_wrong_book(
     page: int = Query(default=1, ge=1, description="页码，从 1 起"),
 ) -> PracticeWrongBook:
     return PracticeWrongBook(**practice_service.wrong_book(language, limit, page))
+
+
+@router.delete(
+    "/wrong-book/{question_id}",
+    status_code=204,
+    summary="把一题移出错题本（只记移出标记，不动作答事件与统计口径，r129）",
+)
+def dismiss_wrong(question_id: str) -> None:
+    practice_service.dismiss_wrong(question_id)
+
+
+@router.delete(
+    "/wrong-book",
+    response_model=ClearResult,
+    summary="清空错题本（逐题记移出标记；之后再答错会重新进错题本，r129）",
+)
+def clear_wrong_book() -> ClearResult:
+    return ClearResult(deleted=practice_service.clear_wrong_book())

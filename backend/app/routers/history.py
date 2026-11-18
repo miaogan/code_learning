@@ -1,9 +1,10 @@
 """历史记录路由（AC-10）：最近测评的成绩与短板数，`created_at` 倒序。
 
-只有一条读路径：`GET /api/history?limit=10&page=1&kind=`（默认 10 条 / 第 1 页 / 不筛选）。
+`GET /api/history?limit=10&page=1&kind=`（默认 10 条 / 第 1 页 / 不筛选）。
 `limit` 是**每页条数**，`page` 从 1 起，响应带 `total`（命中总数）供前端算总页数。
-无新建、无删除 —— 历史是 `runs` / `reports` 的投影，投影逻辑在 `services/interview/history.py`，
-本层只做参数校验。
+r129 起补上删除能力：`DELETE /api/history/{run_id}` 删单场测评（面试 / 笔试皆可，
+级联清时间线事件与该场次作答事件）；删除逻辑在 `services/interview/history.py`，
+本层只做参数校验与错误映射。
 """
 
 from typing import Annotated, Literal
@@ -12,6 +13,7 @@ from fastapi import APIRouter, Depends, Query
 
 from app.deps import current_user
 from app.schemas import HistoryList
+from app.services.interview import history
 from app.services.interview.history import (
     DEFAULT_LIMIT,
     EXAM_KIND,
@@ -53,3 +55,12 @@ def get_history(
         interview_total=counts[INTERVIEW_KIND],
         exam_total=counts[EXAM_KIND],
     )
+
+
+@router.delete(
+    "/history/{run_id}",
+    status_code=204,
+    summary="删除一场测评记录（面试 / 笔试；级联清时间线与该场次作答事件，r129）",
+)
+def delete_history_item(run_id: str) -> None:
+    history.delete_item(run_id)

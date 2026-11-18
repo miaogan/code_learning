@@ -1681,6 +1681,11 @@ class MirrorCardList(BaseModel):
     items: list[MirrorCard] = Field(default_factory=list)
 
 
+#: r129 清空 / 移出类操作的统一回执：告诉前端实际删了几条（0 也如实返回）。
+class ClearResult(BaseModel):
+    deleted: int = 0
+
+
 # --- r103 召回反馈（点赞 / 点踩）：用户参与召回质量提升 --------------------------
 
 #: 反馈类型闭集：只有 赞 / 踩 两种态度（不引入 1-5 星，避免「中间态不作为」）。
