@@ -5,6 +5,7 @@ import { Button } from './components/ui/Button'
 import { ErrorBoundary } from './components/ui/ErrorBoundary'
 import { Stepper, type StepItem, type StepState } from './components/ui/Stepper'
 import { ToolNav } from './components/ui/ToolNav'
+import { NavSection } from './components/ui/NavSection'
 import { TaifuLauncher } from './components/taifu/TaifuLauncher'
 import { StreakBadge } from './components/ui/StreakBadge'
 import EvalPage from './pages/EvalPage'
@@ -32,7 +33,7 @@ import UploadPage from './pages/UploadPage'
 import VersionsPage from './pages/VersionsPage'
 import ArchivePage from './pages/ArchivePage'
 import { GITHUB_AVATAR_URL, GITHUB_OWNER, GITHUB_REPO_URL, PRODUCT_NAME, PRODUCT_TAGLINE } from './lib/brand'
-import { TOOL_GROUPS, TOOL_ITEMS } from './lib/navGroups'
+import { TOOL_GROUPS, TOOL_ITEMS, isRouteActive } from './lib/navGroups'
 import { resetResumePrompt } from './lib/resumePrompt'
 import { logout, startAuth, useAuth } from './state/auth'
 import { dismissKeyRequired } from './state/aiGate'
@@ -148,9 +149,33 @@ export default function App() {
           {/* r83 §11：外层 <aside> 保持撑满整列（右侧分隔线不断），sticky 交给这层，
               导航才不会随页面滚走。见 base.css .sc-sidebar-inner。 */}
           <div className="sc-sidebar-inner">
-            <Stepper steps={steps} orientation="vertical" />
-            <ToolNav groups={[...TOOL_GROUPS]} />
-            <ToolNav items={SETTINGS_ITEMS} label="设置" />
+            {/* r126 迭代：折叠上移到「流程 / 工具 / 设置」三大区。默认全部收起，
+                当前路由所在大区自动展开；工具大区内部保留 5 个语义分组二级折叠。
+                任意时刻展开行数 ≤ 一组内容，侧栏永远不出滚动条。 */}
+            <NavSection
+              sectionId="flow"
+              label="流程"
+              activeInside={STEP_BASE.some((step) =>
+                step.to === '/' ? pathname === '/' : isRouteActive(pathname, step.to),
+              )}
+            >
+              <Stepper steps={steps} orientation="vertical" />
+            </NavSection>
+            <NavSection
+              sectionId="tools"
+              label="工具"
+              activeInside={TOOL_ITEMS.some((item) => isRouteActive(pathname, item.to))}
+            >
+              {/* 外层大区头已承担「工具」标题，label 传空隐藏内层组标题。 */}
+              <ToolNav groups={[...TOOL_GROUPS]} label="" />
+            </NavSection>
+            <NavSection
+              sectionId="settings"
+              label="设置"
+              activeInside={SETTINGS_ITEMS.some((item) => isRouteActive(pathname, item.to))}
+            >
+              <ToolNav items={SETTINGS_ITEMS} label="" />
+            </NavSection>
           </div>
         </aside>
         <main className="sc-main">

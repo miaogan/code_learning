@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { TOOL_GROUPS, TOOL_ITEMS } from '../lib/navGroups'
+import { TOOL_GROUPS, TOOL_ITEMS, isRouteActive } from '../lib/navGroups'
 
 /** r126 侧栏多级菜单：分组数据是侧栏（折叠）与顶部横条（平铺）的唯一入口真源。 */
 describe('navGroups', () => {
@@ -34,5 +34,22 @@ describe('navGroups', () => {
   it('镜试（r125 新页）在分组里且路由仍是 /mirror', () => {
     const mirror = TOOL_ITEMS.find((item) => item.key === 'mirror')
     expect(mirror?.to).toBe('/mirror')
+  })
+})
+
+describe('isRouteActive', () => {
+  it('全等命中、子路径命中（/learn/:chapterId 场景）', () => {
+    expect(isRouteActive('/learn', '/learn')).toBe(true)
+    expect(isRouteActive('/learn/ch1', '/learn')).toBe(true)
+    expect(isRouteActive('/', '/')).toBe(true)
+  })
+
+  it('前缀粘边不误判：/mirrorx 不算 /mirror', () => {
+    expect(isRouteActive('/mirrorx', '/mirror')).toBe(false)
+    expect(isRouteActive('/jd', '/jdx')).toBe(false)
+  })
+
+  it('首页只认全等，任意其他路径不命中', () => {
+    expect(isRouteActive('/settings', '/')).toBe(false)
   })
 })

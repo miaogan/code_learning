@@ -56,3 +56,10 @@ export const TOOL_GROUPS: ToolNavGroup[] = [
 
 /** 顶部横条用的平铺清单：从分组推导，保证两处入口永远同源。 */
 export const TOOL_ITEMS: ToolNavItem[] = TOOL_GROUPS.flatMap((group) => [...group.items])
+
+/**
+ * 路由激活判定：全等或子路径。与 Stepper 判定口径一致——
+ * 学习模块有 `/learn/:chapterId` 子页面，只判全等会让文章页的侧栏失去高亮。
+ */
+export const isRouteActive = (pathname: string, to: string): boolean =>
+  pathname === to || pathname.startsWith(`${to}/`)

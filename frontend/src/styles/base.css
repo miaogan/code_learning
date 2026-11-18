@@ -11977,12 +11977,19 @@ a.sc-radar-name--link:hover .sc-radar-ext {
   line-height: var(--lh-meta);
 }
 
-/* --- r126 侧栏多级菜单：工具项折进可折叠分组，侧栏不再内部滚动 --------------- */
-.sc-toolnav.is-grouped {
+/* --- r126 侧栏多级菜单：流程/工具/设置三大区折叠，任意时刻不出滚动条 -------- */
+/* 三个大区头纵向排布，区与区之间留呼吸 */
+.sc-sidebar-inner {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-1);
+  gap: var(--sp-2);
 }
+.sc-navsection-body {
+  display: flex;
+  flex-direction: column;
+  padding: var(--sp-1) 0;
+}
+/* 大区头：靠侧栏文字列起点，不再对齐步骤编号列（编号列已收进「流程」区内） */
 .sc-toolnav-group {
   width: 100%;
   box-sizing: border-box;
@@ -11990,7 +11997,7 @@ a.sc-radar-name--link:hover .sc-radar-ext {
   align-items: center;
   justify-content: space-between;
   height: calc(var(--sp-2) * 2 + var(--lh-small));
-  padding: 0 var(--sp-3) 0 calc(var(--sp-3) + 24px + var(--sp-2));
+  padding: 0 var(--sp-3);
   border: none;
   border-left: 2px solid transparent;
   border-radius: 2px;
@@ -12023,14 +12030,16 @@ a.sc-radar-name--link:hover .sc-radar-ext {
   color: var(--text-tertiary);
   font-size: var(--fs-meta, var(--fs-small));
 }
-/* 子项在组头基础上再缩一层：与组头文字列对齐（24px 编号列 + 2px 竖条不重画，
-   仅把文字推进去），当前态沿用 .sc-toolnav-item.is-active 的竖条 + tint 底。 */
-.sc-toolnav-group-body {
-  display: flex;
-  flex-direction: column;
-  padding-left: calc(24px + var(--sp-2) * 2);
+/* 二级（大区内）：组头/条目整体再缩一层，层级一眼可辨 */
+.sc-navsection-body .sc-toolnav-group {
+  padding-left: calc(var(--sp-3) + var(--sp-4));
 }
-.sc-toolnav-group-body .sc-toolnav-item {
-  padding-left: var(--sp-3);
+.sc-navsection-body .sc-toolnav-item {
+  padding-left: calc(var(--sp-3) + var(--sp-4) + var(--sp-2));
   font-size: var(--fs-small);
+}
+/* 工具分组容器收进大区后不再自带顶部间距（大区体已留白） */
+.sc-navsection-body .sc-toolnav {
+  margin-top: 0;
+  padding-top: 0;
 }
