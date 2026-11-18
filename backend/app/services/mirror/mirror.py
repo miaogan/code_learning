@@ -21,10 +21,10 @@ import unicodedata
 import uuid
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.core import repository
-from app.core.errors import NOT_FOUND, AppError
+from app.core.errors import AI_SCHEMA_INVALID, NOT_FOUND, AppError
 from app.schemas import (
     MirrorAssessment,
     MirrorCard,
@@ -76,32 +76,212 @@ def _clip_quote(quote: str, limit: int = 360) -> str:
     return quote[:limit].rstrip()
 
 
-# --- AI 输出草稿模型（HTTP 契约在 schemas.py，这里的草稿模型只服务于解析与校验）
+# --- AI 输出草稿模型（HTTP 契约在 schemas.py，这里的草稿模型只服务于解析）------------
+#: 解析口径是「宽松接住、服务端归一」：真实模型的输出会出现 level 写成「非常优秀」、
+#: 列表写成单个字符串、字段超长等形态——严格 Literal / max_length 只会把能救的响应
+#: 变成 502 AI_SCHEMA_INVALID。所有闭集收敛与裁剪都在这里做，契约模型保持严格。
+
+_WRAPPER_KEYS = ("result", "data", "response", "output")
+
+_LEVEL_WORDS: tuple[tuple[str, str], ...] = (
+    ("优秀", "优秀"),
+    ("高", "优秀"),
+    ("良好", "合格"),
+    ("合格", "合格"),
+    ("中等", "合格"),
+    ("基础", "基础"),
+    ("简单", "基础"),
+    ("入门", "基础"),
+    ("初级", "基础"),
+    ("低", "基础"),
+)
+
+
+def _unwrap(value: Any) -> Any:
+    """剥掉常见的单键包装（{"result": {...}} / {"data": {...}}），找不到就原样返回。"""
+    if isinstance(value, dict) and len(value) == 1 and isinstance(next(iter(value.values())), dict):
+        key = next(iter(value))
+        if key.lower() in _WRAPPER_KEYS:
+            return next(iter(value.values()))
+    return value
+
+
+def _as_str(value: Any) -> str:
+    """字段兜底成字符串：None → 空串，dict 包装（{"text": …}）取常见键。"""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict):
+        for key in ("text", "content", "answer", "value"):
+            inner = value.get(key)
+            if isinstance(inner, str):
+                return inner
+    if value is None:
+        return ""
+    return str(value)
+
+
+def _as_str_list(value: Any) -> list[str]:
+    """列表字段兜底：字符串 → 单元素列表；None → []；元素逐个转 str。"""
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [value.strip()] if value.strip() else []
+    if isinstance(value, dict):
+        # {"items": [...]} / {"points": [...]} 这类键值包装取第一个列表值。
+        for inner in value.values():
+            if isinstance(inner, list):
+                return [str(item) for item in inner]
+        return [str(item) for item in value.values()]
+    if isinstance(value, list):
+        return [str(item) for item in value]
+    return []
+
+
+def _as_obj_list(value: Any, *, str_key: str) -> list[dict[str, Any]]:
+    """对象列表字段兜底：dict 包装取首个列表值；裸字符串条目按 `str_key` 收编。"""
+    if value is None:
+        return []
+    if isinstance(value, dict):
+        for inner in value.values():
+            if isinstance(inner, list):
+                value = inner
+                break
+        else:
+            value = [value]
+    if not isinstance(value, list):
+        return []
+    result: list[dict[str, Any]] = []
+    for item in value:
+        if isinstance(item, dict):
+            result.append(item)
+        elif isinstance(item, str) and item.strip():
+            result.append({str_key: item.strip()})
+    return result
+
+
+def _clip_str(value: str, limit: int) -> str:
+    return value.strip()[:limit].rstrip()
+
+
+def _normalize_level(raw: Any) -> str:
+    """AI 的档位词收敛进契约闭集；命中不了就保守归「合格」，不让整卡报废。"""
+    text = _as_str(raw)
+    for token, level in _LEVEL_WORDS:
+        if token in text:
+            return level
+    return "合格"
+
+
+class _DraftSuggestion(BaseModel):
+    """推荐题宽松草稿：三个字段都兜底成 str，超长由服务端裁剪。"""
+
+    question: str = ""
+    rationale: str = ""
+    quote: str = ""
+
+    model_config = ConfigDict(extra="ignore")
+
+    @field_validator("question", "rationale", "quote", mode="before")
+    @classmethod
+    def _coerce(cls, value: Any) -> Any:
+        return _as_str(value)
 
 
 class _SuggestionDraft(BaseModel):
     """AI 推荐题草稿：quote 会在服务端过原文闸门，命不中的整条剔除。"""
 
-    items: list[MirrorSuggestion] = Field(default_factory=list)
+    items: list[_DraftSuggestion] = Field(default_factory=list)
+
+    model_config = ConfigDict(extra="ignore")
+
+    @field_validator("items", mode="before")
+    @classmethod
+    def _coerce_items(cls, value: Any) -> Any:
+        return _as_obj_list(value, str_key="question")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _peel(cls, value: Any) -> Any:
+        return _unwrap(value)
+
+
+class _DraftEvidence(BaseModel):
+    claim: str = ""
+    quote: str = ""
+
+    model_config = ConfigDict(extra="ignore")
+
+    @field_validator("claim", "quote", mode="before")
+    @classmethod
+    def _coerce(cls, value: Any) -> Any:
+        return _as_str(value)
+
+
+class _DraftAssessment(BaseModel):
+    level: str = ""
+    strengths: list[str] = Field(default_factory=list)
+    improvements: list[str] = Field(default_factory=list)
+
+    model_config = ConfigDict(extra="ignore")
+
+    @field_validator("level", mode="before")
+    @classmethod
+    def _coerce_level(cls, value: Any) -> Any:
+        return _as_str(value)
+
+    @field_validator("strengths", "improvements", mode="before")
+    @classmethod
+    def _coerce_lists(cls, value: Any) -> Any:
+        return _as_str_list(value)
 
 
 class _CardDraft(BaseModel):
-    """一次完整复盘的 AI 草稿；answer / rationale / evidence 都会在服务端二次校验。
+    """一次完整复盘的宽松草稿；归一成契约模型之前一切字段都可能是不规整的形态。
 
     `question` 只在用户没有自拟问题时生效（AI 先推荐题目再复盘）；自拟路径下服务端
     直接使用用户的原文，AI 返回什么都会被丢弃。
     """
 
-    question: str = Field(default="", max_length=300)
-    answer: str = Field(min_length=1, max_length=4000)
-    rationale: list[str] = Field(default_factory=list, max_length=6)
-    assessment: MirrorAssessment
-    follow_ups: list[str] = Field(default_factory=list, max_length=4)
-    evidence: list[MirrorEvidence] = Field(default_factory=list, max_length=6)
-    missing_info: list[str] = Field(default_factory=list, max_length=4)
+    question: str = ""
+    answer: str = ""
+    rationale: list[str] = Field(default_factory=list)
+    assessment: _DraftAssessment = Field(default_factory=_DraftAssessment)
+    follow_ups: list[str] = Field(default_factory=list)
+    evidence: list[_DraftEvidence] = Field(default_factory=list)
+    missing_info: list[str] = Field(default_factory=list)
+
+    model_config = ConfigDict(extra="ignore")
+
+    @field_validator("question", "answer", mode="before")
+    @classmethod
+    def _coerce_str(cls, value: Any) -> Any:
+        return _as_str(value)
+
+    @field_validator("rationale", "follow_ups", "missing_info", mode="before")
+    @classmethod
+    def _coerce_lists(cls, value: Any) -> Any:
+        return _as_str_list(value)
+
+    @field_validator("evidence", mode="before")
+    @classmethod
+    def _coerce_evidence(cls, value: Any) -> Any:
+        return _as_obj_list(value, str_key="quote")
+
+    @field_validator("assessment", mode="before")
+    @classmethod
+    def _coerce_assessment(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            # 有些模型把档位压成一个词：「assessment": "优秀"」——按 level 兜住。
+            return {"level": value}
+        return _unwrap(value)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _peel(cls, value: Any) -> Any:
+        return _unwrap(value)
 
 
-# --- 提示词 ------------------------------------------------------------------------
+# --- 提示词（含显式 JSON 骨架：结构错误的最大来源是模型自拟字段名）-------------------
 
 _SUGGEST_SYSTEM = (
     "你是资深技术面试官教练。用户会提供自己的一份简历，你的任务是站在面试官视角，"
@@ -109,6 +289,10 @@ _SUGGEST_SYSTEM = (
     "每个问题必须锚定简历原文的一个真实片段（quote 字段逐字摘录原文，不要改写），"
     "并说明为什么值得问（rationale）。不要编造简历里没有的经历、项目或指标。"
     "全部用简体中文。"
+    "\n\n只输出一个 JSON 对象，不要输出任何解释文字，结构必须是：\n"
+    '{"items": [{"question": "问题", "rationale": "为什么值得问", '
+    '"quote": "简历原文的逐字片段"}]}\n'
+    "items 给 4 条左右；question 不超过 200 字，rationale 不超过 100 字。"
 )
 
 _ASK_SYSTEM = (
@@ -120,6 +304,15 @@ _ASK_SYSTEM = (
     "答案需要的量化指标或细节如果简历里没有，写成〈待补充〉并说明应补什么，"
     "绝不编造项目、数字、经历或职责。evidence 的 quote 字段必须逐字摘录简历原文。"
     "全部用简体中文。"
+    "\n\n只输出一个 JSON 对象，不要输出任何解释文字，结构必须是：\n"
+    '{"question": "复盘的题目", "answer": "参考满分答案", '
+    '"rationale": ["答题理由（2-4 条）"], '
+    '"assessment": {"level": "只能是 基础 / 合格 / 优秀 三选一", '
+    '"strengths": ["出题优点"], "improvements": ["可改进处"]}, '
+    '"follow_ups": ["追问方向（2-3 条）"], '
+    '"evidence": [{"claim": "这条证据说明什么", "quote": "简历原文的逐字片段"}], '
+    '"missing_info": ["简历缺失、需要用户补充的信息"]}\n'
+    "answer 不超过 1500 字；各列表不超过 4 条；level 字段只能取 基础、合格、优秀 之一。"
 )
 
 
@@ -167,15 +360,19 @@ def _sanitize_numbers(answer: str, haystack: str) -> tuple[str, bool]:
 
 
 def _filter_evidence(
-    evidence: list[MirrorEvidence], haystack: str
+    evidence: list[_DraftEvidence], haystack: str
 ) -> tuple[list[MirrorEvidence], int]:
-    """证据闸门：quote 命不中的整条剔除，返回（保留条目, 剔除数）。"""
+    """证据闸门：quote 命不中的整条剔除，返回（契约条目, 剔除数）。
+
+    claim 缺失时给中性占位——证据的价值在 quote 能命中原文，claim 只是给人看的摘要。
+    """
     kept: list[MirrorEvidence] = []
     dropped = 0
     for item in evidence:
-        item.quote = _clip_quote(item.quote)
-        if item.quote and _quote_hits(item.quote, haystack):
-            kept.append(item)
+        quote = _clip_quote(item.quote)
+        if quote and _quote_hits(quote, haystack):
+            claim = _clip_str(item.claim, 240) or "简历原文佐证"
+            kept.append(MirrorEvidence(claim=claim, quote=quote))
         else:
             dropped += 1
     return kept, dropped
@@ -198,10 +395,20 @@ async def suggest_questions(
     kept: list[MirrorSuggestion] = []
     dropped = 0
     for item in draft.items:
-        item.quote = _clip_quote(item.quote)
-        if item.quote and _quote_hits(item.quote, haystack):
+        question = _clip_str(item.question, 300)
+        if not question:
+            dropped += 1
+            continue
+        quote = _clip_quote(item.quote)
+        if quote and _quote_hits(quote, haystack):
             if len(kept) < count:
-                kept.append(item)
+                kept.append(
+                    MirrorSuggestion(
+                        question=question,
+                        rationale=_clip_str(item.rationale, 240) or "锚定简历原文的追问点",
+                        quote=quote,
+                    )
+                )
             # 超出请求数的合格条目直接不返回，也不计入 dropped（那是编造的口径）。
         else:
             dropped += 1
@@ -229,6 +436,11 @@ async def ask(
         f"{question_block}\n\n以下是用户的简历正文：\n\n{_resume_snippet(resume_text)}"
     )
     draft = await client.complete_model(_ASK_SYSTEM, prompt, _CardDraft)
+    if not draft.answer.strip():
+        # 宽松解析后仍然没有答案正文：这卡没法复盘，按既有口径让用户重试。
+        raise AppError(
+            AI_SCHEMA_INVALID, "AI 返回的结构不符合预期，请重试一次", status=502, retryable=True
+        )
 
     # 输出护栏：答案正文与列表项都是模型写的，可能复述用户输入里的联系方式。
     from app.services.ai import guardrails
@@ -245,14 +457,24 @@ async def ask(
     evidence, dropped_evidence = _filter_evidence(draft.evidence, haystack)
     answer, answer_sanitized = _sanitize_numbers(answer, haystack)
 
+    assessment = MirrorAssessment(
+        level=_normalize_level(draft.assessment.level),
+        strengths=[
+            _clip_str(item, 120) for item in draft.assessment.strengths if item.strip()
+        ][:4],
+        improvements=[
+            _clip_str(item, 120) for item in draft.assessment.improvements if item.strip()
+        ][:4],
+    )
+
     card_id = uuid.uuid4().hex
     payload: dict[str, Any] = {
-        "answer": answer,
-        "rationale": rationale,
-        "assessment": draft.assessment.model_dump(),
-        "follow_ups": follow_ups,
+        "answer": answer[:4000],
+        "rationale": rationale[:6],
+        "assessment": assessment.model_dump(),
+        "follow_ups": follow_ups[:4],
         "evidence": [item.model_dump() for item in evidence],
-        "missing_info": draft.missing_info,
+        "missing_info": [_clip_str(item, 200) for item in draft.missing_info if item.strip()][:4],
         "dropped_evidence_count": dropped_evidence,
         "answer_sanitized": answer_sanitized,
     }

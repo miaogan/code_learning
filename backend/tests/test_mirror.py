@@ -299,3 +299,68 @@ def test_cards_are_isolated_across_accounts(
         "/api/mirror/ask", json={"resume_id": resume_id, "question": "为什么这么设计？"}
     )
     assert crossed.status_code == 404
+
+
+# --- 宽松解析：真实模型的「不规整但能救」形态 -------------------------------------
+
+
+def test_ask_tolerates_loose_model_shapes(
+    client: TestClient,
+    patch_ai: Callable[[Responder], None],
+    resume_text: str,
+) -> None:
+    """level 超集、单字符串列表、空 claim、包装键都要被归一，而不是 502。"""
+    resume_id = _seed_resume(resume_text)
+    loose_card: dict[str, Any] = {
+        "question": "这个问题值得问吗？",
+        "answer": "在 2023 年入职后主导数据看板项目，负责表格虚拟滚动与缓存策略。",
+        "rationale": "先给结论再展开优化路径",  # 单字符串 → 单元素列表
+        "assessment": {
+            "level": "非常优秀，接近资深面试官的出题",  # 超集词 → 归「优秀」
+            "strengths": "直接命中主项目",  # 单字符串 → 列表
+            "improvements": None,  # None → 空列表
+        },
+        "follow_ups": ["虚拟滚动的复用策略是什么？"],
+        "evidence": [{"claim": "", "quote": _GOOD_QUOTE}],  # claim 缺失 → 中性占位
+        "missing_info": "简历缺少量化数据",
+    }
+    patch_ai(lambda cls, _user: {"result": loose_card})  # 单键包装 → 自动剥掉
+    response = client.post(
+        "/api/mirror/ask", json={"resume_id": resume_id, "question": "讲讲性能优化？"}
+    )
+    assert response.status_code == 200, response.text
+    card = response.json()
+    assert card["assessment"]["level"] == "优秀"
+    assert card["assessment"]["strengths"] == ["直接命中主项目"]
+    assert card["assessment"]["improvements"] == []
+    assert card["rationale"] == ["先给结论再展开优化路径"]
+    assert card["evidence"][0]["claim"] == "简历原文佐证"
+    assert card["evidence"][0]["quote"] == _GOOD_QUOTE
+    assert card["missing_info"] == ["简历缺少量化数据"]
+
+
+def test_suggestions_tolerate_loose_shapes(
+    client: TestClient,
+    patch_ai: Callable[[Responder], None],
+    resume_text: str,
+) -> None:
+    """空 question 条目剔除；rationale 缺失给中性占位。"""
+    resume_id = _seed_resume(resume_text)
+    patch_ai(
+        lambda cls, _user: {
+            "items": [
+                {"question": "", "rationale": "", "quote": _GOOD_QUOTE},  # 空题剔除
+                {
+                    "question": "x" * 500,  # 超长 → 服务端裁剪
+                    "quote": _GOOD_QUOTE,
+                },  # rationale 缺失 → 中性占位
+            ]
+        }
+    )
+    response = client.post("/api/mirror/suggestions", json={"resume_id": resume_id, "count": 4})
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body["items"]) == 1
+    assert len(body["items"][0]["question"]) <= 300
+    assert body["items"][0]["rationale"] == "锚定简历原文的追问点"
+    assert body["dropped_count"] == 1
