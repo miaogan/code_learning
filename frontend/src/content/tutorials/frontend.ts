@@ -651,4 +651,217 @@ export const FRONTEND_CHAPTERS: TutorialChapter[] = [
       },
     ],
   },
+  {
+    id: 'fe-react-concurrent',
+    title: 'React 并发渲染与非阻塞更新',
+    direction: '前端',
+    sub_direction: 'react',
+    level: '高级',
+    summary: '从可中断渲染讲起，掌握 useTransition、Suspense 与优先级，让heavy 更新不卡住输入交互。',
+    sections: [
+      {
+        id: 'concept',
+        title: '并发不是并行',
+        blocks: [
+          {
+            kind: 'text',
+            text: 'JavaScript 仍是单线程，并发渲染指的是 React 可以把一次渲染拆成小块、在浏览器需要响应输入时暂停让位，之后再继续。它解决的是「大列表渲染时输入框卡顿」这类问题，而不是让计算真的多线程。',
+          },
+          {
+            kind: 'list',
+            items: [
+              '紧急更新：用户打字、点击，必须立刻反馈。',
+              '过渡更新：过滤大列表、切换视图，可以稍后完成。',
+              '并发特性让低优先级的过渡更新可被高优先级更新打断。',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'transition',
+        title: 'useTransition 与 useDeferredValue',
+        blocks: [
+          {
+            kind: 'code',
+            language: 'tsx',
+            caption: '把昂贵的过滤标记为过渡更新',
+            code: [
+              'const [query, setQuery] = useState("")',
+              'const [isPending, startTransition] = useTransition()',
+              '',
+              'function onChange(e) {',
+              '  setQuery(e.target.value)            // 紧急：输入框立即更新',
+              '  startTransition(() => {',
+              '    setFilter(e.target.value)         // 过渡：大列表可延后',
+              '  })',
+              '}',
+              '',
+              'return <>{isPending && <Spinner />}<List filter={filter} /></>',
+            ].join('\n'),
+          },
+          {
+            kind: 'table',
+            headers: ['场景', '推荐', '原因'],
+            rows: [
+              ['状态由本组件直接设置', 'useTransition', '能拿到 isPending 显示加载态'],
+              ['值来自 props 或下游', 'useDeferredValue', '无需改造状态更新处'],
+            ],
+          },
+        ],
+      },
+      {
+        id: 'suspense',
+        title: 'Suspense 与加载边界',
+        blocks: [
+          {
+            kind: 'text',
+            text: 'Suspense 让组件在等待数据时声明「还没准备好」，由最近的边界展示 fallback。配合并发渲染，可以在切换视图时保留旧内容、避免整页闪烁，而不是立刻退回加载态。',
+          },
+          {
+            kind: 'note',
+            tone: 'warn',
+            title: 'Effect 里的竞态',
+            text: '请求返回顺序不一定等于发起顺序。在 Effect 里发起异步请求要提供清理函数，用标志位或 AbortController 忽略过期结果，否则慢请求会覆盖新结果。',
+          },
+        ],
+      },
+      {
+        id: 'pitfalls',
+        title: '常见坑与自测',
+        blocks: [
+          {
+            kind: 'qa',
+            items: [
+              {
+                question: '并发渲染会让我的计算变快吗？',
+                answer: '不会。它优化的是响应性而非计算量：把渲染拆块并在需要时让位给输入。真正的 Heavy 计算要用 Web Worker 或防抖、虚拟化等手段减少工作量。',
+              },
+              {
+                question: 'useTransition 和防抖有什么区别？',
+                answer: '防抖按时间延后执行，代价是结果总是滞后固定时长；useTransition 让更新可中断，紧急输入一到就让位，输入体验更顺滑，且能给出 isPending 状态。',
+              },
+              {
+                question: '为什么给组件加 memo 还是频繁重渲染？',
+                answer: '常见原因是 props 里有每次新建的对象或函数引用，浅比较通不过。用 useMemo/useCallback 稳定引用，或把状态拆分下移，缩小重渲染范围。',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'fe-ts-advanced',
+    title: 'TypeScript 类型系统与工程实践',
+    direction: '前端',
+    sub_direction: 'ts',
+    level: '高级',
+    summary: '用泛型约束、条件类型与可辨识联合把类型写成可执行的设计文档，让非法状态在编译期就无处藏身。',
+    sections: [
+      {
+        id: 'concept',
+        title: '类型是设计工具，不只是注解',
+        blocks: [
+          {
+            kind: 'text',
+            text: '好的类型设计让「非法状态不可表示」：与其用一堆可选字段加一堆 if 判断，不如用可辨识联合把每种状态的合法字段绑定在一起。编译器会逼你处理每一种情况。',
+          },
+          {
+            kind: 'code',
+            language: 'ts',
+            caption: '用可辨识联合建模请求状态',
+            code: [
+              'type LoadState<T> =',
+              '  | { status: "idle" }',
+              '  | { status: "loading" }',
+              '  | { status: "success"; data: T }',
+              '  | { status: "error"; message: string }',
+              '',
+              'function view<T>(s: LoadState<T>): string {',
+              '  switch (s.status) {',
+              '    case "success": return String(s.data)  // data 必定存在',
+              '    case "error": return s.message',
+              '    default: return "..."',
+              '  }',
+              '}',
+            ].join('\n'),
+          },
+        ],
+      },
+      {
+        id: 'generics',
+        title: '泛型约束与条件类型',
+        blocks: [
+          {
+            kind: 'table',
+            headers: ['工具', '作用', '典型用法'],
+            rows: [
+              ['keyof / typeof', '取键集合与值的字面类型', '约束参数只能是对象已有键'],
+              ['extends 约束', '限定泛型范围', '要求入参含某个字段'],
+              ['条件类型 + infer', '按输入推导输出形状', '提取函数返回值类型'],
+              ['satisfies', '校验但保留字面量精度', '配置对象不丢失具体键'],
+            ],
+          },
+          {
+            kind: 'code',
+            language: 'ts',
+            caption: 'satisfies 保留字面量类型',
+            code: [
+              'const routes = {',
+              '  home: "/",',
+              '  user: "/u/:id",',
+              '} satisfies Record<string, string>',
+              '',
+              'type RouteKey = keyof typeof routes  // "home" | "user"，而非 string',
+            ].join('\n'),
+          },
+          {
+            kind: 'note',
+            tone: 'info',
+            title: '不等于断言',
+            text: 'as 是告诉编译器「相信我」，会绕过检查；satisfies 是让编译器验证「确实符合」同时保留精度。能用 satisfies 就不用断言。',
+          },
+        ],
+      },
+      {
+        id: 'engineering',
+        title: '工程化配置要点',
+        blocks: [
+          {
+            kind: 'list',
+            ordered: true,
+            items: [
+              '开启 strict，尤其 strictNullChecks，把空值问题交给编译器。',
+              '对外部数据（接口响应、localStorage）在边界处做运行时校验，类型注解本身没有运行时效果。',
+              '公共类型集中管理，避免同一份接口在多个文件各写一遍。',
+              '谨慎使用 any 与类型断言，它们是类型系统里的逃生口，滥用会让检查形同虚设。',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'pitfalls',
+        title: '常见坑与自测',
+        blocks: [
+          {
+            kind: 'qa',
+            items: [
+              {
+                question: '可辨识联合相比一堆可选字段好在哪？',
+                answer: '可选字段允许多种不合理组合（既 loading 又有 data），代码里要靠约定和 if 去防。可辨识联合用判别字段把每种状态的合法字段绑定，编译器强制你穷尽处理，非法组合无法构造。',
+              },
+              {
+                question: 'satisfies 和类型注解的区别？',
+                answer: '类型注解会把变量类型拓宽成注解类型，丢失字面量信息；satisfies 只做符合性校验，变量仍是它最精确的字面量类型，适合配置对象与常量表。',
+              },
+              {
+                question: '为什么编译过了运行时还会类型错？',
+                answer: 'TypeScript 类型在编译后被擦除，接口返回、用户输入、存储数据这些外部来源不受编译期保护。要在进入系统的边界处做运行时校验，再交给类型系统。',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
 ]

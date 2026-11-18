@@ -1,0 +1,1944 @@
+[
+  {
+    "direction": "后端",
+    "sub_direction": "python",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "某 FastAPI 接口在压测下 QPS 到 200 后延迟陡增，CPU 未打满但事件循环出现明显卡顿，日志里大量请求在同一秒后集中返回。最可能的成因是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "某个 async 路由里直接调用了同步的 time.sleep 或重型计算，阻塞了事件循环所在的单线程"
+      },
+      {
+        "key": "B",
+        "text": "数据库连接池配置得太大，导致线程上下文切换开销过多"
+      },
+      {
+        "key": "C",
+        "text": "Uvicorn 的 worker 数量少于 CPU 核心数，没吃满多核"
+      },
+      {
+        "key": "D",
+        "text": "响应体没有启用 gzip 压缩，网络传输带宽成为瓶颈"
+      }
+    ],
+    "answer": "A",
+    "explanation": "asyncio 是单线程事件循环，一旦在某个协程里直接执行阻塞式调用或 CPU 密集计算，整个循环会被占住，其余协程得不到调度，表现就是延迟呈阶跃式上升且请求成批返回。连接池过大、worker 数偏少或缺少 gzip 都不会让事件循环本身卡顿，它们分别影响连接争用、多核利用和带宽，而非单线程调度。"
+  },
+  {
+    "direction": "后端",
+    "sub_direction": "python",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "一个用 FastAPI 做图片缩略图的在线服务，单 worker 下把一张大图缩放耗时 200ms，再加请求只会排队；部署机有 8 核。哪种改造最能利用多核并保持接口可响应？",
+    "options": [
+      {
+        "key": "A",
+        "text": "把 CPU 密集的缩放函数放进进程池（run_in_executor 配合 ProcessPoolExecutor），并开多个 uvicorn worker"
+      },
+      {
+        "key": "B",
+        "text": "把缩放函数改成 async def，但内部仍是同步的 PIL 调用"
+      },
+      {
+        "key": "C",
+        "text": "把 worker 数固定为 1 并调大数据库连接池，让请求排队更快被处理"
+      },
+      {
+        "key": "D",
+        "text": "在请求处理里用 threading.Thread 直接跑 PIL，依赖 GIL 实现并行加速"
+      }
+    ],
+    "answer": "A",
+    "explanation": "CPU 密集任务受 GIL 限制，线程无法真正并行，必须靠进程才能利用多核；把缩放放进进程池可避免阻塞事件循环，多个 uvicorn worker 又能进一步分摊负载。仅把函数改成 async def 不会让同步计算变为非阻塞；单 worker 加连接池无法突破单核；用线程跑 PIL 仍被 GIL 串行化，达不到多核加速。"
+  },
+  {
+    "direction": "后端",
+    "sub_direction": "python",
+    "language": "",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "由于 GIL 的存在，Python 的多线程在任何场景下都无法提升程序执行效率，因此并发编程一律应改用多进程。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "错误",
+    "explanation": "这个说法过于绝对。GIL 只限制同一时刻一个线程执行 Python 字节码，因此对 CPU 密集任务多线程确实难以加速；但遇到 I/O 阻塞（网络、磁盘、数据库）时，线程会在等待期间让出 GIL，多线程能显著提升吞吐。此外 numpy 等 C 扩展会在计算时释放 GIL。所以应按负载类型选择，而非一律改用多进程。"
+  },
+  {
+    "direction": "后端",
+    "sub_direction": "python",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "某异步服务上线后偶发『Timeout acquiring connection from pool』，监控显示 DB 侧活跃连接数并不高，应用日志里一些请求在拿到连接后还做了上百毫秒的远端 RPC。最可能的根因是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "连接借出后未在 finally 中归还，或把慢 RPC 放在持有连接期间，导致连接长时间被占用而池被耗尽"
+      },
+      {
+        "key": "B",
+        "text": "数据库最大连接数设置得太低，需要直接调高数据库的上限"
+      },
+      {
+        "key": "C",
+        "text": "连接池的预 ping 检查太频繁，白白浪费了连接"
+      },
+      {
+        "key": "D",
+        "text": "应用使用了连接池，但所用数据库根本不支持长连接"
+      }
+    ],
+    "answer": "A",
+    "explanation": "DB 侧活跃连接不高却借不到连接，说明连接被应用端长期占用未归还；典型原因是异常路径漏了归还，或在持有连接时执行慢 RPC，使连接成为瓶颈资源。盲目调高数据库上限治标不治本；预 ping 与长连接支持并非此现象主因，问题在应用侧的连接生命周期管理。"
+  },
+  {
+    "direction": "后端",
+    "sub_direction": "python",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "在 FastAPI 中用中间件给每个请求设置 trace_id，期望下游 async 函数里能直接读到；但开启多个异步任务后，部分任务读到的是上一个请求残留的值。正确的理解是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "contextvars 为每个异步上下文保存独立副本，create_task 会在创建那一刻拷贝当前上下文，此后父协程再改不会同步给已创建的子任务"
+      },
+      {
+        "key": "B",
+        "text": "contextvars 本质是线程局部变量，跨 task 一定会串味"
+      },
+      {
+        "key": "C",
+        "text": "应改用模块级全局变量存 trace_id，才能跨任务共享"
+      },
+      {
+        "key": "D",
+        "text": "create_task 完全不会继承上下文，必须把 trace_id 当参数层层手动传入"
+      }
+    ],
+    "answer": "A",
+    "explanation": "contextvars 为每个异步上下文保存独立副本，create_task 在创建时复制当前上下文快照，因此快照之后父协程对变量的修改不会回写到已创建的子任务，这正解释了读数不一致。它不是线程局部存储；用全局变量会在并发请求间互相污染；create_task 默认会继承（拷贝）上下文，并非完全不继承。"
+  },
+  {
+    "direction": "后端",
+    "sub_direction": "python",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "某长期运行的 Python 服务内存持续缓慢增长，重启后恢复。下面哪些排查或处理手段是合理的？",
+    "options": [
+      {
+        "key": "A",
+        "text": "用 tracemalloc 抓两个时间点的快照做对比，定位分配增长最多的调用栈"
+      },
+      {
+        "key": "B",
+        "text": "检查是否有全局容器（如 list/dict）只增不减，或缓存缺少淘汰策略"
+      },
+      {
+        "key": "C",
+        "text": "用 objgraph 查看某类对象数量是否随时间累积，确认引用环或遗漏的清理"
+      },
+      {
+        "key": "D",
+        "text": "周期性调用 gc.collect() 强制回收，这能从根源上解决所有内存增长"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "tracemalloc 快照对比能定位内存增长热点，全局容器无淘汰和引用环也会造成对象只增不减，objgraph 观察对象数量变化是常用确认手段，三者都对症。单纯周期性调用 gc.collect() 只能缓解由循环引用带来的增长，对仍被强引用的对象无效，属于掩盖问题而非根治，不能作为根本方案。"
+  },
+  {
+    "direction": "后端",
+    "sub_direction": "go",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "一个 Go 服务的 goroutine 数量随请求数单调上升，pprof 显示大量协程停在 channel receive。代码里起了生产者向无缓冲 channel 发送，但消费者在出错分支提前 return 不再接收。根因是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "生产者阻塞在发送上且没有退出通道，错误路径未取消导致 goroutine 永久泄漏"
+      },
+      {
+        "key": "B",
+        "text": "Go 的 channel 默认带缓冲，因此根本不存在发送阻塞的情况"
+      },
+      {
+        "key": "C",
+        "text": "需要把 channel 容量设为 0 才能避免这类泄漏"
+      },
+      {
+        "key": "D",
+        "text": "goroutine 会在函数返回后被 GC 自动回收，无需担心"
+      }
+    ],
+    "answer": "A",
+    "explanation": "无缓冲 channel 的发送必须有接收方配对，消费者提前退出后生产者会永久阻塞在发送语句上；若没有 context 取消或关闭信号让它退出，这些 goroutine 就再也无法结束，形成泄漏。Go 的 channel 默认无缓冲；把容量设为 0 正是无缓冲；GC 不会回收仍在阻塞的 goroutine，因其仍被运行时视为活跃。"
+  },
+  {
+    "direction": "后端",
+    "sub_direction": "go",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "服务 A 调用下游 B 时设置 200ms 超时，但 B 内部又串行请求 C、D 各 150ms。A 侧超时返回后，B 仍继续执行完 C 和 D 才结束，白白浪费资源。要让 B 在 A 取消时立即停止，关键做法是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "B 在入口从请求 context 派生，并把同一个 ctx 透传给 C、D 的调用，任何一层感知取消后立刻返回"
+      },
+      {
+        "key": "B",
+        "text": "B 给每个下游都用 context.Background() 创建彼此独立的超时"
+      },
+      {
+        "key": "C",
+        "text": "A 超时后 B 通过 sleep 等待剩余请求自行结束再退出"
+      },
+      {
+        "key": "D",
+        "text": "把 B 内部的超时设得比 A 更长，确保 C、D 都能跑完"
+      }
+    ],
+    "answer": "A",
+    "explanation": "context 的取消信号需要沿调用链传递：B 应基于入站请求的 ctx 派生子 context，并一路透传给 C、D，这样 A 一旦取消或超时，B 及所有下游能同时收到 Done 信号并尽快退出，避免无用工作。用 Background 会切断取消链；sleep 等待和把 B 超时设得更长都违背及时止损的初衷。"
+  },
+  {
+    "direction": "后端",
+    "sub_direction": "go",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "一段 Go 代码想等 1 秒后放弃接收：select 中一支从 channel 收值，另一支用 time.After(time.Second) 超时。放在高频循环里运行后发现 timers 数量暴涨、内存上升。更合适的写法是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "复用同一个 timer，用 defer timer.Stop() 并在复用前正确处理已触发的通道，避免每次循环新建 time.After"
+      },
+      {
+        "key": "B",
+        "text": "把 time.After 改成 time.Tick，并且永不停止它"
+      },
+      {
+        "key": "C",
+        "text": "用 for range 遍历 channel 代替 select，就不需要超时分支了"
+      },
+      {
+        "key": "D",
+        "text": "把超时时间调到更大即可消除 timers 堆积"
+      }
+    ],
+    "answer": "A",
+    "explanation": "time.After 每次调用都会创建一个新定时器，在高频循环里这些定时器要等到触发后才被回收，短时间内大量堆积造成内存与 timer 开销。正确做法是复用一个 timer，并在每次使用前停止、排空其通道，或用可停止的 timer。time.Tick 创建的 ticker 同样需要 Stop，否则泄漏更严重；单纯增大超时不能减少新建数量。"
+  },
+  {
+    "direction": "后端",
+    "sub_direction": "go",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "nice_to_know",
+    "stem": "某高频接口每次请求都新建一个较大的字节缓冲区，GC 压力大。团队引入 sync.Pool 复用对象，但压测发现对象仍大量逃逸到堆、命中率很低。结合逃逸分析，最合理的判断是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "若对象被存入接口类型、闭包或 channel 等可能逃出当前作用域，就会逃逸到堆，需减少这类引用让对象生命周期局限在借还之间"
+      },
+      {
+        "key": "B",
+        "text": "sync.Pool 里的对象永远不会被 GC 回收，因此命中率低一定是 Pool 用错了"
+      },
+      {
+        "key": "C",
+        "text": "只要主动调用 runtime.GC() 就能提高 Pool 的命中率"
+      },
+      {
+        "key": "D",
+        "text": "逃逸到堆的对象无法被 sync.Pool 复用，必须改用全局变量"
+      }
+    ],
+    "answer": "A",
+    "explanation": "逃逸分析决定对象分配在栈还是堆；一旦对象被存入接口、闭包捕获或发送至 channel，编译器判定其可能活出函数，便分配到堆。要让 Pool 生效，应缩短对象可见范围、避免不必要的逃逸，使其随借随还。Pool 中的对象在 GC 时会被清空，并非永不回收；手动触发 GC 反而降低命中；Pool 复用的正是堆对象，改成全局变量与逃逸无关。"
+  },
+  {
+    "direction": "后端",
+    "sub_direction": "go",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "线上 Go 服务 CPU 飙高且响应变慢，团队想用 pprof 定位。下列关于 pprof 使用的说法哪些是正确的？",
+    "options": [
+      {
+        "key": "A",
+        "text": "cpu profile 通过采样调用栈找出消耗 CPU 最多的函数，适合定位热点代码"
+      },
+      {
+        "key": "B",
+        "text": "heap profile 可查看 inuse_space 与 alloc_space，帮助区分内存泄漏与高分配率"
+      },
+      {
+        "key": "C",
+        "text": "goroutine profile 能看到阻塞的协程及其堆栈，有助于发现泄漏与死锁"
+      },
+      {
+        "key": "D",
+        "text": "pprof 的 CPU 采样会显著降低性能，线上环境绝对不能开启"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "cpu profile 基于采样统计各函数调用栈的 CPU 时间，能定位热点；heap profile 的 inuse_space 反映当前占用、alloc_space 反映累计分配，可区分泄漏与频繁分配；goroutine profile 展示协程状态与堆栈，便于发现阻塞和泄漏。pprof 采样开销通常很小，线上可按需短时开启，说绝对不能开启过于极端。"
+  },
+  {
+    "direction": "后端",
+    "sub_direction": "go",
+    "language": "",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "给 Go 的 http.Server 只配置 ReadTimeout 就足以防范慢客户端攻击（slowloris），不必设置 WriteTimeout 和 IdleTimeout。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "错误",
+    "explanation": "ReadTimeout 只限制读取请求头的时长，慢客户端可以持续发送缓慢的请求体或长期占着连接不发数据，单靠它无法防范。WriteTimeout 限制写响应超时，IdleTimeout 限制 keep-alive 空闲连接的存活时间，三者配合才能有效回收被恶意或异常客户端长期占用的连接。因此只配 ReadTimeout 并不充分。"
+  },
+  {
+    "direction": "后端",
+    "sub_direction": "java",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "某 Java 服务用 ThreadPoolExecutor 处理订单，core 与 max 都设为 8，队列用无界 LinkedBlockingQueue。突发流量下线程数始终停在 8，请求大量堆积、延迟飙升甚至 OOM。最合理的调整是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "改用有界队列并配合合适的拒绝策略与 maxPoolSize，让线程数能增长并在过载时快速失败"
+      },
+      {
+        "key": "B",
+        "text": "把 corePoolSize 调到 1，以减少线程上下文切换"
+      },
+      {
+        "key": "C",
+        "text": "保持无界队列，因为它能无限缓存任务、永远不会拒绝请求"
+      },
+      {
+        "key": "D",
+        "text": "把 keepAliveTime 设为 0，让空闲线程立即销毁腾出资源"
+      }
+    ],
+    "answer": "A",
+    "explanation": "当 core 与 max 相等且使用无界队列时，任务会无限入队，maxPoolSize 永远不生效，突发流量只会堆积直至内存耗尽。改用有界队列后，队列满时才会创建到 max 的线程，仍过载则触发拒绝策略快速失败，保护系统。调小 core、保留无界队列或改 keepAliveTime 都无法解决堆积与 OOM 根因。"
+  },
+  {
+    "direction": "后端",
+    "sub_direction": "java",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "一个对延迟敏感的 Java 服务偶发几百毫秒的 STW 停顿，排查发现老年代使用量呈锯齿状快速增长。若希望在吞吐可接受的前提下把停顿控制在几十毫秒，最合适的方向是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "换用低停顿收集器（如 G1 并设置合理的 MaxGCPauseMillis），减少单次回收范围"
+      },
+      {
+        "key": "B",
+        "text": "把堆调得越小越好，这样每次 GC 自然更快"
+      },
+      {
+        "key": "C",
+        "text": "禁用自动 GC，改由代码里调用 System.gc() 手动触发"
+      },
+      {
+        "key": "D",
+        "text": "把年轻代扩大到占满整个堆，彻底避免对象进入老年代"
+      }
+    ],
+    "answer": "A",
+    "explanation": "G1 等面向低停顿的收集器通过区域化回收和停顿预测，能在满足吞吐的同时把单次 STW 控制在目标范围内，配合合理的 MaxGCPauseMillis 更贴合延迟敏感场景。堆过小会更频繁 GC；禁用 GC 不现实且 System.gc() 只是建议；年轻代占满堆会让存活对象更难晋升、反而加剧 Full GC 风险。"
+  },
+  {
+    "direction": "后端",
+    "sub_direction": "java",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "在 Java 并发编程中，关于 synchronized 与 ReentrantLock 的比较，下列说法正确的有哪些？",
+    "options": [
+      {
+        "key": "A",
+        "text": "ReentrantLock 支持公平锁选择、可中断的锁获取与 tryLock 超时，比 synchronized 更灵活"
+      },
+      {
+        "key": "B",
+        "text": "synchronized 是 JVM 内置关键字，会自动释放锁，使用更简单且不易忘记解锁"
+      },
+      {
+        "key": "C",
+        "text": "ReentrantLock 必须手动在 finally 中 unlock，否则异常时可能导致锁无法释放"
+      },
+      {
+        "key": "D",
+        "text": "synchronized 一定比 ReentrantLock 性能差，任何场景都应优先用 ReentrantLock"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "ReentrantLock 提供公平性选项、lockInterruptibly 与 tryLock 超时，控制力更强；synchronized 由 JVM 保证在退出同步块时自动释放，写法简洁；正因 ReentrantLock 需手动解锁，必须在 finally 中释放以防异常泄漏。随着 JVM 对 synchronized 持续优化，两者性能差距很小，说任何场景都该用 ReentrantLock 并不成立。"
+  },
+  {
+    "direction": "后端",
+    "sub_direction": "java",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "某基于线程池的 Web 服务用 ThreadLocal 存放用户上下文，长时间运行后偶发取到上一个用户的数据，且内存缓慢增长。对根因最准确的解释是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "ThreadLocalMap 的 key 是弱引用但 value 是强引用，线程长期不销毁且未 remove，导致 value 无法回收并可能被复用线程读到旧值"
+      },
+      {
+        "key": "B",
+        "text": "ThreadLocal 的 key 是强引用，因此 GC 永远不会回收其中的值"
+      },
+      {
+        "key": "C",
+        "text": "线程池每次任务结束都会自动清空 ThreadLocal，问题出在数据库缓存"
+      },
+      {
+        "key": "D",
+        "text": "ThreadLocal 是线程安全的，不可能出现串数据，只是网络抖动造成的错觉"
+      }
+    ],
+    "answer": "A",
+    "explanation": "ThreadLocalMap 以弱引用作为 key、强引用作为 value：key 在 GC 后变 null，但 value 仍被 Entry 强引用，线程池中线程长期存活使 value 无法回收；若任务结束不调用 remove，复用同一线程时还可能读到上一个任务的残留值。key 并非强引用；线程池不会自动清理 ThreadLocal；这与数据库缓存或网络无关。"
+  },
+  {
+    "direction": "后端",
+    "sub_direction": "java",
+    "language": "",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "应用报『Connection is not available, request timed out』（HikariPool），只要重启服务就恢复，说明一定是数据库服务器宕机或网络中断导致的。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "错误",
+    "explanation": "该异常表示从连接池借连接超时，数据库宕机只是可能原因之一。更常见的根因在应用侧：连接用完后未归还、慢 SQL 长时间占用连接、连接泄漏使池被耗尽，或池配置过小。重启能临时恢复恰恰说明是应用侧状态（泄漏的连接随进程回收）而非数据库持续不可用。应结合活跃连接数与慢查询日志判断。"
+  },
+  {
+    "direction": "后端",
+    "sub_direction": "通用后端",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "支付接口偶发客户端重试导致重复扣款。团队打算引入幂等键，以下哪项设计最能保证同一笔业务请求重试只执行一次？",
+    "options": [
+      {
+        "key": "A",
+        "text": "客户端为每笔业务生成唯一业务流水号作为幂等键，服务端以它建唯一约束并记录处理结果，重复请求直接返回首次结果"
+      },
+      {
+        "key": "B",
+        "text": "用客户端 IP 加时间戳作为幂等键，超过 1 秒的请求一律拒绝"
+      },
+      {
+        "key": "C",
+        "text": "把幂等键设为固定字符串常量，便于服务端缓存复用"
+      },
+      {
+        "key": "D",
+        "text": "只要接口走 HTTPS 就不会重复扣款，无需额外设计幂等键"
+      }
+    ],
+    "answer": "A",
+    "explanation": "幂等的关键是让每次业务请求拥有稳定且唯一的标识，服务端据此建唯一索引或去重表，首次执行后记录结果，重复请求命中后直接返回原结果，从而保证只扣一次。IP 加时间戳无法区分同一用户的重试；固定常量会把不同请求混为一谈；HTTPS 只保证传输安全，不能防止重试导致的重复处理。"
+  },
+  {
+    "direction": "后端",
+    "sub_direction": "通用后端",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "订单创建要同时写本地订单表和调用库存服务扣减，要求最终一致且不能出现订单成功但库存没扣的情况。哪种方案通过本地事务加可靠投递来避免消息丢失、实现最终一致？",
+    "options": [
+      {
+        "key": "A",
+        "text": "Outbox 模式：在同一本地事务里写订单并写一条待发送消息，由独立投递器可靠发出，消费端做幂等"
+      },
+      {
+        "key": "B",
+        "text": "先调库存扣减，再写订单，任何一步失败都只记录日志、靠人工补偿"
+      },
+      {
+        "key": "C",
+        "text": "使用 2PC 并强制任何时刻都保持强一致，杜绝中间状态"
+      },
+      {
+        "key": "D",
+        "text": "把库存扣减操作塞进订单表的同一行，靠单个数据库事务覆盖两个服务"
+      }
+    ],
+    "answer": "A",
+    "explanation": "Outbox 把业务数据与待发消息放在同一本地事务提交，投递器再依据表记录可靠发送，避免业务成功但消息丢失，消费端幂等保证最终一致。先扣库存再写订单仍会因第二步失败产生不一致；2PC 代价高且存在阻塞、并非此场景首选；跨服务的库存无法塞进订单表同一行事务。"
+  },
+  {
+    "direction": "后端",
+    "sub_direction": "通用后端",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "关于常见限流算法的特点，下列说法正确的有哪些？",
+    "options": [
+      {
+        "key": "A",
+        "text": "固定窗口实现简单，但在窗口边界可能瞬时放行接近两倍阈值的流量"
+      },
+      {
+        "key": "B",
+        "text": "滑动窗口比固定窗口统计更细粒度，能缓解窗口边界的临界突刺"
+      },
+      {
+        "key": "C",
+        "text": "令牌桶允许一定程度的突发，同时约束长期平均速率"
+      },
+      {
+        "key": "D",
+        "text": "漏桶与令牌桶完全等价，二者都无法对突发流量进行任何整形"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "固定窗口简单但窗口边界可能瞬间放行接近两倍阈值；滑动窗口通过更细粒度统计缓解临界突刺；令牌桶可积累令牌允许一定突发同时约束平均速率。漏桶以恒定速率整形，能平滑突发，与令牌桶并不等价，说它不能对突发整形是错误的。"
+  },
+  {
+    "direction": "后端",
+    "sub_direction": "通用后端",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "下游服务响应变慢，上游线程被大量阻塞并逐渐耗尽连接池。为防止故障沿调用链向上蔓延造成雪崩，最有效的隔离与保护措施是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "为每个下游配独立线程池或信号量隔离，并设置熔断：错误率超阈值后快速失败一段时间再半开探测"
+      },
+      {
+        "key": "B",
+        "text": "把上游超时时间调得无限大，耐心等待下游自行恢复"
+      },
+      {
+        "key": "C",
+        "text": "只管增加上游实例数，靠扩容硬扛阻塞"
+      },
+      {
+        "key": "D",
+        "text": "把所有下游调用都改成同步串行执行，降低并发压力"
+      }
+    ],
+    "answer": "A",
+    "explanation": "资源隔离（线程池或信号量）能限制单个下游故障所占用的资源，配合熔断在错误率超标时快速失败、退避后以半开状态探测恢复，可阻止故障向上游扩散，避免雪崩。无限调大超时会让线程更久被占用；单纯扩容成本大且不能根治；串行同步只会降低吞吐，无法隔离故障。"
+  },
+  {
+    "direction": "后端",
+    "sub_direction": "通用后端",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "客户端对下游失败的请求统一采用固定间隔 100ms、最多重试 3 次。大促期间下游短暂不可用时，流量恢复瞬间出现二次洪峰，把刚恢复的下游再次打挂。最能缓解该现象的做法是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "采用指数退避并加入随机抖动（jitter），让各客户端的重试时刻分散开"
+      },
+      {
+        "key": "B",
+        "text": "把重试次数调到 10 次，以提高最终成功率"
+      },
+      {
+        "key": "C",
+        "text": "把所有客户端的重试间隔统一改成 1 秒"
+      },
+      {
+        "key": "D",
+        "text": "彻底取消重试，让失败请求直接返回给用户"
+      }
+    ],
+    "answer": "A",
+    "explanation": "固定间隔重试会让大量客户端在同一时刻集中重试，形成重试风暴把刚恢复的下游再次压垮。指数退避逐步拉长间隔，随机抖动再把各客户端的重试时刻打散，从而削平洪峰。增加重试次数会放大风暴；统一固定间隔仍会同步重试；完全取消重试牺牲了可用性，并非针对该现象的最佳折中。"
+  },
+  {
+    "direction": "后端",
+    "sub_direction": "通用后端",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "关于缓存击穿、穿透与雪崩的治理，下列说法正确的有哪些？",
+    "options": [
+      {
+        "key": "A",
+        "text": "热点键过期可用互斥锁重建或逻辑过期后台刷新，避免大量请求同时回源"
+      },
+      {
+        "key": "B",
+        "text": "查询不存在的数据可用布隆过滤器前置拦截，或对空结果做短 TTL 缓存"
+      },
+      {
+        "key": "C",
+        "text": "给缓存 TTL 加随机抖动，可避免大量键同时过期引发雪崩"
+      },
+      {
+        "key": "D",
+        "text": "缓存雪崩是因为键太多，应把所有键的过期时间设成完全相同来统一管理"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "互斥重建与逻辑过期能防击穿；布隆过滤器与空值缓存能防穿透；TTL 加随机抖动可打散集中过期，缓解雪崩。把过期时间设成完全相同恰恰会制造同时过期、加剧雪崩，是错误的做法。"
+  },
+  {
+    "direction": "后端",
+    "sub_direction": "通用后端",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "一个订单列表用 LIMIT offset,N 做分页，用户翻到很深页码时查询越来越慢，且翻页期间有新订单插入导致部分记录重复出现。更稳健的分页方式是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "基于有序且唯一的游标（如 created_at 加 id）做 keyset 分页，按游标向后取，避免深 offset 与偏移漂移"
+      },
+      {
+        "key": "B",
+        "text": "把每页 size 调到 10000，用大页减少翻页次数"
+      },
+      {
+        "key": "C",
+        "text": "在应用层把全部数据查到内存再自行切片"
+      },
+      {
+        "key": "D",
+        "text": "每次查询都强制走全表扫描，以保证拿到的数据最新"
+      }
+    ],
+    "answer": "A",
+    "explanation": "offset 分页需要数据库扫描并丢弃前 offset 行，越深越慢，且期间数据变动会造成漂移、重复或丢失。keyset（游标）分页以有序唯一键为锚点向下取值，利用索引、性能稳定且不受插入影响。增大页大小只是掩盖问题；全量加载到内存浪费资源；全表扫描更慢且与最新无关。"
+  },
+  {
+    "direction": "后端",
+    "sub_direction": "通用后端",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "团队要把用户接口返回的 user_name 字段改名为 username，但仍有大量旧版客户端在线。为平滑迁移且不破坏旧客户端，最稳妥的发布策略是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "响应中同时保留新旧两个字段一段时间，配合弃用公告与调用占比监控，待旧客户端降到阈值后再移除旧字段"
+      },
+      {
+        "key": "B",
+        "text": "直接删除 user_name，只在更新日志里说明这次变更"
+      },
+      {
+        "key": "C",
+        "text": "启用一个新域名并强制所有客户端在某一时刻全部切换"
+      },
+      {
+        "key": "D",
+        "text": "改名后让服务端监听两个端口，各自返回不同版本的字段"
+      }
+    ],
+    "answer": "A",
+    "explanation": "向后兼容的关键是在过渡期同时提供新旧字段，让旧客户端不受影响，通过监控调用占比与弃用公告逐步收敛后再下线旧字段，做到可灰度、可回滚。直接删除会立即破坏旧客户端；强制全量切换忽视了客户端升级滞后；监听两个端口返回不同内容与字段名兼容无关且徒增复杂度。"
+  },
+  {
+    "direction": "后端",
+    "sub_direction": "通用后端",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "一个 WebSocket 长连接服务发现：客户端在 NAT 后闲置几分钟后连接被静默断开，服务端却以为连接还活着，消息推送大量丢失。最有效的改进是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "实现应用层 ping/pong 心跳保活，并在客户端检测断开后带退避地自动重连与重新订阅"
+      },
+      {
+        "key": "B",
+        "text": "把消息发送都改成同步阻塞，直到对方确认收到才返回"
+      },
+      {
+        "key": "C",
+        "text": "增大操作系统的文件描述符上限，让连接更不容易被断开"
+      },
+      {
+        "key": "D",
+        "text": "把所有消息改为 HTTP 轮询，彻底不再使用 WebSocket"
+      }
+    ],
+    "answer": "A",
+    "explanation": "NAT/防火墙会回收长期空闲的连接，而 TCP 半开状态下服务端不易察觉，导致推送丢失。应用层定期 ping/pong 能维持 NAT 映射并及时探测死连接，配合客户端指数退避重连与重连后重新订阅，可恢复实时性。同步阻塞发送只会卡住线程；提高 fd 上限与连接存活无关；改用轮询则放弃 WebSocket 优势。"
+  },
+  {
+    "direction": "后端",
+    "sub_direction": "通用后端",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "容器化部署中，实例在滚动更新时被直接 kill，导致正在处理的请求返回 502、正在写的消息只写了一半。实现优雅关闭的正确顺序是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "先从注册中心摘流量并停止接收新请求，等在途请求处理完或超时，再关闭连接池与后台任务，最后退出进程"
+      },
+      {
+        "key": "B",
+        "text": "直接发送 SIGKILL 让进程立即退出，靠编排工具对失败请求重试"
+      },
+      {
+        "key": "C",
+        "text": "先关闭数据库等依赖，再慢慢处理剩余的在途请求"
+      },
+      {
+        "key": "D",
+        "text": "只要把 terminationGracePeriod 设为 0，就能实现优雅退出"
+      }
+    ],
+    "answer": "A",
+    "explanation": "优雅关闭应先停止接新流量（摘注册、关闭监听），给在途请求一个排空窗口，再关闭数据库/消息等依赖并等待后台任务收尾，最后退出，从而不丢请求也不写半条数据。直接 SIGKILL 必然中断处理；先关依赖会让在途请求失败；把宽限期设为 0 等于不给排空时间，与优雅关闭相反。"
+  },
+  {
+    "direction": "后端",
+    "sub_direction": "通用后端",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "nice_to_know",
+    "stem": "在响应式或流处理系统里，关于背压与流量控制，下列说法正确的有哪些？",
+    "options": [
+      {
+        "key": "A",
+        "text": "背压让消费者通过需求信号反向影响生产者速率，避免队列无界增长"
+      },
+      {
+        "key": "B",
+        "text": "拉取（pull）模式相比纯推送更容易实现按消费能力的节流"
+      },
+      {
+        "key": "C",
+        "text": "有界队列配合拒绝或降级策略，可在过载时保护系统稳定性"
+      },
+      {
+        "key": "D",
+        "text": "把队列设为无界是应对生产快于消费的推荐做法，可彻底避免消息丢失"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "背压的本质是消费者掌握节奏，用需求信号约束生产速率，避免队列无界堆积；拉取模式天然按能力请求数据，更利于节流；有界队列配合拒绝/降级能在过载时守住系统。无界队列会持续堆积最终拖垮服务甚至 OOM，并非推荐做法。"
+  },
+  {
+    "direction": "后端",
+    "sub_direction": "通用后端",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "一个请求经过网关、订单服务并调用库存与支付，追踪系统里各服务各自上报一段耗时，却无法拼出完整调用链。缺失的关键设计是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "在入口生成全局 traceId 并在每次跨服务调用时透传 traceId 与父 spanId，使各段 span 能关联成同一条链路"
+      },
+      {
+        "key": "B",
+        "text": "给每个服务单独生成随机 traceId，避免不同服务的编号冲突"
+      },
+      {
+        "key": "C",
+        "text": "只记录每个服务的平均耗时，就能还原完整调用关系"
+      },
+      {
+        "key": "D",
+        "text": "把所有日志写进同一个文件，就等同于实现了分布式追踪"
+      }
+    ],
+    "answer": "A",
+    "explanation": "分布式追踪依靠统一的 traceId 标识一次请求、spanId 与 parentSpanId 描述调用层级，跨服务透传这些上下文才能把分散的 span 拼成完整链路。各服务独立生成 traceId 会让链路断裂；平均耗时是聚合指标，丢失调用关系；集中写日志只是日志汇聚，缺少追踪上下文与父子关联。"
+  },
+  {
+    "direction": "后端",
+    "sub_direction": "通用后端",
+    "language": "",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "灰度发布时只要把 1% 流量切到新版本并观察几分钟没有报错，就可以认定新版本完全正确，可以立刻全量发布而无需继续观察。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "错误",
+    "explanation": "灰度观察时间短、流量小，很多问题（如特定参数触发的异常、内存缓慢泄漏、长尾延迟、数据一致性问题）不会在几分钟内暴露。稳妥做法是逐步扩大流量比例，持续监控错误率、延迟与业务指标，设置自动回滚阈值并观察足够长的业务周期后再全量，而非仅凭短暂无报错就下结论。"
+  },
+  {
+    "direction": "前端",
+    "sub_direction": "react",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "一个搜索框每次输入都会过滤万级列表并重渲染，输入明显掉帧。希望输入保持即时响应，把结果列表的更新标为可中断的低优先级。合适的做法是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "用 useEffect 延迟更新列表"
+      },
+      {
+        "key": "B",
+        "text": "把列表更新放进 startTransition，让输入状态的更新保持高优先级"
+      },
+      {
+        "key": "C",
+        "text": "把列表渲染包进 useMemo 并让依赖数组为空，使其永不重算"
+      },
+      {
+        "key": "D",
+        "text": "用 ReactDOM.flushSync 强制同步刷新列表"
+      }
+    ],
+    "answer": "B",
+    "explanation": "startTransition 把其中的状态更新标记为过渡任务，React 在并发渲染下可中断、延后它，让输入这类紧急更新优先呈现，从而保持输入流畅。useEffect 会在渲染后才执行，无法解决过滤本身的掉帧；依赖为空的 useMemo 会让列表永不更新；flushSync 强制同步刷新反而阻塞输入。"
+  },
+  {
+    "direction": "前端",
+    "sub_direction": "react",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "页面里两个组件各自用 React.lazy 异步加载，其中一个加载失败会导致整页被错误页面替换。期望每个区域独立降级、失败互不影响。正确的做法是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "为每个懒加载组件各自包裹独立的 Suspense 与 Error Boundary，使加载态与错误影响范围局部化"
+      },
+      {
+        "key": "B",
+        "text": "在应用最外层只放一个 Suspense 就够了"
+      },
+      {
+        "key": "C",
+        "text": "把两个组件合并成同一个动态 import"
+      },
+      {
+        "key": "D",
+        "text": "用 try/catch 包住 return 语句里的 JSX"
+      }
+    ],
+    "answer": "A",
+    "explanation": "Suspense 按最近的边界显示 fallback，Error Boundary 只捕获其子树内的渲染错误；为每个区域单独包裹能让加载态与失败态彼此隔离。单一最外层边界会让任一组件失败拖垮整页；合并动态 import 反而扩大影响面；try/catch 无法捕获渲染阶段子组件抛出的错误。"
+  },
+  {
+    "direction": "前端",
+    "sub_direction": "react",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "一个用 React.memo 包裹的子组件仍随父组件每次渲染而重渲染。关于 memo 与 useCallback/useMemo 的配合，下列说法正确的有哪些？",
+    "options": [
+      {
+        "key": "A",
+        "text": "传给子组件的内联函数与对象字面量每次渲染引用都不同，会让 memo 的浅比较失效"
+      },
+      {
+        "key": "B",
+        "text": "用 useCallback 稳定函数引用、useMemo 稳定对象引用，能让 memo 真正生效"
+      },
+      {
+        "key": "C",
+        "text": "依赖项数组写错（如遗漏依赖或每次都是新值）也会导致回调与缓存反复重建"
+      },
+      {
+        "key": "D",
+        "text": "React.memo 默认对 props 做深比较，因此引用变化不会影响它"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "memo 默认浅比较 props，内联函数与对象字面量每次引用都变，必然判为变化；用 useCallback/useMemo 稳定引用才能跳过重渲染；依赖项写错同样会让回调与缓存反复重建。说 memo 做深比较、引用变化不影响它是错误的，默认浅比较下引用不同即视为 props 变化。"
+  },
+  {
+    "direction": "前端",
+    "sub_direction": "react",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "一个中后台应用里，表单草稿、弹窗开关只在单个组件内使用，而登录用户信息与主题需要在几十个跨层级组件间共享且频繁更新。合理的状态管理划分是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "局部状态用 useState 就近管理，跨组件共享的少量全局状态用 Context 配合 useReducer 或轻量外部 store，避免把所有状态塞进单一全局 store"
+      },
+      {
+        "key": "B",
+        "text": "所有状态一律放进全局 Redux store 统一维护"
+      },
+      {
+        "key": "C",
+        "text": "跨组件共享的状态都用 props 层层透传，完全不使用 Context"
+      },
+      {
+        "key": "D",
+        "text": "用模块级全局变量导出状态，绕过 React 的状态更新机制"
+      }
+    ],
+    "answer": "A",
+    "explanation": "状态应就近存放：局部 UI 状态用 useState 成本最低；跨层级共享的全局状态才上升，用 Context 加 useReducer 或轻量 store，并注意拆分以减少无关重渲染。把一切塞进全局 store 会增加样板代码和耦合；深层 props 透传繁琐易错；模块全局变量不触发渲染、会破坏 React 数据流。"
+  },
+  {
+    "direction": "前端",
+    "sub_direction": "react",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "一个 Next.js 页面首屏由服务端渲染，浏览器控制台报 hydration 失败并提示文本不一致。检查发现组件渲染时直接读取了 Date.now() 与浏览器专属的 localStorage。最稳妥的修复是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "让服务端与客户端首次渲染输出一致（如把依赖环境的值放到 useEffect 后再设置），避免首屏读取浏览器专属 API"
+      },
+      {
+        "key": "B",
+        "text": "在渲染中继续用 Date.now()，只要最终 DOM 一致就行"
+      },
+      {
+        "key": "C",
+        "text": "用 dangerouslySetInnerHTML 输出内容，跳过 hydration"
+      },
+      {
+        "key": "D",
+        "text": "关闭服务端渲染，全部改成纯客户端渲染"
+      }
+    ],
+    "answer": "A",
+    "explanation": "hydration 要求服务端 HTML 与客户端首次渲染结果完全一致，直接读取 Date.now() 或 localStorage 会让两端输出不同从而失配。正确做法是把这类浏览器专属或随时间变化的值推迟到 useEffect（挂载后）再读取。最终 DOM 一致并不能消除首次渲染的不一致；跳过 hydration 或彻底关闭 SSR 代价过大。"
+  },
+  {
+    "direction": "前端",
+    "sub_direction": "react",
+    "language": "",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "组件在 useEffect 里根据 id 发请求并把结果 setState；快速切换 id 时，旧请求可能在新请求之后返回并覆盖成过期数据。只要给 useEffect 的依赖数组加上 id，就能自动避免这种竞态。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "错误",
+    "explanation": "依赖数组加 id 只保证 id 变化时重新执行 Effect，并不会取消上一次尚未完成的请求。旧请求仍可能后返回并覆盖新结果。正确做法是在 Effect 中返回一个清理函数，用局部布尔标记或 AbortController 让过期结果被丢弃、或在清理时中止旧请求。"
+  },
+  {
+    "direction": "前端",
+    "sub_direction": "js",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "一段脚本依次是：同步输出 A，setTimeout 回调输出 B，Promise.resolve().then 输出 C，queueMicrotask 输出 D。在浏览器主线程空闲前，输出顺序是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "A, C, D, B"
+      },
+      {
+        "key": "B",
+        "text": "A, B, C, D"
+      },
+      {
+        "key": "C",
+        "text": "A, C, B, D"
+      },
+      {
+        "key": "D",
+        "text": "C, D, A, B"
+      }
+    ],
+    "answer": "A",
+    "explanation": "同步代码先执行，因此先输出 A；当前宏任务结束后会清空整个微任务队列，Promise.then 与 queueMicrotask 都属于微任务，按入队顺序输出 C、D；最后才轮到下一个宏任务 setTimeout 输出 B。因此顺序为 A、C、D、B，宏任务不会插在微任务之间。"
+  },
+  {
+    "direction": "前端",
+    "sub_direction": "js",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "ES Module 中 a.js 导入 b.js，b.js 又导入 a.js。a.js 顶层立即读取 b.js 导出的一个用 let 声明、稍后才赋值的变量，结果读到 undefined。对其原因最准确的解释是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "ESM 的导入是活绑定，但绑定在初始化完成前处于未初始化状态，顶层过早读取会拿到暂时性死区的值，应改为延迟到函数调用时再读取"
+      },
+      {
+        "key": "B",
+        "text": "ESM 根本不支持循环依赖，会直接编译报错"
+      },
+      {
+        "key": "C",
+        "text": "必须把 import 改成 require 才能解决该问题"
+      },
+      {
+        "key": "D",
+        "text": "let 声明的变量在模块之间不会共享绑定，必然读到 undefined"
+      }
+    ],
+    "answer": "A",
+    "explanation": "ESM 支持循环依赖，导入的是活绑定而非值拷贝；但绑定的赋值发生在模块求值阶段，若在被赋值前于顶层读取，就会得到未初始化（暂时性死区）的值。把读取推迟到函数调用等运行时机，绑定已被赋值即可正常访问。ESM 不会因循环依赖直接报错；require 与 let 是否共享绑定都不是根因。"
+  },
+  {
+    "direction": "前端",
+    "sub_direction": "js",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "处理超过 2^53 的大整数 ID 时，关于 JavaScript 的数值类型，下列说法正确的有哪些？",
+    "options": [
+      {
+        "key": "A",
+        "text": "Number 以双精度浮点存储，超过 2^53 后无法精确表示所有整数，直接当数字解析会丢精度"
+      },
+      {
+        "key": "B",
+        "text": "BigInt 可精确表示任意大小整数，但它与 Number 不能直接用混合运算符计算，混算会报错"
+      },
+      {
+        "key": "C",
+        "text": "把大整数 ID 作为字符串从后端返回、前端原样展示，可避免精度丢失"
+      },
+      {
+        "key": "D",
+        "text": "BigInt 与 Number 可以直接用加号相加，结果会自动转成 BigInt"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "Number 的安全整数上限是 2^53-1，超过后相邻整数可能映射到同一浮点值而丢精度；BigInt 能精确表示大整数，但它与 Number 不能直接混算，必须显式转换；把大整数 ID 以字符串传递并原样展示是常用规避手段。BigInt 与 Number 直接相加会抛错，不会自动转换。"
+  },
+  {
+    "direction": "前端",
+    "sub_direction": "js",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "一段代码写成从 config 取 port 并用 || 取默认值 3000；测试发现当配置显式把 port 设为 0 时，结果却变成了默认的 3000。要正确区分显式 0 与未配置，应改用？",
+    "options": [
+      {
+        "key": "A",
+        "text": "改用空值合并 ?? 取默认值，它只在左侧为 null 或 undefined 时才取默认值"
+      },
+      {
+        "key": "B",
+        "text": "保持逻辑或，并把 0 改写成字符串 '0' 来绕过判断"
+      },
+      {
+        "key": "C",
+        "text": "用 config && config.port || 3000 这种组合判断"
+      },
+      {
+        "key": "D",
+        "text": "去掉可选链，直接 config.port || 3000 即可"
+      }
+    ],
+    "answer": "A",
+    "explanation": "逻辑或在左值为任意假值（0、空串、false）时都会取默认值，因此显式设置的 0 被误判。空值合并只在左侧为 null 或 undefined 时才取默认值，能保留 0、空串等合法值；配合可选链还能安全处理 config 为空。改成字符串、用逻辑与组合或去掉可选链都不能正确区分显式 0 与未配置。"
+  },
+  {
+    "direction": "前端",
+    "sub_direction": "ts",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "想写一个泛型函数按参数返回 x.length，TypeScript 却报错『Property length does not exist on type T』。最合适的修复是？",
+    "options": [
+        {
+          "key": "A",
+          "text": "给泛型加 T extends 带 length 属性的约束，把参数限定为具有该属性的类型"
+        },
+        {
+          "key": "B",
+          "text": "把返回类型改成 any 绕过检查，代价是完全丢失这一处的类型安全"
+        },
+        {
+          "key": "C",
+          "text": "把参数改成具体数组类型 T[]，放弃对其他带 length 类型复用"
+        },
+        {
+          "key": "D",
+          "text": "用 @ts-ignore 注释忽略这行报错，掩盖问题而不是真正解决"
+        }
+    ],
+    "answer": "A",
+    "explanation": "泛型 T 默认没有任何属性约束，编译器无法保证 x 上有 length；通过让 T 继承一个带 length: number 的形状，把类型参数约束为具备 length 的类型，即可安全访问并通过类型检查。改成 any 或 @ts-ignore 只是绕过检查、丢失类型安全；把参数限定为数组会缩小适用范围，放弃了原本要支持字符串等带 length 类型的通用性。"
+  },
+  {
+    "direction": "前端",
+    "sub_direction": "ts",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "需要一个类型工具 ElementType，当 T 是数组时取元素类型、否则返回 T 本身。最适合实现它的 TypeScript 特性是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "条件类型配合 infer：让类型在 T 匹配数组时推断出元素类型，否则返回 T"
+      },
+      {
+        "key": "B",
+        "text": "函数重载，声明多个调用签名"
+      },
+      {
+        "key": "C",
+        "text": "枚举，把可能的类型列出来"
+      },
+      {
+        "key": "D",
+        "text": "类型断言 as，手动指定结果类型"
+      }
+    ],
+    "answer": "A",
+    "explanation": "条件类型按类型关系分支，infer 能在匹配时推断出其中的类型变量，二者结合正是数组取元素、否则原样返回这种工具类型的写法。函数重载用于表达多个调用签名；枚举是运行时值的集合；类型断言只是告诉编译器按某类型看待，都无法定义这种随输入类型推导的工具类型。"
+  },
+  {
+    "direction": "前端",
+    "sub_direction": "ts",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "一个联合类型表示请求结果，各成员都有 status 字段的字面量（success 带 data，error 带 message）。想在分支里安全访问 data，闭包收窄的关键是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "用判别属性（字面量类型的 status）做 switch 收窄，TypeScript 会在该分支内把类型缩小为对应成员"
+      },
+      {
+        "key": "B",
+        "text": "把所有字段都设为可选，然后用可选链访问 data"
+      },
+      {
+        "key": "C",
+        "text": "用 as 强转成任意类型后再访问 data"
+      },
+      {
+        "key": "D",
+        "text": "给每个成员都加上相同的 data 字段并声明为 any"
+      }
+    ],
+    "answer": "A",
+    "explanation": "可辨识联合依靠各成员共有的字面量类型判别属性（如 status 的具体字面量值）来区分，在 switch 或 if 中据此收窄后，编译器能把类型精确缩小到对应成员，安全访问其独有字段。把字段设为可选或 any 会丢失类型检查；用 as 强转绕过了收窄，等于放弃类型安全。"
+  },
+  {
+    "direction": "前端",
+    "sub_direction": "ts",
+    "language": "",
+    "kind": "judge",
+    "difficulty": "challenge",
+    "essentiality": "nice_to_know",
+    "stem": "TypeScript 的 satisfies 操作符会改变变量最终被推断出的类型，把它拓宽为所标注的类型，因此适合用来隐藏具体的字面量类型信息。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "错误",
+    "explanation": "satisfies 的作用是检查表达式是否符合某个类型，同时保留表达式本身更精确的类型推断，而不是把它拓宽成标注类型。例如它能校验配置对象满足某种约束，又保留各键的字面量类型。若想改变推断类型应使用类型注解。题述说法恰好说反了。"
+  },
+  {
+    "direction": "前端",
+    "sub_direction": "css",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "一个卡片组件会被放进宽度差异很大的侧栏和主区域，希望样式根据卡片自身容器的宽度而非视口宽度来调整。应使用的 CSS 特性是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "容器查询：给父容器设置 container-type: inline-size，再用 @container 编写基于容器宽度的样式"
+      },
+      {
+        "key": "B",
+        "text": "媒体查询 @media，根据视口宽度切换样式"
+      },
+      {
+        "key": "C",
+        "text": "用 vw 单位设置所有尺寸，让元素随视口缩放"
+      },
+      {
+        "key": "D",
+        "text": "仅靠 flex-wrap 自动换行就能完全替代容器查询"
+      }
+    ],
+    "answer": "A",
+    "explanation": "容器查询让样式响应组件所在容器的尺寸：先以 container-type: inline-size 建立查询容器，再用 @container 按容器宽度应用规则，正好满足同一组件在不同栏宽下自适应。媒体查询基于视口而非组件容器；vw 同样依赖视口；flex-wrap 只处理换行，无法做细粒度的容器尺寸响应式样式。"
+  },
+  {
+    "direction": "前端",
+    "sub_direction": "css",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "项目里第三方 UI 库的样式与自研样式优先级冲突，团队希望自研样式稳定覆盖第三方，同时不再靠堆砌 !important 或高特异性选择器。合适的 CSS 机制是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "用 @layer 定义多个层并显式排序（如 reset、lib、app），把自研样式放到靠后的层"
+      },
+      {
+        "key": "B",
+        "text": "给所有自研选择器都加上 !important"
+      },
+      {
+        "key": "C",
+        "text": "把所有自研样式都写成内联 style 属性"
+      },
+      {
+        "key": "D",
+        "text": "给第三方库的样式统一加 !important，使其优先级更高从而被优先采用"
+      }
+    ],
+    "answer": "A",
+    "explanation": "@layer 允许把样式分组到不同层，并显式声明层的先后顺序；位于后面的层整体优先级更高，且层内仍按正常特异性比较，从而稳定实现自研覆盖第三方而不滥用 !important。滥用 !important 或内联样式会让后续难以覆盖、维护性差；给第三方样式加 !important 更与目标背道而驰。"
+  },
+  {
+    "direction": "前端",
+    "sub_direction": "css",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "nice_to_know",
+    "stem": "一个卡片列表希望每张卡片的标题、描述、底部三行在卡片之间对齐成整齐网格，但卡片内部是独立渲染的。关于用 CSS Grid 的 subgrid 解决此问题，下列说法正确的有哪些？",
+    "options": [
+      {
+        "key": "A",
+        "text": "卡片作为网格项可声明网格行轨道为 subgrid，继承父网格的行轨道，与其他卡片共享对齐线"
+      },
+      {
+        "key": "B",
+        "text": "subgrid 让嵌套网格沿用父级轨道尺寸，避免各卡片内部行高不一致导致错位"
+      },
+      {
+        "key": "C",
+        "text": "不使用 subgrid 时，各卡片独立的网格往往难以跨卡片对齐内部行"
+      },
+      {
+        "key": "D",
+        "text": "subgrid 只能用于列方向，无法在行方向实现对齐"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "subgrid 允许作为网格项的卡片继承父网格的轨道（行或列），使不同卡片内部的行共享同一组网格线，实现标题、描述、底部跨卡片对齐；没有它时各卡片独立网格难以对齐内部行；它同时支持行与列方向。说 subgrid 只能用于列方向、不能在行方向对齐是错误的。"
+  },
+  {
+    "direction": "前端",
+    "sub_direction": "通用前端",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "一个电商首页 Lighthouse 分数不错，但用户反馈点商品卡片半天没反应，且页面加载过程中元素频繁跳动。分别对应 Core Web Vitals 中的哪两个指标？",
+    "options": [
+      {
+        "key": "A",
+        "text": "INP（交互到下一次绘制）与 CLS（累积布局偏移）"
+      },
+      {
+        "key": "B",
+        "text": "FCP（首次内容绘制）与 TTFB（首字节时间）"
+      },
+      {
+        "key": "C",
+        "text": "LCP（最大内容绘制）与 TBT（总阻塞时间）"
+      },
+      {
+        "key": "D",
+        "text": "TTI（可交互时间）与 FID（首次输入延迟）"
+      }
+    ],
+    "answer": "A",
+    "explanation": "点击后半天没反应反映交互响应迟缓，由 INP 衡量；元素频繁跳动是视觉稳定性问题，由 CLS 衡量。FCP 关注首次内容绘制、TTFB 关注首字节、LCP 关注最大内容绘制、TBT 衡量主线程阻塞、TTI 是可交互时间、FID 已被 INP 取代，都不直接对应这两类症状。"
+  },
+  {
+    "direction": "前端",
+    "sub_direction": "通用前端",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "为降低 XSS 风险，团队准备上线内容安全策略（CSP）。关于 CSP 的配置与行为，下列说法正确的有哪些？",
+    "options": [
+      {
+        "key": "A",
+        "text": "可通过 Content-Security-Policy 响应头的 script-src 限制允许加载脚本的来源"
+      },
+      {
+        "key": "B",
+        "text": "使用 nonce 或 hash 可以允许特定的内联脚本执行，而不必放开不安全的 unsafe-inline"
+      },
+      {
+        "key": "C",
+        "text": "配置 default-src 可作为各类指令的兜底来源限制"
+      },
+      {
+        "key": "D",
+        "text": "一旦启用 CSP，页面中的任何内联脚本都将永久无法执行，没有任何例外机制"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "CSP 通过响应头中的指令限制资源来源，script-src 控制脚本来源，default-src 为未明确声明的指令提供兜底；nonce 与 hash 能精确放行可信的内联脚本，无需使用不安全的 unsafe-inline。因此内联脚本永久无法执行、没有例外的说法是错误的，nonce/hash 正是合法例外机制。"
+  },
+  {
+    "direction": "前端",
+    "sub_direction": "通用前端",
+    "language": "",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "对于内容几乎不变、但交互很少的纯展示型企业官网，采用构建期静态生成（SSG）并在浏览器做完整 hydration 通常是性价比很高的方案。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "错误",
+    "explanation": "静态生成适合内容稳定的展示站，但完整 hydration 会把整页在浏览器重新激活、下载并执行大量 JS，对交互很少的页面性价比低。这类场景更适合按岛屿架构只激活少量交互组件、甚至零 hydration（纯静态加少量脚本），因此把完整 hydration 说成高性价比方案并不准确。"
+  },
+  {
+    "direction": "算法与数据结构",
+    "sub_direction": "图",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "一个构建系统里任务之间存在着依赖（如 B 必须在 A 之后），需要找出一个满足所有依赖的执行顺序。若依赖图中存在环，以下说法最准确的是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "可用 Kahn 算法按入度减至 0 的顺序输出；若最终输出节点数少于总数，说明存在环，无法得到合法顺序"
+      },
+      {
+        "key": "B",
+        "text": "只要把图变连通就能消除环，自然得到拓扑序"
+      },
+      {
+        "key": "C",
+        "text": "深度优先后序遍历得到的序列天然就是拓扑序，无需考虑环"
+      },
+      {
+        "key": "D",
+        "text": "拓扑排序只对无向图有效，对有向图无能为力"
+      }
+    ],
+    "answer": "A",
+    "explanation": "Kahn 算法反复取入度为 0 的节点并删除其出边，能生成满足依赖的顺序；若存在环，环上节点入度始终大于 0，输出节点数会少于总数，据此可判定有环。连通性与是否有环无关；DFS 后序反转在无环有向图中可行，但有环时结果无意义；拓扑排序针对有向图而非无向图。"
+  },
+  {
+    "direction": "算法与数据结构",
+    "sub_direction": "动态规划",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "一个 DP 的状态方程只依赖上一行的结果，但实现时开了 O(n*m) 的二维数组，n 和 m 都到 1e5 级别导致内存爆掉。在不改变结果的前提下，最直接的优化是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "用滚动数组只保留前一行（或少数几个状态变量），把空间复杂度降到 O(m)"
+      },
+      {
+        "key": "B",
+        "text": "把二维数组改成一维指针数组，空间开销保持不变"
+      },
+      {
+        "key": "C",
+        "text": "改用递归加记忆化搜索，空间占用一定更小"
+      },
+      {
+        "key": "D",
+        "text": "把数组元素类型改成 byte，靠压缩存储解决"
+      }
+    ],
+    "answer": "A",
+    "explanation": "当状态转移只依赖有限的前驱（如上一行）时，用滚动数组覆盖式复用两行即可把空间从 O(n*m) 降到 O(m)，结果不变。改成指针数组并未减少空间；记忆化搜索的栈与缓存开销不一定更小且有爆栈风险；压缩元素类型受数值范围限制、治标不治本。"
+  },
+  {
+    "direction": "算法与数据结构",
+    "sub_direction": "哈希",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "关于哈希在算法与工程中的应用，下列说法正确的有哪些？",
+    "options": [
+      {
+        "key": "A",
+        "text": "Rabin-Karp 用滚动哈希在常数时间更新窗口哈希值，便于快速比较子串与模式串"
+      },
+      {
+        "key": "B",
+        "text": "哈希表平均查找为 O(1)，但存在哈希冲突，常用链地址法或开放寻址法解决"
+      },
+      {
+        "key": "C",
+        "text": "一致性哈希把节点与数据映射到同一哈希环，使节点增减时只影响相邻区间的数据迁移"
+      },
+      {
+        "key": "D",
+        "text": "只要哈希函数设计得足够好，就永远不会发生冲突，无需任何冲突处理"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "Rabin-Karp 借助滚动哈希常数时间更新窗口，适合多模式匹配；哈希表虽平均 O(1)，但冲突不可避免，需链地址或开放寻址处理；一致性哈希通过哈希环减少节点变动时的数据迁移量。再好的哈希函数在有限输出域上也存在碰撞可能，说永不冲突、无需处理是错误的。"
+  },
+  {
+    "direction": "算法与数据结构",
+    "sub_direction": "排序",
+    "language": "",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "快速排序在最坏情况下时间复杂度会退化到 O(n^2)，而堆排序的最坏情况仍是 O(n log n)；因此在对最坏情况有严格要求的场景，堆排序通常比朴素快速排序更可靠。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "正确",
+    "explanation": "朴素快排选取的枢轴若总是当前最值，划分极不平衡，递归深度达 O(n)，退化为 O(n^2)；堆排序建堆与每次调整都保证 O(log n)，最坏情况稳定在 O(n log n)。因此对最坏情况敏感时，堆排序或引入随机化、三数取中的快排更稳妥，题述判断成立。"
+  },
+  {
+    "direction": "计算机基础",
+    "sub_direction": "操作系统",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "一个进程访问虚拟地址时触发缺页异常，操作系统检查后发现该页从未被映射到任何物理页框。此时内核下一步最合理的动作是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "分配一个物理页框、在页表中建立映射，必要时从磁盘调入页面内容，然后重新执行触发缺页的指令"
+      },
+      {
+        "key": "B",
+        "text": "直接终止进程，因为访问了非法地址"
+      },
+      {
+        "key": "C",
+        "text": "把该页标记为只读后继续执行"
+      },
+      {
+        "key": "D",
+        "text": "把整个进程的地址空间换出到磁盘腾出空间"
+      }
+    ],
+    "answer": "A",
+    "explanation": "缺页分两种：访问合法但尚未分配的页时，内核应分配页框、建立虚拟到物理的映射并从磁盘调入数据，然后重执行该指令；只有确认地址确实越界或权限非法才发送段错误终止进程。标记为只读或整体换出都不能解决首次映射并建立内容的需求。"
+  },
+  {
+    "direction": "计算机基础",
+    "sub_direction": "网络",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "TCP 连接进入拥塞避免阶段后，发送方收到 3 个重复 ACK，但还没到重传超时。此时更可能触发的机制是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "快重传与快恢复：重传丢失报文并把拥塞窗口适当减半后继续线性增长，不必回到慢启动"
+      },
+      {
+        "key": "B",
+        "text": "立即把拥塞窗口重置为 1 个 MSS 并重新进入慢启动"
+      },
+      {
+        "key": "C",
+        "text": "拥塞窗口保持不变，继续按指数方式增长"
+      },
+      {
+        "key": "D",
+        "text": "关闭拥塞控制，以链路最大速率全速发送"
+      }
+    ],
+    "answer": "A",
+    "explanation": "收到 3 个重复 ACK 通常意味着单个报文丢失但网络仍能按序交付后续包，TCP 据此触发快重传，并进入快恢复：把拥塞窗口减半（再加少量）后线性增长，避免像超时那样回退到慢启动导致吞吐骤降。重置为 1 个 MSS 是超时 RTO 的处理；继续指数增长或关闭拥塞控制都会加剧拥塞。"
+  },
+  {
+    "direction": "计算机基础",
+    "sub_direction": "组成原理",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "多线程程序里，两个线程频繁修改同一缓存行中的不同变量，性能远低于预期。关于该现象（伪共享）及其缓解，下列说法正确的有哪些？",
+    "options": [
+      {
+        "key": "A",
+        "text": "缓存一致性以缓存行为单位，不同核写同一行会互相使对方副本失效，造成大量总线流量"
+      },
+      {
+        "key": "B",
+        "text": "可通过内存填充或对齐，让两个变量落在不同的缓存行来缓解"
+      },
+      {
+        "key": "C",
+        "text": "把热点变量改为只读，或按核分块（每线程一份再合并），也能减少伪共享"
+      },
+      {
+        "key": "D",
+        "text": "伪共享是因为多个线程写同一个字节，必须加锁才能解决"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "缓存一致性协议以缓存行为粒度，多核写同一行会频繁使彼此副本失效，产生伪共享；用填充/对齐把变量分到不同缓存行，或改为只读、按线程分块各自写再归并，都能缓解。伪共享并非多线程写同一字节，也不是靠加锁解决的问题，而是缓存行粒度的副作用。"
+  },
+  {
+    "direction": "计算机基础",
+    "sub_direction": "通用基础",
+    "language": "",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "与 select 和 poll 相比，epoll 在大量连接但只有少量活跃连接的场景下通常更高效，原因之一是它采用事件回调机制，无需每次调用都遍历全部连接。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "正确",
+    "explanation": "select/poll 每次调用都要把全部文件描述符从用户态拷贝到内核态并线性遍历就绪状态，连接数大时开销高；epoll 通过内核维护的就绪事件表与回调机制，只返回已就绪的描述符，避免全量遍历，因此在海量连接、少量活跃的场景中更有优势，判断成立。"
+  },
+  {
+    "direction": "SQL 与数据库",
+    "sub_direction": "索引",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "表 t 有联合索引 (a, b)，查询为按 a 等值过滤、按 b 排序，但要返回第三列 c。EXPLAIN 显示索引用在了过滤与排序上，却仍需大量回表读取 c，数据量大时较慢。最能减少回表的优化是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "建立覆盖索引 (a, b, c)，使查询所需列都在索引中，只扫索引而不再回表"
+      },
+      {
+        "key": "B",
+        "text": "单独给 c 建一个索引即可"
+      },
+      {
+        "key": "C",
+        "text": "把索引改成 (b, a, c)，优先满足排序"
+      },
+      {
+        "key": "D",
+        "text": "去掉过滤条件，让优化器改走全表扫描"
+      }
+    ],
+    "answer": "A",
+    "explanation": "覆盖索引让索引包含查询所需的全部列，引擎只扫描索引即可返回结果，避免按主键回表读取行数据；把 c 纳入联合索引形成更宽的索引即可覆盖过滤、排序与投影。单独给 c 建索引无法同时满足 a 的过滤与 b 的排序；改变列顺序会破坏 a 的最左前缀；全表扫描通常更慢。"
+  },
+  {
+    "direction": "SQL 与数据库",
+    "sub_direction": "事务与 ACID",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "在 InnoDB 可重复读隔离级别下，事务先执行一次普通 SELECT 读到某行值，之后另一个事务修改该行并提交，原事务再次执行同样的普通 SELECT。最符合 InnoDB 行为的描述是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "两次读到相同的值，因为普通 SELECT 使用一致性非锁定读（MVCC 快照），读取的是事务开始时的一致性视图"
+      },
+      {
+        "key": "B",
+        "text": "第二次会读到提交后的新值，因为另一事务已经提交"
+      },
+      {
+        "key": "C",
+        "text": "第二次读取会被阻塞，直到原事务自身提交为止"
+      },
+      {
+        "key": "D",
+        "text": "可重复读靠表级锁实现，因此另一事务的修改会被阻塞直到原事务结束"
+      }
+    ],
+    "answer": "A",
+    "explanation": "InnoDB 的可重复读通过 MVCC 的一致性非锁定读实现：普通 SELECT 读取事务建立的一致性快照，因此同一事务内多次读取结果一致（幻读另由间隙锁抑制），不会被其他事务的提交影响，也不需要等待对方提交。读已提交隔离级别才会每次读最新快照；InnoDB 行级锁不会让普通 SELECT 阻塞他人写入。"
+  },
+  {
+    "direction": "SQL 与数据库",
+    "sub_direction": "SQL 基础",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "一条慢查询在 WHERE 条件里对索引列使用了函数，如把 create_time 套上 DATE 函数后与某天比较，导致索引失效全表扫描。最合理的改写是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "把条件改写为对裸列的范围比较（大于等于当天零点、小于次日零点），让索引列保持原样以使用索引"
+      },
+      {
+        "key": "B",
+        "text": "给 DATE 函数建立函数索引即可，不必改写 SQL"
+      },
+      {
+        "key": "C",
+        "text": "在应用层先查出全部数据再自行过滤"
+      },
+      {
+        "key": "D",
+        "text": "把 create_time 列类型改成字符串，避免日期转换开销"
+      }
+    ],
+    "answer": "A",
+    "explanation": "对索引列施加函数会阻止 B+ 树索引的有序性被利用，导致全表扫描；把谓词改写成对裸列的范围条件，就能命中索引范围扫描。函数索引只有部分数据库支持，不能一概而论；应用层全量拉取再过滤会传输大量数据；把时间列改成字符串既破坏类型语义也不解决索引使用问题。"
+  },
+  {
+    "direction": "SQL 与数据库",
+    "sub_direction": "通用数据库",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "一张按时间范围分区的历史订单表，查询常按月份过滤。关于分区表的说法，正确的有哪些？",
+    "options": [
+      {
+        "key": "A",
+        "text": "分区裁剪可让优化器只扫描命中的分区，减少 I/O"
+      },
+      {
+        "key": "B",
+        "text": "按时间分区便于用删除或清空分区的方式快速淘汰过期数据"
+      },
+      {
+        "key": "C",
+        "text": "若查询条件不带分区键，可能无法裁剪而扫描所有分区，需要留意"
+      },
+      {
+        "key": "D",
+        "text": "分区后数据会自动分布到不同数据库实例，实现分布式查询"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "分区表把数据按分区键（如时间）切分，查询条件命中分区键时优化器可裁剪掉无关分区，减少扫描；按时间分区还能通过删除/清空整个分区快速淘汰历史数据；若查询不带分区键则无法裁剪、可能扫全部分区。分区是表内部的逻辑或物理切分，并不自动把数据分布到多个数据库实例。"
+  },
+  {
+    "direction": "研发工程实践",
+    "sub_direction": "测试",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "一个项目几乎只有端到端（E2E）UI 测试，跑一轮要几十分钟且经常因环境抖动失败，定位问题困难。按测试金字塔理念，更健康的做法是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "以大量快速稳定的单元测试为基础、适量集成测试，少量关键 E2E 覆盖核心链路"
+      },
+      {
+        "key": "B",
+        "text": "全部改成 E2E 测试，确保覆盖尽可能多的真实场景"
+      },
+      {
+        "key": "C",
+        "text": "取消自动化测试，完全依赖人工点点点"
+      },
+      {
+        "key": "D",
+        "text": "只写集成测试，完全不写单元测试"
+      }
+    ],
+    "answer": "A",
+    "explanation": "测试金字塔主张底层单元测试数量多、速度快、定位精确，中层集成测试验证模块协作，顶层少量 E2E 覆盖关键业务流程；这样反馈快、稳定性高、成本低。全是 E2E 会慢且脆弱；纯人工不可持续；只要集成不要单元会失去快速精确定位问题的能力。"
+  },
+  {
+    "direction": "研发工程实践",
+    "sub_direction": "CI-CD",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "团队希望新功能代码先合并进主干、但只对内测用户开放，并能随时一键关闭以避免线上事故。最适合支撑这种发布与部署解耦的实践是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "特性开关（feature flag）：代码里用开关包裹新逻辑，通过配置按用户灰度，出问题可快速关闭"
+      },
+      {
+        "key": "B",
+        "text": "长期维护一个不合并的功能分支，等全部完成再一次性合入主干"
+      },
+      {
+        "key": "C",
+        "text": "每次发布都重新拉一个发布分支并冻结主干"
+      },
+      {
+        "key": "D",
+        "text": "把功能代码直接推到生产环境后再补写测试"
+      }
+    ],
+    "answer": "A",
+    "explanation": "特性开关把部署与发布解耦：代码可随主干持续部署，但功能通过配置按人群灰度启用，异常时能即时关闭而无需回滚版本。长期功能分支会积累合并冲突、违背持续集成；发布分支冻结降低集成频率；先上生产再补测试风险极高。"
+  },
+  {
+    "direction": "研发工程实践",
+    "sub_direction": "架构设计",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "一次涉及数据库表结构变更与多服务发布的上线需要可回滚设计。关于回滚，下列说法正确的有哪些？",
+    "options": [
+      {
+        "key": "A",
+        "text": "数据库变更尽量采用兼容式的多阶段发布（先加列不删列），使旧版本代码仍能运行"
+      },
+      {
+        "key": "B",
+        "text": "发布应支持按版本快速回切，如保留上一版本镜像与配置"
+      },
+      {
+        "key": "C",
+        "text": "破坏性数据迁移尽量拆成可逆的小步骤，并准备补偿脚本"
+      },
+      {
+        "key": "D",
+        "text": "只要上线前测试全部通过，就不需要准备任何回滚方案"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "可回滚设计要求数据库变更向后兼容（如先加列、后迁移、最后才删列），保留旧版本制品以便快速回切，并把破坏性迁移拆成可逆小步并备好补偿脚本。测试通过不能覆盖所有线上情况，不准备回滚方案一旦出问题将难以止损，这种说法是错误的。"
+  },
+  {
+    "direction": "研发工程实践",
+    "sub_direction": "通用工程实践",
+    "language": "",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "代码评审的主要目的是发现缺陷，因此评审时只需关注代码能否运行、风格是否统一，架构设计与可维护性不在评审职责之内。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "错误",
+    "explanation": "代码评审不仅找 Bug 与统一风格，还承担知识共享、保证设计合理性与长期可维护性的职责，例如接口边界、异常处理、并发安全、可读性与扩展性都应关注。把评审窄化为能跑就行、风格统一会漏掉架构与维护性问题，不利于团队代码质量持续提升。"
+  },
+  {
+    "direction": "中间件与运维",
+    "sub_direction": "Redis",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "业务数据量增长，单机 Redis 内存吃紧。团队迁移到 Redis Cluster 后，客户端访问某个 key 时最合理的机制是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "按 CRC32 算出 key 所属的哈希槽并把请求路由到负责该槽的节点，节点变化时客户端跟随重定向更新槽位映射"
+      },
+      {
+        "key": "B",
+        "text": "把每次请求广播到所有节点，取任意节点返回的结果"
+      },
+      {
+        "key": "C",
+        "text": "把所有 key 固定写到主节点，从节点只做备份完全不参与读"
+      },
+      {
+        "key": "D",
+        "text": "关闭集群模式，靠不断增大单机内存解决"
+      }
+    ],
+    "answer": "A",
+    "explanation": "Redis Cluster 采用虚拟槽分区（16384 个槽），客户端对 key 计算 CRC32 取模得到槽位并路由到负责节点；节点变更时通过重定向让客户端刷新槽位映射。广播到所有节点浪费资源；Cluster 中从节点可参与读，且并非所有 key 都写主；关闭集群回到单机正是要解决的问题。"
+  },
+  {
+    "direction": "中间件与运维",
+    "sub_direction": "消息队列",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "一个 Kafka topic 有 6 个分区，某消费组只启动了 2 个消费者实例，处理速度跟不上。在不改分区数的前提下，最直接有效的扩容方式是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "把消费组内的消费者实例增加到不超过 6 个，让每个分区由一个消费者负责，提高并行度"
+      },
+      {
+        "key": "B",
+        "text": "再启动多个不同 group.id 的消费组，重复消费同一 topic"
+      },
+      {
+        "key": "C",
+        "text": "把单个消费者内部的线程数调到远大于分区数"
+      },
+      {
+        "key": "D",
+        "text": "把 topic 的副本数从 3 改成 1，减少同步开销"
+      }
+    ],
+    "answer": "A",
+    "explanation": "Kafka 中同一消费组内每个分区只会被一个消费者消费，因此组内并行度上限等于分区数；当前 2 个消费者处理 6 个分区，增加到最多 6 个消费者即可让各分区并行处理、提升吞吐。使用不同 group.id 会各自消费全量消息造成重复处理；线程数超过分区数不会提升并行；副本数影响可靠性而非消费并行度。"
+  },
+  {
+    "direction": "中间件与运维",
+    "sub_direction": "监控与日志",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "团队为接口 P99 延迟配置了告警规则，但每次告警都在故障已经持续十几分钟后才触发，错过最佳止损时机。结合 PromQL，最可能的问题是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "规则里统计的时间窗口过长（如 15 分钟），平均值把短时尖峰抹平，导致告警滞后"
+      },
+      {
+        "key": "B",
+        "text": "Prometheus 默认不采集延迟指标，只能改用日志告警"
+      },
+      {
+        "key": "C",
+        "text": "规则里的 for 字段设置得太短，导致告警过于灵敏"
+      },
+      {
+        "key": "D",
+        "text": "应该改用平均值而非 P99 分位数来发现问题"
+      }
+    ],
+    "answer": "A",
+    "explanation": "过长的时间窗口会让统计均值被正常时段稀释，突发的延迟升高被抹平，直到持续较久才越过阈值，因而告警滞后。Prometheus 完全可以通过直方图采集并计算延迟分位数；for 太短会导致误报而非滞后；用平均值会掩盖长尾问题，P99 更适合发现少数请求的严重延迟。"
+  },
+  {
+    "direction": "中间件与运维",
+    "sub_direction": "CI-CD",
+    "language": "",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "在 Kubernetes 滚动更新中，只要容器进程还在运行（running），就说明新版本已就绪，可以立即接收流量，无需配置就绪探针（readinessProbe）。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "错误",
+    "explanation": "容器处于运行态只代表进程已启动，并不表示应用已完成初始化或能正常处理请求。就绪探针用于判断实例是否真正可服务，未就绪时 Kubernetes 不会把流量切给它；缺少它会导致请求打到尚未准备好的实例而报错。存活探针负责重启不健康容器，二者职责不同，不能省略就绪探针。"
+  }
+]

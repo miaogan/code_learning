@@ -276,7 +276,9 @@ def test_generated_bank_has_no_ai_placeholder(bank_rows: list[dict[str, Any]]) -
 #: r107 追加 `acp-official`（14 号素材，ACP 官方课后小测验 32 道）与 `acp-ext`
 #: （15 号素材，基于教程 V2.4 正文的原创扩展题 18 道）。
 #: r123 追加 `kb-expand`（16 号素材，八方向均衡的知识量扩充 100 道）。
-R12_SOURCES = ("tiji", "local100", "iq380", "fe-interview", "ai-eng", "mw", "sql", "algo", "devprac", "ai-adv", "ai-sys", "acp-eng", "sys-arch", "acp-official", "acp-ext", "kb-expand")
+#: r124 追加 `ai-mastery`（17 号素材，AI 精通深化 50 道）与 `fullstack-adv`
+#: （18 号素材，熟练后端 + 熟悉前端进阶 70 道）。
+R12_SOURCES = ("tiji", "local100", "iq380", "fe-interview", "ai-eng", "mw", "sql", "algo", "devprac", "ai-adv", "ai-sys", "acp-eng", "sys-arch", "acp-official", "acp-ext", "kb-expand", "ai-mastery", "fullstack-adv")
 #: 每来源条数：`seed` 是存量 260 行（种子不写 `source`，读侧缺省 `'seed'`）。
 R12_SOURCE_COUNTS = {
     "seed": 260,
@@ -296,9 +298,11 @@ R12_SOURCE_COUNTS = {
     "acp-official": 32,
     "acp-ext": 18,
     "kb-expand": 100,
+    "ai-mastery": 50,
+    "fullstack-adv": 70,
 }
-#: 合并后总量（= 存量 260 + 已登记素材 1174；含 r107 的 32+18 与 r123 的 100 扩充题）。
-R12_TOTAL = 1434
+#: 合并后总量（= 存量 260 + 已登记素材 1294；含 r107 的 32+18、r123 的 100 与 r124 的 50+70）。
+R12_TOTAL = 1554
 
 
 def test_r12_source_enum_and_per_source_counts(bank_rows: list[dict[str, Any]]) -> None:
@@ -314,8 +318,8 @@ def test_r12_source_enum_and_per_source_counts(bank_rows: list[dict[str, Any]]) 
             )
 
 
-def test_r12_total_after_merge_is_1434(bank_rows: list[dict[str, Any]]) -> None:
-    """合并后总量恰 1434（260 存量 + 1174 素材题），且素材题全是客观题。"""
+def test_r12_total_after_merge_is_1554(bank_rows: list[dict[str, Any]]) -> None:
+    """合并后总量恰 1554（260 存量 + 1294 素材题），且素材题全是客观题。"""
     assert len(bank_rows) == R12_TOTAL, f"题库总量 {len(bank_rows)} ≠ {R12_TOTAL}"
     merged = [row for row in bank_rows if str(row.get("source") or "") in R12_SOURCES]
     assert len(merged) == R12_TOTAL - R12_SOURCE_COUNTS["seed"]

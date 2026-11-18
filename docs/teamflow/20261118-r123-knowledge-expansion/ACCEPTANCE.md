@@ -47,7 +47,13 @@
 
 `npm run build` 首两次在 `C:\Users\user\AppData\Local\Temp\esbuild-*` 报 `Access is denied`（本机安全策略拦截 esbuild 清理临时文件，与代码无关）。把 `TEMP` / `TMP` 重定向到项目内 `.tmp/wintemp` 后正常通过。CI 环境不复现。
 
-## 3. 已知限制
+## 3. 提交与部署
+
+- 提交：`258577f`（dev），单一语义 commit，20 文件。
+- CI run `#44218025412`：frontend success 60s / backend success 441s / Release gate skipped / Deploy to public IP server success 36s。
+- 三方交叉判定（`cd_status.py`，09:53）：服务器 `git HEAD` 与 `deploy-state` 均为 `258577f`，写在 deploy job 窗口内（`2026-11-18T09:51:55+08:00`）；公网 `/health` 200、`/docs` 404、TLSv1.3 证书链可信；四容器均 healthy。
+
+## 4. 已知限制
 
 - 教程中的代码示例是结构骨架，未在独立工程里逐段执行；按各库当前 API 结构编写，读者需按自身版本核对参数。
 - 新题均为通用题（`language=""`），不带具体语言标签；这是为了让八方向均衡且不引入「语言↔方向冲突」，语言专项筛选仍由既有 1074 道素材题覆盖。

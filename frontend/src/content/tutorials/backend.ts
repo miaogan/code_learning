@@ -630,4 +630,326 @@ export const BACKEND_CHAPTERS: TutorialChapter[] = [
       },
     ],
   },
+  {
+    id: 'be-distributed-consistency',
+    title: '分布式事务与最终一致性',
+    direction: '后端',
+    sub_direction: '通用后端',
+    level: '高级',
+    summary: '跨服务没有本地事务可用：从 2PC 的代价讲到 Saga、Outbox 与幂等，掌握最终一致性的工程落地。',
+    sections: [
+      {
+        id: 'concept',
+        title: '为什么本地事务不够用',
+        blocks: [
+          {
+            kind: 'text',
+            text: '单体里一条 BEGIN/COMMIT 就能保证原子性，但跨服务、跨库之后，各自己的本地事务无法互相感知。强一致的两阶段提交（2PC）需要协调者在整个过程中锁住资源，任一参与者卡住都会拖长阻塞窗口，吞吐和低延迟场景难以接受。',
+          },
+          {
+            kind: 'list',
+            items: [
+              'CAP 取舍：分区不可避免时，要在一致性与可用性之间明确选择。',
+              '多数业务真正需要的是「最终一致」：允许短暂中间态，但保证最终收敛。',
+              '工程重心从「怎么保证原子」转向「怎么检测并修复不一致」。',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'patterns',
+        title: 'Saga、Outbox 与事务消息',
+        blocks: [
+          {
+            kind: 'table',
+            headers: ['模式', '核心思路', '适用'],
+            rows: [
+              ['Saga（补偿）', '每步配一个反向操作，失败时逐层回滚', '跨服务长流程'],
+              ['Outbox', '业务数据与消息在同一本地事务写入，异步投递', '避免「库改了消息没发」'],
+              ['事务消息', '先发半消息，提交本地事务后再确认投递', '依赖 MQ 支持'],
+            ],
+          },
+          {
+            kind: 'text',
+            text: 'Outbox 的关键是把「改数据」和「记待发事件」放进同一个本地事务：两者要么都成、要么都不成。再由独立投递进程扫描 outbox 表发消息，发送成功后标记，从根上消除双写不一致。',
+          },
+          {
+            kind: 'note',
+            tone: 'warn',
+            title: '补偿操作必须幂等',
+            text: 'Saga 的补偿步骤可能因为重试被执行多次，回滚逻辑要能安全重放。用业务幂等键或状态机约束，避免「退两次款」。',
+          },
+        ],
+      },
+      {
+        id: 'practice',
+        title: '落地时的三件大事',
+        blocks: [
+          {
+            kind: 'list',
+            ordered: true,
+            items: [
+              '幂等：每个写操作带唯一键，服务端按 key 去重，重试不产生重复副作用。',
+              '可观测：给整个流程一个 trace_id，串起每一步与补偿，能对账、能定位。',
+              '对账与修复：定时扫描长期处于中间态的记录，触发补偿或人工介入。',
+            ],
+          },
+          {
+            kind: 'code',
+            language: 'python',
+            caption: 'Outbox 与业务写入同事务',
+            code: [
+              'def create_order(conn, order, event):',
+              '    with conn.transaction():',
+              '        conn.insert("orders", order)',
+              '        conn.insert("outbox", {',
+              '            "event_id": event.id,',
+              '            "payload": event.to_json(),',
+              '            "status": "pending",',
+              '        })',
+              '    # 事务提交后，投递进程再异步处理 outbox',
+            ].join('\n'),
+          },
+        ],
+      },
+      {
+        id: 'pitfalls',
+        title: '常见坑与自测',
+        blocks: [
+          {
+            kind: 'note',
+            tone: 'warn',
+            title: '别把最终一致当作不做对账的借口',
+            text: '「最终会一致」不等于「一定会一致」。消息丢失、补偿失败都会让流程永久卡在中间态，必须有超时扫描与对账兜底。',
+          },
+          {
+            kind: 'qa',
+            items: [
+              {
+                question: 'Saga 和 2PC 的本质区别是什么？',
+                answer: '2PC 追求强一致，用锁和协调者保证要么全成要么全不成，代价是阻塞与性能；Saga 接受中间态，把大事务拆成本地事务序列，失败时用补偿回滚，换取可用性与吞吐。',
+              },
+              {
+                question: 'Outbox 模式解决什么问题？',
+                answer: '解决「数据库改了但消息没发出去」的双写不一致。把业务数据和待发事件放进同一个本地事务，投递进程从 outbox 读取并重试，保证事件不丢。',
+              },
+              {
+                question: '为什么幂等是最终一致性的地基？',
+                answer: '异步链路里消息可能重复投递、补偿可能重放。没有幂等，重试就会产生重复扣款、重复下单。幂等键加去重表或状态机是让重试安全的前提。',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'be-rate-limit-resilience',
+    title: '限流、熔断与服务韧性',
+    direction: '后端',
+    sub_direction: '通用后端',
+    level: '高级',
+    summary: '面对突发流量和下游故障，用限流、熔断、超时与降级保护系统，避免局部故障演变成雪崩。',
+    sections: [
+      {
+        id: 'concept',
+        title: '韧性是设计出来的',
+        blocks: [
+          {
+            kind: 'text',
+            text: '下游变慢不会只影响它自己：上游线程被占满、连接池耗尽、请求排队，最终整条链路一起超时，这就是雪崩。韧性设计的目标是给故障划边界：限制进入的流量、快速失败、保留核心功能。',
+          },
+          {
+            kind: 'list',
+            items: [
+              '限流：控制进入系统的请求速率，保护自身不被打垮。',
+              '熔断：下游错误率过高时暂时断开调用，给它恢复时间。',
+              '超时与降级：设合理超时，失败时返回兜底结果而不是无限等待。',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'algorithms',
+        title: '限流算法怎么选',
+        blocks: [
+          {
+            kind: 'table',
+            headers: ['算法', '特点', '注意'],
+            rows: [
+              ['固定窗口', '实现简单', '临界点可能瞬时两倍流量'],
+              ['滑动窗口', '更平滑', '需记录时间点，成本略高'],
+              ['令牌桶', '允许一定突发', '桶容量决定突发上限'],
+              ['漏桶', '恒定速率输出', '不允许突发，过于死板'],
+            ],
+          },
+          {
+            kind: 'code',
+            language: 'python',
+            caption: '滑动窗口限流的计数思路',
+            code: [
+              'def allow(key, now, limit=100, window=60):',
+              '    # 只保留窗口内的时间戳',
+              '    hits = [t for t in store.get(key, []) if now - t < window]',
+              '    if len(hits) >= limit:',
+              '        store.set(key, hits)',
+              '        return False',
+              '    hits.append(now)',
+              '    store.set(key, hits)',
+              '    return True',
+            ].join('\n'),
+          },
+        ],
+      },
+      {
+        id: 'circuit',
+        title: '熔断的状态与降级',
+        blocks: [
+          {
+            kind: 'list',
+            ordered: true,
+            items: [
+              '闭合：正常调用，同时统计错误率与慢调用比例。',
+              '打开：错误率超阈值后快速失败，不再打真实下游。',
+              '半开：冷却期后放少量探测流量，成功则闭合，失败则继续打开。',
+            ],
+          },
+          {
+            kind: 'note',
+            tone: 'warn',
+            title: '超时时间比重试次数更重要',
+            text: '没有超时的重试只会放大故障：每次重试都占住连接，下游越慢、上游重试越猛。先设合理超时，再谈重试次数与退避，并给重试加抖动避免同步风暴。',
+          },
+        ],
+      },
+      {
+        id: 'pitfalls',
+        title: '常见坑与自测',
+        blocks: [
+          {
+            kind: 'qa',
+            items: [
+              {
+                question: '固定窗口限流为什么会在临界点出问题？',
+                answer: '在两个窗口交界处，前一窗口末尾和后一窗口开头各能放入一批请求，瞬间流量可能达到限额的两倍。对突发敏感的场景要改用滑动窗口或令牌桶。',
+              },
+              {
+                question: '熔断和限流的保护对象有什么不同？',
+                answer: '限流保护自己，控制进入系统的请求量；熔断保护调用链，当下游故障时快速失败，避免上游被拖垮。两者常配合使用。',
+              },
+              {
+                question: '降级返回什么比较合适？',
+                answer: '按业务定：读场景可返回缓存或默认值，写场景可转异步消息队列稍后处理。关键是核心链路可用，而不是所有功能都保持原样。',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'be-go-concurrency',
+    title: 'Go 并发模型与泄漏排查',
+    direction: '后端',
+    sub_direction: 'go',
+    level: '高级',
+    summary: '从 goroutine 与 channel 的调度语义出发，掌握 context 取消、常见泄漏模式与 pprof 实战排查。',
+    sections: [
+      {
+        id: 'concept',
+        title: '并发的原语与代价',
+        blocks: [
+          {
+            kind: 'text',
+            text: 'goroutine 是轻量线程，由 Go 运行时在少量 OS 线程上多路复用；channel 提供带同步语义的通信。轻量不等于免费：每个 goroutine 有独立栈，阻塞的 goroutine 会累积，泄漏时内存和调度开销都会失控。',
+          },
+          {
+            kind: 'list',
+            items: [
+              'don’t communicate by sharing memory：优先用 channel 传递数据所有权。',
+              'context 是跨 goroutine 传递取消信号和超时的标准方式。',
+              '通道的缓冲与阻塞语义决定了背压行为。',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'leaks',
+        title: '常见泄漏模式',
+        blocks: [
+          {
+            kind: 'table',
+            headers: ['模式', '症状', '修复'],
+            rows: [
+              ['无人接收的发送', 'goroutine 卡在 send', '用 select + context.Done()'],
+              ['未关闭的 ticker', '后台循环永不退出', 'defer ticker.Stop()'],
+              ['被遗忘的子任务', '父任务结束子任务还在跑', '派生 context 并传递取消'],
+            ],
+          },
+          {
+            kind: 'code',
+            language: 'go',
+            caption: '可被取消的生产者',
+            code: [
+              'func produce(ctx context.Context, out chan<- int) {',
+              '    defer close(out)',
+              '    for i := 0; ; i++ {',
+              '        select {',
+              '        case <-ctx.Done():',
+              '            return',
+              '        case out <- i:',
+              '        }',
+              '    }',
+              '}',
+            ].join('\n'),
+          },
+          {
+            kind: 'note',
+            tone: 'warn',
+            title: 'select 里别忘了取消分支',
+            text: '只写发送分支的 select 在接收方退出后会永久阻塞。任何可能长期阻塞的操作都要同时监听 ctx.Done()，让取消信号能打断它。',
+          },
+        ],
+      },
+      {
+        id: 'pprof',
+        title: '用 pprof 定位问题',
+        blocks: [
+          {
+            kind: 'list',
+            ordered: true,
+            items: [
+              'goroutine profile：看阻塞在哪些调用上，数量是否随时间增长。',
+              'heap profile：定位内存增长对象，配合 inuse_space 与 alloc_space 区分泄漏与分配频繁。',
+              'CPU profile：找热点函数，确认是否在忙等或序列化上耗费过多。',
+              'mutex / block profile：定位锁竞争与阻塞点。',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'pitfalls',
+        title: '常见坑与自测',
+        blocks: [
+          {
+            kind: 'qa',
+            items: [
+              {
+                question: '为什么 context 要一路往下传？',
+                answer: '取消信号只有沿着调用链传递，才能让所有子 goroutine 一起退出。中途用 context.Background() 重新起一条链，会让下游失去取消能力，上游超时后它们仍在运行。',
+              },
+              {
+                question: '带缓冲的 channel 就没有背压了吗？',
+                answer: '缓冲只能吸收短时突发，缓冲区写满后发送方依然阻塞。它改变的是瞬态行为，不改变整体生产消费速率必须匹配的事实。',
+              },
+              {
+                question: 'goroutine 泄漏为什么危险？',
+                answer: '泄漏的 goroutine 持有栈和引用对象，会阻止垃圾回收，长期累积导致内存上涨和调度变慢。它们还在等待永远不会发生的信号，问题往往在压力消退后才暴露。',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
 ]

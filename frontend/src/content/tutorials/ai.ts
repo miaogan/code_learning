@@ -1780,4 +1780,680 @@ export const AI_CHAPTERS: TutorialChapter[] = [
       },
     ],
   },
+  {
+    id: 'ai-context-engineering',
+    title: '上下文工程：窗口预算与信息布局',
+    direction: 'AI 工程',
+    sub_direction: 'LLM 与 RAG',
+    level: '高级',
+    summary: '把上下文当成稀缺资源来经营：预算分配、信息布局、压缩与缓存复用，决定长任务里模型到底能「看见」什么。',
+    sections: [
+      {
+        id: 'concept',
+        title: '上下文不是越多越好',
+        blocks: [
+          {
+            kind: 'text',
+            text: '提示词工程关注「怎么问一句话」，上下文工程关注「在有限的 token 窗口里放哪些信息、按什么顺序放」。模型对上下文的利用并不均匀：开头和结尾的信息更容易被注意到，中段容易被稀释（lost in the middle）。把 20 万 token 全部塞进去，不等于模型真的读完了 20 万 token。',
+          },
+          {
+            kind: 'list',
+            items: [
+              '固定成本：系统提示、工具定义、few-shot 示例、输出格式约束，每轮都要占。',
+              '任务成本：当前问题、历史对话、检索到的文档、工具返回。',
+              '预留成本：模型输出所需的 max_tokens，必须从窗口里提前留出，否则会被截断。',
+            ],
+          },
+          {
+            kind: 'note',
+            tone: 'warn',
+            title: '先算账再调模型',
+            text: '很多「模型答不好」的问题其实是预算超支：工具返回一大段 JSON 把正文挤出窗口。先打印每一块的 token 数，再决定压缩什么，比换更大的模型便宜得多。',
+          },
+        ],
+      },
+      {
+        id: 'budget',
+        title: '预算分配与信息布局',
+        blocks: [
+          {
+            kind: 'table',
+            headers: ['区域', '典型内容', '布局建议'],
+            rows: [
+              ['头部', '系统提示、角色与规则', '最稳定，放不可变的约束'],
+              ['中部', '检索文档、历史对话', '最容易被忽略，重要的往两端挪'],
+              ['尾部', '当前问题、输出格式', '靠近生成位置，权重最高'],
+            ],
+          },
+          {
+            kind: 'text',
+            text: '把最需要模型遵循的指令放在头部与尾部各一份，中间放参考材料；检索结果按相关度排序后，最相关的放最前和最后，次相关的放中间。这是对抗「中段遗忘」的低成本手段。',
+          },
+          {
+            kind: 'code',
+            language: 'python',
+            caption: '按 token 预算裁剪检索结果',
+            code: [
+              'def fit_context(query, docs, tokenizer, budget=6000):',
+              '    # 预留输出与系统提示的空间',
+              '    room = budget - len(tokenizer.encode(build_system())) - 1024',
+              '    kept, used = [], 0',
+              '    for doc in docs:  # docs 已按相关度降序',
+              '        n = len(tokenizer.encode(doc["text"]))',
+              '        if used + n > room:',
+              '            continue',
+              '        kept.append(doc)',
+              '        used += n',
+              '    return render(query, kept)',
+            ].join('\n'),
+          },
+        ],
+      },
+      {
+        id: 'compress',
+        title: '压缩、卸载与前缀缓存',
+        blocks: [
+          {
+            kind: 'list',
+            ordered: true,
+            items: [
+              '滚动摘要：对话超过阈值时，把早期轮次压成一段摘要，保留原始事实与未决任务。',
+              '工具返回裁剪：让工具只回传命中的字段而不是整份 JSON，从源头减少噪声。',
+              '外部卸载：把完整文档放到沙箱或 RAG 索引里，上下文里只留定位符与摘要。',
+              '前缀缓存：系统提示与长 few-shot 保持稳定，命中服务商的 prompt cache 可显著降低延迟与成本。',
+            ],
+          },
+          {
+            kind: 'note',
+            tone: 'info',
+            title: '稳定前缀是缓存的前提',
+            text: '前缀缓存按完全相同的 token 前缀命中。哪怕在系统提示里插入一个动态时间戳，都会让整段前缀失效。把变化的部分挪到末尾。',
+          },
+        ],
+      },
+      {
+        id: 'pitfalls',
+        title: '常见坑与自测',
+        blocks: [
+          {
+            kind: 'note',
+            tone: 'warn',
+            title: '摘要会丢细节',
+            text: '滚动摘要适合保留语义脉络，不适合保留精确数字、ID 与约束条件。这类硬事实要单独抽成结构化状态字段，而不是寄托在摘要文本里。',
+          },
+          {
+            kind: 'qa',
+            items: [
+              {
+                question: '为什么长上下文问答在中段表现最差？',
+                answer: '注意力权重在长序列上被大量 token 分摊，中段信息既不在开头的位置优势区，也不在靠近生成的尾部优势区，容易被稀释。对策是把关键材料挪到两端，并先用检索缩小候选集。',
+              },
+              {
+                question: '上下文压缩和 RAG 有什么区别？',
+                answer: '压缩是把已有上下文变短，信息一旦被丢掉就不可恢复；RAG 是把全文留在外部索引里，按需取回。高价值、需要精确引用的内容应交给 RAG，而不是压进摘要。',
+              },
+              {
+                question: '为什么改了一个时间戳就变贵了？',
+                answer: '前缀缓存要求 token 前缀完全一致，动态内容插在前面会让后续所有 token 缓存失效。应把动态字段放在提示末尾，保持前缀稳定。',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'ai-rag-advanced-retrieval',
+    title: 'RAG 高级召回：改写、混合检索与重排',
+    direction: 'AI 工程',
+    sub_direction: 'LLM 与 RAG',
+    level: '高级',
+    summary: '当朴素向量召回到不了准确率目标，用查询改写、混合检索、RRF 融合与重排把召回链路做成可度量的工程系统。',
+    sections: [
+      {
+        id: 'concept',
+        title: '瓶颈通常在召回，不在生成',
+        blocks: [
+          {
+            kind: 'text',
+            text: '很多 RAG 效果问题被误判为「模型不行」，实际是正确答案根本没进上下文。先分别度量「Recall@k（正确文档是否被召回）」与「答案正确率」，如果 Recall 低而给对文档时答案对，那要优化的是检索链路。',
+          },
+          {
+            kind: 'list',
+            items: [
+              '查询改写：把口语化、多意图的问题拆成多个可检索的子问题。',
+              '混合检索：向量召回抓语义，BM25 抓关键词与专有名词，两者互补。',
+              '重排：用 cross-encoder 对 Top-N 候选精排，把最相关的放到最前。',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'fusion',
+        title: '多路召回怎么融合',
+        blocks: [
+          {
+            kind: 'text',
+            text: '不同召回通路的分数不在同一量纲，不能直接相加。RRF（Reciprocal Rank Fusion）只看名次不看分数，鲁棒且无需调参：对每个文档，把它在各路召回中的名次倒数累加作为最终分。',
+          },
+          {
+            kind: 'code',
+            language: 'python',
+            caption: 'RRF 融合两份召回结果',
+            code: [
+              'def rrf(rankings, k=60):',
+              '    score = {}',
+              '    for ranking in rankings:',
+              '        for rank, doc_id in enumerate(ranking, start=1):',
+              '            score[doc_id] = score.get(doc_id, 0) + 1 / (k + rank)',
+              '    return sorted(score, key=score.get, reverse=True)',
+              '',
+              'dense = [d.id for d in vector_search(q, top_k=50)]',
+              'sparse = [d.id for d in bm25_search(q, top_k=50)]',
+              'fused = rrf([dense, sparse])[:20]',
+              'reranked = cross_encoder_rank(q, fused)[:5]',
+            ].join('\n'),
+          },
+          {
+            kind: 'note',
+            tone: 'info',
+            title: '重排要放在融合之后',
+            text: 'cross-encoder 逐对计算 query-doc 相关性，精度高但慢，只适合对 Top-20~50 精排。先融合召回扩大候选，再重排，兼顾召回率与精度。',
+          },
+        ],
+      },
+      {
+        id: 'chunk',
+        title: '切分与查询改写',
+        blocks: [
+          {
+            kind: 'table',
+            headers: ['手段', '适用场景', '代价'],
+            rows: [
+              ['父子块', '需要精确引用又想要语义完整', '索引与存储翻倍'],
+              ['HyDE', '问题短、文档长的探索式查询', '多一次生成调用'],
+              ['多意图拆解', '一句话里含多个子问题', '召回量增大，需重排'],
+            ],
+          },
+          {
+            kind: 'text',
+            text: '父子块用小块做检索、用大块做生成：小块命中后返回它所属的父块，既保证检索精度，又给模型足够上下文。HyDE 先让模型生成一个假想答案，再用它去检索，适合关键词稀疏的抽象问题。',
+          },
+        ],
+      },
+      {
+        id: 'pitfalls',
+        title: '常见坑与自测',
+        blocks: [
+          {
+            kind: 'note',
+            tone: 'warn',
+            title: '别只调 top_k',
+            text: 'Top-k 从 5 调到 20 往往只是把噪声一起搬进上下文，反而干扰生成。要区分「没召回」和「召回了但排太后」，前者靠混合检索与改写，后者靠重排。',
+          },
+          {
+            kind: 'qa',
+            items: [
+              {
+                question: '为什么向量检索对产品型号、错误码这类词效果差？',
+                answer: '向量表示偏语义，对罕见字符串与专名的区分度低。BM25 这类稀疏检索按字面匹配，正好补上这一块，所以混合检索是标配。',
+              },
+              {
+                question: 'RRF 为什么不用归一化后的分数相加？',
+                answer: '不同召回通路的分数分布差异大，归一化假设常常不成立。RRF 只用名次，对各通路的分数量纲不敏感，实现简单且效果好。',
+              },
+              {
+                question: '什么时候该引入 rerank？',
+                answer: '当 Recall@k 足够但排序靠后的正确文档挤不进最终上下文时。重排成本高，只应对 Top-N 候选使用，且要放在多路召回融合之后。',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'ai-llm-eval-judge',
+    title: '大模型评测体系：从评测集到回归门禁',
+    direction: 'AI 工程',
+    sub_direction: '通用 AI',
+    level: '高级',
+    summary: '把「感觉变好了」变成可复现的数字：golden set 构建、LLM-as-Judge 的偏差控制，以及接进 CI 的回归门禁。',
+    sections: [
+      {
+        id: 'concept',
+        title: '评测是工程闭环，不是一次性打分',
+        blocks: [
+          {
+            kind: 'text',
+            text: '提示词、模型版本、检索策略都会变，每次改动都可能让原本答对的问题退化。评测体系要做的是：把典型问题固化成数据集，每次改动自动跑一遍，用同一把尺子比较新旧版本。',
+          },
+          {
+            kind: 'list',
+            items: [
+              'golden set：标注了标准答案或评分要点的高质量样本，规模不必大但要覆盖关键场景。',
+              'bad case 闭环：线上发现的错误答案沉淀为新样本，防止回归。',
+              '评测器：确定性规则（格式、引用是否命中）与模型评判（语义正确性）结合。',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'judge',
+        title: 'LLM-as-Judge 的偏差与对策',
+        blocks: [
+          {
+            kind: 'table',
+            headers: ['偏差', '表现', '对策'],
+            rows: [
+              ['位置偏好', '同样答案放 A 或 B 得分不同', '交换顺序各评一次取一致结果'],
+              ['长度偏好', '长回答被无脑打高分', '评分要点里明确惩罚冗余'],
+              ['自我偏好', '偏向同家族模型的输出', '换不同模型做评判或多人复核'],
+            ],
+          },
+          {
+            kind: 'note',
+            tone: 'warn',
+            title: '评判提示要对齐业务标准',
+            text: '「回答是否有帮助」太主观，评判结果会随模型心情漂移。把它拆成可核查的要点：是否覆盖关键信息、引用是否来自给定材料、是否编造了未给出的数值。',
+          },
+        ],
+      },
+      {
+        id: 'gate',
+        title: '接进 CI 的回归门禁',
+        blocks: [
+          {
+            kind: 'code',
+            language: 'python',
+            caption: '评测结果与新基线比较',
+            code: [
+              'def pass_gate(current, baseline, tol=0.02):',
+              '    failures = []',
+              '    for metric in ("answer_acc", "citation_hit"):',
+              '        delta = current[metric] - baseline[metric]',
+              '        if delta < -tol:',
+              '            failures.append(f"{metric} 退化 {delta:.3f}")',
+              '    return failures',
+              '',
+              '# 关键 bad case 不允许退化，即使总准确率上升',
+              'for case_id in CRITICAL_CASES:',
+              '    assert current["per_case"][case_id] >= baseline["per_case"][case_id]',
+            ].join('\n'),
+          },
+          {
+            kind: 'list',
+            items: [
+              '确定性指标先过：JSON 格式可解析、引用 ID 存在、必填字段非空。',
+              '语义指标再看：用评判模型打分，记录原始理由便于人工抽查。',
+              '关键 case 一票否决：核心场景的退化不能用其他场景的提升抵消。',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'pitfalls',
+        title: '常见坑与自测',
+        blocks: [
+          {
+            kind: 'note',
+            tone: 'warn',
+            title: '评测集不能来自同一模型',
+            text: '用被测模型自己生成的标准答案去评测它，等于自问自答。golden set 要人工标注或来自真实业务记录，并定期检查是否泄漏进训练数据。',
+          },
+          {
+            kind: 'qa',
+            items: [
+              {
+                question: '为什么评测分数很好看，线上却被吐槽？',
+                answer: '常见原因是评测集与真实分布不符，只覆盖了简单问法；或者评测用「给对文档」的理想条件，没算上召回失败。要让评测集来自真实日志并覆盖 bad case。',
+              },
+              {
+                question: 'LLM-as-Judge 能完全替代人工评测吗？',
+                answer: '不能。它有位置、长度、自我偏好等系统性偏差，适合做大规模初筛与回归监测，但新场景上线前和关键 case 上仍需人工复核校准。',
+              },
+              {
+                question: '回归门禁为什么要设容差？',
+                answer: '评测本身有噪声，尤其是模型评判。设一个小容差可以避免随机波动导致的假报警，但关键 case 应单独设为一票否决，不受容差影响。',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'ai-mcp-tools',
+    title: 'MCP 协议与工具生态的工程边界',
+    direction: 'AI 工程',
+    sub_direction: 'Agent',
+    level: '高级',
+    summary: 'MCP 把工具提供方与模型解耦，但协议本身不负责权限与审计：搞清职责边界，才能安全地接入第三方能力。',
+    sections: [
+      {
+        id: 'concept',
+        title: 'MCP 解决了什么',
+        blocks: [
+          {
+            kind: 'text',
+            text: '没有统一协议时，每个 Agent 框架都要为每个工具写一遍适配。MCP（Model Context Protocol）定义了 host、client、server 三类角色与标准消息格式：server 暴露工具、资源与提示，client 与 server 建立会话，host 把工具能力交给模型。',
+          },
+          {
+            kind: 'list',
+            items: [
+              'Tools：可被模型调用的函数，带 JSON Schema 描述入参。',
+              'Resources：可读的数据源，由应用决定如何注入上下文。',
+              'Prompts：可复用的提示模板，避免每个客户端重复维护。',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'boundary',
+        title: '协议不管的部分',
+        blocks: [
+          {
+            kind: 'table',
+            headers: ['职责', '谁负责', '说明'],
+            rows: [
+              ['工具描述准确', 'Server 提供方', '描述会被模型当真，误导会产生错误调用'],
+              ['调用授权', 'Host / 应用', '协议不判断用户是否有权执行写操作'],
+              ['参数校验', 'Server 实现', '模型给的参数必须按 Schema 严格校验'],
+              ['审计与限流', 'Host / 网关', '记录谁在什么时候调用了什么工具'],
+            ],
+          },
+          {
+            kind: 'note',
+            tone: 'warn',
+            title: '第三方 MCP Server 是新的攻击面',
+            text: '一个恶意或被人篡改的工具描述，就是一次间接提示注入：它会随着工具列表进入模型上下文。接第三方 server 前要锁定版本、审阅工具描述，并对写操作做人工确认。',
+          },
+        ],
+      },
+      {
+        id: 'practice',
+        title: '接入生产时的做法',
+        blocks: [
+          {
+            kind: 'code',
+            language: 'python',
+            caption: '把工具按风险分级后再交给模型',
+            code: [
+              'TOOL_RISK = {"search_doc": "safe", "refund_order": "write"}',
+              '',
+              'def expose_tools(tools, user):',
+              '    ready = []',
+              '    for tool in tools:',
+              '        risk = TOOL_RISK.get(tool.name, "unknown")',
+              '        if risk == "unknown":',
+              '            continue  # 未登记的第三方工具默认不暴露',
+              '        if risk == "write" and not user.can_write:',
+              '            continue',
+              '        ready.append(tool)',
+              '    return ready',
+            ].join('\n'),
+          },
+          {
+            kind: 'list',
+            items: [
+              '工具数量要克制：几十个工具会让模型选择困难，按场景动态启用最小集合。',
+              '返回值要瘦身：工具输出先过滤再进上下文，避免整表数据淹没正文。',
+              '调用要可追踪：记录工具名、参数摘要与结果状态，便于事后回放。',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'pitfalls',
+        title: '常见坑与自测',
+        blocks: [
+          {
+            kind: 'note',
+            tone: 'warn',
+            title: '别把鉴权交给模型判断',
+            text: '「你是管理员才能调用」写在工具描述里只是提示，不是权限控制。真正的授权必须在服务端按调用者身份校验，模型无法被信任来执行安全策略。',
+          },
+          {
+            kind: 'qa',
+            items: [
+              {
+                question: 'MCP 和标准函数调用有什么区别？',
+                answer: '函数调用是模型与某个应用内部的约定，MCP 是跨应用的可互操作协议，工具可以由第三方独立部署。协议解决的是接入标准化，不解决授权、审计与内容可信。',
+              },
+              {
+                question: '为什么第三方工具描述算安全风险？',
+                answer: '工具名称和描述会作为文本进入模型上下文，模型会照着它理解工具用途。恶意描述可以诱导模型调用错误工具或泄露信息，属于间接提示注入。',
+              },
+              {
+                question: '工具越多能力越强吗？',
+                answer: '通常相反。工具过多会增加选择错误率与 token 开销，应按当前任务动态暴露最小可用集合，并对未登记工具默认不开放。',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'ai-inference-quantization',
+    title: '推理量化与 KV Cache 显存优化',
+    direction: 'AI 工程',
+    sub_direction: '部署与推理',
+    level: '高级',
+    summary: '显存决定能并发多少请求：算清权重与 KV Cache 的账，再选量化、PagedAttention 与连续批处理的组合。',
+    sections: [
+      {
+        id: 'memory',
+        title: '显存都花在哪了',
+        blocks: [
+          {
+            kind: 'text',
+            text: '推理时的显存主要分三块：模型权重、KV Cache、以及运行时临时缓冲。权重是固定的，KV Cache 随并发数、序列长度和层数线性增长，往往是高并发下的真正瓶颈。',
+          },
+          {
+            kind: 'code',
+            language: 'python',
+            caption: '估算 KV Cache 显存（字节）',
+            code: [
+              'def kv_cache_bytes(n_layers, n_kv_heads, head_dim, seq_len,',
+              '                   batch, dtype_bytes=2):',
+              '    # 每层要缓存 K 和 V 两份',
+              '    return (2 * n_layers * n_kv_heads * head_dim',
+              '            * seq_len * batch * dtype_bytes)',
+              '',
+              'print(kv_cache_bytes(32, 8, 128, 4096, 16) / 1024**3)',
+              '# GQA 减少 n_kv_heads，是大模型省显存的关键设计',
+            ].join('\n'),
+          },
+          {
+            kind: 'note',
+            tone: 'info',
+            title: '先算再选卡',
+            text: '权重 + KV Cache + 运行开销要留出余量。按理论上限刚好填满显存，会因为碎片和临时缓冲导致 OOM，实践中通常预留 10%~20%。',
+          },
+        ],
+      },
+      {
+        id: 'quant',
+        title: '量化的收益与代价',
+        blocks: [
+          {
+            kind: 'table',
+            headers: ['方案', '收益', '代价'],
+            rows: [
+              ['权重量化（AWQ/GPTQ）', '显存减半以上，吞吐提升', '精度有损，需校准集'],
+              ['KV Cache INT8/FP8', '并发数显著提升', '长文本与数值敏感任务需回归'],
+              ['GQA / MQA', '结构性减少 KV 头数', '需模型本身支持，非部署侧可选'],
+            ],
+          },
+          {
+            kind: 'text',
+            text: '量化不是无损压缩，尤其对数学推理、代码生成这类对数值敏感的任务要做回归评测。先用小样本对比量化前后的答案一致率，再决定是否全量切换。',
+          },
+        ],
+      },
+      {
+        id: 'serving',
+        title: '连续批处理与显存分页',
+        blocks: [
+          {
+            kind: 'list',
+            ordered: true,
+            items: [
+              '静态批处理要等最慢的请求生成完，GPU 大量空转。',
+              '连续批处理在每个生成步动态加入新请求、移出已完成请求，显著提升吞吐。',
+              'PagedAttention 把 KV Cache 按块分配，避免为最长序列预留显存造成的浪费与碎片。',
+              'GQA 模型配合 PagedAttention，能支撑的并发数会再上一个台阶。',
+            ],
+          },
+          {
+            kind: 'note',
+            tone: 'warn',
+            title: 'TTFT 和吞吐是两回事',
+            text: '连续批处理提高整体吞吐，但队列变长会推高首 token 延迟（TTFT）。在线交互场景要同时设置最大队列长度和 TTFT 目标，不能只看每秒生成多少 token。',
+          },
+        ],
+      },
+      {
+        id: 'pitfalls',
+        title: '常见坑与自测',
+        blocks: [
+          {
+            kind: 'note',
+            tone: 'warn',
+            title: '别用平均长度估容量',
+            text: 'KV Cache 按请求的实际序列长度增长，少数超长请求就能吃光显存。要按 P99 长度和最大并发估算，并配置单请求长度上限。',
+          },
+          {
+            kind: 'qa',
+            items: [
+              {
+                question: '同样的卡，为什么换个模型并发能力差很多？',
+                answer: '除了参数量，KV 头数、层数和结构（如 GQA）决定了每 token 的缓存占用。参数量相近但 KV 头多的模型，长序列并发下显存压力会大得多。',
+              },
+              {
+                question: '量化后吞吐涨了，但评测分数掉了怎么办？',
+                answer: '先定位是哪种量化：权重量化对精度影响通常小于 KV Cache 量化。对敏感任务保留高精度版本，或只对非关键路径启用量化，并用回归集量化退化幅度。',
+              },
+              {
+                question: 'PagedAttention 解决的是什么问题？',
+                answer: '它把 KV Cache 按固定大小的块分配，像操作系统分页一样，避免为最长可能序列预留连续显存导致的内部碎片和浪费，从而容纳更多并发序列。',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'ai-agent-memory',
+    title: 'Agent 记忆与状态持久化',
+    direction: 'AI 工程',
+    sub_direction: 'Agent',
+    level: '高级',
+    summary: '让 Agent 跨轮次记住该记的：工作记忆、情节记忆与长期知识分层，配合可回放的状态持久化。',
+    sections: [
+      {
+        id: 'layers',
+        title: '记忆不是一块内存',
+        blocks: [
+          {
+            kind: 'text',
+            text: '把 Agent 的所有历史都塞进上下文，既贵又会稀释注意力。实用做法是按用途分层：工作记忆放当前任务的临时变量，情节记忆放本次会话发生过什么，长期记忆放跨会话稳定事实与偏好。',
+          },
+          {
+            kind: 'table',
+            headers: ['层次', '内容', '存放位置'],
+            rows: [
+              ['工作记忆', '当前计划、工具结果、未决步骤', '上下文 / 结构化状态对象'],
+              ['情节记忆', '本会话关键事件摘要', '上下文中的滚动摘要'],
+              ['长期记忆', '用户偏好、稳定事实', '外部存储 + 检索'],
+            ],
+          },
+        ],
+      },
+      {
+        id: 'state',
+        title: '结构化状态优先于自然语言',
+        blocks: [
+          {
+            kind: 'text',
+            text: '「已完成下单，正在等支付确认」这类状态如果只写在摘要里，模型可能记错或漏掉。把关键状态显式存成字段，每次决策前读入，决策后更新，让记忆变成可验证的数据而不是概率性的回忆。',
+          },
+          {
+            kind: 'code',
+            language: 'python',
+            caption: '把事实抽成结构化状态',
+            code: [
+              'from dataclasses import dataclass, field',
+              '',
+              '@dataclass',
+              'class AgentState:',
+              '    goal: str',
+              '    completed: list[str] = field(default_factory=list)',
+              '    pending: list[str] = field(default_factory=list)',
+              '    facts: dict[str, str] = field(default_factory=dict)',
+              '',
+              'def advance(state, step, result):',
+              '    state.completed.append(step)',
+              '    state.pending.remove(step)',
+              '    state.facts.update(result.get("facts", {}))',
+              '    return state',
+            ].join('\n'),
+          },
+          {
+            kind: 'note',
+            tone: 'info',
+            title: '写入前先校验',
+            text: '模型抽取出的「事实」可能有误。写入长期记忆前做类型与来源校验，并保留来源引用，便于出错时追溯与回滚。',
+          },
+        ],
+      },
+      {
+        id: 'replay',
+        title: '持久化与回放',
+        blocks: [
+          {
+            kind: 'list',
+            ordered: true,
+            items: [
+              '把每次状态变更记成事件（时间、动作、输入摘要、输出摘要），而不是覆盖写最终状态。',
+              '崩溃后按事件重放重建状态，能定位是哪一步引入了错误。',
+              '长期记忆写入要可撤销：支持按来源删除或过期，避免一条错误偏好永久污染后续会话。',
+              '给记忆设 TTL 与冲突解决规则：新事实覆盖旧事实要注明时间与来源。',
+            ],
+          },
+          {
+            kind: 'note',
+            tone: 'warn',
+            title: '别把密钥写进记忆',
+            text: '工具返回里可能夹带 token、手机号等敏感信息。写入长期记忆前做脱敏，并对存储加密、限制访问范围。',
+          },
+        ],
+      },
+      {
+        id: 'pitfalls',
+        title: '常见坑与自测',
+        blocks: [
+          {
+            kind: 'qa',
+            items: [
+              {
+                question: '为什么 Agent 聊久了就开始重复或遗忘任务？',
+                answer: '历史被截断或摘要丢弃了未决任务。把目标、已完成步骤和待办存成结构化状态并每轮读入，比依赖自然语言摘要可靠。',
+              },
+              {
+                question: '长期记忆和 RAG 有什么区别？',
+                answer: 'RAG 索引的是外部文档知识，长期记忆存的是关于用户与任务的稳定事实。两者都靠检索注入，但记忆更强调写入校验、时效与可撤销。',
+              },
+              {
+                question: '为什么要记录事件而不是只存最终状态？',
+                answer: '事件日志支持重放与定位错误源头，能从任意历史点恢复。只存最终状态一旦被错误写入污染，就无法追溯是哪一步出的错。',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
 ]

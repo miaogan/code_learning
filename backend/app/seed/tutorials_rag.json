@@ -2,7 +2,7 @@
   "version": "v1",
   "generated_by": "scripts/export_tutorials.mjs",
   "note": "由前端教程语料导出；改教程后请重新生成（CI 有 --check 门禁）。",
-  "count": 197,
+  "count": 245,
   "items": [
     {
       "chapter_id": "fe-event-loop",
@@ -552,6 +552,182 @@
           "code": ".cards { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }\n\n@media (max-width: 640px) {\n  .cards { grid-template-columns: 1fr; }\n  .sidebar { display: none; }\n}",
           "caption": "断点只处理真正的布局切换"
         },
+        {
+          "kind": "text",
+          "text": ""
+        }
+      ]
+    },
+    {
+      "chapter_id": "fe-react-concurrent",
+      "section_id": "concept",
+      "title": "前端 · React 并发渲染与非阻塞更新 · 并发不是并行",
+      "content": "React 并发渲染与非阻塞更新 · 并发不是并行\nJavaScript 仍是单线程，并发渲染指的是 React 可以把一次渲染拆成小块、在浏览器需要响应输入时暂停让位，之后再继续。它解决的是「大列表渲染时输入框卡顿」这类问题，而不是让计算真的多线程。\n紧急更新：用户打字、点击，必须立刻反馈。；过渡更新：过滤大列表、切换视图，可以稍后完成。；并发特性让低优先级的过渡更新可被高优先级更新打断。",
+      "blocks": [
+        {
+          "kind": "text",
+          "text": "JavaScript 仍是单线程，并发渲染指的是 React 可以把一次渲染拆成小块、在浏览器需要响应输入时暂停让位，之后再继续。它解决的是「大列表渲染时输入框卡顿」这类问题，而不是让计算真的多线程。"
+        },
+        {
+          "kind": "list",
+          "items": [
+            "紧急更新：用户打字、点击，必须立刻反馈。",
+            "过渡更新：过滤大列表、切换视图，可以稍后完成。",
+            "并发特性让低优先级的过渡更新可被高优先级更新打断。"
+          ]
+        }
+      ]
+    },
+    {
+      "chapter_id": "fe-react-concurrent",
+      "section_id": "transition",
+      "title": "前端 · React 并发渲染与非阻塞更新 · useTransition 与 useDeferredValue",
+      "content": "React 并发渲染与非阻塞更新 · useTransition 与 useDeferredValue\n示例：把昂贵的过滤标记为过渡更新\nconst [query, setQuery] = useState(\"\")\nconst [isPending, startTransition] = useTransition()\n\nfunction onChange(e) {\n  setQuery(e.target.value)            // 紧急：输入框立即更新\n  startTransition(() => {\n    setFilter(e.target.value)         // 过渡：大列表可延后\n  })\n}\n\nreturn <>{isPending && <Spinner />}<List filter={filter} /></>\n场景 | 推荐 | 原因\n状态由本组件直接设置 | useTransition | 能拿到 isPending 显示加载态\n值来自 props 或下游 | useDeferredValue | 无需改造状态更新处",
+      "blocks": [
+        {
+          "kind": "code",
+          "code": "const [query, setQuery] = useState(\"\")\nconst [isPending, startTransition] = useTransition()\n\nfunction onChange(e) {\n  setQuery(e.target.value)            // 紧急：输入框立即更新\n  startTransition(() => {\n    setFilter(e.target.value)         // 过渡：大列表可延后\n  })\n}\n\nreturn <>{isPending && <Spinner />}<List filter={filter} /></>",
+          "caption": "把昂贵的过滤标记为过渡更新"
+        },
+        {
+          "kind": "table",
+          "headers": [
+            "场景",
+            "推荐",
+            "原因"
+          ],
+          "rows": [
+            [
+              "状态由本组件直接设置",
+              "useTransition",
+              "能拿到 isPending 显示加载态"
+            ],
+            [
+              "值来自 props 或下游",
+              "useDeferredValue",
+              "无需改造状态更新处"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "chapter_id": "fe-react-concurrent",
+      "section_id": "suspense",
+      "title": "前端 · React 并发渲染与非阻塞更新 · Suspense 与加载边界",
+      "content": "React 并发渲染与非阻塞更新 · Suspense 与加载边界\nSuspense 让组件在等待数据时声明「还没准备好」，由最近的边界展示 fallback。配合并发渲染，可以在切换视图时保留旧内容、避免整页闪烁，而不是立刻退回加载态。\n请求返回顺序不一定等于发起顺序。在 Effect 里发起异步请求要提供清理函数，用标志位或 AbortController 忽略过期结果，否则慢请求会覆盖新结果。",
+      "blocks": [
+        {
+          "kind": "text",
+          "text": "Suspense 让组件在等待数据时声明「还没准备好」，由最近的边界展示 fallback。配合并发渲染，可以在切换视图时保留旧内容、避免整页闪烁，而不是立刻退回加载态。"
+        },
+        {
+          "kind": "note",
+          "title": "Effect 里的竞态",
+          "text": "请求返回顺序不一定等于发起顺序。在 Effect 里发起异步请求要提供清理函数，用标志位或 AbortController 忽略过期结果，否则慢请求会覆盖新结果。"
+        }
+      ]
+    },
+    {
+      "chapter_id": "fe-react-concurrent",
+      "section_id": "pitfalls",
+      "title": "前端 · React 并发渲染与非阻塞更新 · 常见坑与自测",
+      "content": "React 并发渲染与非阻塞更新 · 常见坑与自测",
+      "blocks": [
+        {
+          "kind": "text",
+          "text": ""
+        }
+      ]
+    },
+    {
+      "chapter_id": "fe-ts-advanced",
+      "section_id": "concept",
+      "title": "前端 · TypeScript 类型系统与工程实践 · 类型是设计工具，不只是注解",
+      "content": "TypeScript 类型系统与工程实践 · 类型是设计工具，不只是注解\n好的类型设计让「非法状态不可表示」：与其用一堆可选字段加一堆 if 判断，不如用可辨识联合把每种状态的合法字段绑定在一起。编译器会逼你处理每一种情况。\n示例：用可辨识联合建模请求状态\ntype LoadState<T> =\n  | { status: \"idle\" }\n  | { status: \"loading\" }\n  | { status: \"success\"; data: T }\n  | { status: \"error\"; message: string }\n\nfunction view<T>(s: LoadState<T>): string {\n  switch (s.status) {\n    case \"success\": return String(s.data)  // data 必定存在\n    case \"error\": return s.message\n    default: return \"...\"\n  }\n}",
+      "blocks": [
+        {
+          "kind": "text",
+          "text": "好的类型设计让「非法状态不可表示」：与其用一堆可选字段加一堆 if 判断，不如用可辨识联合把每种状态的合法字段绑定在一起。编译器会逼你处理每一种情况。"
+        },
+        {
+          "kind": "code",
+          "code": "type LoadState<T> =\n  | { status: \"idle\" }\n  | { status: \"loading\" }\n  | { status: \"success\"; data: T }\n  | { status: \"error\"; message: string }\n\nfunction view<T>(s: LoadState<T>): string {\n  switch (s.status) {\n    case \"success\": return String(s.data)  // data 必定存在\n    case \"error\": return s.message\n    default: return \"...\"\n  }\n}",
+          "caption": "用可辨识联合建模请求状态"
+        }
+      ]
+    },
+    {
+      "chapter_id": "fe-ts-advanced",
+      "section_id": "generics",
+      "title": "前端 · TypeScript 类型系统与工程实践 · 泛型约束与条件类型",
+      "content": "TypeScript 类型系统与工程实践 · 泛型约束与条件类型\n工具 | 作用 | 典型用法\nkeyof / typeof | 取键集合与值的字面类型 | 约束参数只能是对象已有键\nextends 约束 | 限定泛型范围 | 要求入参含某个字段\n条件类型 + infer | 按输入推导输出形状 | 提取函数返回值类型\nsatisfies | 校验但保留字面量精度 | 配置对象不丢失具体键\n示例：satisfies 保留字面量类型\nconst routes = {\n  home: \"/\",\n  user: \"/u/:id\",\n} satisfies Record<string, string>\n\ntype RouteKey = keyof typeof routes  // \"home\" | \"user\"，而非 string\nas 是告诉编译器「相信我」，会绕过检查；satisfies 是让编译器验证「确实符合」同时保留精度。能用 satisfies 就不用断言。",
+      "blocks": [
+        {
+          "kind": "table",
+          "headers": [
+            "工具",
+            "作用",
+            "典型用法"
+          ],
+          "rows": [
+            [
+              "keyof / typeof",
+              "取键集合与值的字面类型",
+              "约束参数只能是对象已有键"
+            ],
+            [
+              "extends 约束",
+              "限定泛型范围",
+              "要求入参含某个字段"
+            ],
+            [
+              "条件类型 + infer",
+              "按输入推导输出形状",
+              "提取函数返回值类型"
+            ],
+            [
+              "satisfies",
+              "校验但保留字面量精度",
+              "配置对象不丢失具体键"
+            ]
+          ]
+        },
+        {
+          "kind": "code",
+          "code": "const routes = {\n  home: \"/\",\n  user: \"/u/:id\",\n} satisfies Record<string, string>\n\ntype RouteKey = keyof typeof routes  // \"home\" | \"user\"，而非 string",
+          "caption": "satisfies 保留字面量类型"
+        },
+        {
+          "kind": "note",
+          "title": "不等于断言",
+          "text": "as 是告诉编译器「相信我」，会绕过检查；satisfies 是让编译器验证「确实符合」同时保留精度。能用 satisfies 就不用断言。"
+        }
+      ]
+    },
+    {
+      "chapter_id": "fe-ts-advanced",
+      "section_id": "engineering",
+      "title": "前端 · TypeScript 类型系统与工程实践 · 工程化配置要点",
+      "content": "TypeScript 类型系统与工程实践 · 工程化配置要点\n开启 strict，尤其 strictNullChecks，把空值问题交给编译器。；对外部数据（接口响应、localStorage）在边界处做运行时校验，类型注解本身没有运行时效果。；公共类型集中管理，避免同一份接口在多个文件各写一遍。；谨慎使用 any 与类型断言，它们是类型系统里的逃生口，滥用会让检查形同虚设。",
+      "blocks": [
+        {
+          "kind": "list",
+          "items": [
+            "开启 strict，尤其 strictNullChecks，把空值问题交给编译器。",
+            "对外部数据（接口响应、localStorage）在边界处做运行时校验，类型注解本身没有运行时效果。",
+            "公共类型集中管理，避免同一份接口在多个文件各写一遍。",
+            "谨慎使用 any 与类型断言，它们是类型系统里的逃生口，滥用会让检查形同虚设。"
+          ]
+        }
+      ]
+    },
+    {
+      "chapter_id": "fe-ts-advanced",
+      "section_id": "pitfalls",
+      "title": "前端 · TypeScript 类型系统与工程实践 · 常见坑与自测",
+      "content": "TypeScript 类型系统与工程实践 · 常见坑与自测",
+      "blocks": [
         {
           "kind": "text",
           "text": ""
@@ -1176,6 +1352,294 @@
           "title": "线程池的真正用途",
           "text": "asyncio.to_thread 把阻塞函数丢到线程池执行，适合没有异步版本的库；它不突破 GIL，只避免阻塞事件循环。CPU 密集任务应该用 ProcessPoolExecutor。"
         },
+        {
+          "kind": "text",
+          "text": ""
+        }
+      ]
+    },
+    {
+      "chapter_id": "be-distributed-consistency",
+      "section_id": "concept",
+      "title": "后端 · 分布式事务与最终一致性 · 为什么本地事务不够用",
+      "content": "分布式事务与最终一致性 · 为什么本地事务不够用\n单体里一条 BEGIN/COMMIT 就能保证原子性，但跨服务、跨库之后，各自己的本地事务无法互相感知。强一致的两阶段提交（2PC）需要协调者在整个过程中锁住资源，任一参与者卡住都会拖长阻塞窗口，吞吐和低延迟场景难以接受。\nCAP 取舍：分区不可避免时，要在一致性与可用性之间明确选择。；多数业务真正需要的是「最终一致」：允许短暂中间态，但保证最终收敛。；工程重心从「怎么保证原子」转向「怎么检测并修复不一致」。",
+      "blocks": [
+        {
+          "kind": "text",
+          "text": "单体里一条 BEGIN/COMMIT 就能保证原子性，但跨服务、跨库之后，各自己的本地事务无法互相感知。强一致的两阶段提交（2PC）需要协调者在整个过程中锁住资源，任一参与者卡住都会拖长阻塞窗口，吞吐和低延迟场景难以接受。"
+        },
+        {
+          "kind": "list",
+          "items": [
+            "CAP 取舍：分区不可避免时，要在一致性与可用性之间明确选择。",
+            "多数业务真正需要的是「最终一致」：允许短暂中间态，但保证最终收敛。",
+            "工程重心从「怎么保证原子」转向「怎么检测并修复不一致」。"
+          ]
+        }
+      ]
+    },
+    {
+      "chapter_id": "be-distributed-consistency",
+      "section_id": "patterns",
+      "title": "后端 · 分布式事务与最终一致性 · Saga、Outbox 与事务消息",
+      "content": "分布式事务与最终一致性 · Saga、Outbox 与事务消息\n模式 | 核心思路 | 适用\nSaga（补偿） | 每步配一个反向操作，失败时逐层回滚 | 跨服务长流程\nOutbox | 业务数据与消息在同一本地事务写入，异步投递 | 避免「库改了消息没发」\n事务消息 | 先发半消息，提交本地事务后再确认投递 | 依赖 MQ 支持\nOutbox 的关键是把「改数据」和「记待发事件」放进同一个本地事务：两者要么都成、要么都不成。再由独立投递进程扫描 outbox 表发消息，发送成功后标记，从根上消除双写不一致。\nSaga 的补偿步骤可能因为重试被执行多次，回滚逻辑要能安全重放。用业务幂等键或状态机约束，避免「退两次款」。",
+      "blocks": [
+        {
+          "kind": "table",
+          "headers": [
+            "模式",
+            "核心思路",
+            "适用"
+          ],
+          "rows": [
+            [
+              "Saga（补偿）",
+              "每步配一个反向操作，失败时逐层回滚",
+              "跨服务长流程"
+            ],
+            [
+              "Outbox",
+              "业务数据与消息在同一本地事务写入，异步投递",
+              "避免「库改了消息没发」"
+            ],
+            [
+              "事务消息",
+              "先发半消息，提交本地事务后再确认投递",
+              "依赖 MQ 支持"
+            ]
+          ]
+        },
+        {
+          "kind": "text",
+          "text": "Outbox 的关键是把「改数据」和「记待发事件」放进同一个本地事务：两者要么都成、要么都不成。再由独立投递进程扫描 outbox 表发消息，发送成功后标记，从根上消除双写不一致。"
+        },
+        {
+          "kind": "note",
+          "title": "补偿操作必须幂等",
+          "text": "Saga 的补偿步骤可能因为重试被执行多次，回滚逻辑要能安全重放。用业务幂等键或状态机约束，避免「退两次款」。"
+        }
+      ]
+    },
+    {
+      "chapter_id": "be-distributed-consistency",
+      "section_id": "practice",
+      "title": "后端 · 分布式事务与最终一致性 · 落地时的三件大事",
+      "content": "分布式事务与最终一致性 · 落地时的三件大事\n幂等：每个写操作带唯一键，服务端按 key 去重，重试不产生重复副作用。；可观测：给整个流程一个 trace_id，串起每一步与补偿，能对账、能定位。；对账与修复：定时扫描长期处于中间态的记录，触发补偿或人工介入。\n示例：Outbox 与业务写入同事务\ndef create_order(conn, order, event):\n    with conn.transaction():\n        conn.insert(\"orders\", order)\n        conn.insert(\"outbox\", {\n            \"event_id\": event.id,\n            \"payload\": event.to_json(),\n            \"status\": \"pending\",\n        })\n    # 事务提交后，投递进程再异步处理 outbox",
+      "blocks": [
+        {
+          "kind": "list",
+          "items": [
+            "幂等：每个写操作带唯一键，服务端按 key 去重，重试不产生重复副作用。",
+            "可观测：给整个流程一个 trace_id，串起每一步与补偿，能对账、能定位。",
+            "对账与修复：定时扫描长期处于中间态的记录，触发补偿或人工介入。"
+          ]
+        },
+        {
+          "kind": "code",
+          "code": "def create_order(conn, order, event):\n    with conn.transaction():\n        conn.insert(\"orders\", order)\n        conn.insert(\"outbox\", {\n            \"event_id\": event.id,\n            \"payload\": event.to_json(),\n            \"status\": \"pending\",\n        })\n    # 事务提交后，投递进程再异步处理 outbox",
+          "caption": "Outbox 与业务写入同事务"
+        }
+      ]
+    },
+    {
+      "chapter_id": "be-distributed-consistency",
+      "section_id": "pitfalls",
+      "title": "后端 · 分布式事务与最终一致性 · 常见坑与自测",
+      "content": "分布式事务与最终一致性 · 常见坑与自测\n「最终会一致」不等于「一定会一致」。消息丢失、补偿失败都会让流程永久卡在中间态，必须有超时扫描与对账兜底。",
+      "blocks": [
+        {
+          "kind": "note",
+          "title": "别把最终一致当作不做对账的借口",
+          "text": "「最终会一致」不等于「一定会一致」。消息丢失、补偿失败都会让流程永久卡在中间态，必须有超时扫描与对账兜底。"
+        },
+        {
+          "kind": "text",
+          "text": ""
+        }
+      ]
+    },
+    {
+      "chapter_id": "be-rate-limit-resilience",
+      "section_id": "concept",
+      "title": "后端 · 限流、熔断与服务韧性 · 韧性是设计出来的",
+      "content": "限流、熔断与服务韧性 · 韧性是设计出来的\n下游变慢不会只影响它自己：上游线程被占满、连接池耗尽、请求排队，最终整条链路一起超时，这就是雪崩。韧性设计的目标是给故障划边界：限制进入的流量、快速失败、保留核心功能。\n限流：控制进入系统的请求速率，保护自身不被打垮。；熔断：下游错误率过高时暂时断开调用，给它恢复时间。；超时与降级：设合理超时，失败时返回兜底结果而不是无限等待。",
+      "blocks": [
+        {
+          "kind": "text",
+          "text": "下游变慢不会只影响它自己：上游线程被占满、连接池耗尽、请求排队，最终整条链路一起超时，这就是雪崩。韧性设计的目标是给故障划边界：限制进入的流量、快速失败、保留核心功能。"
+        },
+        {
+          "kind": "list",
+          "items": [
+            "限流：控制进入系统的请求速率，保护自身不被打垮。",
+            "熔断：下游错误率过高时暂时断开调用，给它恢复时间。",
+            "超时与降级：设合理超时，失败时返回兜底结果而不是无限等待。"
+          ]
+        }
+      ]
+    },
+    {
+      "chapter_id": "be-rate-limit-resilience",
+      "section_id": "algorithms",
+      "title": "后端 · 限流、熔断与服务韧性 · 限流算法怎么选",
+      "content": "限流、熔断与服务韧性 · 限流算法怎么选\n算法 | 特点 | 注意\n固定窗口 | 实现简单 | 临界点可能瞬时两倍流量\n滑动窗口 | 更平滑 | 需记录时间点，成本略高\n令牌桶 | 允许一定突发 | 桶容量决定突发上限\n漏桶 | 恒定速率输出 | 不允许突发，过于死板\n示例：滑动窗口限流的计数思路\ndef allow(key, now, limit=100, window=60):\n    # 只保留窗口内的时间戳\n    hits = [t for t in store.get(key, []) if now - t < window]\n    if len(hits) >= limit:\n        store.set(key, hits)\n        return False\n    hits.append(now)\n    store.set(key, hits)\n    return True",
+      "blocks": [
+        {
+          "kind": "table",
+          "headers": [
+            "算法",
+            "特点",
+            "注意"
+          ],
+          "rows": [
+            [
+              "固定窗口",
+              "实现简单",
+              "临界点可能瞬时两倍流量"
+            ],
+            [
+              "滑动窗口",
+              "更平滑",
+              "需记录时间点，成本略高"
+            ],
+            [
+              "令牌桶",
+              "允许一定突发",
+              "桶容量决定突发上限"
+            ],
+            [
+              "漏桶",
+              "恒定速率输出",
+              "不允许突发，过于死板"
+            ]
+          ]
+        },
+        {
+          "kind": "code",
+          "code": "def allow(key, now, limit=100, window=60):\n    # 只保留窗口内的时间戳\n    hits = [t for t in store.get(key, []) if now - t < window]\n    if len(hits) >= limit:\n        store.set(key, hits)\n        return False\n    hits.append(now)\n    store.set(key, hits)\n    return True",
+          "caption": "滑动窗口限流的计数思路"
+        }
+      ]
+    },
+    {
+      "chapter_id": "be-rate-limit-resilience",
+      "section_id": "circuit",
+      "title": "后端 · 限流、熔断与服务韧性 · 熔断的状态与降级",
+      "content": "限流、熔断与服务韧性 · 熔断的状态与降级\n闭合：正常调用，同时统计错误率与慢调用比例。；打开：错误率超阈值后快速失败，不再打真实下游。；半开：冷却期后放少量探测流量，成功则闭合，失败则继续打开。\n没有超时的重试只会放大故障：每次重试都占住连接，下游越慢、上游重试越猛。先设合理超时，再谈重试次数与退避，并给重试加抖动避免同步风暴。",
+      "blocks": [
+        {
+          "kind": "list",
+          "items": [
+            "闭合：正常调用，同时统计错误率与慢调用比例。",
+            "打开：错误率超阈值后快速失败，不再打真实下游。",
+            "半开：冷却期后放少量探测流量，成功则闭合，失败则继续打开。"
+          ]
+        },
+        {
+          "kind": "note",
+          "title": "超时时间比重试次数更重要",
+          "text": "没有超时的重试只会放大故障：每次重试都占住连接，下游越慢、上游重试越猛。先设合理超时，再谈重试次数与退避，并给重试加抖动避免同步风暴。"
+        }
+      ]
+    },
+    {
+      "chapter_id": "be-rate-limit-resilience",
+      "section_id": "pitfalls",
+      "title": "后端 · 限流、熔断与服务韧性 · 常见坑与自测",
+      "content": "限流、熔断与服务韧性 · 常见坑与自测",
+      "blocks": [
+        {
+          "kind": "text",
+          "text": ""
+        }
+      ]
+    },
+    {
+      "chapter_id": "be-go-concurrency",
+      "section_id": "concept",
+      "title": "后端 · Go 并发模型与泄漏排查 · 并发的原语与代价",
+      "content": "Go 并发模型与泄漏排查 · 并发的原语与代价\ngoroutine 是轻量线程，由 Go 运行时在少量 OS 线程上多路复用；channel 提供带同步语义的通信。轻量不等于免费：每个 goroutine 有独立栈，阻塞的 goroutine 会累积，泄漏时内存和调度开销都会失控。\ndon’t communicate by sharing memory：优先用 channel 传递数据所有权。；context 是跨 goroutine 传递取消信号和超时的标准方式。；通道的缓冲与阻塞语义决定了背压行为。",
+      "blocks": [
+        {
+          "kind": "text",
+          "text": "goroutine 是轻量线程，由 Go 运行时在少量 OS 线程上多路复用；channel 提供带同步语义的通信。轻量不等于免费：每个 goroutine 有独立栈，阻塞的 goroutine 会累积，泄漏时内存和调度开销都会失控。"
+        },
+        {
+          "kind": "list",
+          "items": [
+            "don’t communicate by sharing memory：优先用 channel 传递数据所有权。",
+            "context 是跨 goroutine 传递取消信号和超时的标准方式。",
+            "通道的缓冲与阻塞语义决定了背压行为。"
+          ]
+        }
+      ]
+    },
+    {
+      "chapter_id": "be-go-concurrency",
+      "section_id": "leaks",
+      "title": "后端 · Go 并发模型与泄漏排查 · 常见泄漏模式",
+      "content": "Go 并发模型与泄漏排查 · 常见泄漏模式\n模式 | 症状 | 修复\n无人接收的发送 | goroutine 卡在 send | 用 select + context.Done()\n未关闭的 ticker | 后台循环永不退出 | defer ticker.Stop()\n被遗忘的子任务 | 父任务结束子任务还在跑 | 派生 context 并传递取消\n示例：可被取消的生产者\nfunc produce(ctx context.Context, out chan<- int) {\n    defer close(out)\n    for i := 0; ; i++ {\n        select {\n        case <-ctx.Done():\n            return\n        case out <- i:\n        }\n    }\n}\n只写发送分支的 select 在接收方退出后会永久阻塞。任何可能长期阻塞的操作都要同时监听 ctx.Done()，让取消信号能打断它。",
+      "blocks": [
+        {
+          "kind": "table",
+          "headers": [
+            "模式",
+            "症状",
+            "修复"
+          ],
+          "rows": [
+            [
+              "无人接收的发送",
+              "goroutine 卡在 send",
+              "用 select + context.Done()"
+            ],
+            [
+              "未关闭的 ticker",
+              "后台循环永不退出",
+              "defer ticker.Stop()"
+            ],
+            [
+              "被遗忘的子任务",
+              "父任务结束子任务还在跑",
+              "派生 context 并传递取消"
+            ]
+          ]
+        },
+        {
+          "kind": "code",
+          "code": "func produce(ctx context.Context, out chan<- int) {\n    defer close(out)\n    for i := 0; ; i++ {\n        select {\n        case <-ctx.Done():\n            return\n        case out <- i:\n        }\n    }\n}",
+          "caption": "可被取消的生产者"
+        },
+        {
+          "kind": "note",
+          "title": "select 里别忘了取消分支",
+          "text": "只写发送分支的 select 在接收方退出后会永久阻塞。任何可能长期阻塞的操作都要同时监听 ctx.Done()，让取消信号能打断它。"
+        }
+      ]
+    },
+    {
+      "chapter_id": "be-go-concurrency",
+      "section_id": "pprof",
+      "title": "后端 · Go 并发模型与泄漏排查 · 用 pprof 定位问题",
+      "content": "Go 并发模型与泄漏排查 · 用 pprof 定位问题\ngoroutine profile：看阻塞在哪些调用上，数量是否随时间增长。；heap profile：定位内存增长对象，配合 inuse_space 与 alloc_space 区分泄漏与分配频繁。；CPU profile：找热点函数，确认是否在忙等或序列化上耗费过多。；mutex / block profile：定位锁竞争与阻塞点。",
+      "blocks": [
+        {
+          "kind": "list",
+          "items": [
+            "goroutine profile：看阻塞在哪些调用上，数量是否随时间增长。",
+            "heap profile：定位内存增长对象，配合 inuse_space 与 alloc_space 区分泄漏与分配频繁。",
+            "CPU profile：找热点函数，确认是否在忙等或序列化上耗费过多。",
+            "mutex / block profile：定位锁竞争与阻塞点。"
+          ]
+        }
+      ]
+    },
+    {
+      "chapter_id": "be-go-concurrency",
+      "section_id": "pitfalls",
+      "title": "后端 · Go 并发模型与泄漏排查 · 常见坑与自测",
+      "content": "Go 并发模型与泄漏排查 · 常见坑与自测",
+      "blocks": [
         {
           "kind": "text",
           "text": ""
@@ -2408,6 +2872,107 @@
           "kind": "note",
           "title": "回滚脚本要能独立执行",
           "text": "回滚常常发生在代码已经被撤掉之后，所以回滚逻辑要么固化在服务器上的固定版本里，要么随仓库保留且兼容旧 SHA。依赖「当前分支里的最新脚本」回滚，往往在你需要它时已经不存在了。"
+        },
+        {
+          "kind": "text",
+          "text": ""
+        }
+      ]
+    },
+    {
+      "chapter_id": "mw-redis-ha",
+      "section_id": "concept",
+      "title": "中间件与运维 · Redis 高可用与数据可靠性 · 高可用的三个层次",
+      "content": "Redis 高可用与数据可靠性 · 高可用的三个层次\n单点 Redis 一旦宕机，缓存击穿加数据库压力可能连锁失败。高可用要解决三件事：数据有副本（不丢）、故障能自动切换（不停）、故障切换后客户端能找到新主（不断连）。\n主从复制：从节点复制主节点数据，提供读扩展与冗余。；哨兵（Sentinel）：监控主节点，故障时自动把从节点提升为主。；Cluster：分片存储，突破单机内存与写入瓶颈，内置故障转移。",
+      "blocks": [
+        {
+          "kind": "text",
+          "text": "单点 Redis 一旦宕机，缓存击穿加数据库压力可能连锁失败。高可用要解决三件事：数据有副本（不丢）、故障能自动切换（不停）、故障切换后客户端能找到新主（不断连）。"
+        },
+        {
+          "kind": "list",
+          "items": [
+            "主从复制：从节点复制主节点数据，提供读扩展与冗余。",
+            "哨兵（Sentinel）：监控主节点，故障时自动把从节点提升为主。",
+            "Cluster：分片存储，突破单机内存与写入瓶颈，内置故障转移。"
+          ]
+        }
+      ]
+    },
+    {
+      "chapter_id": "mw-redis-ha",
+      "section_id": "replication",
+      "title": "中间件与运维 · Redis 高可用与数据可靠性 · 复制的代价与丢数据窗口",
+      "content": "Redis 高可用与数据可靠性 · 复制的代价与丢数据窗口\n主节点先写内存再异步复制给从节点。如果主节点在同步前宕机，这部分写就丢了。把 min-replicas-to-write 提高可以减少丢失窗口，但会在从节点不足时拒绝写入，可用性下降——这是明确的取舍。\n配置取向 | 效果 | 代价\n异步复制 | 延迟低、吞吐高 | 故障时有丢数据窗口\n等待从节点确认 | 数据更安全 | 延迟上升，节点少时不可写\n关闭本地写盘 | 性能更好 | 整机宕机可能丢更多\n故障切换时新主可能缺少最后一小段写。如果 Redis 里放的是业务状态而非纯缓存，这部分不一致会直接影响正确性。关键状态不要只依赖缓存层。",
+      "blocks": [
+        {
+          "kind": "text",
+          "text": "主节点先写内存再异步复制给从节点。如果主节点在同步前宕机，这部分写就丢了。把 min-replicas-to-write 提高可以减少丢失窗口，但会在从节点不足时拒绝写入，可用性下降——这是明确的取舍。"
+        },
+        {
+          "kind": "table",
+          "headers": [
+            "配置取向",
+            "效果",
+            "代价"
+          ],
+          "rows": [
+            [
+              "异步复制",
+              "延迟低、吞吐高",
+              "故障时有丢数据窗口"
+            ],
+            [
+              "等待从节点确认",
+              "数据更安全",
+              "延迟上升，节点少时不可写"
+            ],
+            [
+              "关闭本地写盘",
+              "性能更好",
+              "整机宕机可能丢更多"
+            ]
+          ]
+        },
+        {
+          "kind": "note",
+          "title": "主从切换后的缓存不一致",
+          "text": "故障切换时新主可能缺少最后一小段写。如果 Redis 里放的是业务状态而非纯缓存，这部分不一致会直接影响正确性。关键状态不要只依赖缓存层。"
+        }
+      ]
+    },
+    {
+      "chapter_id": "mw-redis-ha",
+      "section_id": "practice",
+      "title": "中间件与运维 · Redis 高可用与数据可靠性 · 客户端与运维要点",
+      "content": "Redis 高可用与数据可靠性 · 客户端与运维要点\n客户端用支持哨兵/Cluster 发现的 SDK，切换后能自动更新拓扑，别写死主节点地址。；为慢查询与大 key 设监控，它们会阻塞单线程的 Redis，拖累所有请求。；设置内存上限与淘汰策略，避免 OOM；缓存场景常用 allkeys-lru。；缓存与数据库的一致性用「先更新库再删缓存 + 延迟双删」等策略，并接受短暂不一致。\n示例：缓存旁路更新\ndef update_user(user_id, data):\n    db.update(user_id, data)         # 先更新权威数据源\n    cache.delete(f\"user:{user_id}\")  # 再删缓存，让下次读回源\n    # 删除失败要进重试队列，不能静默忽略",
+      "blocks": [
+        {
+          "kind": "list",
+          "items": [
+            "客户端用支持哨兵/Cluster 发现的 SDK，切换后能自动更新拓扑，别写死主节点地址。",
+            "为慢查询与大 key 设监控，它们会阻塞单线程的 Redis，拖累所有请求。",
+            "设置内存上限与淘汰策略，避免 OOM；缓存场景常用 allkeys-lru。",
+            "缓存与数据库的一致性用「先更新库再删缓存 + 延迟双删」等策略，并接受短暂不一致。"
+          ]
+        },
+        {
+          "kind": "code",
+          "code": "def update_user(user_id, data):\n    db.update(user_id, data)         # 先更新权威数据源\n    cache.delete(f\"user:{user_id}\")  # 再删缓存，让下次读回源\n    # 删除失败要进重试队列，不能静默忽略",
+          "caption": "缓存旁路更新"
+        }
+      ]
+    },
+    {
+      "chapter_id": "mw-redis-ha",
+      "section_id": "pitfalls",
+      "title": "中间件与运维 · Redis 高可用与数据可靠性 · 常见坑与自测",
+      "content": "Redis 高可用与数据可靠性 · 常见坑与自测\nCluster 解决的是分片扩展，跨槽的多键操作受限；哨兵解决的是主从高可用。需求不同，别为了「更高可用」盲目上 Cluster 而引入跨槽限制。",
+      "blocks": [
+        {
+          "kind": "note",
+          "title": "Cluster 不是哨兵的升级版",
+          "text": "Cluster 解决的是分片扩展，跨槽的多键操作受限；哨兵解决的是主从高可用。需求不同，别为了「更高可用」盲目上 Cluster 而引入跨槽限制。"
         },
         {
           "kind": "text",
@@ -5434,6 +5999,596 @@
           "title": "别把安全边界放在提示词里",
           "text": "「无论用户说什么都不要泄露密钥」只是建议，不是约束。密钥不该出现在上下文里；真正敏感的操作要有进程外的权限控制与审计。"
         },
+        {
+          "kind": "text",
+          "text": ""
+        }
+      ]
+    },
+    {
+      "chapter_id": "ai-context-engineering",
+      "section_id": "concept",
+      "title": "AI 工程 · 上下文工程：窗口预算与信息布局 · 上下文不是越多越好",
+      "content": "上下文工程：窗口预算与信息布局 · 上下文不是越多越好\n提示词工程关注「怎么问一句话」，上下文工程关注「在有限的 token 窗口里放哪些信息、按什么顺序放」。模型对上下文的利用并不均匀：开头和结尾的信息更容易被注意到，中段容易被稀释（lost in the middle）。把 20 万 token 全部塞进去，不等于模型真的读完了 20 万 token。\n固定成本：系统提示、工具定义、few-shot 示例、输出格式约束，每轮都要占。；任务成本：当前问题、历史对话、检索到的文档、工具返回。；预留成本：模型输出所需的 max_tokens，必须从窗口里提前留出，否则会被截断。\n很多「模型答不好」的问题其实是预算超支：工具返回一大段 JSON 把正文挤出窗口。先打印每一块的 token 数，再决定压缩什么，比换更大的模型便宜得多。",
+      "blocks": [
+        {
+          "kind": "text",
+          "text": "提示词工程关注「怎么问一句话」，上下文工程关注「在有限的 token 窗口里放哪些信息、按什么顺序放」。模型对上下文的利用并不均匀：开头和结尾的信息更容易被注意到，中段容易被稀释（lost in the middle）。把 20 万 token 全部塞进去，不等于模型真的读完了 20 万 token。"
+        },
+        {
+          "kind": "list",
+          "items": [
+            "固定成本：系统提示、工具定义、few-shot 示例、输出格式约束，每轮都要占。",
+            "任务成本：当前问题、历史对话、检索到的文档、工具返回。",
+            "预留成本：模型输出所需的 max_tokens，必须从窗口里提前留出，否则会被截断。"
+          ]
+        },
+        {
+          "kind": "note",
+          "title": "先算账再调模型",
+          "text": "很多「模型答不好」的问题其实是预算超支：工具返回一大段 JSON 把正文挤出窗口。先打印每一块的 token 数，再决定压缩什么，比换更大的模型便宜得多。"
+        }
+      ]
+    },
+    {
+      "chapter_id": "ai-context-engineering",
+      "section_id": "budget",
+      "title": "AI 工程 · 上下文工程：窗口预算与信息布局 · 预算分配与信息布局",
+      "content": "上下文工程：窗口预算与信息布局 · 预算分配与信息布局\n区域 | 典型内容 | 布局建议\n头部 | 系统提示、角色与规则 | 最稳定，放不可变的约束\n中部 | 检索文档、历史对话 | 最容易被忽略，重要的往两端挪\n尾部 | 当前问题、输出格式 | 靠近生成位置，权重最高\n把最需要模型遵循的指令放在头部与尾部各一份，中间放参考材料；检索结果按相关度排序后，最相关的放最前和最后，次相关的放中间。这是对抗「中段遗忘」的低成本手段。\n示例：按 token 预算裁剪检索结果\ndef fit_context(query, docs, tokenizer, budget=6000):\n    # 预留输出与系统提示的空间\n    room = budget - len(tokenizer.encode(build_system())) - 1024\n    kept, used = [], 0\n    for doc in docs:  # docs 已按相关度降序\n        n = len(tokenizer.encode(doc[\"text\"]))\n        if used + n > room:\n            continue\n        kept.append(doc)\n        used += n\n    return render(query, kept)",
+      "blocks": [
+        {
+          "kind": "table",
+          "headers": [
+            "区域",
+            "典型内容",
+            "布局建议"
+          ],
+          "rows": [
+            [
+              "头部",
+              "系统提示、角色与规则",
+              "最稳定，放不可变的约束"
+            ],
+            [
+              "中部",
+              "检索文档、历史对话",
+              "最容易被忽略，重要的往两端挪"
+            ],
+            [
+              "尾部",
+              "当前问题、输出格式",
+              "靠近生成位置，权重最高"
+            ]
+          ]
+        },
+        {
+          "kind": "text",
+          "text": "把最需要模型遵循的指令放在头部与尾部各一份，中间放参考材料；检索结果按相关度排序后，最相关的放最前和最后，次相关的放中间。这是对抗「中段遗忘」的低成本手段。"
+        },
+        {
+          "kind": "code",
+          "code": "def fit_context(query, docs, tokenizer, budget=6000):\n    # 预留输出与系统提示的空间\n    room = budget - len(tokenizer.encode(build_system())) - 1024\n    kept, used = [], 0\n    for doc in docs:  # docs 已按相关度降序\n        n = len(tokenizer.encode(doc[\"text\"]))\n        if used + n > room:\n            continue\n        kept.append(doc)\n        used += n\n    return render(query, kept)",
+          "caption": "按 token 预算裁剪检索结果"
+        }
+      ]
+    },
+    {
+      "chapter_id": "ai-context-engineering",
+      "section_id": "compress",
+      "title": "AI 工程 · 上下文工程：窗口预算与信息布局 · 压缩、卸载与前缀缓存",
+      "content": "上下文工程：窗口预算与信息布局 · 压缩、卸载与前缀缓存\n滚动摘要：对话超过阈值时，把早期轮次压成一段摘要，保留原始事实与未决任务。；工具返回裁剪：让工具只回传命中的字段而不是整份 JSON，从源头减少噪声。；外部卸载：把完整文档放到沙箱或 RAG 索引里，上下文里只留定位符与摘要。；前缀缓存：系统提示与长 few-shot 保持稳定，命中服务商的 prompt cache 可显著降低延迟与成本。\n前缀缓存按完全相同的 token 前缀命中。哪怕在系统提示里插入一个动态时间戳，都会让整段前缀失效。把变化的部分挪到末尾。",
+      "blocks": [
+        {
+          "kind": "list",
+          "items": [
+            "滚动摘要：对话超过阈值时，把早期轮次压成一段摘要，保留原始事实与未决任务。",
+            "工具返回裁剪：让工具只回传命中的字段而不是整份 JSON，从源头减少噪声。",
+            "外部卸载：把完整文档放到沙箱或 RAG 索引里，上下文里只留定位符与摘要。",
+            "前缀缓存：系统提示与长 few-shot 保持稳定，命中服务商的 prompt cache 可显著降低延迟与成本。"
+          ]
+        },
+        {
+          "kind": "note",
+          "title": "稳定前缀是缓存的前提",
+          "text": "前缀缓存按完全相同的 token 前缀命中。哪怕在系统提示里插入一个动态时间戳，都会让整段前缀失效。把变化的部分挪到末尾。"
+        }
+      ]
+    },
+    {
+      "chapter_id": "ai-context-engineering",
+      "section_id": "pitfalls",
+      "title": "AI 工程 · 上下文工程：窗口预算与信息布局 · 常见坑与自测",
+      "content": "上下文工程：窗口预算与信息布局 · 常见坑与自测\n滚动摘要适合保留语义脉络，不适合保留精确数字、ID 与约束条件。这类硬事实要单独抽成结构化状态字段，而不是寄托在摘要文本里。",
+      "blocks": [
+        {
+          "kind": "note",
+          "title": "摘要会丢细节",
+          "text": "滚动摘要适合保留语义脉络，不适合保留精确数字、ID 与约束条件。这类硬事实要单独抽成结构化状态字段，而不是寄托在摘要文本里。"
+        },
+        {
+          "kind": "text",
+          "text": ""
+        }
+      ]
+    },
+    {
+      "chapter_id": "ai-rag-advanced-retrieval",
+      "section_id": "concept",
+      "title": "AI 工程 · RAG 高级召回：改写、混合检索与重排 · 瓶颈通常在召回，不在生成",
+      "content": "RAG 高级召回：改写、混合检索与重排 · 瓶颈通常在召回，不在生成\n很多 RAG 效果问题被误判为「模型不行」，实际是正确答案根本没进上下文。先分别度量「Recall@k（正确文档是否被召回）」与「答案正确率」，如果 Recall 低而给对文档时答案对，那要优化的是检索链路。\n查询改写：把口语化、多意图的问题拆成多个可检索的子问题。；混合检索：向量召回抓语义，BM25 抓关键词与专有名词，两者互补。；重排：用 cross-encoder 对 Top-N 候选精排，把最相关的放到最前。",
+      "blocks": [
+        {
+          "kind": "text",
+          "text": "很多 RAG 效果问题被误判为「模型不行」，实际是正确答案根本没进上下文。先分别度量「Recall@k（正确文档是否被召回）」与「答案正确率」，如果 Recall 低而给对文档时答案对，那要优化的是检索链路。"
+        },
+        {
+          "kind": "list",
+          "items": [
+            "查询改写：把口语化、多意图的问题拆成多个可检索的子问题。",
+            "混合检索：向量召回抓语义，BM25 抓关键词与专有名词，两者互补。",
+            "重排：用 cross-encoder 对 Top-N 候选精排，把最相关的放到最前。"
+          ]
+        }
+      ]
+    },
+    {
+      "chapter_id": "ai-rag-advanced-retrieval",
+      "section_id": "fusion",
+      "title": "AI 工程 · RAG 高级召回：改写、混合检索与重排 · 多路召回怎么融合",
+      "content": "RAG 高级召回：改写、混合检索与重排 · 多路召回怎么融合\n不同召回通路的分数不在同一量纲，不能直接相加。RRF（Reciprocal Rank Fusion）只看名次不看分数，鲁棒且无需调参：对每个文档，把它在各路召回中的名次倒数累加作为最终分。\n示例：RRF 融合两份召回结果\ndef rrf(rankings, k=60):\n    score = {}\n    for ranking in rankings:\n        for rank, doc_id in enumerate(ranking, start=1):\n            score[doc_id] = score.get(doc_id, 0) + 1 / (k + rank)\n    return sorted(score, key=score.get, reverse=True)\n\ndense = [d.id for d in vector_search(q, top_k=50)]\nsparse = [d.id for d in bm25_search(q, top_k=50)]\nfused = rrf([dense, sparse])[:20]\nreranked = cross_encoder_rank(q, fused)[:5]\ncross-encoder 逐对计算 query-doc 相关性，精度高但慢，只适合对 Top-20~50 精排。先融合召回扩大候选，再重排，兼顾召回率与精度。",
+      "blocks": [
+        {
+          "kind": "text",
+          "text": "不同召回通路的分数不在同一量纲，不能直接相加。RRF（Reciprocal Rank Fusion）只看名次不看分数，鲁棒且无需调参：对每个文档，把它在各路召回中的名次倒数累加作为最终分。"
+        },
+        {
+          "kind": "code",
+          "code": "def rrf(rankings, k=60):\n    score = {}\n    for ranking in rankings:\n        for rank, doc_id in enumerate(ranking, start=1):\n            score[doc_id] = score.get(doc_id, 0) + 1 / (k + rank)\n    return sorted(score, key=score.get, reverse=True)\n\ndense = [d.id for d in vector_search(q, top_k=50)]\nsparse = [d.id for d in bm25_search(q, top_k=50)]\nfused = rrf([dense, sparse])[:20]\nreranked = cross_encoder_rank(q, fused)[:5]",
+          "caption": "RRF 融合两份召回结果"
+        },
+        {
+          "kind": "note",
+          "title": "重排要放在融合之后",
+          "text": "cross-encoder 逐对计算 query-doc 相关性，精度高但慢，只适合对 Top-20~50 精排。先融合召回扩大候选，再重排，兼顾召回率与精度。"
+        }
+      ]
+    },
+    {
+      "chapter_id": "ai-rag-advanced-retrieval",
+      "section_id": "chunk",
+      "title": "AI 工程 · RAG 高级召回：改写、混合检索与重排 · 切分与查询改写",
+      "content": "RAG 高级召回：改写、混合检索与重排 · 切分与查询改写\n手段 | 适用场景 | 代价\n父子块 | 需要精确引用又想要语义完整 | 索引与存储翻倍\nHyDE | 问题短、文档长的探索式查询 | 多一次生成调用\n多意图拆解 | 一句话里含多个子问题 | 召回量增大，需重排\n父子块用小块做检索、用大块做生成：小块命中后返回它所属的父块，既保证检索精度，又给模型足够上下文。HyDE 先让模型生成一个假想答案，再用它去检索，适合关键词稀疏的抽象问题。",
+      "blocks": [
+        {
+          "kind": "table",
+          "headers": [
+            "手段",
+            "适用场景",
+            "代价"
+          ],
+          "rows": [
+            [
+              "父子块",
+              "需要精确引用又想要语义完整",
+              "索引与存储翻倍"
+            ],
+            [
+              "HyDE",
+              "问题短、文档长的探索式查询",
+              "多一次生成调用"
+            ],
+            [
+              "多意图拆解",
+              "一句话里含多个子问题",
+              "召回量增大，需重排"
+            ]
+          ]
+        },
+        {
+          "kind": "text",
+          "text": "父子块用小块做检索、用大块做生成：小块命中后返回它所属的父块，既保证检索精度，又给模型足够上下文。HyDE 先让模型生成一个假想答案，再用它去检索，适合关键词稀疏的抽象问题。"
+        }
+      ]
+    },
+    {
+      "chapter_id": "ai-rag-advanced-retrieval",
+      "section_id": "pitfalls",
+      "title": "AI 工程 · RAG 高级召回：改写、混合检索与重排 · 常见坑与自测",
+      "content": "RAG 高级召回：改写、混合检索与重排 · 常见坑与自测\nTop-k 从 5 调到 20 往往只是把噪声一起搬进上下文，反而干扰生成。要区分「没召回」和「召回了但排太后」，前者靠混合检索与改写，后者靠重排。",
+      "blocks": [
+        {
+          "kind": "note",
+          "title": "别只调 top_k",
+          "text": "Top-k 从 5 调到 20 往往只是把噪声一起搬进上下文，反而干扰生成。要区分「没召回」和「召回了但排太后」，前者靠混合检索与改写，后者靠重排。"
+        },
+        {
+          "kind": "text",
+          "text": ""
+        }
+      ]
+    },
+    {
+      "chapter_id": "ai-llm-eval-judge",
+      "section_id": "concept",
+      "title": "AI 工程 · 大模型评测体系：从评测集到回归门禁 · 评测是工程闭环，不是一次性打分",
+      "content": "大模型评测体系：从评测集到回归门禁 · 评测是工程闭环，不是一次性打分\n提示词、模型版本、检索策略都会变，每次改动都可能让原本答对的问题退化。评测体系要做的是：把典型问题固化成数据集，每次改动自动跑一遍，用同一把尺子比较新旧版本。\ngolden set：标注了标准答案或评分要点的高质量样本，规模不必大但要覆盖关键场景。；bad case 闭环：线上发现的错误答案沉淀为新样本，防止回归。；评测器：确定性规则（格式、引用是否命中）与模型评判（语义正确性）结合。",
+      "blocks": [
+        {
+          "kind": "text",
+          "text": "提示词、模型版本、检索策略都会变，每次改动都可能让原本答对的问题退化。评测体系要做的是：把典型问题固化成数据集，每次改动自动跑一遍，用同一把尺子比较新旧版本。"
+        },
+        {
+          "kind": "list",
+          "items": [
+            "golden set：标注了标准答案或评分要点的高质量样本，规模不必大但要覆盖关键场景。",
+            "bad case 闭环：线上发现的错误答案沉淀为新样本，防止回归。",
+            "评测器：确定性规则（格式、引用是否命中）与模型评判（语义正确性）结合。"
+          ]
+        }
+      ]
+    },
+    {
+      "chapter_id": "ai-llm-eval-judge",
+      "section_id": "judge",
+      "title": "AI 工程 · 大模型评测体系：从评测集到回归门禁 · LLM-as-Judge 的偏差与对策",
+      "content": "大模型评测体系：从评测集到回归门禁 · LLM-as-Judge 的偏差与对策\n偏差 | 表现 | 对策\n位置偏好 | 同样答案放 A 或 B 得分不同 | 交换顺序各评一次取一致结果\n长度偏好 | 长回答被无脑打高分 | 评分要点里明确惩罚冗余\n自我偏好 | 偏向同家族模型的输出 | 换不同模型做评判或多人复核\n「回答是否有帮助」太主观，评判结果会随模型心情漂移。把它拆成可核查的要点：是否覆盖关键信息、引用是否来自给定材料、是否编造了未给出的数值。",
+      "blocks": [
+        {
+          "kind": "table",
+          "headers": [
+            "偏差",
+            "表现",
+            "对策"
+          ],
+          "rows": [
+            [
+              "位置偏好",
+              "同样答案放 A 或 B 得分不同",
+              "交换顺序各评一次取一致结果"
+            ],
+            [
+              "长度偏好",
+              "长回答被无脑打高分",
+              "评分要点里明确惩罚冗余"
+            ],
+            [
+              "自我偏好",
+              "偏向同家族模型的输出",
+              "换不同模型做评判或多人复核"
+            ]
+          ]
+        },
+        {
+          "kind": "note",
+          "title": "评判提示要对齐业务标准",
+          "text": "「回答是否有帮助」太主观，评判结果会随模型心情漂移。把它拆成可核查的要点：是否覆盖关键信息、引用是否来自给定材料、是否编造了未给出的数值。"
+        }
+      ]
+    },
+    {
+      "chapter_id": "ai-llm-eval-judge",
+      "section_id": "gate",
+      "title": "AI 工程 · 大模型评测体系：从评测集到回归门禁 · 接进 CI 的回归门禁",
+      "content": "大模型评测体系：从评测集到回归门禁 · 接进 CI 的回归门禁\n示例：评测结果与新基线比较\ndef pass_gate(current, baseline, tol=0.02):\n    failures = []\n    for metric in (\"answer_acc\", \"citation_hit\"):\n        delta = current[metric] - baseline[metric]\n        if delta < -tol:\n            failures.append(f\"{metric} 退化 {delta:.3f}\")\n    return failures\n\n# 关键 bad case 不允许退化，即使总准确率上升\nfor case_id in CRITICAL_CASES:\n    assert current[\"per_case\"][case_id] >= baseline[\"per_case\"][case_id]\n确定性指标先过：JSON 格式可解析、引用 ID 存在、必填字段非空。；语义指标再看：用评判模型打分，记录原始理由便于人工抽查。；关键 case 一票否决：核心场景的退化不能用其他场景的提升抵消。",
+      "blocks": [
+        {
+          "kind": "code",
+          "code": "def pass_gate(current, baseline, tol=0.02):\n    failures = []\n    for metric in (\"answer_acc\", \"citation_hit\"):\n        delta = current[metric] - baseline[metric]\n        if delta < -tol:\n            failures.append(f\"{metric} 退化 {delta:.3f}\")\n    return failures\n\n# 关键 bad case 不允许退化，即使总准确率上升\nfor case_id in CRITICAL_CASES:\n    assert current[\"per_case\"][case_id] >= baseline[\"per_case\"][case_id]",
+          "caption": "评测结果与新基线比较"
+        },
+        {
+          "kind": "list",
+          "items": [
+            "确定性指标先过：JSON 格式可解析、引用 ID 存在、必填字段非空。",
+            "语义指标再看：用评判模型打分，记录原始理由便于人工抽查。",
+            "关键 case 一票否决：核心场景的退化不能用其他场景的提升抵消。"
+          ]
+        }
+      ]
+    },
+    {
+      "chapter_id": "ai-llm-eval-judge",
+      "section_id": "pitfalls",
+      "title": "AI 工程 · 大模型评测体系：从评测集到回归门禁 · 常见坑与自测",
+      "content": "大模型评测体系：从评测集到回归门禁 · 常见坑与自测\n用被测模型自己生成的标准答案去评测它，等于自问自答。golden set 要人工标注或来自真实业务记录，并定期检查是否泄漏进训练数据。",
+      "blocks": [
+        {
+          "kind": "note",
+          "title": "评测集不能来自同一模型",
+          "text": "用被测模型自己生成的标准答案去评测它，等于自问自答。golden set 要人工标注或来自真实业务记录，并定期检查是否泄漏进训练数据。"
+        },
+        {
+          "kind": "text",
+          "text": ""
+        }
+      ]
+    },
+    {
+      "chapter_id": "ai-mcp-tools",
+      "section_id": "concept",
+      "title": "AI 工程 · MCP 协议与工具生态的工程边界 · MCP 解决了什么",
+      "content": "MCP 协议与工具生态的工程边界 · MCP 解决了什么\n没有统一协议时，每个 Agent 框架都要为每个工具写一遍适配。MCP（Model Context Protocol）定义了 host、client、server 三类角色与标准消息格式：server 暴露工具、资源与提示，client 与 server 建立会话，host 把工具能力交给模型。\nTools：可被模型调用的函数，带 JSON Schema 描述入参。；Resources：可读的数据源，由应用决定如何注入上下文。；Prompts：可复用的提示模板，避免每个客户端重复维护。",
+      "blocks": [
+        {
+          "kind": "text",
+          "text": "没有统一协议时，每个 Agent 框架都要为每个工具写一遍适配。MCP（Model Context Protocol）定义了 host、client、server 三类角色与标准消息格式：server 暴露工具、资源与提示，client 与 server 建立会话，host 把工具能力交给模型。"
+        },
+        {
+          "kind": "list",
+          "items": [
+            "Tools：可被模型调用的函数，带 JSON Schema 描述入参。",
+            "Resources：可读的数据源，由应用决定如何注入上下文。",
+            "Prompts：可复用的提示模板，避免每个客户端重复维护。"
+          ]
+        }
+      ]
+    },
+    {
+      "chapter_id": "ai-mcp-tools",
+      "section_id": "boundary",
+      "title": "AI 工程 · MCP 协议与工具生态的工程边界 · 协议不管的部分",
+      "content": "MCP 协议与工具生态的工程边界 · 协议不管的部分\n职责 | 谁负责 | 说明\n工具描述准确 | Server 提供方 | 描述会被模型当真，误导会产生错误调用\n调用授权 | Host / 应用 | 协议不判断用户是否有权执行写操作\n参数校验 | Server 实现 | 模型给的参数必须按 Schema 严格校验\n审计与限流 | Host / 网关 | 记录谁在什么时候调用了什么工具\n一个恶意或被人篡改的工具描述，就是一次间接提示注入：它会随着工具列表进入模型上下文。接第三方 server 前要锁定版本、审阅工具描述，并对写操作做人工确认。",
+      "blocks": [
+        {
+          "kind": "table",
+          "headers": [
+            "职责",
+            "谁负责",
+            "说明"
+          ],
+          "rows": [
+            [
+              "工具描述准确",
+              "Server 提供方",
+              "描述会被模型当真，误导会产生错误调用"
+            ],
+            [
+              "调用授权",
+              "Host / 应用",
+              "协议不判断用户是否有权执行写操作"
+            ],
+            [
+              "参数校验",
+              "Server 实现",
+              "模型给的参数必须按 Schema 严格校验"
+            ],
+            [
+              "审计与限流",
+              "Host / 网关",
+              "记录谁在什么时候调用了什么工具"
+            ]
+          ]
+        },
+        {
+          "kind": "note",
+          "title": "第三方 MCP Server 是新的攻击面",
+          "text": "一个恶意或被人篡改的工具描述，就是一次间接提示注入：它会随着工具列表进入模型上下文。接第三方 server 前要锁定版本、审阅工具描述，并对写操作做人工确认。"
+        }
+      ]
+    },
+    {
+      "chapter_id": "ai-mcp-tools",
+      "section_id": "practice",
+      "title": "AI 工程 · MCP 协议与工具生态的工程边界 · 接入生产时的做法",
+      "content": "MCP 协议与工具生态的工程边界 · 接入生产时的做法\n示例：把工具按风险分级后再交给模型\nTOOL_RISK = {\"search_doc\": \"safe\", \"refund_order\": \"write\"}\n\ndef expose_tools(tools, user):\n    ready = []\n    for tool in tools:\n        risk = TOOL_RISK.get(tool.name, \"unknown\")\n        if risk == \"unknown\":\n            continue  # 未登记的第三方工具默认不暴露\n        if risk == \"write\" and not user.can_write:\n            continue\n        ready.append(tool)\n    return ready\n工具数量要克制：几十个工具会让模型选择困难，按场景动态启用最小集合。；返回值要瘦身：工具输出先过滤再进上下文，避免整表数据淹没正文。；调用要可追踪：记录工具名、参数摘要与结果状态，便于事后回放。",
+      "blocks": [
+        {
+          "kind": "code",
+          "code": "TOOL_RISK = {\"search_doc\": \"safe\", \"refund_order\": \"write\"}\n\ndef expose_tools(tools, user):\n    ready = []\n    for tool in tools:\n        risk = TOOL_RISK.get(tool.name, \"unknown\")\n        if risk == \"unknown\":\n            continue  # 未登记的第三方工具默认不暴露\n        if risk == \"write\" and not user.can_write:\n            continue\n        ready.append(tool)\n    return ready",
+          "caption": "把工具按风险分级后再交给模型"
+        },
+        {
+          "kind": "list",
+          "items": [
+            "工具数量要克制：几十个工具会让模型选择困难，按场景动态启用最小集合。",
+            "返回值要瘦身：工具输出先过滤再进上下文，避免整表数据淹没正文。",
+            "调用要可追踪：记录工具名、参数摘要与结果状态，便于事后回放。"
+          ]
+        }
+      ]
+    },
+    {
+      "chapter_id": "ai-mcp-tools",
+      "section_id": "pitfalls",
+      "title": "AI 工程 · MCP 协议与工具生态的工程边界 · 常见坑与自测",
+      "content": "MCP 协议与工具生态的工程边界 · 常见坑与自测\n「你是管理员才能调用」写在工具描述里只是提示，不是权限控制。真正的授权必须在服务端按调用者身份校验，模型无法被信任来执行安全策略。",
+      "blocks": [
+        {
+          "kind": "note",
+          "title": "别把鉴权交给模型判断",
+          "text": "「你是管理员才能调用」写在工具描述里只是提示，不是权限控制。真正的授权必须在服务端按调用者身份校验，模型无法被信任来执行安全策略。"
+        },
+        {
+          "kind": "text",
+          "text": ""
+        }
+      ]
+    },
+    {
+      "chapter_id": "ai-inference-quantization",
+      "section_id": "memory",
+      "title": "AI 工程 · 推理量化与 KV Cache 显存优化 · 显存都花在哪了",
+      "content": "推理量化与 KV Cache 显存优化 · 显存都花在哪了\n推理时的显存主要分三块：模型权重、KV Cache、以及运行时临时缓冲。权重是固定的，KV Cache 随并发数、序列长度和层数线性增长，往往是高并发下的真正瓶颈。\n示例：估算 KV Cache 显存（字节）\ndef kv_cache_bytes(n_layers, n_kv_heads, head_dim, seq_len,\n                   batch, dtype_bytes=2):\n    # 每层要缓存 K 和 V 两份\n    return (2 * n_layers * n_kv_heads * head_dim\n            * seq_len * batch * dtype_bytes)\n\nprint(kv_cache_bytes(32, 8, 128, 4096, 16) / 1024**3)\n# GQA 减少 n_kv_heads，是大模型省显存的关键设计\n权重 + KV Cache + 运行开销要留出余量。按理论上限刚好填满显存，会因为碎片和临时缓冲导致 OOM，实践中通常预留 10%~20%。",
+      "blocks": [
+        {
+          "kind": "text",
+          "text": "推理时的显存主要分三块：模型权重、KV Cache、以及运行时临时缓冲。权重是固定的，KV Cache 随并发数、序列长度和层数线性增长，往往是高并发下的真正瓶颈。"
+        },
+        {
+          "kind": "code",
+          "code": "def kv_cache_bytes(n_layers, n_kv_heads, head_dim, seq_len,\n                   batch, dtype_bytes=2):\n    # 每层要缓存 K 和 V 两份\n    return (2 * n_layers * n_kv_heads * head_dim\n            * seq_len * batch * dtype_bytes)\n\nprint(kv_cache_bytes(32, 8, 128, 4096, 16) / 1024**3)\n# GQA 减少 n_kv_heads，是大模型省显存的关键设计",
+          "caption": "估算 KV Cache 显存（字节）"
+        },
+        {
+          "kind": "note",
+          "title": "先算再选卡",
+          "text": "权重 + KV Cache + 运行开销要留出余量。按理论上限刚好填满显存，会因为碎片和临时缓冲导致 OOM，实践中通常预留 10%~20%。"
+        }
+      ]
+    },
+    {
+      "chapter_id": "ai-inference-quantization",
+      "section_id": "quant",
+      "title": "AI 工程 · 推理量化与 KV Cache 显存优化 · 量化的收益与代价",
+      "content": "推理量化与 KV Cache 显存优化 · 量化的收益与代价\n方案 | 收益 | 代价\n权重量化（AWQ/GPTQ） | 显存减半以上，吞吐提升 | 精度有损，需校准集\nKV Cache INT8/FP8 | 并发数显著提升 | 长文本与数值敏感任务需回归\nGQA / MQA | 结构性减少 KV 头数 | 需模型本身支持，非部署侧可选\n量化不是无损压缩，尤其对数学推理、代码生成这类对数值敏感的任务要做回归评测。先用小样本对比量化前后的答案一致率，再决定是否全量切换。",
+      "blocks": [
+        {
+          "kind": "table",
+          "headers": [
+            "方案",
+            "收益",
+            "代价"
+          ],
+          "rows": [
+            [
+              "权重量化（AWQ/GPTQ）",
+              "显存减半以上，吞吐提升",
+              "精度有损，需校准集"
+            ],
+            [
+              "KV Cache INT8/FP8",
+              "并发数显著提升",
+              "长文本与数值敏感任务需回归"
+            ],
+            [
+              "GQA / MQA",
+              "结构性减少 KV 头数",
+              "需模型本身支持，非部署侧可选"
+            ]
+          ]
+        },
+        {
+          "kind": "text",
+          "text": "量化不是无损压缩，尤其对数学推理、代码生成这类对数值敏感的任务要做回归评测。先用小样本对比量化前后的答案一致率，再决定是否全量切换。"
+        }
+      ]
+    },
+    {
+      "chapter_id": "ai-inference-quantization",
+      "section_id": "serving",
+      "title": "AI 工程 · 推理量化与 KV Cache 显存优化 · 连续批处理与显存分页",
+      "content": "推理量化与 KV Cache 显存优化 · 连续批处理与显存分页\n静态批处理要等最慢的请求生成完，GPU 大量空转。；连续批处理在每个生成步动态加入新请求、移出已完成请求，显著提升吞吐。；PagedAttention 把 KV Cache 按块分配，避免为最长序列预留显存造成的浪费与碎片。；GQA 模型配合 PagedAttention，能支撑的并发数会再上一个台阶。\n连续批处理提高整体吞吐，但队列变长会推高首 token 延迟（TTFT）。在线交互场景要同时设置最大队列长度和 TTFT 目标，不能只看每秒生成多少 token。",
+      "blocks": [
+        {
+          "kind": "list",
+          "items": [
+            "静态批处理要等最慢的请求生成完，GPU 大量空转。",
+            "连续批处理在每个生成步动态加入新请求、移出已完成请求，显著提升吞吐。",
+            "PagedAttention 把 KV Cache 按块分配，避免为最长序列预留显存造成的浪费与碎片。",
+            "GQA 模型配合 PagedAttention，能支撑的并发数会再上一个台阶。"
+          ]
+        },
+        {
+          "kind": "note",
+          "title": "TTFT 和吞吐是两回事",
+          "text": "连续批处理提高整体吞吐，但队列变长会推高首 token 延迟（TTFT）。在线交互场景要同时设置最大队列长度和 TTFT 目标，不能只看每秒生成多少 token。"
+        }
+      ]
+    },
+    {
+      "chapter_id": "ai-inference-quantization",
+      "section_id": "pitfalls",
+      "title": "AI 工程 · 推理量化与 KV Cache 显存优化 · 常见坑与自测",
+      "content": "推理量化与 KV Cache 显存优化 · 常见坑与自测\nKV Cache 按请求的实际序列长度增长，少数超长请求就能吃光显存。要按 P99 长度和最大并发估算，并配置单请求长度上限。",
+      "blocks": [
+        {
+          "kind": "note",
+          "title": "别用平均长度估容量",
+          "text": "KV Cache 按请求的实际序列长度增长，少数超长请求就能吃光显存。要按 P99 长度和最大并发估算，并配置单请求长度上限。"
+        },
+        {
+          "kind": "text",
+          "text": ""
+        }
+      ]
+    },
+    {
+      "chapter_id": "ai-agent-memory",
+      "section_id": "layers",
+      "title": "AI 工程 · Agent 记忆与状态持久化 · 记忆不是一块内存",
+      "content": "Agent 记忆与状态持久化 · 记忆不是一块内存\n把 Agent 的所有历史都塞进上下文，既贵又会稀释注意力。实用做法是按用途分层：工作记忆放当前任务的临时变量，情节记忆放本次会话发生过什么，长期记忆放跨会话稳定事实与偏好。\n层次 | 内容 | 存放位置\n工作记忆 | 当前计划、工具结果、未决步骤 | 上下文 / 结构化状态对象\n情节记忆 | 本会话关键事件摘要 | 上下文中的滚动摘要\n长期记忆 | 用户偏好、稳定事实 | 外部存储 + 检索",
+      "blocks": [
+        {
+          "kind": "text",
+          "text": "把 Agent 的所有历史都塞进上下文，既贵又会稀释注意力。实用做法是按用途分层：工作记忆放当前任务的临时变量，情节记忆放本次会话发生过什么，长期记忆放跨会话稳定事实与偏好。"
+        },
+        {
+          "kind": "table",
+          "headers": [
+            "层次",
+            "内容",
+            "存放位置"
+          ],
+          "rows": [
+            [
+              "工作记忆",
+              "当前计划、工具结果、未决步骤",
+              "上下文 / 结构化状态对象"
+            ],
+            [
+              "情节记忆",
+              "本会话关键事件摘要",
+              "上下文中的滚动摘要"
+            ],
+            [
+              "长期记忆",
+              "用户偏好、稳定事实",
+              "外部存储 + 检索"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "chapter_id": "ai-agent-memory",
+      "section_id": "state",
+      "title": "AI 工程 · Agent 记忆与状态持久化 · 结构化状态优先于自然语言",
+      "content": "Agent 记忆与状态持久化 · 结构化状态优先于自然语言\n「已完成下单，正在等支付确认」这类状态如果只写在摘要里，模型可能记错或漏掉。把关键状态显式存成字段，每次决策前读入，决策后更新，让记忆变成可验证的数据而不是概率性的回忆。\n示例：把事实抽成结构化状态\nfrom dataclasses import dataclass, field\n\n@dataclass\nclass AgentState:\n    goal: str\n    completed: list[str] = field(default_factory=list)\n    pending: list[str] = field(default_factory=list)\n    facts: dict[str, str] = field(default_factory=dict)\n\ndef advance(state, step, result):\n    state.completed.append(step)\n    state.pending.remove(step)\n    state.facts.update(result.get(\"facts\", {}))\n    return state\n模型抽取出的「事实」可能有误。写入长期记忆前做类型与来源校验，并保留来源引用，便于出错时追溯与回滚。",
+      "blocks": [
+        {
+          "kind": "text",
+          "text": "「已完成下单，正在等支付确认」这类状态如果只写在摘要里，模型可能记错或漏掉。把关键状态显式存成字段，每次决策前读入，决策后更新，让记忆变成可验证的数据而不是概率性的回忆。"
+        },
+        {
+          "kind": "code",
+          "code": "from dataclasses import dataclass, field\n\n@dataclass\nclass AgentState:\n    goal: str\n    completed: list[str] = field(default_factory=list)\n    pending: list[str] = field(default_factory=list)\n    facts: dict[str, str] = field(default_factory=dict)\n\ndef advance(state, step, result):\n    state.completed.append(step)\n    state.pending.remove(step)\n    state.facts.update(result.get(\"facts\", {}))\n    return state",
+          "caption": "把事实抽成结构化状态"
+        },
+        {
+          "kind": "note",
+          "title": "写入前先校验",
+          "text": "模型抽取出的「事实」可能有误。写入长期记忆前做类型与来源校验，并保留来源引用，便于出错时追溯与回滚。"
+        }
+      ]
+    },
+    {
+      "chapter_id": "ai-agent-memory",
+      "section_id": "replay",
+      "title": "AI 工程 · Agent 记忆与状态持久化 · 持久化与回放",
+      "content": "Agent 记忆与状态持久化 · 持久化与回放\n把每次状态变更记成事件（时间、动作、输入摘要、输出摘要），而不是覆盖写最终状态。；崩溃后按事件重放重建状态，能定位是哪一步引入了错误。；长期记忆写入要可撤销：支持按来源删除或过期，避免一条错误偏好永久污染后续会话。；给记忆设 TTL 与冲突解决规则：新事实覆盖旧事实要注明时间与来源。\n工具返回里可能夹带 token、手机号等敏感信息。写入长期记忆前做脱敏，并对存储加密、限制访问范围。",
+      "blocks": [
+        {
+          "kind": "list",
+          "items": [
+            "把每次状态变更记成事件（时间、动作、输入摘要、输出摘要），而不是覆盖写最终状态。",
+            "崩溃后按事件重放重建状态，能定位是哪一步引入了错误。",
+            "长期记忆写入要可撤销：支持按来源删除或过期，避免一条错误偏好永久污染后续会话。",
+            "给记忆设 TTL 与冲突解决规则：新事实覆盖旧事实要注明时间与来源。"
+          ]
+        },
+        {
+          "kind": "note",
+          "title": "别把密钥写进记忆",
+          "text": "工具返回里可能夹带 token、手机号等敏感信息。写入长期记忆前做脱敏，并对存储加密、限制访问范围。"
+        }
+      ]
+    },
+    {
+      "chapter_id": "ai-agent-memory",
+      "section_id": "pitfalls",
+      "title": "AI 工程 · Agent 记忆与状态持久化 · 常见坑与自测",
+      "content": "Agent 记忆与状态持久化 · 常见坑与自测",
+      "blocks": [
         {
           "kind": "text",
           "text": ""

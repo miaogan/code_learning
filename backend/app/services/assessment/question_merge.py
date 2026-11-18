@@ -58,6 +58,8 @@ SOURCES: tuple[str, ...] = (
     "acp-official",
     "acp-ext",
     "kb-expand",
+    "ai-mastery",
+    "fullstack-adv",
 )
 
 #: 来源 → 素材文件名（`docs/question-bank-staging/` 下的可复现输入，必须随仓库提交）。
@@ -78,6 +80,8 @@ STAGING_FILES: dict[str, str] = {
     "acp-official": "14-acp-official-quizzes.json",
     "acp-ext": "15-acp-v24-extension.json",
     "kb-expand": "16-knowledge-expansion.json",
+    "ai-mastery": "17-ai-engineering-mastery.json",
+    "fullstack-adv": "18-fullstack-advanced.json",
 }
 
 #: 来源 → 种子 id 前缀（避开 legacy `fe-/be-/al-/cs-` 与 r11 九个语言前缀，保证
@@ -94,6 +98,9 @@ STAGING_FILES: dict[str, str] = {
 #: `acpext-` 是 15 号素材：基于该教程 V2.4 正文（Agent Skills / Memory / Harness Loop /
 #: 蒸馏 / 生产实践 / 安全合规等）创作的原创题，覆盖官方小测验未涉及的独立知识点。
 #: `kbx-` 是 16 号素材：八方向均衡的知识量扩充题（应用题面 + 完整解析），落既有子方向。
+#: `aim-` 是 17 号素材：面向「精通 AI 工程」的深化题（上下文工程 / 高级召回 / 评测 /
+#: MCP / 推理量化 / Agent 记忆），独立前缀便于按批审计。
+#: `fsadv-` 是 18 号素材：面向「熟练后端 + 熟悉前端」的进阶题（含各支撑方向）。
 ID_PREFIX: dict[str, str] = {
     "tiji": "tiji-",
     "local100": "l100-",
@@ -111,6 +118,8 @@ ID_PREFIX: dict[str, str] = {
     "acp-official": "acpof-",
     "acp-ext": "acpext-",
     "kb-expand": "kbx-",
+    "ai-mastery": "aim-",
+    "fullstack-adv": "fsadv-",
 }
 
 #: 近重复口径：字符 n-gram 的 Jaccard 下界（常量只在这里，别处不得再写一个阈值）。

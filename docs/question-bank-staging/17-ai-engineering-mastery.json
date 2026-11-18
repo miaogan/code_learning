@@ -1,0 +1,841 @@
+[
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "某客服 RAG 把 20 段检索片段按相关度从高到低拼进提示词，测试发现把关键证据放在第 9～12 段时模型常答不出，而同样内容挪到第 1 段或末段就能答对。最贴合该现象的解释与做法是？",
+    "options": [
+      {"key": "A", "text": "这是中间遗忘现象，应把最相关片段放在上下文首尾，或先重排再截断并减少片段总数"},
+      {"key": "B", "text": "这是 embedding 模型维度不足，应换成更高维度的向量模型"},
+      {"key": "C", "text": "这是生成温度设置过高，应把 temperature 直接设为 0"},
+      {"key": "D", "text": "这是向量库返回顺序错乱，应按文档编号重新排序后再拼接"}
+    ],
+    "answer": "A",
+    "explanation": "该现象即长上下文的中间遗忘：模型对首尾信息利用更充分，中部信息容易被稀释忽略，把关键证据置于首尾、减少片段数或先重排再截断最对症。换更高维向量、调温度、按编号排序都不解决中部信息被淹没的问题。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "must_know",
+    "stem": "多路召回同时跑 BM25 与稠密向量两路，两路打分尺度差异很大，直接加权求和总被某一路主导。改用倒数排名融合（RRF）合并候选时，关于 RRF 下列说法正确的有哪些？",
+    "options": [
+      {"key": "A", "text": "仅依据各路结果中的排名位次累加，不直接使用原始相似度分数"},
+      {"key": "B", "text": "对两路的分数尺度差异不敏感，无需先做归一化处理"},
+      {"key": "C", "text": "平滑参数越大，高位次与低位次之间的权重差距被压得越小"},
+      {"key": "D", "text": "要求各路召回数量必须完全相同才能融合"},
+      {"key": "E", "text": "会把两路的原始分数直接相加后再排序"}
+    ],
+    "answer": "A,B,C",
+    "explanation": "倒数排名融合按位次倒数累加，不使用原始分数，故对分数尺度不敏感、无需归一化；平滑参数越大，不同位次的权重差越小。它不要求各路召回数量相同，也不是把分数相加，涉及数量必须一致与分数直接相加的说法错误。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "judge",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "HyDE 先让大模型针对查询生成一段假想答案文档，再用它做向量检索。这一方法成立的前提是：即便假想答案的事实未必准确，它与真正相关文档在嵌入空间里通常更接近。",
+    "options": [
+      {"key": "A", "text": "正确"},
+      {"key": "B", "text": "错误"}
+    ],
+    "answer": "正确",
+    "explanation": "该说法正确。HyDE 的核心是生成先于检索：假想答案与相关文档共享主题语义，因此在嵌入空间更接近，用它作查询往往比稀疏短查询召回更准，并不要求假想答案的事实完全正确。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "知识库按 128 token 的小块做向量检索，命中率不错但答案常缺上下文，模型只能看到孤立句子。改用父子块索引后，检索与生成阶段最合理的配合方式是？",
+    "options": [
+      {"key": "A", "text": "用子块做向量检索定位，再把命中的子块映射回其父块回填进上下文供生成"},
+      {"key": "B", "text": "用父块做向量检索，再回填对应子块，因为父块语义更完整"},
+      {"key": "C", "text": "只保留父块入库、删除子块，以降低索引存储成本"},
+      {"key": "D", "text": "把子块与父块的向量首尾拼接成一个更长向量再做检索"}
+    ],
+    "answer": "A",
+    "explanation": "父子块索引的思路是小块检索、大块回填：细粒度子块保证检索精度，命中的子块映射到所属父块，把更完整的父块送入生成以补足上下文。用大块检索会降低精度，删子块或拼接向量都不是该方案的做法。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "用户问“甲公司和乙公司去年在云原生业务上的营收差距是多少”，单次检索只命中零散讨论某一方的片段，无法直接回答。最有针对性的检索改造是？",
+    "options": [
+      {"key": "A", "text": "先做查询分解，拆成两家公司营收与云原生口径等子问题分别检索再汇总"},
+      {"key": "B", "text": "把召回数量从 5 提到 50，靠堆更多片段覆盖答案"},
+      {"key": "C", "text": "换用更高维度的 embedding 模型重新构建索引"},
+      {"key": "D", "text": "把生成温度调高，让模型自行推算出差距数值"}
+    ],
+    "answer": "A",
+    "explanation": "多跳与对比型问题需要查询分解：把复合问题拆成可独立检索的子查询，分别召回后再综合推理。单纯增大召回数只会引入噪声，换更高维向量与调温度都不解决一个问题里含多个信息点这一根因。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "同一批向量在甲向量库用内积检索结果正常，迁移到乙库改用默认余弦相似度后排序几乎全变了，且全程未做预处理。最可能的根因是？",
+    "options": [
+      {"key": "A", "text": "入库向量未做 L2 归一化，未归一化向量上的余弦与内积排序并不等价"},
+      {"key": "B", "text": "向量维度超过了乙库声明的最大维度上限"},
+      {"key": "C", "text": "乙库的近似最近邻索引类型与甲库不同，必然造成排序差异"},
+      {"key": "D", "text": "查询文本与文档文本分别用了两个不同的 embedding 模型"}
+    ],
+    "answer": "A",
+    "explanation": "余弦相似度相当于对内积按向量模长做归一化。向量未做 L2 归一化时，内积与余弦的排序会不同，乙库默认余弦而向量是原始未归一化的，排序变化正源于此。维度超限会直接报错，索引类型不同不应系统性改变排序。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "给 RAG 加了一个交叉编码器重排器后，团队把重排相似度阈值设得很高，结果准确率上去了，但大量本可回答的问题变成未检索到相关内容而拒答。要改善这一状况，最合理的调整是？",
+    "options": [
+      {"key": "A", "text": "适当下调重排阈值，并保证仍有足够数量的高分片段进入生成阶段"},
+      {"key": "B", "text": "把阈值进一步调到接近 1.0，只保留几乎完全匹配的片段"},
+      {"key": "C", "text": "彻底去掉重排器，完全依赖首轮向量召回的结果"},
+      {"key": "D", "text": "删掉提示词里的拒答规则，强制模型对所有问题都给出答案"}
+    ],
+    "answer": "A",
+    "explanation": "重排阈值过高会牺牲召回率，把相关但分数没那么极端的片段挡在门外，导致误拒答。适度下调阈值并保证头部片段进入生成可在准确与召回间取平衡。把阈值调到接近一更极端，去掉重排放弃精度，删拒答只会让模型硬编答案。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "需要从简历中抽取姓名、公司、入职年份等字段并直接落库，要求输出必须是合法 JSON 且字段名固定。相比只在提示词里叮嘱模型输出 JSON，更可靠的工程做法是？",
+    "options": [
+      {"key": "A", "text": "使用带 JSON Schema 的约束解码，让解码阶段只能生成符合 schema 的 token"},
+      {"key": "B", "text": "把生成温度设为 0 就足以保证输出一定是合法 JSON"},
+      {"key": "C", "text": "在提示词中重复写三遍只输出 JSON 不要多余文字"},
+      {"key": "D", "text": "生成完毕后用正则表达式删掉所有看起来不像 JSON 的字符"}
+    ],
+    "answer": "A",
+    "explanation": "JSON Schema 约束解码在 token 生成阶段就限制候选，能从机制上保证格式合法、字段齐全。温度设为零只降低随机性，反复叮嘱属于软约束仍可能违规，事后正则清洗遇到嵌套或异常结构时非常脆弱。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "某服务把 system 提示、few-shot 示例与用户输入拼成一条完整提示发送给推理引擎，尽管 system 与示例完全固定，前缀缓存命中率仍几乎为零。最该先调整的是？",
+    "options": [
+      {"key": "A", "text": "把固定内容放在提示最前、变化的用户输入放在最后，保证前缀逐 token 一致"},
+      {"key": "B", "text": "把用户输入放在提示最前面，让缓存优先匹配用户问题"},
+      {"key": "C", "text": "为每次请求生成唯一编号并作为提示前缀，便于区分缓存"},
+      {"key": "D", "text": "把 system 提示拆散，穿插插入到用户输入之后的位置"}
+    ],
+    "answer": "A",
+    "explanation": "前缀缓存要求从第一个 token 起逐 token 完全一致。把固定的 system 与示例置于最前、变化的用户输入置于末尾，不同请求才能共享前缀。把用户输入前置、加唯一编号、拆散 system 都会破坏前缀一致性。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "关于投机解码能带来真实的生成加速，以下哪些条件是必要的或显著的促进因素？",
+    "options": [
+      {"key": "A", "text": "草稿模型与目标大模型的输出分布足够接近，草稿接受率高"},
+      {"key": "B", "text": "草稿生成与大模型校验的额外开销小于被接受 token 省下的串行解码时间"},
+      {"key": "C", "text": "目标模型一次前向即可并行校验多个候选 token"},
+      {"key": "D", "text": "草稿模型的参数量必须显著大于目标模型"},
+      {"key": "E", "text": "必须关闭批处理，每次只处理一个请求"}
+    ],
+    "answer": "A,B,C",
+    "explanation": "投机解码加速依赖三点：草稿分布接近目标模型从而接受率高，校验多 token 的开销小于省下的串行解码时间，目标模型能一次前向并行校验多个候选。草稿应更小更快而非更大，是否批处理与能否加速无必然关系。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "同一个模型分别用 GPTQ 与 AWQ 做 4-bit 权重量化，二者在工程取舍上的关键差异是？",
+    "options": [
+      {"key": "A", "text": "GPTQ 依校准数据逐层用二阶误差补偿，AWQ 依激活显著性保护少数重要权重通道"},
+      {"key": "B", "text": "GPTQ 只能量化到 8-bit，而 AWQ 只能量化到 4-bit"},
+      {"key": "C", "text": "AWQ 需要重新训练全部权重，GPTQ 不需要任何校准数据"},
+      {"key": "D", "text": "二者算法本质完全相同，差别只在开源协议"}
+    ],
+    "answer": "A",
+    "explanation": "GPTQ 基于校准数据、用二阶信息逐层量化并补偿误差；AWQ 认为少数显著权重通道对性能关键，按激活幅度缩放保护这些通道。二者都属于训练后量化、都需要校准，也不存在位宽或协议上的本质区别。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "judge",
+    "difficulty": "challenge",
+    "essentiality": "nice_to_know",
+    "stem": "部署一个混合专家大模型时发现专家负载严重不均：少数专家被大量 token 选中、其余长期空闲，部分设备显存吃紧而另一些闲置。通常可用负载均衡辅助损失或路由器容量上限来缓解。",
+    "options": [
+      {"key": "A", "text": "正确"},
+      {"key": "B", "text": "错误"}
+    ],
+    "answer": "正确",
+    "explanation": "该说法正确。混合专家负载不均源于路由器偏好，常用辅助负载均衡损失、专家容量上限与 token 溢出丢弃机制来均衡各专家负载，避免少数专家过载而其余空闲造成的显存与算力浪费。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "用半精度浮点部署一个 32 层、隐层维度 4096、采用 32 个键值头的模型，单请求上下文 4096 token。仅键值缓存一项的显存占用最接近多少？（一个半精度数占 2 字节）",
+    "options": [
+      {"key": "A", "text": "约 2 GB，按层数×2×键值头数×头维×序列长×2 字节估算"},
+      {"key": "B", "text": "约 0.5 GB，因为每个 token 只存一份键向量"},
+      {"key": "C", "text": "约 8 GB，按隐层维度而非头维计算健值缓存"},
+      {"key": "D", "text": "与上下文长度无关，是一个固定值"}
+    ],
+    "answer": "A",
+    "explanation": "键值缓存约等于层数三十二乘以二再乘以键值头数三十二、头维一百二十八、序列长四千零九十六与每数两字节，结果约二十一亿字节即约 2 GB。它随序列长度线性增长，并非固定值，其余估算都不符。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "关于文档切块时的块重叠与语义边界，下列哪些做法是合理的？",
+    "options": [
+      {"key": "A", "text": "尽量按标题、段落等语义边界切分，避免把完整语义硬生生切断"},
+      {"key": "B", "text": "设置适度重叠，缓解答案恰好跨越两个块时被切断的风险"},
+      {"key": "C", "text": "重叠比例过高会造成内容重复入库、索引膨胀与检索结果冗余"},
+      {"key": "D", "text": "重叠比例越大越好，最好接近块本身的大小"}
+    ],
+    "answer": "A,B,C",
+    "explanation": "合理做法是优先按标题段落等语义边界切分，并设适度重叠来缓解跨块语义割裂；但重叠过大会导致重复入库、索引膨胀与候选冗余，因此并非越大越好，认为重叠越接近块大小越好的主张不合理。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "一个个人助理既要记住用户上次对话提到的临时偏好，又要跨会话长期记住用户是素食者这类稳定事实。最合理的记忆分层设计是？",
+    "options": [
+      {"key": "A", "text": "短期记忆承载当前会话上下文，长期记忆经提炼后持久化稳定偏好与事实"},
+      {"key": "B", "text": "把所有历史对话原文永久存库，每次请求全量读入上下文"},
+      {"key": "C", "text": "长期记忆只保留最近一轮对话，短期记忆保存全年历史"},
+      {"key": "D", "text": "把用户偏好直接写死在系统提示里，不做任何持久化"}
+    ],
+    "answer": "A",
+    "explanation": "合理分层是短期记忆承载当前会话上下文，长期记忆经摘要提炼后持久化稳定事实与偏好并按需注入。全量原文读入会撑爆上下文且成本高，把偏好写死在系统提示无法随用户变化更新，都不合适。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "一个可中断的长任务 Agent 崩溃后，需要从最后一个成功提交的工具动作之后恢复，而不是从头重跑。支撑这种步骤级恢复的最小必要设计是？",
+    "options": [
+      {"key": "A", "text": "每步执行前后持久化状态与工具结果，并用幂等键标记已提交动作"},
+      {"key": "B", "text": "把全部中间状态只放在进程内存里，靠定期整体快照恢复"},
+      {"key": "C", "text": "把工具调用结果打印到日志即可，无需结构化存储"},
+      {"key": "D", "text": "每次崩溃后把所有工具全部重新执行一遍以保证状态最新"}
+    ],
+    "answer": "A",
+    "explanation": "要做到步骤级恢复，需逐步持久化状态与工具结果，并用幂等键防止已提交动作在恢复后被重复执行。仅靠内存快照会丢失进度，只写日志难以结构化恢复，全部重跑会带来重复副作用与资源浪费。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "Agent 调用外部工具时，为提高可靠性，下列哪些重试与容错做法是合理的？",
+    "options": [
+      {"key": "A", "text": "对幂等的查询类工具做有限次数的指数退避重试"},
+      {"key": "B", "text": "对有副作用的写操作，重试前确认幂等键或改为人工确认"},
+      {"key": "C", "text": "为工具调用设置超时，避免单次卡死拖垮整个任务"},
+      {"key": "D", "text": "对所有工具都无限重试，直到成功为止"},
+      {"key": "E", "text": "一旦某次超时就把该工具从可用列表永久移除"}
+    ],
+    "answer": "A,B,C",
+    "explanation": "幂等查询适合有限次指数退避，有副作用的写操作重试需幂等键或人工确认以防重复提交，设超时可防止单次卡死。无限重试会拖垮任务，一超时就永久禁用工具过于激进，都不是合理容错。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "某 Agent 在开放式调研任务中表现良好，但换到步骤固定的结构化报表任务时效率低下、频繁改主意。更匹配的编排范式是？",
+    "options": [
+      {"key": "A", "text": "改用先规划后执行：一次性生成完整计划，再逐步执行，减少反复试错"},
+      {"key": "B", "text": "继续使用交错推理与行动的范式，靠增加推理轮次自然收敛"},
+      {"key": "C", "text": "把任务描述写得更长更细，让模型自己摸索步骤"},
+      {"key": "D", "text": "关闭全部工具调用，纯靠模型内部知识完成报表"}
+    ],
+    "answer": "A",
+    "explanation": "交错推理与行动适合开放式探索，而步骤明确的结构化任务更适合先规划后执行，减少每步重新决策带来的反复。单纯增加轮次、拉长描述或关闭工具，都不能解决范式与任务不匹配的问题。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "一个舆情 Agent 用有向无依赖图并行调度多个抓取分支，汇总节点被实现成必须等所有分支都返回。某分支数据源常年不稳定，导致整条链路频繁整体超时。更稳健的调度策略是？",
+    "options": [
+      {"key": "A", "text": "识别真实依赖，对可并行的无依赖分支单独设超时，并支持部分结果先进入汇总"},
+      {"key": "B", "text": "把所有分支改为严格串行，确保每个都拿到完整结果"},
+      {"key": "C", "text": "去掉所有超时设置，让不稳定分支一直重试到成功"},
+      {"key": "D", "text": "汇总时只取最先返回的那个分支结果，其余全部丢弃"}
+    ],
+    "answer": "A",
+    "explanation": "问题在于全量栅栏被最慢分支拖垮。应按依赖分组、对无依赖分支并行并单独设超时，允许已完成的部分结果先进入汇总。全部串行牺牲吞吐，取消超时会无限等待，只取最快结果会丢失必要信息。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "must_know",
+    "stem": "一个 Agent 设置了最大步数 50 作为终止条件，线上却仍出现成本暴涨：它在第 40 步附近反复调用昂贵的检索工具。最能补上这个缺口的控制是？",
+    "options": [
+      {"key": "A", "text": "在最大步数之外再设 token 或费用预算上限与重复动作检测，触发即终止或降级"},
+      {"key": "B", "text": "把最大步数从 50 提高到 100，给它更多完成空间"},
+      {"key": "C", "text": "只监控最终答案质量，不对执行过程做任何干预"},
+      {"key": "D", "text": "给每次工具调用都设置同样时长的固定超时"}
+    ],
+    "answer": "A",
+    "explanation": "最大步数只约束轮次，无法限制单步 token 消耗与重复行为；叠加费用预算上限和重复动作检测才能在成本失控前止损。提高步数上限会放大问题，只看最终质量、统一工具超时都与成本失控无关。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "要给一个可自动调用插件的办公 Agent 加安全护栏，要求既不能读无关文件，也不能删除重要数据。下列措施组合最完整的是？",
+    "options": [
+      {"key": "A", "text": "工具白名单加参数校验加最小权限沙箱，危险写操作需人工确认"},
+      {"key": "B", "text": "只在提示词里写一句请勿删除文件的约束"},
+      {"key": "C", "text": "把所有工具都开放，完全依赖事后日志审计"},
+      {"key": "D", "text": "禁止调用任何工具，只保留纯对话能力"}
+    ],
+    "answer": "A",
+    "explanation": "完整护栏应包含工具白名单、参数校验、最小权限沙箱，并对危险写操作设人工确认，从机制上限制越权。仅靠提示词是软约束，全开放加事后审计为时已晚，禁用全部工具则让 Agent 失去价值。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "stem": "团队讨论模型上下文协议（MCP）的职责边界，以下哪种理解最准确？",
+    "options": [
+      {"key": "A", "text": "它标准化应用如何向模型提供上下文与工具，主机负责编排与安全决策，不替代规划"},
+      {"key": "B", "text": "它规定了模型必须采用哪种推理框架进行部署"},
+      {"key": "C", "text": "它自身负责评估答案质量并在劣化时自动回滚模型版本"},
+      {"key": "D", "text": "它本质上是一种向量数据库的索引文件格式"}
+    ],
+    "answer": "A",
+    "explanation": "模型上下文协议定义主机、客户端与服务器之间如何标准化暴露和调用工具、资源与提示，主机仍负责编排、权限与安全决策。它不负责推理部署、质量评测，也不是向量索引格式。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "一个多步 Agent 线上偶发失败，团队希望做到失败可归因。追踪记录里至少应包含哪些信息？",
+    "options": [
+      {"key": "A", "text": "每一步的输入输出，以及模型调用与工具调用的参数和返回"},
+      {"key": "B", "text": "各步骤的耗时与 token 消耗"},
+      {"key": "C", "text": "关键中间状态与决策依据，如选中的工具与重试次数"},
+      {"key": "D", "text": "只记录最终答案即可，中间过程可以省略"}
+    ],
+    "answer": "A,B,C",
+    "explanation": "失败可归因要求能还原执行轨迹：逐步输入输出、模型与工具调用的参数返回、耗时与 token、关键决策与重试都应记录。只记录最终答案无法判断是哪一步、哪次调用出错。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "language": "",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "在一个自动审批 Agent 中，人工介入只需要在任务全部执行完后看一眼最终结论即可，中途的高风险动作不必设置检查点。",
+    "options": [
+      {"key": "A", "text": "正确"},
+      {"key": "B", "text": "错误"}
+    ],
+    "answer": "错误",
+    "explanation": "该说法错误。人工介入的价值在于高风险不可逆动作执行前设置检查点，如付款、删除、外发，事后看结论往往无法挽回副作用。是否插入检查点应依据动作风险，而非只在任务末尾看一眼。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "部署与推理",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "一个推理服务按固定批次大小组批，请求长短不一时，短请求要等同批最长请求生成完才返回，批尾常见 GPU 空转。改用连续批处理后，最直接的改善是？",
+    "options": [
+      {"key": "A", "text": "序列生成完即释放槽位并立即插入新请求，减少空转、提升整体吞吐"},
+      {"key": "B", "text": "让每个请求的单 token 生成速度都提升到相同水平"},
+      {"key": "C", "text": "彻底消除首个 token 的等待时间"},
+      {"key": "D", "text": "让单次请求能够生成的 token 数明显变多"}
+    ],
+    "answer": "A",
+    "explanation": "连续批处理按 token 粒度动态调度：某序列结束就腾出槽位接入新请求，避免固定批次中等最慢序列造成的尾延迟与空转，从而提升吞吐。它不保证各请求速度一致，也不消除首 token 等待。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "部署与推理",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "推理引擎里若按每个请求的最大可能长度为键值缓存预分配连续显存，会产生内部碎片、限制并发。分页注意力借鉴操作系统分页思想，主要解决的是？",
+    "options": [
+      {"key": "A", "text": "把键值缓存切成固定大小的块按需分配，消除连续预分配带来的碎片与浪费"},
+      {"key": "B", "text": "提升模型权重计算时的数值精度"},
+      {"key": "C", "text": "减少训练阶段的梯度显存占用"},
+      {"key": "D", "text": "把键值缓存永久转储到磁盘以节约显存"}
+    ],
+    "answer": "A",
+    "explanation": "分页注意力像虚拟内存分页一样，把键值缓存切成定长块按需分配、离散存放，避免按最大长度预留连续显存造成的内部碎片，提升显存利用率与并发。它与权重精度、训练梯度和磁盘转储无关。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "部署与推理",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "用某高吞吐推理框架部署时，并发一高就报显存不足，但显卡监控显示模型权重本身只占一小部分显存。最该优先检查并调整的参数是？",
+    "options": [
+      {"key": "A", "text": "gpu_memory_utilization、最大并发序列数与最大模型长度，它们决定缓存显存与并发上限"},
+      {"key": "B", "text": "把权重的数值类型从半精度改成另一种半精度即可解决"},
+      {"key": "C", "text": "把生成温度调低以减少显存占用"},
+      {"key": "D", "text": "关闭所有日志输出以释放显存"}
+    ],
+    "answer": "A",
+    "explanation": "显存利用率参数决定留给键值缓存的显存比例，最大并发序列数与最大模型长度决定单请求与总并发的缓存需求，并发高时显存不足通常要调这些。改权重类型收益有限，温度与日志不影响缓存显存。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "部署与推理",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "同一推理服务把最大批次调大后每秒请求数上升，但长尾延迟明显恶化。对这一权衡最合理的解释是？",
+    "options": [
+      {"key": "A", "text": "大批次提高利用率与吞吐，但增大排队与单步计算量，推高长尾延迟"},
+      {"key": "B", "text": "批次越大单请求计算越快，延迟应同步下降"},
+      {"key": "C", "text": "吞吐与延迟在任何系统里都完全无关"},
+      {"key": "D", "text": "长尾延迟恶化一定是网络带宽不足造成的"}
+    ],
+    "answer": "A",
+    "explanation": "大批次提升利用率从而提高吞吐，但批内序列增多、排队时间变长、每步计算量增大，会推高长尾延迟，这是典型的吞吐与延迟权衡。批次大不会让单请求更快，二者并非无关，也不能归因于网络。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "部署与推理",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "关于在线推理服务的延迟指标，下列说法正确的有哪些？",
+    "options": [
+      {"key": "A", "text": "首 token 延迟衡量从发出请求到收到第一个 token 的时间，主要受排队与预填充影响"},
+      {"key": "B", "text": "每输出 token 时间衡量解码阶段平均每生成一个 token 的间隔，反映输出流畅度"},
+      {"key": "C", "text": "端到端延迟可近似看作首 token 延迟加上输出 token 数乘以每输出 token 时间"},
+      {"key": "D", "text": "首 token 延迟只与显卡算力有关，与排队情况完全无关"}
+    ],
+    "answer": "A,B,C",
+    "explanation": "首 token 延迟反映排队与预填充后的首字等待，每输出 token 时间反映解码流畅度，端到端延迟可近似为二者组合。认为首 token 延迟与排队无关的说法错误。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "部署与推理",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "为一个 70 亿参数模型做半精度单卡部署规划，除权重外还需预留键值缓存、激活值与运行时上下文开销。若只看权重约 14GB，选 16GB 显卡上线后最可能在什么时候出问题？",
+    "options": [
+      {"key": "A", "text": "并发稍高、上下文变长时键值缓存快速增长，触发显存溢出"},
+      {"key": "B", "text": "模型加载阶段就会因权重大于显存而直接失败"},
+      {"key": "C", "text": "只会在训练阶段出问题，推理阶段完全不受影响"},
+      {"key": "D", "text": "永远不会有问题，因为键值缓存不占用显存"}
+    ],
+    "answer": "A",
+    "explanation": "约 14GB 权重能装进 16GB，加载不会立刻失败；但键值缓存随并发与序列长度线性增长，加上激活与上下文开销，稍高负载就会溢出。键值缓存是推理期显存大头，说它不占显存或只在训练出问题都错误。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "部署与推理",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "多卡多实例部署推理服务时，为提高资源利用与稳定性，下列哪些做法是合理的？",
+    "options": [
+      {"key": "A", "text": "结合显卡亲和性把同一实例的权重与缓存尽量放在同卡，减少跨卡通信"},
+      {"key": "B", "text": "在实例前做负载均衡，并结合健康检查摘除异常实例"},
+      {"key": "C", "text": "依据显存占用与并发数而非仅靠每秒请求数来决策扩缩容"},
+      {"key": "D", "text": "让所有实例共享各自独立且不设上限的显存，越多越好"}
+    ],
+    "answer": "A,B,C",
+    "explanation": "合理做法包括利用显卡亲和性减少跨卡通信、前置负载均衡与健康检查、按显存与并发而非仅请求数扩缩容。让实例无上限争抢显存会引发溢出与互相干扰，不是合理做法。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "部署与推理",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "nice_to_know",
+    "stem": "平台需要在不中断服务的情况下把模型从旧版切到新版，要求切换期间请求不丢失且能秒级回退。较稳妥的机制是？",
+    "options": [
+      {"key": "A", "text": "新旧实例同时在线，通过流量权重逐步切换，异常时把权重调回旧版"},
+      {"key": "B", "text": "先停掉所有旧版实例，再启动新版实例"},
+      {"key": "C", "text": "在单个进程里原地覆盖正在被加载的模型权重文件"},
+      {"key": "D", "text": "让客户端每次自行决定连接哪个版本"}
+    ],
+    "answer": "A",
+    "explanation": "热切换应让新旧实例并行在线、用流量权重灰度切换，异常时把权重调回旧版即可秒级回退。停机切换会造成中断，进程内覆盖权重有加载窗口风险，让客户端自选版本无法统一治理。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "部署与推理",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "新推理版本离线指标全面优于旧版，但放量到少量线上流量后监控到某类长请求超时率上升。此时最合理的处置是？",
+    "options": [
+      {"key": "A", "text": "先回滚或降低灰度比例止血，再定位长请求超时的具体原因"},
+      {"key": "B", "text": "忽略超时，因为离线指标已经更好"},
+      {"key": "C", "text": "立即把灰度扩到全部流量，靠线上规模验证"},
+      {"key": "D", "text": "把超时告警的阈值调高，让告警不再出现"}
+    ],
+    "answer": "A",
+    "explanation": "线上出现超时恶化应先止血，回滚或降低灰度比例，再分析根因。离线指标好不能覆盖线上问题，直接全量会放大故障，调高告警阈值只是掩盖问题而非解决。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "部署与推理",
+    "language": "",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "推理服务在过载时应优先保证所有请求都被尽力处理，因此不设置超时和排队上限，让请求一直等待直到获得服务。",
+    "options": [
+      {"key": "A", "text": "正确"},
+      {"key": "B", "text": "错误"}
+    ],
+    "answer": "错误",
+    "explanation": "该说法错误。不设超时与排队上限会让请求在过载时无限堆积，耗尽连接与显存，最终拖垮整个服务形成雪崩。合理的过载保护应设置超时、排队上限与降级限流，必要时快速失败以保障整体可用。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "用模型当裁判对两个答案做成对比较时，发现它系统性地更偏爱较长的那个，即使内容并不更准确。为降低这种长度偏好，最有效的做法是？",
+    "options": [
+      {"key": "A", "text": "对候选答案做长度归一化或截断，并交换两者的呈现顺序做双向比较后取一致结论"},
+      {"key": "B", "text": "让裁判只比较答案的第一句话"},
+      {"key": "C", "text": "把两个答案拼接成一段让裁判整体打分"},
+      {"key": "D", "text": "把裁判模型的生成温度调高"}
+    ],
+    "answer": "A",
+    "explanation": "长度偏好属于裁判偏差，应对答案做长度规整并交换两个候选的呈现顺序做双向比较、只采信一致结论，可同时缓解长度与位置偏差。只比首句丢失信息，拼接打分放大整体印象偏差，升高温度只会增加不稳定。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "团队从线上日志抽样做评测集，分数虚高。排查发现多条样本只是标点或同义词不同、语义高度重复，且部分样本的标准答案就写在少样本示例里。最该先做的是？",
+    "options": [
+      {"key": "A", "text": "对样本做语义去重，并把评测集与少样本示例及索引快照隔离开"},
+      {"key": "B", "text": "只要继续增加评测样本数量就能解决"},
+      {"key": "C", "text": "只保留字数最多的样本作为该类代表"},
+      {"key": "D", "text": "把标准答案也写进系统提示以提升一致性"}
+    ],
+    "answer": "A",
+    "explanation": "语义重复会让某类问题被过度加权、分数虚高，标准答案泄漏进少样本示例会造成评测集污染。应对样本语义去重，并把评测集与少样本示例及索引快照隔离；单纯加数量、只留最长样本、把答案写进提示都不解决污染。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "持续集成里把新版本与基线在评测集上的分数直接比较，规定不低于基线即通过。某次新版比基线高 0.3 分就通过，人工复核却认为其实变差了。最合理的门禁改进是？",
+    "options": [
+      {"key": "A", "text": "设定有统计意义的最小提升幅度与置信区间，并结合关键失败样例回归检查"},
+      {"key": "B", "text": "只要高于基线任意幅度就一律通过"},
+      {"key": "C", "text": "取消门禁，完全依赖每次人工评审"},
+      {"key": "D", "text": "把基线分数直接替换为满分"}
+    ],
+    "answer": "A",
+    "explanation": "零点三分可能是噪声或方差，需设定最小显著提升幅度与置信区间，并辅以关键失败样例是否回退的检查。高于基线就通过无法区分真实提升与抖动，取消门禁或改用满分都不构成合理门禁。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "某开源模型在一份公开榜单上表现异常地好，团队怀疑训练数据混入了测试集。要验证是否存在数据污染，最有说服力的做法是？",
+    "options": [
+      {"key": "A", "text": "用金丝雀样本：改写措辞或插入触发词构造新样本，看模型对改写前后表现差异是否异常"},
+      {"key": "B", "text": "在同一份榜单上再测一遍，看分数是否稳定"},
+      {"key": "C", "text": "检查该模型的参数量是否明显过大"},
+      {"key": "D", "text": "比较该模型与其他模型在榜单上的排名"}
+    ],
+    "answer": "A",
+    "explanation": "数据污染检测常用金丝雀或改写探针：构造训练中不可能见过的新措辞样本，若模型只对原始措辞异常好、对改写明显变差，说明可能记忆了测试集。重测同一榜单、看参数量、比排名都无法证明污染。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "要度量一个检索增强问答系统的幻觉率，最严谨的度量口径是？",
+    "options": [
+      {"key": "A", "text": "统计答案中无法被给定检索片段或可信来源支撑的事实性陈述所占比例"},
+      {"key": "B", "text": "统计答案字数超过某阈值的比例"},
+      {"key": "C", "text": "统计用户点点赞按钮的比例"},
+      {"key": "D", "text": "统计模型输出格式不合法的比例"}
+    ],
+    "answer": "A",
+    "explanation": "幻觉率应基于事实支撑性：逐条判断答案中的事实陈述能否被检索片段或可信来源蕴含，计算无支撑陈述的占比。字数、点赞率、格式错误率衡量的是完全不同的维度，不能代表幻觉。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "一个多租户平台要把月度推理成本准确分摊到各业务方，调用日志需要记录哪些信息才能支撑归因？",
+    "options": [
+      {"key": "A", "text": "每次调用的输入 token 数与输出 token 数"},
+      {"key": "B", "text": "调用方租户标识与所用模型档位"},
+      {"key": "C", "text": "缓存命中情况以及是否路由到了高价位模型"},
+      {"key": "D", "text": "只记录当月总费用即可，无需拆分到单次调用"}
+    ],
+    "answer": "A,B,C",
+    "explanation": "成本归因需按调用拆分：输入输出 token 数、租户与模型档位、缓存命中与路由信息，才能按单价核算到各业务方。只记总费用无法分摊，也不利于定位优化空间。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "关于离线评测与线上对照实验的关系，下列说法正确的有哪些？",
+    "options": [
+      {"key": "A", "text": "离线评测可快速筛掉明显退化的版本，成本低且可复现"},
+      {"key": "B", "text": "线上对照实验能反映真实用户行为与业务指标，但周期长且有流量风险"},
+      {"key": "C", "text": "二者互补，通常先做离线门禁再进线上小流量实验"},
+      {"key": "D", "text": "离线分数高就一定能推出线上业务指标变好，无需再做线上验证"}
+    ],
+    "answer": "A,B,C",
+    "explanation": "离线评测快速可复现，适合早期筛选；线上对照反映真实业务指标但有成本与风险；二者互补常串联使用。离线分数高并不保证线上指标提升，存在分布差异与代理指标偏差，不能省掉线上验证。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "language": "",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "黄金评测集一旦建立就应长期固定不变，线上发现的失败案例不应再补进去，否则会破坏历史分数的可比性。",
+    "options": [
+      {"key": "A", "text": "正确"},
+      {"key": "B", "text": "错误"}
+    ],
+    "answer": "错误",
+    "explanation": "该说法错误。黄金评测集需要随业务和线上失败案例持续补充维护，把真实失败回归化才能形成闭环、防止同类问题复发。为保持可比性应做版本化管理并记录集合变更，而不是拒绝纳入新案例。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "Prompt 工程",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "一个分类提示用少样本示例，但少数类样本总被误判为多数类，且把某个示例放在示例列表末尾时该类别预测明显偏高。最该改进的是？",
+    "options": [
+      {"key": "A", "text": "平衡各类示例数量，并轮换打乱示例顺序以消除近因效应"},
+      {"key": "B", "text": "把示例总数增加到 50 个即可"},
+      {"key": "C", "text": "把所有同类示例连续排在一起便于模型归纳"},
+      {"key": "D", "text": "删掉少数类示例，只保留多数类示例"}
+    ],
+    "answer": "A",
+    "explanation": "少样本存在类别不平衡与顺序敏感：少数类示例不足会被多数类压制，末尾示例被过度模仿即近因效应。应平衡各类并轮换顺序，单纯堆数量、同类连续排列、删少数类都会加剧偏差。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "Prompt 工程",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "某任务需要模型在多个候选解题路径中做探索与回溯，比如小型规划谜题，单纯线性思维链表现不佳。更适合的推理范式是？",
+    "options": [
+      {"key": "A", "text": "思维树：生成多条思路并逐条评估、可回溯地选择最优路径"},
+      {"key": "B", "text": "把温度设为 0 的线性思维链"},
+      {"key": "C", "text": "只用零样本直接给出答案，不做任何推理展开"},
+      {"key": "D", "text": "对同一个问题重复提问若干次"}
+    ],
+    "answer": "A",
+    "explanation": "思维树把推理组织成树，能并行探索多条思路并评估回溯，适合需要搜索试错的任务；线性思维链一条路走到黑不适合回溯。零样本、调温度、重复提问都不提供探索与回溯能力。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "Prompt 工程",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "一个工具调用要求模型产出结构化参数：严重度只能取三个枚举值之一、重试次数为非负整数、且必须给出摘要。若仅用自然语言描述要求而不提供 schema 校验，最可能出现的问题是？",
+    "options": [
+      {"key": "A", "text": "字段名与取值不稳定，出现非法枚举值或类型错误，调用方校验失败"},
+      {"key": "B", "text": "模型必然拒绝生成任何参数"},
+      {"key": "C", "text": "输出 token 数必然翻倍"},
+      {"key": "D", "text": "模型会把参数写成自然语言而完全无法被解析"}
+    ],
+    "answer": "A",
+    "explanation": "纯自然语言描述属于软约束，模型可能生成枚举外的取值、把次数写成字符串或漏掉摘要，导致参数校验失败。它不会让模型必然拒绝、必然翻倍 token，也不是完全无法解析，问题在于不稳定。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "Prompt 工程",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "把角色设定、输出格式规则和用户问题全部塞进同一条用户消息里，线上常出现模型把用户问题里夹带的指令当成规则执行。更合理的分层是？",
+    "options": [
+      {"key": "A", "text": "把稳定的角色与规则放系统消息，用户数据放用户消息，并标明数据区与不可覆盖的规则边界"},
+      {"key": "B", "text": "把所有内容全部放进系统消息"},
+      {"key": "C", "text": "把规则写在用户消息末尾即可"},
+      {"key": "D", "text": "取消系统消息，只用多轮对话暗示"}
+    ],
+    "answer": "A",
+    "explanation": "系统消息与用户消息分层，让稳定规则与用户输入分离，配合数据区标注和规则不可被用户内容覆盖的声明，可降低把用户内容误当指令的风险。全塞系统或用户、取消系统都会削弱层级区分。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "Prompt 工程",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "团队把提示词直接硬编码在业务代码里，某次微调后线上效果退化却无法快速定位是哪次改动造成的。要根治该问题，最合理的做法是？",
+    "options": [
+      {"key": "A", "text": "把提示词作为带版本号的独立资产集中管理，每次变更跑固定回归集并保留差异记录"},
+      {"key": "B", "text": "每次改完凭记忆记录改动内容"},
+      {"key": "C", "text": "把不同版本提示词复制到多个代码分支"},
+      {"key": "D", "text": "只在出问题时才回滚代码"}
+    ],
+    "answer": "A",
+    "explanation": "提示词应作为版本化资产集中管理，变更时跑固定回归集并保留差异记录，才能定位退化来源并快速回滚。凭记忆、多分支复制、事后回滚都缺乏可追溯性与回归保障。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "Prompt 工程",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "为一个客服助手做上线前的对抗性测试，为有效暴露提示注入与越狱风险，应覆盖哪些测试类型？",
+    "options": [
+      {"key": "A", "text": "直接注入类，例如要求忽略之前所有指令"},
+      {"key": "B", "text": "间接注入，把恶意指令藏进被检索的网页或文档"},
+      {"key": "C", "text": "编码与变形绕过，例如字符拆分、多语言混写"},
+      {"key": "D", "text": "只测试语法完全正确的正常用户提问"}
+    ],
+    "answer": "A,B,C",
+    "explanation": "对抗性测试应覆盖直接注入、藏在外部内容中的间接注入，以及字符拆分、多语言混写等变形绕过，才能暴露真实越狱面。只测语法正常的提问无法发现提示注入风险。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "Prompt 工程",
+    "language": "",
+    "kind": "judge",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "当系统提示与用户输入指令冲突时，模型总会无条件优先执行系统提示，因此只需把安全规则写进系统提示就高枕无忧。",
+    "options": [
+      {"key": "A", "text": "正确"},
+      {"key": "B", "text": "错误"}
+    ],
+    "answer": "错误",
+    "explanation": "该说法错误。模型对系统提示与用户指令的遵循并非绝对，提示注入、长上下文稀释等都可能让用户内容压过系统规则。因此需要分层标注、输入净化、输出校验与对抗测试等多重手段，不能只依赖系统提示。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "Prompt 工程",
+    "language": "",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "长对话助手为控制成本，把较早的对话轮次压缩成摘要再送入上下文。这种做法在降低成本的同时可能丢失细节并引入摘要自身的偏差，因此需要对摘要做保真校验。",
+    "options": [
+      {"key": "A", "text": "正确"},
+      {"key": "B", "text": "错误"}
+    ],
+    "answer": "正确",
+    "explanation": "该说法正确。上下文压缩与摘要能降低 token 成本，但有损细节、可能放大摘要模型的偏差或遗漏关键事实，因此应结合结构化摘要、引用保留或保真校验，避免压缩误差累积影响后续回答。"
+  }
+]
