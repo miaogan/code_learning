@@ -513,4 +513,142 @@ export const FRONTEND_CHAPTERS: TutorialChapter[] = [
       },
     ],
   },
+  {
+    id: 'fe-css-layout',
+    title: 'CSS 层叠上下文与响应式布局',
+    direction: '前端',
+    sub_direction: 'css',
+    level: '基础',
+    summary: '从盒模型到层叠上下文，再到 Flex/Grid 与媒体查询：把「样式不生效」变成可推理的布局问题。',
+    sections: [
+      {
+        id: 'box-model',
+        title: '盒模型：宽度到底算到哪一层',
+        blocks: [
+          {
+            kind: 'text',
+            text: 'CSS 里每个元素都是一个盒子：内容（content）→ 内边距（padding）→ 边框（border）→ 外边距（margin）。默认的 box-sizing: content-box 让 width 只指内容宽，padding 和 border 会额外加上去，于是「设了 100% 却撑出父容器」就成了高频问题。',
+          },
+          {
+            kind: 'table',
+            headers: ['box-sizing', 'width 包含', '典型症状'],
+            rows: [
+              ['content-box（默认）', '只有 content', '加 padding 后实际宽度超出设定值'],
+              ['border-box', 'content + padding + border', '宽度所见即所得，栅格布局更稳'],
+            ],
+          },
+          {
+            kind: 'note',
+            tone: 'info',
+            title: '全局设置的取舍',
+            text: '工程里常用 *, *::before, *::after { box-sizing: border-box } 统一口径。它不改变 margin，改动面集中且可预测，比逐个组件修正省事。',
+          },
+        ],
+      },
+      {
+        id: 'stacking',
+        title: '层叠上下文：z-index 为什么不起作用',
+        blocks: [
+          {
+            kind: 'text',
+            text: 'z-index 只在同一个层叠上下文里比较。父元素一旦创建了层叠上下文（如 position 配合 z-index、opacity < 1、transform、filter），子元素的 z-index 就只在这个父级内部有效，再大也盖不过父级的兄弟节点。',
+          },
+          {
+            kind: 'list',
+            items: [
+              '定位元素（relative/absolute/fixed）且 z-index 不是 auto：最常见的创建方式。',
+              'opacity 小于 1、transform 非 none、filter 非 none、will-change 声明了相关属性。',
+              'flex/grid 容器的子项，只要 z-index 不是 auto，即使没有 position 也会形成层叠上下文。',
+              '排查顺序：先看两个元素是否在同一父级，再看父级是否创建了上下文，最后才看 z-index 数值。',
+            ],
+          },
+          {
+            kind: 'note',
+            tone: 'warn',
+            title: '不要用超大 z-index 救火',
+            text: '写 z-index: 999999 往往说明层叠边界没理清。更稳的做法是控制上下文的层级：让弹窗挂到 body 下的独立容器，与业务内容不在同一上下文中比较。',
+          },
+        ],
+      },
+      {
+        id: 'layout',
+        title: 'Flex 与 Grid 怎么分工',
+        blocks: [
+          {
+            kind: 'text',
+            text: 'Flex 是一维布局，适合「一行或一列怎么排」；Grid 是二维布局，适合「行列同时约束」的页面骨架。两者不互斥：外层 Grid 定区域，区域内 Flex 排内容，是最常见的组合。',
+          },
+          {
+            kind: 'code',
+            language: 'css',
+            caption: '外层 Grid 定骨架，内层 Flex 排工具条',
+            code: [
+              '.page {',
+              '  display: grid;',
+              '  grid-template-columns: 220px minmax(0, 1fr);',
+              '  grid-template-areas: "side main";',
+              '}',
+              '',
+              '.toolbar {',
+              '  display: flex;',
+              '  gap: 12px;',
+              '  align-items: center;',
+              '}',
+              '',
+              '.toolbar .spacer { flex: 1; }',
+            ].join('\n'),
+          },
+          {
+            kind: 'list',
+            ordered: true,
+            items: [
+              'minmax(0, 1fr) 而不是 1fr：后者最小尺寸默认是 auto，长内容会撑破网格列。',
+              'Flex 的 flex: 1 是 grow/shrink/basis 的缩写，等价于 1 1 0%，不要和 width 混用猜结果。',
+              '需要「等宽多列」优先 Grid 的 repeat(auto-fill, minmax(240px, 1fr))，比 Flex 换行更可控。',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'pitfalls',
+        title: '常见坑与自测',
+        blocks: [
+          {
+            kind: 'text',
+            text: '响应式布局的关键是「先让内容能收缩，再谈断点」。媒体查询只在弹性布局失效后才介入，把断点当万能补丁会让维护成本随屏幕数量线性增长。',
+          },
+          {
+            kind: 'code',
+            language: 'css',
+            caption: '断点只处理真正的布局切换',
+            code: [
+              '.cards { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }',
+              '',
+              '@media (max-width: 640px) {',
+              '  .cards { grid-template-columns: 1fr; }',
+              '  .sidebar { display: none; }',
+              '}',
+            ].join('\n'),
+          },
+          {
+            kind: 'qa',
+            items: [
+              {
+                question: '元素设了 width: 100% 又加了 20px padding，为什么会横向溢出？',
+                answer: '默认是 content-box，width 只算内容区，padding 会额外叠加。改为 box-sizing: border-box，让 width 包含 padding 与 border。',
+              },
+              {
+                question: '子元素的 z-index 设成 9999 仍被盖住，最可能是什么原因？',
+                answer: '父子不在同一个层叠上下文：父级创建了上下文（transform、opacity<1、定位+z-index 等），子元素的 z-index 只在父级内部比较。应先调整父级层级或把元素移出该上下文。',
+              },
+              {
+                question: '什么时候用 Grid 而不是 Flex？',
+                answer: '需要同时约束行与列、对齐到页面级栅格时用 Grid；只在单一方向排列、内容长度不确定时用 Flex。常见的组合是外层 Grid、内层 Flex。',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
 ]

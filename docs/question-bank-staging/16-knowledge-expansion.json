@@ -1,0 +1,1670 @@
+[
+  {
+    "direction": "前端",
+    "sub_direction": "react",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "一个列表页有 5000 行数据，父组件每次输入关键字都重渲染整张表，卡顿明显。下面哪种改动最能减少子行的重复渲染？",
+    "options": [
+      {"key": "A", "text": "把每一行抽成组件并用 React.memo 包裹，配合稳定的 key"},
+      {"key": "B", "text": "把整个表格用 useMemo 缓存，依赖数组留空"},
+      {"key": "C", "text": "在父组件里把输入值存进 ref，避免触发 setState"},
+      {"key": "D", "text": "给每个行元素加上 inline style 提升优先级"}
+    ],
+    "answer": "A",
+    "explanation": "把每行抽成记忆化组件后，属性不变的子行会跳过重渲染，这是大列表优化的标准做法；整表用缓存且依赖留空会让输入变化后表格永不更新；把值存进引用不触发渲染会让搜索结果失效；内联样式与渲染次数无关。"
+  },
+  {
+    "direction": "前端",
+    "sub_direction": "vue3",
+    "language": "",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "某 Vue3 子组件用 computed 根据 props.price 和本地响应式 count 计算总价。父组件只改了无关状态导致子组件重渲染，但 price 与 count 都没变，此时该 computed 会怎样？",
+    "options": [
+      {"key": "A", "text": "不会重新计算，直接返回上次的缓存值"},
+      {"key": "B", "text": "每次重渲染都会重新求值"},
+      {"key": "C", "text": "只有当 count 变化时才重新求值，price 变化不触发"},
+      {"key": "D", "text": "会触发警告并退回普通方法"}
+    ],
+    "answer": "A",
+    "explanation": "Vue3 的计算属性基于依赖追踪与缓存，只有它依赖的响应式数据真正变化时才失效重算；无关状态变化导致的重渲染不会让它重算。每次重渲染都求值是方法写进模板的表现；price 同样是依赖，变化也会触发；它不会因重渲染而报警告。"
+  },
+  {
+    "direction": "前端",
+    "sub_direction": "js",
+    "language": "",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "一段脚本先调用定时器在零延迟后打印 timer，紧接着用 Promise 的微任务打印 micro，最后同步打印 sync。实际输出顺序是？",
+    "options": [
+      {"key": "A", "text": "sync、micro、timer"},
+      {"key": "B", "text": "sync、timer、micro"},
+      {"key": "C", "text": "micro、sync、timer"},
+      {"key": "D", "text": "timer、sync、micro"}
+    ],
+    "answer": "A",
+    "explanation": "同步代码先入栈执行，所以 sync 最先；当前宏任务结束后会清空微任务队列，Promise 回调属于微任务，故 micro 次之；定时器属于下一个宏任务，最后执行。把微任务排在同步之前或把定时器排在微任务之前都违背事件循环的调度顺序。"
+  },
+  {
+    "direction": "前端",
+    "sub_direction": "ts",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "一个泛型函数声明为 pick<T, K extends keyof T>，接收对象 obj 与键 key，返回 obj[key]。调用 pick 传入对象 {name:'a',age:1} 和键 age 时，返回值的静态类型是？",
+    "options": [
+      {"key": "A", "text": "number"},
+      {"key": "B", "text": "string"},
+      {"key": "C", "text": "unknown"},
+      {"key": "D", "text": "keyof T"}
+    ],
+    "answer": "A",
+    "explanation": "类型参数会被推断为字面量键 age，索引访问类型因此取到该键对应的值类型，这里 age 是 number，所以返回值静态类型是 number。string 对应 name 键；unknown 意味着丢失推断，而键约束保留了精确信息；键的联合是键类型而非值类型。"
+  },
+  {
+    "direction": "前端",
+    "sub_direction": "css",
+    "language": "",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "一个容器设置为横向 flex 布局，其中一项写了 flex:1 1 0，另一项写了 flex:0 0 200px。容器宽度足够时，哪一项会占据剩余空间？",
+    "options": [
+      {"key": "A", "text": "写 flex:1 1 0 的那一项"},
+      {"key": "B", "text": "写 flex:0 0 200px 的那一项"},
+      {"key": "C", "text": "两项等分剩余空间"},
+      {"key": "D", "text": "两项都保持内容宽度不变"}
+    ],
+    "answer": "A",
+    "explanation": "flex 简写的三个值依次是放大系数、收缩系数和基准尺寸；写 1 1 0 的项放大系数为一、基准为零，会吃掉全部剩余空间；写 0 0 200px 的项既不放大也不缩小，固定为 200 像素。后者没有放大系数所以不会增长；两项并不等分；前者基准为零，不会保持内容宽度。"
+  },
+  {
+    "direction": "前端",
+    "sub_direction": "html",
+    "language": "",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "nice_to_know",
+    "stem": "一个表单里有多个 type=submit 按钮，其中一个按钮设置了 formaction 指向另一接口。点击这个按钮时会发生什么？",
+    "options": [
+      {"key": "A", "text": "表单提交到该按钮 formaction 指定的地址"},
+      {"key": "B", "text": "表单提交到 form 标签的 action，formaction 被忽略"},
+      {"key": "C", "text": "不会提交，只会触发 click 事件"},
+      {"key": "D", "text": "浏览器会报错并阻止默认行为"}
+    ],
+    "answer": "A",
+    "explanation": "HTML5 的 formaction 属性允许单个提交按钮覆盖表单的 action，点击时表单会提交到按钮指定的地址。其他未设置的按钮仍走表单 action；该属性不会让按钮失去提交能力；这是合法属性，不会报错或阻止默认行为。"
+  },
+  {
+    "direction": "前端",
+    "sub_direction": "通用前端",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "在浏览器地址栏输入一个域名直到页面显示，期间把主机名转换成 IP 地址这一环节主要依赖哪个系统？",
+    "options": [
+      {"key": "A", "text": "DNS"},
+      {"key": "B", "text": "CDN"},
+      {"key": "C", "text": "WebSocket"},
+      {"key": "D", "text": "Service Worker"}
+    ],
+    "answer": "A",
+    "explanation": "域名解析由域名系统完成，它把主机名映射到 IP 地址，是导航过程中的关键一步。内容分发网络负责就近分发静态资源，不参与域名到地址的解析；WebSocket 是应用层全双工通信协议；服务工作线程是浏览器里的脚本代理，用于缓存与离线，均不承担域名解析。"
+  },
+  {
+    "direction": "前端",
+    "sub_direction": "通用前端",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "stem": "开发者希望用户关闭浏览器标签后登录态失效，重新打开标签必须重新登录。选用哪种存储最贴合这一需求？",
+    "options": [
+      {"key": "A", "text": "sessionStorage"},
+      {"key": "B", "text": "localStorage"},
+      {"key": "C", "text": "IndexedDB"},
+      {"key": "D", "text": "设置长期有效期的 Cookie"}
+    ],
+    "answer": "A",
+    "explanation": "会话存储的生命周期绑定标签会话，关闭标签即被清除，符合关闭后失效的需求。本地存储与长期有效的 Cookie 都会持久保留，关闭标签后仍然存在；索引数据库同样是持久存储，不会因关闭标签自动清空。"
+  },
+  {
+    "direction": "前端",
+    "sub_direction": "js",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "一段前端代码需要在页面关闭前尽量保证统计数据上报成功。以下哪些做法能提高上报成功率？",
+    "options": [
+      {"key": "A", "text": "在 pagehide 事件里用 sendBeacon 发送数据"},
+      {"key": "B", "text": "用同步 XMLHttpRequest 在 unload 中发送"},
+      {"key": "C", "text": "在 visibilitychange 变为 hidden 时尽早发送"},
+      {"key": "D", "text": "依赖 unload 里的普通 fetch 且不等它完成"}
+    ],
+    "answer": "A,C",
+    "explanation": "信标接口专为页面卸载时的上报设计，浏览器会在后台可靠发送；页面可见性变为隐藏时页面仍存活，此时发送成功率更高。同步请求已被废弃且会阻塞卸载体验；卸载事件中的普通异步请求在页面关闭后常被取消，无法保证送达。"
+  },
+  {
+    "direction": "前端",
+    "sub_direction": "react",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "一个页面接入了第三方埋点，发现开发环境里某个 effect 执行两次、埋点重复。关于这一现象及处理，下列说法正确的有哪些？",
+    "options": [
+      {"key": "A", "text": "这是严格模式在开发环境有意重复挂载效应以暴露副作用问题"},
+      {"key": "B", "text": "应当让 effect 的清理函数撤销订阅或定时器以保证幂等"},
+      {"key": "C", "text": "生产构建中严格模式不会导致 effect 执行两次"},
+      {"key": "D", "text": "直接在 effect 里加一个模块级布尔变量跳过第二次即可根治"}
+    ],
+    "answer": "A,B,C",
+    "explanation": "严格模式在开发模式故意重复挂载与清理，帮助发现缺少清理的副作用；正确应对是让清理函数撤销订阅或定时器，使重复执行保持幂等；生产构建不会触发这种双调用。用模块级布尔开关跳过第二次只是掩盖问题，还会破坏真正的重新挂载语义，不是可靠修复。"
+  },
+  {
+    "direction": "前端",
+    "sub_direction": "css",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "移动端页面想避免点击输入框时布局被软键盘顶起而跳动。以下哪些视口与字号相关做法合理？",
+    "options": [
+      {"key": "A", "text": "使用 dvh 等动态视口单位替代固定的 vh"},
+      {"key": "B", "text": "给输入框设置足够字号避免 iOS 自动缩放"},
+      {"key": "C", "text": "依赖 body 的 height:100% 固定内容高度"},
+      {"key": "D", "text": "使用 visualViewport 监听视口变化再调整布局"}
+    ],
+    "answer": "A,B,D",
+    "explanation": "动态视口单位会随可视区域变化更新，能缓解键盘弹出时的布局跳动；把输入框字号设到足够大可避免苹果系统聚焦时的自动放大；可视视口接口提供变化事件，可用于精细适配。固定页面高度无法感知键盘弹出的空间占用，反而在键盘出现时造成遮挡或错位。"
+  },
+  {
+    "direction": "前端",
+    "sub_direction": "ts",
+    "language": "",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "TypeScript 中的 interface 声明在编译后会产生对应的 JavaScript 运行时代码。",
+    "options": [
+      {"key": "A", "text": "正确"},
+      {"key": "B", "text": "错误"}
+    ],
+    "answer": "错误",
+    "explanation": "接口只存在于类型层面，编译为 JavaScript 时会被完全擦除，不会生成任何运行时代码。会在运行时留下产物的是类、枚举或带初始值的声明等；把接口当成运行时对象使用会在编译期被类型检查拦下。"
+  },
+  {
+    "direction": "前端",
+    "sub_direction": "vue3",
+    "language": "",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "在 Vue3 的 setup 中，用 ref 声明的对象被直接解构后，解构出来的变量仍然保持响应式。",
+    "options": [
+      {"key": "A", "text": "正确"},
+      {"key": "B", "text": "错误"}
+    ],
+    "answer": "错误",
+    "explanation": "直接解构引用会得到它的当前值，丢失响应式连接，后续修改不再触发视图更新。要保持响应式应使用 toRefs 把引用包装成属性引用后再解构，或始终通过原对象访问属性。因此题目说法不成立。"
+  },
+  {
+    "direction": "后端",
+    "sub_direction": "python",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "某服务用 lru_cache 缓存一个纯函数结果，压测发现命中率很低。排查发现每次传入的参数都是新建的 dict。最可能的原因是？",
+    "options": [
+      {"key": "A", "text": "字典不可哈希，无法作为缓存键，导致缓存实际不生效"},
+      {"key": "B", "text": "lru_cache 默认只缓存一个结果"},
+      {"key": "C", "text": "纯函数不能用 lru_cache 装饰"},
+      {"key": "D", "text": "字典参数总是被转成字符串后再存储"}
+    ],
+    "answer": "A",
+    "explanation": "缓存以参数作为键，要求参数可哈希；字典是可变对象、不可哈希，传入时会直接抛出类型错误或无法命中，因此命中率极低。该装饰器默认容量为一百多个而非一个；纯函数正因为无副作用才适合缓存；参数不会被自动转成字符串。"
+  },
+  {
+    "direction": "后端",
+    "sub_direction": "python",
+    "language": "",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "nice_to_know",
+    "stem": "一段 Python 代码用 list 作栈，反复对末尾元素执行 append 与 pop。这两种操作的平均时间复杂度分别是？",
+    "options": [
+      {"key": "A", "text": "O(1) 与 O(1)"},
+      {"key": "B", "text": "O(1) 与 O(n)"},
+      {"key": "C", "text": "O(n) 与 O(1)"},
+      {"key": "D", "text": "O(n) 与 O(n)"}
+    ],
+    "answer": "A",
+    "explanation": "列表在尾部追加与弹出都只涉及末端操作，均摊后都是常数时间，因此二者都是 O(1)。只有对列表头部做插入或删除才需要搬移大量元素、退化为线性时间；尾部操作并不具备这种开销。"
+  },
+  {
+    "direction": "后端",
+    "sub_direction": "java",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "一个 Java 服务用 HashMap 作本地缓存，key 是自定义类且没有重写 hashCode 和 equals。运行一段时间后发现逻辑上相同的键取不到值。根因是？",
+    "options": [
+      {"key": "A", "text": "默认用对象地址计算哈希并判等，逻辑相等的不同对象被当成不同键"},
+      {"key": "B", "text": "HashMap 的键必须是 String 类型"},
+      {"key": "C", "text": "HashMap 不允许自定义类作为键"},
+      {"key": "D", "text": "值对象被垃圾回收导致查不到"}
+    ],
+    "answer": "A",
+    "explanation": "未重写时对象的方法基于身份计算哈希与判等，逻辑相等的两个实例会得到不同哈希与不等判断，因此用另一个等价对象取不到缓存值。哈希映射的键可以是任意引用类型；自定义类完全可以做键，只要正确重写这两个方法；容器强引用键，不会因回收丢失。"
+  },
+  {
+    "direction": "后端",
+    "sub_direction": "java",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "一段 Java 并发代码用 volatile 修饰计数器并执行自增操作，多线程下结果仍小于预期。原因是？",
+    "options": [
+      {"key": "A", "text": "volatile 只保证可见性，不保证复合操作的原子性"},
+      {"key": "B", "text": "volatile 会让编译器把变量放进寄存器"},
+      {"key": "C", "text": "volatile 禁止了线程切换导致死锁"},
+      {"key": "D", "text": "volatile 变量不能参与算术运算"}
+    ],
+    "answer": "A",
+    "explanation": "volatile 保证修改对其他线程立即可见并禁止特定重排序，但自增是读取、修改、写回三步的复合操作，多个线程交错执行仍会丢失更新，因此结果偏小。它不会把变量锁进寄存器，也不会禁止线程切换；变量可以参与运算，只是不具原子性，需要原子类或锁来保证。"
+  },
+  {
+    "direction": "后端",
+    "sub_direction": "go",
+    "language": "",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "Go 程序中一个 goroutine 通过无缓冲 channel 发送数据，但没有任何接收者。该 goroutine 的状态是？",
+    "options": [
+      {"key": "A", "text": "阻塞在发送语句上，直到有接收者出现"},
+      {"key": "B", "text": "立即返回错误并退出"},
+      {"key": "C", "text": "数据被丢弃，goroutine 继续运行"},
+      {"key": "D", "text": "自动切换到带缓冲模式并缓存数据"}
+    ],
+    "answer": "A",
+    "explanation": "无缓冲通道要求发送与接收同时就绪，没有接收者时发送操作会一直阻塞，直到有协程从该通道接收。它不会返回错误或丢弃数据，也不会自动变成带缓冲通道；只有向已关闭的通道发送才会触发运行时异常。"
+  },
+  {
+    "direction": "后端",
+    "sub_direction": "go",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "一段 Go 代码对 nil 接口变量调用方法会崩溃，但把值为 nil 的指针赋给接口后调用同一方法却不崩溃。最合理的解释是？",
+    "options": [
+      {"key": "A", "text": "接口的动态类型与动态值都为空时才为 nil，含 nil 指针的接口非空"},
+      {"key": "B", "text": "Go 的方法调用会自动跳过空指针"},
+      {"key": "C", "text": "nil 接口与含 nil 值的接口在底层完全相同"},
+      {"key": "D", "text": "编译器为指针接收者方法做了特殊空值保护"}
+    ],
+    "answer": "A",
+    "explanation": "接口由动态类型与动态值两部分构成，只有两者都为空时接口才等于 nil；把类型化的空指针赋给接口后，接口带上了动态类型、不再为 nil，方法调用能进入方法体，只是方法内解引用时仍可能出错。语言不会自动跳过空指针或为方法加空值保护，两者底层也并不相同。"
+  },
+  {
+    "direction": "后端",
+    "sub_direction": "通用后端",
+    "language": "",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "一个 HTTP 服务收到请求后返回状态码 429。这通常表示什么？",
+    "options": [
+      {"key": "A", "text": "请求过多，客户端被限流"},
+      {"key": "B", "text": "请求的资源不存在"},
+      {"key": "C", "text": "服务端内部错误"},
+      {"key": "D", "text": "请求需要鉴权"}
+    ],
+    "answer": "A",
+    "explanation": "429 表示请求过多，用于限流场景，告诉客户端在一段时间后重试。资源不存在对应 404；服务端内部错误对应 500；需要鉴权通常返回 401 或 403。把限流误判为鉴权或内部错误会导致客户端重试策略错误。"
+  },
+  {
+    "direction": "后端",
+    "sub_direction": "通用后端",
+    "language": "",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "一个接口用请求体整体替换目标资源，多次发送同一请求后资源最终状态完全一致。这最符合哪个 HTTP 方法的语义？",
+    "options": [
+      {"key": "A", "text": "PUT"},
+      {"key": "B", "text": "POST"},
+      {"key": "C", "text": "PATCH"},
+      {"key": "D", "text": "GET"}
+    ],
+    "answer": "A",
+    "explanation": "PUT 表示用请求体替换目标资源的完整表示，重复执行结果幂等，符合题干描述。POST 通常用于新建资源，多次执行可能产生多个副本；PATCH 是对资源的局部修改；GET 用于读取，不会改变资源状态。"
+  },
+  {
+    "direction": "后端",
+    "sub_direction": "python",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "一个 Python 服务处理并发请求时需要共享一份配置，以下哪些做法能避免数据竞争或意外修改？",
+    "options": [
+      {"key": "A", "text": "用线程锁保护对共享配置的写操作"},
+      {"key": "B", "text": "用只读映射代理生成只读视图"},
+      {"key": "C", "text": "在每个线程里各自持有一份配置副本"},
+      {"key": "D", "text": "直接把全局字典暴露出去，靠约定不改"}
+    ],
+    "answer": "A,B,C",
+    "explanation": "加锁能串行化写操作避免竞争；只读代理提供不可修改的映射视图，能阻止外部写入；每个线程持有独立副本则从根源上消除共享。仅靠约定不修改全局字典没有强制力，在并发下极易被意外写入，不能作为可靠手段。"
+  },
+  {
+    "direction": "后端",
+    "sub_direction": "go",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "一个 Go 服务出现 goroutine 泄漏，排查方向正确的有哪些？",
+    "options": [
+      {"key": "A", "text": "检查是否有协程阻塞在无接收者的通道发送上"},
+      {"key": "B", "text": "检查 context 取消信号是否在所有路径都被监听"},
+      {"key": "C", "text": "检查读取通道时是否缺少关闭或退出条件"},
+      {"key": "D", "text": "检查是否有协程因尚未启动而占用内存"}
+    ],
+    "answer": "A,B,C",
+    "explanation": "协程泄漏通常源于永久阻塞：向无接收者的通道发送、未响应上下文取消、或等待一个永不关闭且无退出条件的通道读取，都会让协程无法退出。尚未启动的协程并不存在运行实体，不会造成泄漏，排查它方向错误。"
+  },
+  {
+    "direction": "后端",
+    "sub_direction": "java",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "一个 Java 服务频繁触发 Full GC。下列哪些原因需要优先排查？",
+    "options": [
+      {"key": "A", "text": "大对象持续进入老年代且长期被引用"},
+      {"key": "B", "text": "静态集合不断加入对象却从不清理"},
+      {"key": "C", "text": "频繁创建短生命周期的局部对象"},
+      {"key": "D", "text": "堆内存设置过小且存活对象偏多"}
+    ],
+    "answer": "A,B,D",
+    "explanation": "大对象直接进入老年代、静态集合持续持有引用、以及堆过小导致存活对象挤满老年代，都会促使整堆回收频繁发生。频繁创建短生命周期局部对象属于新生代回收的常态，通常由 Minor GC 处理，未必引发整堆回收，优先排查它偏离重点。"
+  },
+  {
+    "direction": "后端",
+    "sub_direction": "python",
+    "language": "",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "Python 中，生成器表达式比等价的列表推导式更节省内存，因为它按需生成元素。",
+    "options": [
+      {"key": "A", "text": "正确"},
+      {"key": "B", "text": "错误"}
+    ],
+    "answer": "正确",
+    "explanation": "生成器表达式不会一次性构造完整列表，而是在迭代时逐个产出元素，因此内存占用更低，适合处理大数据流。列表推导式会立即在内存中生成全部元素。因此题目说法成立，但需注意生成器只能遍历一次。"
+  },
+  {
+    "direction": "后端",
+    "sub_direction": "go",
+    "language": "",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "Go 语言中切片是引用类型，把它传给函数后，函数内修改其元素会影响原切片。",
+    "options": [
+      {"key": "A", "text": "正确"},
+      {"key": "B", "text": "错误"}
+    ],
+    "answer": "正确",
+    "explanation": "切片底层指向一个数组，形参拿到的是切片的副本，但副本与原切片共享底层数组，因此修改元素会反映到原切片。不过若在函数内追加导致扩容，新数组不再共享，此时修改不会影响原切片，这是关键区别。"
+  },
+  {
+    "direction": "算法与数据结构",
+    "sub_direction": "动态规划",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "一段楼梯共十级，每次可上一级或两级。用动态规划求方案数时，状态 dp[i] 表示走到第 i 级的方案数，其转移方程应是？",
+    "options": [
+      {"key": "A", "text": "dp[i] = dp[i-1] + dp[i-2]"},
+      {"key": "B", "text": "dp[i] = dp[i-1] * dp[i-2]"},
+      {"key": "C", "text": "dp[i] = dp[i-1] + 1"},
+      {"key": "D", "text": "dp[i] = max(dp[i-1], dp[i-2])"}
+    ],
+    "answer": "A",
+    "explanation": "走到第 i 级的最后一步只能来自第 i-1 级再跨一级或第 i-2 级再跨两级，两类方案互不重叠，故相加。相乘会夸大组合数；每步固定加一是错误地把新增方案当成常数；取最大只会保留单一路径，丢失了所有方案。"
+  },
+  {
+    "direction": "算法与数据结构",
+    "sub_direction": "二叉树与递归",
+    "language": "",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "对一棵二叉搜索树做中序遍历，得到的序列具有什么性质？",
+    "options": [
+      {"key": "A", "text": "严格递增的有序序列"},
+      {"key": "B", "text": "按层从左到右的序列"},
+      {"key": "C", "text": "根结点值总在序列中间"},
+      {"key": "D", "text": "先访问右子树再访问左子树"}
+    ],
+    "answer": "A",
+    "explanation": "二叉搜索树满足左子树所有结点小于根、右子树大于根，中序遍历按左、根、右的顺序访问，恰好得到递增有序序列。层序遍历才是按层从左到右；根的位置取决于树形不一定在中间；中序是先左后右而非先右后左。"
+  },
+  {
+    "direction": "算法与数据结构",
+    "sub_direction": "链表",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "用快慢指针判断单链表是否有环时，慢指针每次走一步、快指针每次走两步。若链表有环，两指针最终会怎样？",
+    "options": [
+      {"key": "A", "text": "在某个结点相遇"},
+      {"key": "B", "text": "快指针先到达表尾的空指针"},
+      {"key": "C", "text": "两指针永远不会相遇"},
+      {"key": "D", "text": "慢指针会追上快指针并超出环"}
+    ],
+    "answer": "A",
+    "explanation": "有环时快指针会在环内绕行并从后方追上慢指针，二者必然在环内某结点相遇，这是快慢指针判环法的原理。有环意味着不存在表尾空指针，快指针不会到达末尾；两指针的速度差保证终会相遇；相遇发生在慢指针入环之后，不存在慢指针反超快指针。"
+  },
+  {
+    "direction": "算法与数据结构",
+    "sub_direction": "排序",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "对一组基本有序、仅少数元素位置错乱的数据排序，哪种算法最能利用这一特点达到接近线性的时间？",
+    "options": [
+      {"key": "A", "text": "插入排序"},
+      {"key": "B", "text": "堆排序"},
+      {"key": "C", "text": "选择排序"},
+      {"key": "D", "text": "归并排序"}
+    ],
+    "answer": "A",
+    "explanation": "插入排序在基本有序的数据上，每个元素只需与前驱做少量比较即可归位，最好情况接近线性，非常适合此类场景。堆排序与归并排序的时间与初始顺序无关，稳定在对数线性级；选择排序无论是否有序都要平方级比较，无法利用有序性。"
+  },
+  {
+    "direction": "算法与数据结构",
+    "sub_direction": "图",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "要在一个带权有向图中求单源最短路径，图中存在负权边但无负权环，应优先选用哪种算法？",
+    "options": [
+      {"key": "A", "text": "Bellman-Ford 算法"},
+      {"key": "B", "text": "Dijkstra 算法"},
+      {"key": "C", "text": "拓扑排序"},
+      {"key": "D", "text": "Kruskal 算法"}
+    ],
+    "answer": "A",
+    "explanation": "该算法能处理负权边，通过多轮松弛求最短路，还能检测负权环。另一个算法依赖非负权，遇到负权边结果可能错误；拓扑排序用于有向无环图的依赖顺序，不直接求带权最短路；最小生成树算法解决的是无向连通图问题。"
+  },
+  {
+    "direction": "算法与数据结构",
+    "sub_direction": "复杂度",
+    "language": "",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "一个算法外层循环从 1 到 n，内层循环每次从 1 到 i。其时间复杂度是？",
+    "options": [
+      {"key": "A", "text": "O(n²)"},
+      {"key": "B", "text": "O(n)"},
+      {"key": "C", "text": "O(n log n)"},
+      {"key": "D", "text": "O(log n)"}
+    ],
+    "answer": "A",
+    "explanation": "内层执行次数随 i 线性增长，总次数约为 1+2+…+n，即 n(n+1)/2，属于平方量级，故为 O(n²)。它不是线性或对数级；虽然次数是三角数，但与对数线性级不同，后者出现在每次对半缩减的场景中。"
+  },
+  {
+    "direction": "算法与数据结构",
+    "sub_direction": "哈希",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "一个哈希表采用链地址法解决冲突，装载因子持续升高。在不扩容的前提下，最直接的后果是？",
+    "options": [
+      {"key": "A", "text": "每条链的期望长度变长，查找退化"},
+      {"key": "B", "text": "哈希函数会自动失效"},
+      {"key": "C", "text": "冲突不再发生"},
+      {"key": "D", "text": "键会被强制转成整数"}
+    ],
+    "answer": "A",
+    "explanation": "装载因子是元素数与桶数之比，升高意味着平均每个桶挂载更多元素，链变长使查找需要更多次比较，性能下降。哈希函数不会因装载因子升高而失效；冲突只会增多不会消失；链地址法不会把键转成整数。"
+  },
+  {
+    "direction": "算法与数据结构",
+    "sub_direction": "通用算法",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "需要在海量数据流中快速判断某元素是否出现过，允许极小误判率但要求空间极省。最合适的数据结构是？",
+    "options": [
+      {"key": "A", "text": "布隆过滤器"},
+      {"key": "B", "text": "平衡二叉搜索树"},
+      {"key": "C", "text": "双向链表"},
+      {"key": "D", "text": "二叉堆"}
+    ],
+    "answer": "A",
+    "explanation": "布隆过滤器用位数组与多个哈希函数紧凑表示集合，空间效率极高，代价是存在假阳性但无假阴性，非常适合海量数据的存在性初筛。平衡树与链表都要存储实际元素，空间随数据量线性增长；堆用于维护最值，不用于集合归属判断。"
+  },
+  {
+    "direction": "算法与数据结构",
+    "sub_direction": "动态规划",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "关于动态规划与贪心算法的关系，下列哪些说法是对的？",
+    "options": [
+      {"key": "A", "text": "动态规划通过保存子问题结果避免重复计算"},
+      {"key": "B", "text": "贪心在每一步做局部最优选择，未必得到全局最优"},
+      {"key": "C", "text": "能用贪心解决的问题通常也可用动态规划求解"},
+      {"key": "D", "text": "动态规划一定比贪心时间更快"}
+    ],
+    "answer": "A,B,C",
+    "explanation": "动态规划用状态表缓存重叠子问题的解；贪心只做当前最优选择，缺少回退因此在部分问题上次优；贪心适用的问题往往也满足最优子结构，可用动态规划求解。但动态规划需要枚举状态，通常不比贪心更快，认为它一定更快是错误的。"
+  },
+  {
+    "direction": "算法与数据结构",
+    "sub_direction": "二叉树与递归",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "判断两棵二叉树是否互为镜像时，下列哪些做法可行？",
+    "options": [
+      {"key": "A", "text": "递归比较左子树与对方的右子树、右子树与对方的左子树"},
+      {"key": "B", "text": "把其中一棵树做镜像翻转后再比较两树是否相同"},
+      {"key": "C", "text": "只比较两棵树的根结点值是否相等"},
+      {"key": "D", "text": "层序遍历后逐层比较结点值序列是否相等"}
+    ],
+    "answer": "A,B",
+    "explanation": "镜像的递归定义正是左右对称交换后相等；先把一棵树翻转再判断结构是否完全相同也是等价做法。只比较根结点完全忽略子树结构；层序序列相等只能说明形状与值的层序一致，无法保证左右镜像关系，结构不同的树也可能有相同层序值。"
+  },
+  {
+    "direction": "算法与数据结构",
+    "sub_direction": "排序",
+    "language": "",
+    "kind": "judge",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "快速排序在最坏情况下的时间复杂度会退化为平方级。",
+    "options": [
+      {"key": "A", "text": "正确"},
+      {"key": "B", "text": "错误"}
+    ],
+    "answer": "正确",
+    "explanation": "当每次划分都极不平衡，例如对已排序数组总选首元素为基准时，递归深度达到 n，每层比较量线性，总复杂度退化为平方级。通过随机化选择基准或三数取中可大幅降低退化概率，但最坏情况理论上依然存在。"
+  },
+  {
+    "direction": "算法与数据结构",
+    "sub_direction": "复杂度",
+    "language": "",
+    "kind": "judge",
+    "difficulty": "basic",
+    "essentiality": "nice_to_know",
+    "stem": "时间复杂度为 O(log n) 的算法，其运行时间一定比 O(n) 的算法更短。",
+    "options": [
+      {"key": "A", "text": "正确"},
+      {"key": "B", "text": "错误"}
+    ],
+    "answer": "错误",
+    "explanation": "大 O 描述的是输入规模趋于无穷时的增长趋势，不涉及常数系数与具体输入规模。在小规模数据上，常数很大的对数级算法完全可能比线性级更慢；只有当规模足够大时渐进优势才体现。因此不能断言对数算法总是更快。"
+  },
+  {
+    "direction": "计算机基础",
+    "sub_direction": "操作系统",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "一个进程持有文件描述符却始终不关闭，长时间运行后新连接频繁失败。最可能的系统级原因是？",
+    "options": [
+      {"key": "A", "text": "进程耗尽了可打开的文件描述符上限"},
+      {"key": "B", "text": "内存被完全占满导致无法分配"},
+      {"key": "C", "text": "CPU 时间片被耗尽"},
+      {"key": "D", "text": "磁盘空间不足"}
+    ],
+    "answer": "A",
+    "explanation": "每个进程有可打开文件的数量上限，套接字也占用描述符，泄漏会导致达到上限后无法再打开新连接或文件。内存耗尽、时间片与磁盘空间不足虽也会引发问题，但都表现为不同症状，不会特异性地让新建连接因句柄不足而失败。"
+  },
+  {
+    "direction": "计算机基础",
+    "sub_direction": "操作系统",
+    "language": "",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "进程与线程的核心区别之一是资源拥有方式。下列关于线程的说法正确的是？",
+    "options": [
+      {"key": "A", "text": "同一进程内的线程共享地址空间与全局变量"},
+      {"key": "B", "text": "每个线程都有独立的地址空间"},
+      {"key": "C", "text": "线程是资源分配的基本单位"},
+      {"key": "D", "text": "线程之间通信必须经过内核网络栈"}
+    ],
+    "answer": "A",
+    "explanation": "同一进程的线程共享虚拟地址空间、全局变量与打开的文件等资源，仅各自拥有独立的栈、寄存器与线程局部存储。独立地址空间是进程的特征；资源分配的基本单位是进程，线程是处理器调度的基本单位；线程间通信可直接通过共享内存完成，无需经过网络栈。"
+  },
+  {
+    "direction": "计算机基础",
+    "sub_direction": "网络",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "客户端与服务器完成 TCP 三次握手后开始传输数据。第三次握手的作用是？",
+    "options": [
+      {"key": "A", "text": "客户端确认已收到服务端的 SYN+ACK，双方就绪"},
+      {"key": "B", "text": "服务端首次向客户端发送同步序号"},
+      {"key": "C", "text": "客户端第一次发送连接请求"},
+      {"key": "D", "text": "双方协商拥塞窗口大小"}
+    ],
+    "answer": "A",
+    "explanation": "三次握手流程是客户端发同步、服务端回同步加确认、客户端再发确认。第三次由客户端发出，用来确认收到服务端的同步与确认，使双方都确认收发正常。首次同步由客户端在第一步发出；服务端的回应发生在第二步；拥塞窗口是传输阶段通过拥塞控制动态决定的，不在握手时固定协商。"
+  },
+  {
+    "direction": "计算机基础",
+    "sub_direction": "网络",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "一个 HTTPS 站点在 TLS 握手阶段报错。排查发现客户端不信任服务器证书链中的中间证书。这会直接影响什么？",
+    "options": [
+      {"key": "A", "text": "证书验证无法通过，握手失败"},
+      {"key": "B", "text": "加密套件立即失效，改用明文传输"},
+      {"key": "C", "text": "TCP 连接无法建立"},
+      {"key": "D", "text": "DNS 解析被劫持"}
+    ],
+    "answer": "A",
+    "explanation": "握手时客户端要验证服务器证书链直至受信任的根证书，缺少可信任的中间证书会导致链条断裂、验证失败，握手随之中断。它不会悄悄退回明文，安全协议不会因证书问题降级为不加密；传输控制连接在此之前已建立成功，不受影响；这与域名解析无关。"
+  },
+  {
+    "direction": "计算机基础",
+    "sub_direction": "组成原理",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "CPU 访问数据时先从高速缓存查找。相比主存，高速缓存的特点是？",
+    "options": [
+      {"key": "A", "text": "容量更小但访问速度更快"},
+      {"key": "B", "text": "容量更大且速度更快"},
+      {"key": "C", "text": "断电后仍能保存数据"},
+      {"key": "D", "text": "由操作系统直接按字节管理"}
+    ],
+    "answer": "A",
+    "explanation": "高速缓存用更快的静态存储制成，容量小、延迟低，用于缓解处理器与主存的速度差距；主存容量大但相对慢。缓存通常是易失的，断电丢失内容；对程序员与操作系统而言缓存由硬件自动管理，并非按字节直接操控。"
+  },
+  {
+    "direction": "计算机基础",
+    "sub_direction": "组成原理",
+    "language": "",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "nice_to_know",
+    "stem": "一台 64 位计算机中的『64 位』通常主要指什么？",
+    "options": [
+      {"key": "A", "text": "CPU 一次能处理的字长与通用寄存器宽度"},
+      {"key": "B", "text": "内存容量为 64 GB"},
+      {"key": "C", "text": "操作系统版本号为 64"},
+      {"key": "D", "text": "地址总线一定恰好有 64 根"}
+    ],
+    "answer": "A",
+    "explanation": "常说的 64 位主要指处理器的机器字长与通用寄存器宽度，决定一次整数运算能处理的位数和指针宽度。它不表示内存一定是 64GB，也不代表系统版本号；虽然 64 位系统常配 64 位地址总线，但物理实现可能少于 64 根，因此不能作为绝对定义。"
+  },
+  {
+    "direction": "计算机基础",
+    "sub_direction": "通用基础",
+    "language": "",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "在类 Unix 系统中，一个程序收到 SIGTERM 信号后未被捕获，默认行为是？",
+    "options": [
+      {"key": "A", "text": "进程被终止退出"},
+      {"key": "B", "text": "进程被暂停"},
+      {"key": "C", "text": "进程忽略该信号继续运行"},
+      {"key": "D", "text": "进程产生核心转储"}
+    ],
+    "answer": "A",
+    "explanation": "该信号是请求进程正常终止的通知，默认动作为终止进程，程序可捕获它做优雅退出。暂停进程是另一个停止类信号的职责；该信号默认不被忽略，除非程序显式设置；产生核心转储的是退出或中止类信号，不是它。"
+  },
+  {
+    "direction": "计算机基础",
+    "sub_direction": "组成原理",
+    "language": "",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "计算机采用补码表示有符号整数，一个直接好处是？",
+    "options": [
+      {"key": "A", "text": "加减法可以统一用加法电路完成"},
+      {"key": "B", "text": "每个整数编码唯一且正负数完全对称"},
+      {"key": "C", "text": "能表示的数值范围比原码大一倍"},
+      {"key": "D", "text": "不再需要符号位"}
+    ],
+    "answer": "A",
+    "explanation": "补码中减去一个数等价于加上它的相反数补码，因此加减法可共用加法器，简化硬件。补码中零的表示唯一，但正数与负数并非完全对称，负数一侧多一个值；表示范围与原码并非简单大一倍；补码仍需要符号位，只是符号位参与运算。"
+  },
+  {
+    "direction": "计算机基础",
+    "sub_direction": "网络",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "排查线上接口偶发超时，从网络层面考虑，下列哪些因素可能导致？",
+    "options": [
+      {"key": "A", "text": "中间链路丢包触发重传"},
+      {"key": "B", "text": "DNS 解析耗时过长"},
+      {"key": "C", "text": "连接池耗尽导致请求排队等待"},
+      {"key": "D", "text": "服务器返回 200 且响应体很小"}
+    ],
+    "answer": "A,B,C",
+    "explanation": "链路丢包会触发重传、拉长往返时间；域名解析慢会在建立连接前就消耗大量时间；连接池耗尽使请求排队等待可用连接，均会造成超时。服务端快速返回小体积的成功响应属于健康表现，不会引发超时。"
+  },
+  {
+    "direction": "计算机基础",
+    "sub_direction": "操作系统",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "关于进程间通信方式，下列哪些说法是对的？",
+    "options": [
+      {"key": "A", "text": "管道分为匿名与命名两种，前者常用于父子进程"},
+      {"key": "B", "text": "共享内存通信效率高，但需自行处理同步"},
+      {"key": "C", "text": "信号量主要用于进程间的同步与互斥"},
+      {"key": "D", "text": "套接字只能用于同一台主机内的进程通信"}
+    ],
+    "answer": "A,B,C",
+    "explanation": "匿名管道依托进程创建在亲缘进程间传递数据，命名管道则可用于无亲缘进程；共享内存省去内核拷贝、效率高，但需要额外同步机制避免竞态；信号量是经典的同步互斥工具。套接字同样支持跨网络通信，说它只能用于本机进程是错误的。"
+  },
+  {
+    "direction": "计算机基础",
+    "sub_direction": "网络",
+    "language": "",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "HTTP 协议是无状态的，每次请求之间默认不保留客户端身份信息。",
+    "options": [
+      {"key": "A", "text": "正确"},
+      {"key": "B", "text": "错误"}
+    ],
+    "answer": "正确",
+    "explanation": "协议本身不对请求间的关系做记录，每个请求独立处理，因此称为无状态。Cookie、会话与令牌等机制是在应用层之上附加的状态保持手段，用来在多个请求间识别用户，并不改变协议无状态的本质。"
+  },
+  {
+    "direction": "计算机基础",
+    "sub_direction": "操作系统",
+    "language": "",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "死锁发生的四个必要条件中，只要破坏其中任意一个，就能防止死锁发生。",
+    "options": [
+      {"key": "A", "text": "正确"},
+      {"key": "B", "text": "错误"}
+    ],
+    "answer": "正确",
+    "explanation": "死锁需要互斥、占有并等待、不可剥夺与循环等待四个条件同时成立，只要设法破坏任一条件，例如按固定顺序申请资源以打破循环等待，即可预防死锁。这是死锁预防策略的基本依据。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "一个企业知识库问答上线后，回答经常张冠李戴：把甲产品的参数安到乙产品上。检索召回的片段本身都相关。最值得优先改进的是？",
+    "options": [
+      {"key": "A", "text": "在检索与生成时都带上产品标识做过滤或元数据约束"},
+      {"key": "B", "text": "把温度调高以增加答案多样性"},
+      {"key": "C", "text": "去掉重排序步骤让更多片段进入上下文"},
+      {"key": "D", "text": "缩短系统提示词以节省 token"}
+    ],
+    "answer": "A",
+    "explanation": "片段都相关却串台，说明上下文里混入了别的产品信息，应在检索阶段按产品标识过滤并在提示中要求依据对应产品作答。调高温度会增加随机性、更容易编造；去掉重排序会引入更多噪声片段；缩短提示词与区分产品无关。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "一份技术手册按章节切块入库，用户问某个具体步骤时总能召回章节开头却答不出细节。最可能的切块问题是？",
+    "options": [
+      {"key": "A", "text": "切块过小或过于机械，导致步骤与上下文被切断、语义不完整"},
+      {"key": "B", "text": "使用了向量检索而非关键词检索"},
+      {"key": "C", "text": "嵌入模型输出的向量维度太高"},
+      {"key": "D", "text": "检索结果数量设置得过多"}
+    ],
+    "answer": "A",
+    "explanation": "按固定长度机械切块会把一个完整操作步骤拆散，召回的片段只剩标题或开头，缺少答案所需的上下文。改用语义切块或适度重叠可缓解。向量检索本身是合理选择；维度高不等于召回差；结果过多反而带来噪声，但不是答不出细节的根因。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "一个客服 Agent 需要调用订单查询工具，但模型经常在用户没提供订单号时就发起调用，引发大量无效请求。最有效的约束是？",
+    "options": [
+      {"key": "A", "text": "把订单号设为工具必填参数，并在提示中要求信息齐全后才调用"},
+      {"key": "B", "text": "把工具描述写得简短以节省上下文"},
+      {"key": "C", "text": "允许 Agent 任意重试直到拿到结果"},
+      {"key": "D", "text": "关闭工具调用，只让模型凭记忆回答"}
+    ],
+    "answer": "A",
+    "explanation": "把关键参数设为必填并在提示中明确调用前提，能让模型在缺参时先追问用户，从源头减少无效调用。缩短工具描述会丢失使用条件；无限制重试会放大无效请求；关闭工具调用则让应用无法获取实时订单数据，背离需求。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "一个多步 Agent 任务中，模型在前几步执行正确，但步数增多后开始重复已完成的动作、原地打转。最稳妥的改进方向是？",
+    "options": [
+      {"key": "A", "text": "维护已执行动作的短期记忆与状态，并显式传入进度与停止条件"},
+      {"key": "B", "text": "无限增大最大步数上限"},
+      {"key": "C", "text": "每一步都重新从头读取系统提示而不带历史"},
+      {"key": "D", "text": "把温度设为零以保证每步一致"}
+    ],
+    "answer": "A",
+    "explanation": "让 Agent 携带动作历史与当前进度、明确终止条件，才能避免重复已完成步骤；原始反应式循环在长程任务中容易丢失进度感知。单纯增大步数上限只会让它打转更久；不带历史会彻底失去上下文；温度为零只能减少随机性，无法解决状态管理缺陷。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "Prompt 工程",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "让模型从一段病历中抽取结构化字段，要求输出可被程序直接解析为 JSON。提示词层面最有效的做法是？",
+    "options": [
+      {"key": "A", "text": "给出 JSON Schema 或少量标准样例并要求只输出 JSON、不要额外解释"},
+      {"key": "B", "text": "只说请抽取关键信息，让模型自由发挥"},
+      {"key": "C", "text": "要求模型先写一段分析再给结果"},
+      {"key": "D", "text": "把字段名写成模糊的自然语言描述"}
+    ],
+    "answer": "A",
+    "explanation": "用模式或少量样例约束输出结构，并明确禁止额外文字，能显著提高可解析率。宽泛指令缺乏结构约束；先写分析会在结果里混入解释、增加解析难度；模糊字段名会让模型自行命名，导致键不稳定。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "Prompt 工程",
+    "language": "",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "同一提示词在生产环境每次输出格式都不同，难以稳定对接下游。在采样参数上应优先调整？",
+    "options": [
+      {"key": "A", "text": "降低 temperature 或设置随机种子以减小输出波动"},
+      {"key": "B", "text": "把 top_p 提高到接近 1"},
+      {"key": "C", "text": "增大最大生成长度"},
+      {"key": "D", "text": "关闭所有系统提示"}
+    ],
+    "answer": "A",
+    "explanation": "温度越低，模型越倾向于高概率词，输出更确定；固定随机种子也能提升可复现性，从而稳定格式。把采样阈值提高到接近一会扩大候选范围、增加随机性；最大长度影响长度不影响随机程度；关闭系统提示会丢失格式约束。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "部署与推理",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "一个推理服务上线后出现显存溢出，监控显示显存主要被 KV 缓存占用、且随并发线性增长。优先优化方向是？",
+    "options": [
+      {"key": "A", "text": "引入分页式 KV 缓存管理并限制并发序列数"},
+      {"key": "B", "text": "把模型权重从显存移到磁盘"},
+      {"key": "C", "text": "无限增大批量大小以提高吞吐"},
+      {"key": "D", "text": "关闭所有日志输出"}
+    ],
+    "answer": "A",
+    "explanation": "键值缓存随并发与序列长度增长，采用分页管理可减少碎片与预留浪费，配合并发上限能有效控制显存峰值。把权重放到磁盘会严重拖慢推理；增大批量会加剧显存压力；关闭日志对显存几乎无影响。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "部署与推理",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "推理服务在长文本请求下首 token 延迟很高，但后续 token 生成速度正常。这主要受哪个阶段影响？",
+    "options": [
+      {"key": "A", "text": "预填充阶段需要并行处理整个输入提示"},
+      {"key": "B", "text": "解码阶段的逐 token 采样"},
+      {"key": "C", "text": "网络传输阶段"},
+      {"key": "D", "text": "模型权重加载阶段"}
+    ],
+    "answer": "A",
+    "explanation": "首 token 延迟主要由预填充阶段决定，它要对全部输入 token 做一次前向计算，输入越长耗时越久；后续 token 进入自回归解码阶段，每次只算一个 token，速度相对稳定。网络传输与权重加载是请求级或启动期因素，不会只影响首个 token。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "一个检索增强问答系统用户满意度低，评估后发现召回内容相关但排序靠后、没进前 k。可从哪些方面改进？",
+    "options": [
+      {"key": "A", "text": "引入重排序模型对召回候选二次打分"},
+      {"key": "B", "text": "优化切块与元数据过滤，提高候选质量"},
+      {"key": "C", "text": "适当增大召回数量再交给重排序"},
+      {"key": "D", "text": "只要把温度调低就能解决"}
+    ],
+    "answer": "A,B,C",
+    "explanation": "重排序能把真正相关但初排靠后的片段提到前面；改进切块与过滤提升候选整体质量；先扩大召回再由重排序精选是常见两阶段策略。温度只影响生成的随机性，与检索排序无关，调低它无法让相关片段进入前列。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "设计一个能调用外部工具的 Agent 时，下列哪些做法有助于提升可靠性？",
+    "options": [
+      {"key": "A", "text": "为工具调用设置超时与失败重试上限"},
+      {"key": "B", "text": "对工具入参做校验，拒绝缺参或非法格式"},
+      {"key": "C", "text": "记录完整调用轨迹便于回溯与审计"},
+      {"key": "D", "text": "让 Agent 无限重试直到工具成功为止"}
+    ],
+    "answer": "A,B,C",
+    "explanation": "超时与有限重试能防止卡死；入参校验能拦住模型生成的错误参数；完整轨迹对排查与审计至关重要。无限重试会在工具永久故障时耗尽资源、放大故障，应设置上限并优雅降级。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "评估大模型应用效果时，下列哪些做法比单纯人工拍脑袋更靠谱？",
+    "options": [
+      {"key": "A", "text": "建立覆盖典型场景的评测集并定期回归"},
+      {"key": "B", "text": "对事实性问题核对参考答案或外部证据"},
+      {"key": "C", "text": "用多维度指标分别衡量相关性、忠实度与安全性"},
+      {"key": "D", "text": "仅凭一次演示的观感判断上线质量"}
+    ],
+    "answer": "A,B,C",
+    "explanation": "固定评测集加回归能稳定追踪改动影响；对事实性回答核对证据可量化幻觉；多维度指标能定位具体问题。仅凭单次演示观感缺乏可重复性与覆盖面，无法作为上线依据。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "Prompt 工程",
+    "language": "",
+    "kind": "judge",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "在提示词中给出少量输入输出示例，通常能改善模型对任务格式与风格的理解。",
+    "options": [
+      {"key": "A", "text": "正确"},
+      {"key": "B", "text": "错误"}
+    ],
+    "answer": "正确",
+    "explanation": "少量示例让模型在上下文中归纳任务模式，往往能显著提升格式遵循与任务表现，尤其在没有微调时。示例质量与多样性很关键；对于很强的新模型零样本有时已足够，但这不否定少量示例的一般作用。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "judge",
+    "difficulty": "basic",
+    "essentiality": "advanced",
+    "stem": "检索增强问答系统中，把检索到的所有文档片段全部塞进提示词，一定能提升回答质量。",
+    "options": [
+      {"key": "A", "text": "正确"},
+      {"key": "B", "text": "错误"}
+    ],
+    "answer": "错误",
+    "explanation": "上下文窗口有限，塞入过多片段会导致重要信息被淹没、注意力分散，还可能超出长度或增加成本，反而降低质量。更重要的是召回片段的相关性与排序，通常需要筛选与重排序，而非一味求多。"
+  },
+  {
+    "direction": "中间件与运维",
+    "sub_direction": "Docker 与容器",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "一个容器启动后立刻退出，日志里只有一条 exec format error。最可能的原因是？",
+    "options": [
+      {"key": "A", "text": "镜像架构与宿主机 CPU 架构不匹配"},
+      {"key": "B", "text": "容器内存限制太小"},
+      {"key": "C", "text": "入口命令没有执行权限"},
+      {"key": "D", "text": "容器网络模式配置错误"}
+    ],
+    "answer": "A",
+    "explanation": "该错误表示二进制格式无法在当前架构执行，常见于在 x86 机器上拉取了 arm 架构镜像。内存不足通常表现为被强制结束；无执行权限会报权限拒绝而非格式错误；网络模式错误不会导致入口程序格式错误。"
+  },
+  {
+    "direction": "中间件与运维",
+    "sub_direction": "Docker 与容器",
+    "language": "",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "Dockerfile 中把复制依赖文件的指令放在复制源代码之前，主要目的是什么？",
+    "options": [
+      {"key": "A", "text": "利用构建缓存，源码变动时跳过依赖安装层"},
+      {"key": "B", "text": "减小最终镜像体积"},
+      {"key": "C", "text": "让容器启动更快"},
+      {"key": "D", "text": "提高运行时网络性能"}
+    ],
+    "answer": "A",
+    "explanation": "镜像分层构建，指令按顺序缓存；依赖文件变化少、源码变化频繁，先复制依赖并安装能让源码改动只失效后面的层，复用前面缓存的安装层，加快构建。它不直接减小体积或提升运行时网络性能，主要收益在构建阶段。"
+  },
+  {
+    "direction": "中间件与运维",
+    "sub_direction": "Nginx",
+    "language": "",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "一个反向代理把请求转发给后端，但后端日志里看到的客户端 IP 全是代理机器地址。需要配置什么让后端拿到真实 IP？",
+    "options": [
+      {"key": "A", "text": "在转发时设置 X-Forwarded-For 请求头"},
+      {"key": "B", "text": "把 proxy_pass 改成 root"},
+      {"key": "C", "text": "关闭 keepalive 连接"},
+      {"key": "D", "text": "增加 worker_processes 数量"}
+    ],
+    "answer": "A",
+    "explanation": "反向代理会改写来源地址，通过 X-Forwarded-For 请求头传递原始客户端地址，后端据此还原真实来源。改成静态根目录会变成静态服务而非代理；关闭长连接与增加工作进程数都不影响地址传递。"
+  },
+  {
+    "direction": "中间件与运维",
+    "sub_direction": "Nginx",
+    "language": "",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "一个大文件上传接口经反向代理转发时报 413 错误。调整哪个配置最直接？",
+    "options": [
+      {"key": "A", "text": "调大 client_max_body_size"},
+      {"key": "B", "text": "调大 worker_connections"},
+      {"key": "C", "text": "开启 gzip 压缩"},
+      {"key": "D", "text": "增大 keepalive_timeout"}
+    ],
+    "answer": "A",
+    "explanation": "413 表示请求实体过大，代理默认对请求体大小有限制，调大请求体上限配置可直接放行更大的上传。并发连接数控制同时处理的连接；压缩是响应处理；长连接超时与请求体大小无关。"
+  },
+  {
+    "direction": "中间件与运维",
+    "sub_direction": "Redis",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "某服务把热点数据写进 Redis 并设置过期时间，但发现大量 key 在同一时刻集体失效、数据库压力陡增。最可能的原因是？",
+    "options": [
+      {"key": "A", "text": "缓存键的过期时间被设成相同值，形成缓存雪崩"},
+      {"key": "B", "text": "Redis 开启了持久化"},
+      {"key": "C", "text": "使用了 Hash 结构存储"},
+      {"key": "D", "text": "客户端连接数过少"}
+    ],
+    "answer": "A",
+    "explanation": "大量键同时过期会造成缓存雪崩，瞬间请求穿透到数据库。给过期时间加随机抖动可错开失效时刻。持久化只影响数据可靠性；散列结构本身不会导致同时失效；连接数过少表现为等待或报错，不会造成集体过期。"
+  },
+  {
+    "direction": "中间件与运维",
+    "sub_direction": "Redis",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "一个分布式锁用 SET key value NX EX 实现，但业务执行时间可能超过锁过期时间。为安全释放锁，正确的做法是？",
+    "options": [
+      {"key": "A", "text": "释放时用 Lua 脚本先校验 value 再删除，防止误删他人锁"},
+      {"key": "B", "text": "到期后直接 DEL key，简单可靠"},
+      {"key": "C", "text": "把锁的过期时间设为极短，避免长时间占用"},
+      {"key": "D", "text": "用 GET 判断存在后再 DEL 即可"}
+    ],
+    "answer": "A",
+    "explanation": "业务超时后锁可能已被他人持有，直接删除会误删别人的锁；用脚本原子地比较值标识再删除可避免此问题。单纯删除有误删风险；过短过期时间会让锁提前失效、失去互斥；先读后删并非原子，两步之间锁可能已易主。"
+  },
+  {
+    "direction": "中间件与运维",
+    "sub_direction": "消息队列",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "订单服务发消息到队列后，库存服务消费失败但消息被自动确认，导致库存未扣减。最可能的配置问题是？",
+    "options": [
+      {"key": "A", "text": "消费者开启了自动 ACK，失败也应手动拒绝或重试"},
+      {"key": "B", "text": "队列设置了过长过期时间"},
+      {"key": "C", "text": "生产者没有使用事务"},
+      {"key": "D", "text": "消息体序列化为 JSON"}
+    ],
+    "answer": "A",
+    "explanation": "自动确认会在消息投递后立即确认，消费失败也无法重新投递；应改为手动确认，成功才确认、失败则拒绝或重试。队列过期时间与消费确认无关；生产者事务影响发送一致性，不决定消费端确认方式；序列化格式与确认机制无关。"
+  },
+  {
+    "direction": "中间件与运维",
+    "sub_direction": "监控与日志",
+    "language": "",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "排查一次线上故障时，需要按请求链路串起多个微服务的日志。最有效的做法是？",
+    "options": [
+      {"key": "A", "text": "使用统一的 trace ID 贯穿整条调用链并写入日志"},
+      {"key": "B", "text": "把日志级别调到 DEBUG"},
+      {"key": "C", "text": "把所有服务日志写到同一台机器"},
+      {"key": "D", "text": "增大日志缓冲区"}
+    ],
+    "answer": "A",
+    "explanation": "为每次请求生成并透传链路标识，能让跨服务日志按同一标识关联，还原完整调用路径。调调试级别只会增加日志量；写到同一台机器不解决请求间的关联问题；增大缓冲区与链路追踪无关。"
+  },
+  {
+    "direction": "中间件与运维",
+    "sub_direction": "Redis",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "使用 Redis 缓存时，下列哪些做法有助于缓解缓存穿透问题？",
+    "options": [
+      {"key": "A", "text": "对不存在的 key 也缓存一个空值并设置较短过期时间"},
+      {"key": "B", "text": "在查询缓存之前用布隆过滤器拦截非法 key"},
+      {"key": "C", "text": "让所有请求都直接查数据库以校验"},
+      {"key": "D", "text": "对参数做合法性校验，拦截明显非法的查询"}
+    ],
+    "answer": "A,B,D",
+    "explanation": "缓存空值可挡住对不存在键的重复查询；布隆过滤器能在访问缓存前过滤大量非法键；参数合法性校验从入口减少无效请求。让所有请求直接查库正是缓存穿透要避免的情形，会放大数据库压力。"
+  },
+  {
+    "direction": "中间件与运维",
+    "sub_direction": "消息队列",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "为保证订单消息至少一次投递且不重复消费，下列哪些措施是配套的合理做法？",
+    "options": [
+      {"key": "A", "text": "消费端实现幂等，用业务唯一键去重"},
+      {"key": "B", "text": "采用手动 ACK，处理成功后再确认"},
+      {"key": "C", "text": "生产者使用确认机制确保消息到达"},
+      {"key": "D", "text": "把消息体加密即可避免重复"}
+    ],
+    "answer": "A,B,C",
+    "explanation": "至少一次投递会带来重复，消费端幂等是必须的；手动确认确保处理成功才确认，配合重试；生产者确认保证消息确实发出。加密只保护内容机密性，与去重和投递语义无关。"
+  },
+  {
+    "direction": "中间件与运维",
+    "sub_direction": "Docker 与容器",
+    "language": "",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "nice_to_know",
+    "stem": "Docker 镜像是分层存储的，不同镜像之间可以共享相同的只读层。",
+    "options": [
+      {"key": "A", "text": "正确"},
+      {"key": "B", "text": "错误"}
+    ],
+    "answer": "正确",
+    "explanation": "镜像由多层只读文件系统叠加而成，相同层在不同镜像间可复用，节省存储与传输开销；容器运行时在最上层添加一个可写层。这一分层机制是镜像体积优化与快速分发的基础。"
+  },
+  {
+    "direction": "中间件与运维",
+    "sub_direction": "Nginx",
+    "language": "",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "Nginx 的 location 匹配中，前缀匹配一定会优先于正则匹配，无论前缀长度。",
+    "options": [
+      {"key": "A", "text": "正确"},
+      {"key": "B", "text": "错误"}
+    ],
+    "answer": "错误",
+    "explanation": "代理会先做前缀匹配并记录最长前缀，但仍会继续检查正则位置；正则匹配成功会覆盖普通前缀结果，只有带特殊修饰符的前缀匹配才会跳过正则。因此并非前缀一定优先，题干说法过于绝对。"
+  },
+  {
+    "direction": "SQL 与数据库",
+    "sub_direction": "SQL 基础",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "表 orders 含 user_id、amount、status 字段。要统计每个用户已支付订单的总金额，且只保留总额大于 1000 的用户，正确的 SQL 是？",
+    "options": [
+      {"key": "A", "text": "SELECT user_id, SUM(amount) AS total FROM orders WHERE status='paid' GROUP BY user_id HAVING SUM(amount)>1000"},
+      {"key": "B", "text": "SELECT user_id, SUM(amount) FROM orders GROUP BY user_id WHERE SUM(amount)>1000 AND status='paid'"},
+      {"key": "C", "text": "SELECT user_id, SUM(amount) FROM orders WHERE status='paid' AND SUM(amount)>1000 GROUP BY user_id"},
+      {"key": "D", "text": "SELECT user_id, amount FROM orders WHERE status='paid' GROUP BY user_id HAVING total>1000"}
+    ],
+    "answer": "A",
+    "explanation": "先在前置条件中过滤已支付记录，再按用户分组求和，最后用分组后条件筛选总额，顺序与语义都正确。前置条件中不能出现聚合函数，也不能放在分组之后；把聚合条件写在分组前是非法写法；选原始金额而非聚合值会使分组失效。"
+  },
+  {
+    "direction": "SQL 与数据库",
+    "sub_direction": "SQL 基础",
+    "language": "",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "一条 UPDATE 语句忘记写 WHERE 条件，在多数数据库客户端默认配置下会发生什么？",
+    "options": [
+      {"key": "A", "text": "表中所有行都会被更新"},
+      {"key": "B", "text": "语句会被数据库拒绝执行"},
+      {"key": "C", "text": "只更新第一行"},
+      {"key": "D", "text": "只更新最近插入的行"}
+    ],
+    "answer": "A",
+    "explanation": "更新语句不带条件会对表中全部行执行更新，这是常见的误操作风险；安全更新模式或客户端设置可拦截，但默认并不总是开启。它不会被无条件拒绝；也不会只作用单行，除非驱动额外限制。"
+  },
+  {
+    "direction": "SQL 与数据库",
+    "sub_direction": "索引",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "一张用户表在 (last_name, first_name) 上有联合索引。下列哪个查询最能利用该索引的最左前缀？",
+    "options": [
+      {"key": "A", "text": "WHERE last_name = '张'"},
+      {"key": "B", "text": "WHERE first_name = '三'"},
+      {"key": "C", "text": "WHERE first_name = '三' AND age = 30"},
+      {"key": "D", "text": "WHERE age = 30"}
+    ],
+    "answer": "A",
+    "explanation": "联合索引遵循最左前缀原则，只有从最左列开始的查询条件才能利用该索引。单独用第二列或跳过第一列用其他列都无法命中；同时用第二列与无关列也不满足最左前缀。"
+  },
+  {
+    "direction": "SQL 与数据库",
+    "sub_direction": "索引",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "一个高频查询走索引后依然很慢，检查发现索引选择性很低（某布尔列只有两个取值）。其根本问题是？",
+    "options": [
+      {"key": "A", "text": "低选择性索引需要回表大量行，优化器可能不如全表扫描"},
+      {"key": "B", "text": "索引字段越多查询一定越快"},
+      {"key": "C", "text": "布尔列不能被索引"},
+      {"key": "D", "text": "索引必须在事务外创建"}
+    ],
+    "answer": "A",
+    "explanation": "选择性低的列区分度差，命中后仍需回表读取大量行，成本可能高于全表扫描，优化器常因此放弃索引。索引并非越多越好；布尔列可以建索引，只是往往收益低；索引创建与事务边界无直接关系。"
+  },
+  {
+    "direction": "SQL 与数据库",
+    "sub_direction": "事务与 ACID",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "事务甲读取某行后，事务乙修改并提交了该行，甲再次读取同一行发现值变了。这种现象称为？",
+    "options": [
+      {"key": "A", "text": "不可重复读"},
+      {"key": "B", "text": "脏读"},
+      {"key": "C", "text": "幻读"},
+      {"key": "D", "text": "丢失更新"}
+    ],
+    "answer": "A",
+    "explanation": "同一事务内两次读取同一行得到不同结果，是因为期间被其他已提交事务修改，称为不可重复读。脏读是读到未提交的数据；幻读针对的是查询结果集行数变化；丢失更新是并发写覆盖，均与题干描述不同。"
+  },
+  {
+    "direction": "SQL 与数据库",
+    "sub_direction": "事务与 ACID",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "两个事务分别持有对方需要的行锁并互相等待，数据库检测到后选择一个回滚以打破僵局。这一机制是？",
+    "options": [
+      {"key": "A", "text": "死锁检测与解除"},
+      {"key": "B", "text": "脏读隔离"},
+      {"key": "C", "text": "两阶段提交"},
+      {"key": "D", "text": "快照隔离"}
+    ],
+    "answer": "A",
+    "explanation": "互相持有对方所需锁形成环即为死锁，数据库通过等待图检测并选择代价最小的事务回滚来解除。脏读是隔离级别现象；两阶段提交用于分布式事务一致性；快照隔离是多版本并发控制的隔离级别，都不负责打破锁等待环。"
+  },
+  {
+    "direction": "SQL 与数据库",
+    "sub_direction": "NoSQL",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "一个社交应用要高效查询某用户的所有关注关系，数据以键值对或宽列存储。建模时最合适的思路是？",
+    "options": [
+      {"key": "A", "text": "以用户 ID 为键，把关注列表作为一个集合或列族存储"},
+      {"key": "B", "text": "把所有关系放在单行单列里用逗号分隔"},
+      {"key": "C", "text": "每条关系都作为独立文件存放在对象存储"},
+      {"key": "D", "text": "每次查询都全表扫描再过滤"}
+    ],
+    "answer": "A",
+    "explanation": "非关系型数据库建模围绕查询模式设计，按用户标识聚合其关注列表，可用一次键查询取出，效率最高。把关系塞进单列字符串难以按成员修改与查询；对象存储不适合关系型遍历；全表扫描违背高效查询的初衷。"
+  },
+  {
+    "direction": "SQL 与数据库",
+    "sub_direction": "通用数据库",
+    "language": "",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "数据库事务的 ACID 中，字母 C 代表的特性是指？",
+    "options": [
+      {"key": "A", "text": "一致性，事务前后数据满足完整性约束"},
+      {"key": "B", "text": "并发性，允许多个事务同时执行"},
+      {"key": "C", "text": "缓存性，热点数据常驻内存"},
+      {"key": "D", "text": "压缩性，存储占用更小"}
+    ],
+    "answer": "A",
+    "explanation": "ACID 中的这一项是一致性，要求事务执行前后数据库都处于合法状态、满足预定义约束。并发性对应的是隔离性；缓存与压缩都不是事务特性的组成部分。"
+  },
+  {
+    "direction": "SQL 与数据库",
+    "sub_direction": "事务与 ACID",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "关于数据库事务隔离级别，下列哪些说法是对的？",
+    "options": [
+      {"key": "A", "text": "读未提交可能导致脏读"},
+      {"key": "B", "text": "可重复读在同一事务内多次读同一行结果一致"},
+      {"key": "C", "text": "串行化通常并发度最低但一致性最强"},
+      {"key": "D", "text": "读已提交可以彻底避免幻读"}
+    ],
+    "answer": "A,B,C",
+    "explanation": "读未提交允许读到其他事务未提交的数据，会产生脏读；可重复读保证同一事务内对同一行的重复读取一致；串行化通过强隔离避免多数并发异常，代价是并发度低。读已提交只能避免脏读，无法杜绝幻读，幻读需要更高隔离或锁机制。"
+  },
+  {
+    "direction": "SQL 与数据库",
+    "sub_direction": "索引",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "一个查询在创建索引后反而变慢了，可能的原因有哪些？",
+    "options": [
+      {"key": "A", "text": "索引列选择性太低，回表成本超过全表扫描"},
+      {"key": "B", "text": "写操作频繁，索引维护带来额外开销"},
+      {"key": "C", "text": "查询条件对索引列使用了函数，导致索引失效"},
+      {"key": "D", "text": "索引覆盖了查询所需字段，避免了回表"}
+    ],
+    "answer": "A,B,C",
+    "explanation": "低选择性索引带来大量回表；频繁写入要同步维护索引，增加写放大；对索引列施加函数会破坏有序性使优化器无法使用。覆盖索引能避免回表、通常提升性能，不是变慢的原因。"
+  },
+  {
+    "direction": "SQL 与数据库",
+    "sub_direction": "SQL 基础",
+    "language": "",
+    "kind": "judge",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "SQL 中 COUNT(*) 会统计包含 NULL 值在内的所有行，而 COUNT(某列) 会跳过该列为 NULL 的行。",
+    "options": [
+      {"key": "A", "text": "正确"},
+      {"key": "B", "text": "错误"}
+    ],
+    "answer": "正确",
+    "explanation": "统计所有行不关心列值是否为空；统计某列只计算该列非空的记录数。因此在存在空值时两者结果可能不同，这是编写统计语句时需要留意的差异。"
+  },
+  {
+    "direction": "SQL 与数据库",
+    "sub_direction": "索引",
+    "language": "",
+    "kind": "judge",
+    "difficulty": "basic",
+    "essentiality": "nice_to_know",
+    "stem": "为表创建的索引越多，查询性能一定越好。",
+    "options": [
+      {"key": "A", "text": "正确"},
+      {"key": "B", "text": "错误"}
+    ],
+    "answer": "错误",
+    "explanation": "索引能加速匹配的查询，但每个索引都会占用存储并增加写操作的维护成本；未被查询使用的索引只会带来开销。优化器也可能因索引过多而选择次优计划。索引应围绕实际查询模式精简创建，并非越多越好。"
+  },
+  {
+    "direction": "研发工程实践",
+    "sub_direction": "Git 与版本控制",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "开发者在 feature 分支提交后，发现主干已有新提交。希望把自己的提交接在主干最新提交之后、保持线性历史，应使用？",
+    "options": [
+      {"key": "A", "text": "git rebase main"},
+      {"key": "B", "text": "git merge main"},
+      {"key": "C", "text": "git reset --hard main"},
+      {"key": "D", "text": "git checkout main"}
+    ],
+    "answer": "A",
+    "explanation": "变基会把当前分支的提交逐个重放到主干之上，形成线性历史，没有多余合并提交。合并会生成合并提交、保留分叉；硬重置会丢弃本地提交且破坏工作区；切换分支只是检出，不会变基。"
+  },
+  {
+    "direction": "研发工程实践",
+    "sub_direction": "Git 与版本控制",
+    "language": "",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "执行 git status 后发现一个文件被误改，想丢弃工作区改动但保留暂存区已暂存的版本，应使用哪条命令？",
+    "options": [
+      {"key": "A", "text": "git checkout -- 文件名"},
+      {"key": "B", "text": "git reset --hard HEAD"},
+      {"key": "C", "text": "git clean -fd"},
+      {"key": "D", "text": "git revert HEAD"}
+    ],
+    "answer": "A",
+    "explanation": "该检出命令会把工作区文件恢复为暂存区中的内容，因此保留已暂存版本、只丢弃未暂存的改动。硬重置会同时重置暂存区与工作区到最新提交；清理命令用于删除未跟踪文件；撤销提交会生成新提交来抵消已有提交。"
+  },
+  {
+    "direction": "研发工程实践",
+    "sub_direction": "测试",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "一个支付回调处理函数依赖外部支付网关。单元测试想验证回调逻辑而不真实调用网关，最合适的做法是？",
+    "options": [
+      {"key": "A", "text": "用 mock 替换网关依赖，使其返回可控结果"},
+      {"key": "B", "text": "直接调用生产环境网关接口"},
+      {"key": "C", "text": "跳过该测试，只做人工验证"},
+      {"key": "D", "text": "在测试里连接测试环境数据库即可"}
+    ],
+    "answer": "A",
+    "explanation": "通过模拟或打桩替换外部依赖，能隔离被测逻辑、让结果可预测且测试快速稳定。调用生产网关既不安全又不可控；跳过测试会留下质量盲区；连接测试库并不能解决对外部网关的依赖。"
+  },
+  {
+    "direction": "研发工程实践",
+    "sub_direction": "测试",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "一个测试用例单独运行时通过，但在完整测试套件中与其他用例一起运行时偶尔失败。最可能的根因是？",
+    "options": [
+      {"key": "A", "text": "测试用例之间存在共享状态或执行顺序依赖"},
+      {"key": "B", "text": "测试框架版本过旧"},
+      {"key": "C", "text": "被测试代码含有随机分支"},
+      {"key": "D", "text": "测试运行机器内存不足"}
+    ],
+    "answer": "A",
+    "explanation": "单独通过、一起运行失败是典型的测试间污染：共享全局状态、数据库记录或顺序依赖导致前一个用例影响后一个。框架版本过旧或内存不足通常表现为稳定失败而非顺序相关；随机分支虽会导致不稳定，但题干强调与其他用例一起才失败，更指向共享状态。"
+  },
+  {
+    "direction": "研发工程实践",
+    "sub_direction": "CI-CD",
+    "language": "",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "团队希望合并到主干前自动运行测试与构建，只有通过才能合并。这主要通过什么实现？",
+    "options": [
+      {"key": "A", "text": "在代码托管平台配置 Pull Request 的分支保护与检查"},
+      {"key": "B", "text": "在每个开发者本地安装钩子即可"},
+      {"key": "C", "text": "手动在合并后运行测试"},
+      {"key": "D", "text": "关闭所有自动化检查以加快合并"}
+    ],
+    "answer": "A",
+    "explanation": "分支保护规则配合合并请求检查能在合并前强制运行测试与构建，只有通过才允许合并，是保障主干质量的常用做法。仅靠本地钩子可被绕过；合并后再测为时已晚；关闭检查会降低质量门槛。"
+  },
+  {
+    "direction": "研发工程实践",
+    "sub_direction": "CI-CD",
+    "language": "",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "流水线中构建产物阶段生成的容器镜像，最应该推送到哪里以便后续部署使用？",
+    "options": [
+      {"key": "A", "text": "镜像仓库"},
+      {"key": "B", "text": "源代码仓库"},
+      {"key": "C", "text": "测试报告目录"},
+      {"key": "D", "text": "开发机本地缓存"}
+    ],
+    "answer": "A",
+    "explanation": "构建出的容器镜像应推送到镜像仓库集中管理，部署阶段再按标签拉取，保证环境间产物一致。源代码仓库存放代码而非二进制镜像；测试报告目录只放报告；本地缓存无法供其他环境共享。"
+  },
+  {
+    "direction": "研发工程实践",
+    "sub_direction": "架构设计",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "一个单体应用拆分为微服务后，原本的本地调用变成跨网络调用，出现延迟上升与部分失败。为提升稳定性，不应优先采用的做法是？",
+    "options": [
+      {"key": "A", "text": "让服务间直接共享同一个数据库表以绕过接口"},
+      {"key": "B", "text": "为核心调用设置合理超时与重试退避"},
+      {"key": "C", "text": "引入熔断与降级避免故障扩散"},
+      {"key": "D", "text": "通过网关统一做限流"}
+    ],
+    "answer": "A",
+    "explanation": "让服务共享同一数据库表会破坏服务自治与边界，形成紧耦合，是微服务反模式，不应采用。设置超时与退避重试、熔断降级、网关限流都是应对网络不可靠的常规稳定性手段。"
+  },
+  {
+    "direction": "研发工程实践",
+    "sub_direction": "架构设计",
+    "language": "",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "一个系统读请求远多于写请求，希望提升查询性能并有效分摊压力。最常见的架构手段是？",
+    "options": [
+      {"key": "A", "text": "引入读写分离与只读副本"},
+      {"key": "B", "text": "把所有数据放内存并禁用持久化"},
+      {"key": "C", "text": "取消所有缓存层"},
+      {"key": "D", "text": "让每个请求都写主库"}
+    ],
+    "answer": "A",
+    "explanation": "读写分离把读流量导向只读副本，主库专注写入，能有效分摊压力并提升读性能。禁用持久化会造成数据丢失风险；取消缓存会增加数据库负担；所有请求写主库无法缓解读多写少的压力。"
+  },
+  {
+    "direction": "研发工程实践",
+    "sub_direction": "Git 与版本控制",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "一次提交不小心包含了密码配置文件，已经推送到远程仓库。合理的补救措施有哪些？",
+    "options": [
+      {"key": "A", "text": "立即轮换或吊销泄露的凭据"},
+      {"key": "B", "text": "在后续提交中删除文件并考虑用工具清理历史"},
+      {"key": "C", "text": "通知团队成员并评估是否已扩散"},
+      {"key": "D", "text": "只要本地删掉文件即可，无需其他处理"}
+    ],
+    "answer": "A,B,C",
+    "explanation": "凭据一旦进入远程就应视为泄露，首要措施是轮换吊销；随后删除文件并视情况用工具清理历史；同时评估扩散范围并通知团队。仅本地删除文件无法清除远程与克隆中的记录，凭据仍然有效，做法远远不够。"
+  },
+  {
+    "direction": "研发工程实践",
+    "sub_direction": "测试",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "关于单元测试与集成测试，下列说法正确的有哪些？",
+    "options": [
+      {"key": "A", "text": "单元测试聚焦最小可测单元，通常速度快、依赖少"},
+      {"key": "B", "text": "集成测试关注多个模块协作是否正确"},
+      {"key": "C", "text": "测试金字塔建议单元测试数量多于高层测试"},
+      {"key": "D", "text": "集成测试应当完全替代单元测试"}
+    ],
+    "answer": "A,B,C",
+    "explanation": "单元测试粒度小、运行快、依赖少；集成测试验证模块间协作；测试金字塔主张底层单元测试多、上层端到端测试少。集成测试无法替代单元测试，两者覆盖层次不同，互补而非互斥。"
+  },
+  {
+    "direction": "研发工程实践",
+    "sub_direction": "通用工程实践",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "一次线上事故复盘后，团队希望降低同类故障复发概率。下列哪些做法真正有助于改进？",
+    "options": [
+      {"key": "A", "text": "补充能覆盖故障场景的自动化测试"},
+      {"key": "B", "text": "增加对应异常的监控告警"},
+      {"key": "C", "text": "把根因写成可执行的检查清单纳入发布流程"},
+      {"key": "D", "text": "仅对责任人进行口头批评"}
+    ],
+    "answer": "A,B,C",
+    "explanation": "用自动化测试覆盖故障场景能防止回归；针对性的监控告警能缩短发现时间；把根因固化为发布检查清单能从流程上堵住漏洞。单纯口头批评不产生任何工程改进，无法真正降低复发概率。"
+  },
+  {
+    "direction": "研发工程实践",
+    "sub_direction": "Git 与版本控制",
+    "language": "",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "git fetch 会把远程分支的更新下载到本地，但不会自动合并到当前分支。",
+    "options": [
+      {"key": "A", "text": "正确"},
+      {"key": "B", "text": "错误"}
+    ],
+    "answer": "正确",
+    "explanation": "该命令只同步远程引用与对象到本地，不改变工作区与当前分支；要合并需再执行合并或变基，而拉取命令相当于下载加合并。因此题目描述正确。"
+  },
+  {
+    "direction": "研发工程实践",
+    "sub_direction": "测试",
+    "language": "",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "代码覆盖率达到百分之百就意味着代码没有任何缺陷。",
+    "options": [
+      {"key": "A", "text": "正确"},
+      {"key": "B", "text": "错误"}
+    ],
+    "answer": "错误",
+    "explanation": "覆盖率只说明代码行或分支被执行过，并不保证断言充分或逻辑正确；未覆盖的边界、错误假设与交互缺陷仍可能存在。高覆盖率是质量信号之一，但绝不等于无缺陷，还需结合断言质量与多类型测试。"
+  }
+]

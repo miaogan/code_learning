@@ -57,6 +57,7 @@ SOURCES: tuple[str, ...] = (
     "sys-arch",
     "acp-official",
     "acp-ext",
+    "kb-expand",
 )
 
 #: 来源 → 素材文件名（`docs/question-bank-staging/` 下的可复现输入，必须随仓库提交）。
@@ -76,6 +77,7 @@ STAGING_FILES: dict[str, str] = {
     "sys-arch": "13-system-architecture-scenarios.json",
     "acp-official": "14-acp-official-quizzes.json",
     "acp-ext": "15-acp-v24-extension.json",
+    "kb-expand": "16-knowledge-expansion.json",
 }
 
 #: 来源 → 种子 id 前缀（避开 legacy `fe-/be-/al-/cs-` 与 r11 九个语言前缀，保证
@@ -91,6 +93,7 @@ STAGING_FILES: dict[str, str] = {
 #: aliyun_acp_learning，Apache-2.0）各章课后小测验，忠实转录其题干/选项/答案/解析。
 #: `acpext-` 是 15 号素材：基于该教程 V2.4 正文（Agent Skills / Memory / Harness Loop /
 #: 蒸馏 / 生产实践 / 安全合规等）创作的原创题，覆盖官方小测验未涉及的独立知识点。
+#: `kbx-` 是 16 号素材：八方向均衡的知识量扩充题（应用题面 + 完整解析），落既有子方向。
 ID_PREFIX: dict[str, str] = {
     "tiji": "tiji-",
     "local100": "l100-",
@@ -107,6 +110,7 @@ ID_PREFIX: dict[str, str] = {
     "sys-arch": "sysarch-",
     "acp-official": "acpof-",
     "acp-ext": "acpext-",
+    "kb-expand": "kbx-",
 }
 
 #: 近重复口径：字符 n-gram 的 Jaccard 下界（常量只在这里，别处不得再写一个阈值）。

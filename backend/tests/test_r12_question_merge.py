@@ -84,7 +84,9 @@ R13_SEED_BYTES = 199377
 #: r107 追加 14/15 号素材（ACP 官方小测验 32 + 教程 V2.4 原创扩展 18，均为通用桶），
 #: 再次触发全局选项位置轮转：前 260 行仅选项 key 与对应解析字母改写，题干 / 选项文本集合 /
 #: 正确答案文本均不变，字节数仍为 199377，sha256 随轮转态漂移，故在此刷新基线。
-R13_SEED_SHA256 = "c3254c318db9e833aee2e3ec60b11061675b970a96b37c1f829e5d946969b977"
+#: r123 追加 16 号素材（八方向均衡扩充 100 道，通用桶）：同类的确定性轮转，前 260 行字节数
+#: 仍为 199377，sha256 随轮转态漂移，故在此刷新基线。
+R13_SEED_SHA256 = "931c639f770e29f7517a59ac79565f37aee6586386bcf698f69d2bf63304b27b"
 
 #: 合并后的期望规模与来源分布（TECH-CHANGE §3.4 逐项）。门禁是唯一断言点，故允许字面量。
 #: r47 追加 10 号素材 `ai-adv` 40 道（面向高级 AI 应用工程师），总量 1088 → 1128。
@@ -93,7 +95,8 @@ R13_SEED_SHA256 = "c3254c318db9e833aee2e3ec60b11061675b970a96b37c1f829e5d946969b
 #: 系统架构场景批追加 13 号素材 `sys-arch` 60 道，总量 1224 → 1284。
 #: r107 追加 14 号素材 `acp-official` 32 道（官方课后小测验）与 15 号素材 `acp-ext`
 #: 18 道（基于教程 V2.4 正文的原创扩展），总量 1284 → 1334。
-EXPECTED_TOTAL = 1334
+#: r123 追加 16 号素材 `kb-expand` 100 道（八方向均衡的知识量扩充），总量 1334 → 1434。
+EXPECTED_TOTAL = 1434
 EXPECTED_SOURCES = {
     "seed": 260,
     "tiji": 20,
@@ -111,6 +114,7 @@ EXPECTED_SOURCES = {
     "sys-arch": 60,
     "acp-official": 32,
     "acp-ext": 18,
+    "kb-expand": 100,
 }
 
 _EXPLANATION = "这是一段足够长的解析文本，用于满足解析非空与长度门槛的断言。"
@@ -457,8 +461,8 @@ def test_merge_is_idempotent_byte_identical() -> None:
     """`--write` 可重复：每次重算都得到同一串字节，且与磁盘上的 seed 一致（`--check` 成立）。"""
     first, stats = qm.build_seed()
     assert qm.dumps(first).encode("utf-8") == qm.SEED_PATH.read_bytes(), "重算结果与磁盘 seed 不一致"
-    assert stats["total"]["added"] == 1074, "按素材重算应恒报 1074 条新增（上一批不当作存量）"
-    assert stats["total"]["read"] == 1074
+    assert stats["total"]["added"] == 1174, "按素材重算应恒报 1174 条新增（上一批不当作存量）"
+    assert stats["total"]["read"] == 1174
     assert stats["total"]["literal_dup"] == 0
     assert stats["total"]["near_dup"] == 0
     assert stats["total"]["out_of_range"] == 0
@@ -549,7 +553,7 @@ def test_seed_source_enum_and_counts() -> None:
 
 # --- ⑨ 回滚 -----------------------------------------------------------------
 def test_rollback_deletes_only_batch_sources(tmp_db: Path) -> None:
-    """回滚只删 15 个已登记来源（1334 → 260），且幂等（再跑一次删 0 行）。绝不碰存量行。"""
+    """回滚只删 16 个已登记来源（1434 → 260），且幂等（再跑一次删 0 行）。绝不碰存量行。"""
     total = question_bank.ensure_seeded()
     assert total == EXPECTED_TOTAL, f"导入后总量 {total} ≠ {EXPECTED_TOTAL}"
 
@@ -562,7 +566,7 @@ def test_rollback_deletes_only_batch_sources(tmp_db: Path) -> None:
     assert len(legacy_ids) == EXPECTED_SOURCES["seed"]
 
     removed = qm.rollback()
-    assert removed == EXPECTED_TOTAL - EXPECTED_SOURCES["seed"], "回滚删除的必须是素材 1074 行"
+    assert removed == EXPECTED_TOTAL - EXPECTED_SOURCES["seed"], "回滚删除的必须是素材 1174 行"
     assert repository.count_questions() == EXPECTED_SOURCES["seed"]
     assert qm.rollback() == 0, "回滚必须幂等（未导入 / 已删过 → 0）"
 

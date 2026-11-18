@@ -503,4 +503,131 @@ export const BACKEND_CHAPTERS: TutorialChapter[] = [
       },
     ],
   },
+  {
+    id: 'be-python-concurrency',
+    title: 'Python 的 GIL、线程与异步 IO',
+    direction: '后端',
+    sub_direction: 'python',
+    level: '进阶',
+    summary: '为什么 CPU 密集任务用多线程不快、IO 密集任务却能并发：从 GIL 到 asyncio 的事件循环，给出选型依据。',
+    sections: [
+      {
+        id: 'gil',
+        title: 'GIL 到底限制了什么',
+        blocks: [
+          {
+            kind: 'text',
+            text: 'CPython 的全局解释器锁（GIL）保证同一时刻只有一个线程执行 Python 字节码。它不是「Python 不能并发」，而是「同一进程内的 Python 字节码不能并行执行 CPU 工作」。线程在等待 IO 时会释放 GIL，这是 IO 密集任务能靠线程提速的原因。',
+          },
+          {
+            kind: 'table',
+            headers: ['任务类型', '多线程', '多进程', 'asyncio'],
+            rows: [
+              ['CPU 密集（压缩、计算）', '受 GIL 限制，几乎不提速', '真正并行，推荐', '不适用，仍受 GIL 限制'],
+              ['IO 密集（网络、磁盘）', '有效，等待时释放 GIL', '有效但开销更大', '最省资源，高并发首选'],
+              ['混合型', '可用但需实测', '隔离性好', '把 CPU 部分丢给进程池'],
+            ],
+          },
+          {
+            kind: 'note',
+            tone: 'info',
+            title: '不是所有 Python 实现都有 GIL',
+            text: 'PyPy、Jython 等实现有无 GIL 的版本；numpy 等 C 扩展会在执行原生代码时主动释放 GIL。讨论性能前先确认运行的是哪种解释器、热点是否在 Python 字节码里。',
+          },
+        ],
+      },
+      {
+        id: 'asyncio',
+        title: '事件循环与协程的协作',
+        blocks: [
+          {
+            kind: 'text',
+            text: 'asyncio 用一个事件循环在单线程里调度大量协程。协程遇到 await 就把控制权交还循环，循环转去执行其他就绪任务。这里的并发来自「等待期间不占着线程」，不是来自多核。',
+          },
+          {
+            kind: 'list',
+            items: [
+              'await 只能等待可等待对象（协程、Task、Future）；普通函数里的阻塞调用不会让出控制权。',
+              'time.sleep 是阻塞的，协程里要用 asyncio.sleep；requests 是同步库，要用 httpx.AsyncClient 或 aiohttp。',
+              '一个协程里跑了同步的 CPU 密集循环，会卡住整个事件循环，其他协程全部跟着停。',
+            ],
+          },
+          {
+            kind: 'note',
+            tone: 'warn',
+            title: '别在协程里混入阻塞调用',
+            text: '这是最常见的性能事故：代码用了 async/await，但底层库还是同步阻塞的，结果并发度没有任何提升。排查方法是给关键路径打点，看协程是不是串行完成的。',
+          },
+        ],
+      },
+      {
+        id: 'example',
+        title: '把同步请求改成并发请求',
+        blocks: [
+          {
+            kind: 'text',
+            text: '面对一批独立的 HTTP 查询，同步写法逐个等待；用 asyncio.gather 可以同时发起并在全部完成后收集结果，总耗时接近最慢的那一个而不是所有请求之和。',
+          },
+          {
+            kind: 'code',
+            language: 'python',
+            caption: '并发抓取多个 URL',
+            code: [
+              'import asyncio',
+              'import httpx',
+              '',
+              'async def fetch(client, url):',
+              '    response = await client.get(url, timeout=5)',
+              '    return response.status_code',
+              '',
+              'async def main(urls):',
+              '    async with httpx.AsyncClient() as client:',
+              '        tasks = [fetch(client, url) for url in urls]',
+              '        return await asyncio.gather(*tasks, return_exceptions=True)',
+              '',
+              '# return_exceptions=True：单个请求失败不影响其他结果',
+            ].join('\n'),
+          },
+          {
+            kind: 'list',
+            ordered: true,
+            items: [
+              '确认客户端库是异步实现，否则 await 无从谈起。',
+              '为每次请求设置超时，避免一个慢调用拖住整批 gather。',
+              '用 return_exceptions=True 保留部分成功的结果，再逐个处理异常。',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'pitfalls',
+        title: '常见坑与自测',
+        blocks: [
+          {
+            kind: 'note',
+            tone: 'warn',
+            title: '线程池的真正用途',
+            text: 'asyncio.to_thread 把阻塞函数丢到线程池执行，适合没有异步版本的库；它不突破 GIL，只避免阻塞事件循环。CPU 密集任务应该用 ProcessPoolExecutor。',
+          },
+          {
+            kind: 'qa',
+            items: [
+              {
+                question: '为什么爬虫用多线程能提速，但矩阵乘法用多线程几乎不快？',
+                answer: '爬虫大部分时间在等网络响应，等待时线程释放 GIL，可以并发；矩阵乘法全程执行 Python/原生计算，受 GIL 串行化，CPU 密集任务应使用多进程。',
+              },
+              {
+                question: '协程里调用了 time.sleep(10) 会发生什么？',
+                answer: '它阻塞整个线程，事件循环无法切换，所有协程都被卡住 10 秒。应改用 await asyncio.sleep(10)，让出控制权给其他任务。',
+              },
+              {
+                question: 'asyncio.gather 加 return_exceptions=True 的作用是什么？',
+                answer: '让失败的任务以异常对象的形式出现在结果列表里，而不是直接中断整批等待；适合部分失败仍要保留其他结果的批量场景。',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
 ]

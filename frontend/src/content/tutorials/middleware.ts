@@ -501,4 +501,128 @@ export const MIDDLEWARE_CHAPTERS: TutorialChapter[] = [
       },
     ],
   },
+  {
+    id: 'mw-cicd-pipeline',
+    title: 'CI/CD 流水线的门禁与发布',
+    direction: '中间件与运维',
+    sub_direction: 'CI-CD',
+    level: '进阶',
+    summary: 'CI 负责证明「这份代码可以发布」，CD 负责把「已经被证明的那份」送上线；版本号、部署凭据与回滚路径必须在流水线里闭环。',
+    sections: [
+      {
+        id: 'stages',
+        title: '流水线分几段，各段证明什么',
+        blocks: [
+          {
+            kind: 'text',
+            text: '一个可追溯的流水线通常分三段：CI 跑类型检查、lint、单测与构建，产出不可变产物；制品段给产物打版本号并推送镜像；CD 只做部署，不再重新构建。关键是「部署的东西」和「测过的东西」是同一份字节，否则绿灯毫无意义。',
+          },
+          {
+            kind: 'table',
+            headers: ['阶段', '输入', '产出', '失败时含义'],
+            rows: [
+              ['CI', '提交 SHA', '测试结论 + 构建产物', '代码有问题，不进入部署'],
+              ['制品', '同一 SHA', '带版本号的镜像/包', '版本或凭据配置错'],
+              ['CD', '已发布制品', '线上服务 + 部署状态', '环境/网络/编排问题'],
+            ],
+          },
+          {
+            kind: 'note',
+            tone: 'info',
+            title: '部署凭据要最小权限',
+            text: 'CD 用的 SSH key 或 token 只给部署所需权限（如只能拉取仓库、执行既定脚本），与开发者个人账号分离。凭据进 Secrets，不进代码库与日志。',
+          },
+        ],
+      },
+      {
+        id: 'gates',
+        title: '绿灯不等于部署成功',
+        blocks: [
+          {
+            kind: 'text',
+            text: '流水线显示成功只说明每一步「脚本正常退出」。有些脚本在凭据缺失时会主动 exit 0 跳过部署，于是 CI 全绿但线上没变。真正可信的判据是部署状态文件的时间戳或版本号落在本次运行窗口内，并用公网探活交叉验证。',
+          },
+          {
+            kind: 'list',
+            items: [
+              '用 deploy-state 记录部署时间与 SHA，CD 结束后核对是否更新。',
+              '部署后打一次 /health，确认 version 字段与这次发布的目标版本一致。',
+              '镜像摘要不变时容器可能不重建；代码等价时这是正常的，不要误判为部署失败。',
+            ],
+          },
+          {
+            kind: 'note',
+            tone: 'warn',
+            title: '跳过关卡要有显式开关',
+            text: '需要临时跳过检查时，用明确的 env 变量并在日志里记录，而不是把检查命令注释掉。无声的跳过会在几周后变成「为什么线上是旧版本」的谜题。',
+          },
+        ],
+      },
+      {
+        id: 'example',
+        title: '把部署 SHA 固定下来',
+        blocks: [
+          {
+            kind: 'text',
+            text: '部署脚本应接收一个明确的 SHA 参数并只 checkout 这一份源码；用分支名或「最新提交」会在并发推送时部署到意料之外的版本。',
+          },
+          {
+            kind: 'code',
+            language: 'bash',
+            caption: '按 SHA 部署并写状态',
+            code: [
+              '#!/usr/bin/env bash',
+              'set -euo pipefail',
+              'SHA="$1"',
+              '',
+              'git fetch origin --tags',
+              '(umask 022; git checkout --force "$SHA")',
+              'docker compose up -d --build',
+              '',
+              'printf "%s %s\\n" "$(date -Iseconds)" "$SHA" > logs/deploy-state',
+              'curl --fail https://example.com/health',
+            ].join('\n'),
+          },
+          {
+            kind: 'list',
+            ordered: true,
+            items: [
+              'checkout 放在 umask 022 的子 shell 里，避免源码权限被进程级 umask 污染。',
+              '部署状态在探活通过后写入，避免把失败部署记成成功。',
+              '脚本失败时保留上一版状态文件，便于回滚定位。',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'pitfalls',
+        title: '常见坑与自测',
+        blocks: [
+          {
+            kind: 'note',
+            tone: 'warn',
+            title: '回滚脚本要能独立执行',
+            text: '回滚常常发生在代码已经被撤掉之后，所以回滚逻辑要么固化在服务器上的固定版本里，要么随仓库保留且兼容旧 SHA。依赖「当前分支里的最新脚本」回滚，往往在你需要它时已经不存在了。',
+          },
+          {
+            kind: 'qa',
+            items: [
+              {
+                question: '为什么 CI 绿灯但线上还是旧版本？',
+                answer: '可能是部署步骤因凭据缺失静默跳过、部署状态未更新，或镜像摘要未变导致容器没重建。应以部署状态时间戳和 /health 版本号为准，而不是流水线结论。',
+              },
+              {
+                question: '部署为什么要固定 SHA 而不是分支名？',
+                answer: '分支会继续前进，并发推送时「拉最新」可能部署到一个未经本次测试的版本。固定 SHA 保证测过与部署的是同一份代码，版本可追溯。',
+              },
+              {
+                question: '为什么说 umask 会影响容器里的源码权限？',
+                answer: 'umask 是进程级全局状态，若设为 077，git checkout 重建的源码文件会变成 600；Dockerfile COPY 保留权限，容器内非 root 用户就读不到文件。',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
 ]

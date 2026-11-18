@@ -518,4 +518,122 @@ export const CS_CHAPTERS: TutorialChapter[] = [
       },
     ],
   },
+  {
+    id: 'cs-computer-network-ip',
+    title: 'IP、TCP 与 HTTP 的分层职责',
+    direction: '计算机基础',
+    sub_direction: '网络',
+    level: '基础',
+    summary: '一句话说清每层解决什么问题：IP 负责寻址与送达，TCP 负责可靠有序，HTTP 负责语义；握手、TIME_WAIT 与 keep-alive 都落在各自那一层。',
+    sections: [
+      {
+        id: 'layers',
+        title: '每层只解决自己的问题',
+        blocks: [
+          {
+            kind: 'text',
+            text: '分层的意义在于职责隔离：IP 层只保证「尽力把包送到目标地址」，不保证到达、不保证顺序；TCP 在 IP 之上加确认、重传与序号，把不可靠的字节流变成可靠有序的流；HTTP 再往上定义「一次请求要做什么」。把问题归到正确的层，排查才有方向。',
+          },
+          {
+            kind: 'table',
+            headers: ['层', '核心职责', '典型故障现象'],
+            rows: [
+              ['IP / 网络层', '寻址、路由、分包', '目标不可达、路由环路、TTL 耗尽'],
+              ['TCP / 传输层', '可靠、有序、流量与拥塞控制', '重传、连接超时、TIME_WAIT 堆积'],
+              ['HTTP / 应用层', '方法、状态码、头部、语义', '404/500、缓存错误、 Cookie 丢失'],
+            ],
+          },
+          {
+            kind: 'note',
+            tone: 'info',
+            title: '三次握手在解决什么',
+            text: '客户端与服务端各确认一次自己的发送与接收能力正常，再确认对方也确认完毕：SYN、SYN+ACK、ACK 三步让双方对「初始序号」达成一致，避免旧连接的数据被误认作新连接。',
+          },
+        ],
+      },
+      {
+        id: 'connection',
+        title: '连接复用与 TIME_WAIT',
+        blocks: [
+          {
+            kind: 'text',
+            text: 'HTTP/1.1 默认 keep-alive，一个 TCP 连接可以承载多个请求，省去反复握手。主动关闭连接的一方会进入 TIME_WAIT，停留 2 倍报文最大生命周期，确保最后的 ACK 能到达，并让迟到的旧包在网络里散尽。',
+          },
+          {
+            kind: 'list',
+            items: [
+              '大量短连接 + 主动关闭，会让发起方积累大量 TIME_WAIT，可能出现端口耗尽。',
+              '更稳妥的做法是复用连接池、让客户端侧主动关闭，或用长连接网关减少建连次数。',
+              'TIME_WAIT 本身是正常的协议行为，不是「泄漏」；不要靠调内核参数掩盖连接管理问题。',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'example',
+        title: '用命令把分层现象看一遍',
+        blocks: [
+          {
+            kind: 'text',
+            text: '排查网络问题时，按层从下往上验证，比直接盯应用日志更快定位：先看能不能到达，再看端口通不通，最后看 HTTP 返回什么。',
+          },
+          {
+            kind: 'code',
+            language: 'bash',
+            caption: '从网络层到应用层逐层确认',
+            code: [
+              '# 网络层：目标是否可达、路径如何',
+              'ping example.com',
+              'traceroute example.com',
+              '',
+              '# 传输层：目标端口是否开放、TLS 是否正常',
+              'nc -vz example.com 443',
+              'openssl s_client -connect example.com:443',
+              '',
+              '# 应用层：看状态码与响应头',
+              'curl -i https://example.com/health',
+            ].join('\n'),
+          },
+          {
+            kind: 'list',
+            ordered: true,
+            items: [
+              'ping 不通但 curl 通：可能是主机禁了 ICMP，不代表服务不可用。',
+              'TCP 能连但 TLS 失败：证书链、SNI 或协议版本问题，在应用层之上、HTTP 之下。',
+              '拿到 4xx/5xx 后停止怀疑网络：包已经完整往返，问题在服务端语义处理。',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'pitfalls',
+        title: '常见坑与自测',
+        blocks: [
+          {
+            kind: 'note',
+            tone: 'warn',
+            title: 'TCP 是字节流，不保留消息边界',
+            text: '多次 write 的数据可能被合并或被拆开接收，应用层必须自己定义帧边界（长度前缀、分隔符）；直接假设「一次 send 对应一次 recv」是网络编程最常见的错误。',
+          },
+          {
+            kind: 'qa',
+            items: [
+              {
+                question: 'TCP 与 UDP 的核心差别是什么？',
+                answer: 'TCP 提供可靠、有序、面向连接的字节流，有确认与重传；UDP 只尽最大努力交付，不保证到达与顺序，但开销小、延迟可控，适合实时场景。',
+              },
+              {
+                question: 'HTTP keep-alive 解决的是什么问题？',
+                answer: '复用同一 TCP 连接处理多个请求，避免每个请求都经历三次握手与慢启动，降低延迟与服务器连接开销。',
+              },
+              {
+                question: '为什么主动关闭方会有大量 TIME_WAIT？',
+                answer: '主动关闭方发出最后一个 ACK 后必须等待 2MSL，确保对方能收到并让迟到报文失效；短连接高并发下积累明显，应优先用连接池与长连接。',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
 ]

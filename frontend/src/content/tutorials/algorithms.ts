@@ -549,4 +549,135 @@ export const ALGORITHM_CHAPTERS: TutorialChapter[] = [
       },
     ],
   },
+  {
+    id: 'algo-sorting-stability',
+    title: '排序算法的稳定性与选择',
+    direction: '算法与数据结构',
+    sub_direction: '排序',
+    level: '进阶',
+    summary: '稳定排序保留相等元素的原顺序：它决定多关键字排序能否正确叠加，也是快速排序与归并排序选型的关键。',
+    sections: [
+      {
+        id: 'stability',
+        title: '什么是稳定性，为什么重要',
+        blocks: [
+          {
+            kind: 'text',
+            text: '稳定性指：排序后，值相等的元素仍保持它们在原序列中的相对顺序。很多工程质量问题都出在这里——先按时间排序、再按状态排序，如果第二次排序不稳定，第一次排好的时间顺序就被打乱了。',
+          },
+          {
+            kind: 'table',
+            headers: ['算法', '稳定', '平均时间', '额外空间'],
+            rows: [
+              ['归并排序', '是', 'O(n log n)', 'O(n)'],
+              ['冒泡 / 插入排序', '是', 'O(n^2)', 'O(1)'],
+              ['快速排序', '否', 'O(n log n)', 'O(log n) 递归栈'],
+              ['堆排序', '否', 'O(n log n)', 'O(1)'],
+            ],
+          },
+          {
+            kind: 'note',
+            tone: 'info',
+            title: '语言内置排序怎么选',
+            text: 'Python 的 sorted 与 Java 的 Arrays.sort（对象数组）都是稳定的；C++ 的 std::sort 不保证稳定，需要稳定版本用 std::stable_sort。写多关键字排序前先查文档，别默认稳定。',
+          },
+        ],
+      },
+      {
+        id: 'multi-key',
+        title: '多关键字排序的正确姿势',
+        blocks: [
+          {
+            kind: 'text',
+            text: '有两种写法：一是用稳定排序按关键字从次要到主要依次排（LSD），二是把多个关键字拼成元组一次比较（MSD）。前者依赖稳定性，后者不依赖但元组构造有成本。',
+          },
+          {
+            kind: 'code',
+            language: 'python',
+            caption: '按状态升序、同状态内按创建时间升序',
+            code: [
+              'items = [',
+              '    {"state": 2, "created": 1, "name": "a"},',
+              '    {"state": 1, "created": 3, "name": "b"},',
+              '    {"state": 1, "created": 2, "name": "c"},',
+              ']',
+              '',
+              '# 写法一：两次稳定排序，次要关键字先排',
+              'by_time = sorted(items, key=lambda x: x["created"])',
+              'result = sorted(by_time, key=lambda x: x["state"])',
+              '',
+              '# 写法二：元组一次比较，不依赖稳定性',
+              'result2 = sorted(items, key=lambda x: (x["state"], x["created"]))',
+            ].join('\n'),
+          },
+          {
+            kind: 'list',
+            items: [
+              '写法一在「关键字是运行时动态列表」时更灵活，循环几次排几次。',
+              '写法二更短、更快，且不受排序算法稳定性影响，固定关键字时优先。',
+              '降序混合升序时写法一需要用 reverse 分段处理，写法二要给某一维取负值或自定义比较。',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'quickselect',
+        title: 'Top-K 不必全排序',
+        blocks: [
+          {
+            kind: 'text',
+            text: '只要前 K 大（小）的 K 个元素，不需要把整个数组排成 O(n log n)。维护一个大小不超过 K 的堆，扫一遍数组即可，复杂度 O(n log K)，K 远小于 n 时优势明显。',
+          },
+          {
+            kind: 'code',
+            language: 'python',
+            caption: '堆求 Top-K',
+            code: [
+              'import heapq',
+              '',
+              'def top_k(nums, k):',
+              '    heap = []',
+              '    for value in nums:',
+              '        if len(heap) < k:',
+              '            heapq.heappush(heap, value)',
+              '        elif value > heap[0]:',
+              '            heapq.heapreplace(heap, value)',
+              '    return sorted(heap, reverse=True)',
+              '',
+              '# 小根堆堆顶是「当前前 K 个里最小的」，新元素比它大才值得替换',
+            ].join('\n'),
+          },
+        ],
+      },
+      {
+        id: 'pitfalls',
+        title: '常见坑与自测',
+        blocks: [
+          {
+            kind: 'note',
+            tone: 'warn',
+            title: '快排的最坏情况',
+            text: '已排序或近乎有序的数组若固定选首元素作 pivot，快排会退化到 O(n^2)。随机化 pivot 或三数取中可以避免；生产库通常用内省排序（快排退化时切堆排）。',
+          },
+          {
+            kind: 'qa',
+            items: [
+              {
+                question: '先按姓名排序、再按年龄排序，想让同年龄的人按姓名排，第二次排序必须满足什么？',
+                answer: '第二次按年龄的排序必须是稳定的，才能保留第一次排好的姓名顺序；否则同年龄组内姓名顺序不确定。',
+              },
+              {
+                question: '为什么堆排序不是稳定排序？',
+                answer: '堆在调整过程中会把不相邻的元素交换位置，相等元素的相对顺序可能被打乱；稳定性要求只交换必要的相邻位置或保持原有次序。',
+              },
+              {
+                question: '从 100 万条记录里取最大的 10 条，为什么不用全排序？',
+                answer: '全排序是 O(n log n)，用小根堆维护 10 个元素是 O(n log 10)，常数差距巨大且只需 O(10) 额外空间。',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
 ]

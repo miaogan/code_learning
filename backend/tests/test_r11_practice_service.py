@@ -500,12 +500,12 @@ def test_sub_direction_auto_locks_parent_when_direction_is_all(tmp_db: Any) -> N
 
 
 def test_system_architecture_seed_import_is_idempotent(tmp_db: Any) -> None:
-    """真实 seed 首次导入 1334 道，重复导入与刷新均不新增或改写；只使用临时库。"""
-    assert question_bank.ensure_seeded() == 1334
-    assert repository.count_questions() == 1334
+    """真实 seed 首次导入 1434 道，重复导入与刷新均不新增或改写；只使用临时库。"""
+    assert question_bank.ensure_seeded() == 1434
+    assert repository.count_questions() == 1434
     assert question_bank.import_seed() == 0
     assert question_bank.refresh_from_seed() == 0
-    assert question_bank.ensure_seeded() == 1334
+    assert question_bank.ensure_seeded() == 1434
     batch = [row for row in question_bank.practice_pool() if row["source"] == "sys-arch"]
     assert len(batch) == 60
     assert all(
@@ -518,18 +518,20 @@ def test_system_architecture_seed_import_is_idempotent(tmp_db: Any) -> None:
 
 
 def test_system_architecture_focus_and_objective_grading(tmp_db: Any) -> None:
-    """架构设计筛选恰出 60 道且无补位，三种客观题沿用统一判分入口。"""
+    """架构设计筛选恰出 62 道且无补位（sys-arch 60 + r123 kbx 2），三种客观题沿用统一判分入口。"""
     question_bank.ensure_seeded()
     focus = {"direction": "研发工程实践", "sub_direction": "架构设计"}
     paper = practice.build_paper(**focus, limit=0)
     ids = _ids(paper)
-    assert len(ids) == paper["hit_count"] == 60
-    assert all(question_id.startswith("sysarch-") for question_id in ids)
+    assert len(ids) == paper["hit_count"] == 62
+    assert sum(question_id.startswith("sysarch-") for question_id in ids) == 60
+    assert sum(question_id.startswith("kbx-") for question_id in ids) == 2
+    assert all(question_id.startswith(("sysarch-", "kbx-")) for question_id in ids)
     assert paper["sub_direction"] == "架构设计"
     assert paper["sub_direction_backfill"] == 0
     assert paper["filtered_count"] == 0
     assert all("answer" not in row and "explanation" not in row for row in paper["questions"])
-    assert practice.stats(**focus)["hit"] == 60
+    assert practice.stats(**focus)["hit"] == 62
 
     for index, kind in ((1, "single"), (3, "multiple"), (5, "judge")):
         question_id = f"sysarch-{index:03d}"
