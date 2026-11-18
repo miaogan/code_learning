@@ -57,6 +57,18 @@ def _guard_answer(raw: str) -> str:
     return checked.text
 
 
+def _guard_turn(turn: InterviewTurn) -> InterviewTurn:
+    """回合输出过护栏：评语与下一条发言都是模型写的，可能复述作答里的手机号。"""
+    guarded = guardrails.guard_output(turn.comment, surface="interview.answer")
+    if guarded.blocked or guarded.changed:
+        turn.comment = guarded.notice if guarded.blocked else guarded.text
+    if turn.next_question is not None:
+        prompt = guardrails.guard_output(turn.next_question.prompt, surface="interview.answer")
+        if prompt.blocked or prompt.changed:
+            turn.next_question.prompt = prompt.notice if prompt.blocked else prompt.text
+    return turn
+
+
 @router.get("", response_model=list[InterviewSessionSummary], summary="历史面试列表（含在途场次）")
 def get_runs(limit: int = 10) -> list[InterviewSessionSummary]:
     return list_interview_sessions(limit)
@@ -79,9 +91,8 @@ async def submit_answer(
     # r122：作答正文会原样进评分提示词，是注入的入口之一（且 schema 不限长度）。
     checked = _guard_answer(payload.answer)
     client = user_ai.client_for(user, "heavy")
-    return await score_interview_answer(
-        run_id, payload.question_id, checked, client=client
-    )
+    turn = await score_interview_answer(run_id, payload.question_id, checked, client=client)
+    return _guard_turn(turn)
 
 
 @router.post(
@@ -123,8 +134,10 @@ async def submit_answer_stream(
     async def _gen():
         yield sse_event("phase", {"phase": "scoring", "message": "正在评分并生成下一条发言"})
         try:
-            turn = await score_interview_answer(
-                run_id, payload.question_id, checked.text, client=client
+            turn = _guard_turn(
+                await score_interview_answer(
+                    run_id, payload.question_id, checked.text, client=client
+                )
             )
         except AppError as exc:
             yield sse_event(

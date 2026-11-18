@@ -93,8 +93,8 @@
 | `POST /api/coach/agent/run` | ✅ 建客户端前 | ✅ 结论 | `422 GUARDRAIL_BLOCKED` |
 | `POST /api/taifu/chat` | ✅ 查库前 | ✅ 回答 | `200 + notice`（沿用零成本出口口径） |
 | `POST /api/taifu/chat/stream` | ✅ 建客户端前 | ✅ token 流 | `done` 帧 + `reason=guardrail` |
-| `POST /api/interviews/{id}/answers` | ✅ 评分前 | — | `422 GUARDRAIL_BLOCKED` |
-| `.../answers/stream` | ✅ 建客户端前 | — | `error` 帧（本端点既有契约） |
+| `POST /api/interviews/{id}/answers` | ✅ 评分前 | ✅ 评语 + 下一条发言 | `422 GUARDRAIL_BLOCKED` |
+| `.../answers/stream` | ✅ 建客户端前 | ✅ 同左 | `error` 帧（本端点既有契约） |
 
 **不做输入护栏的两个地方**，都是刻意留白：
 
@@ -103,6 +103,7 @@
   没有自由文本字段。
 
 护栏统一放在 `client_for()` **之前**：被拦的请求不该扣掉一次内置 Key 配额。
+面试回合的输出侧也接了：评语与下一条发言是模型写的，可能复述作答里的手机号。
 
 ## 配置
 
