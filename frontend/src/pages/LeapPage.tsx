@@ -164,7 +164,7 @@ function LeapBody({ archive }: { archive: LeapArchive }) {
         </Card>
       </section>
 
-      <section className="sc-leap-block sc-leap-block--wide">
+      <section className="sc-leap-block">
         <SectionHead
           index="03"
           title="面试表达"

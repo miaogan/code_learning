@@ -104,6 +104,8 @@ deploy.env
 
 # 本地构建临时目录（Windows esbuild 临时文件被杀软锁时的绕行目录）
 frontend/.tmp/
+# 本会话把 TEMP/TMP 指到 frontend/logs/tmp 时产生的临时目录（用完即删，防误提交）
+frontend/logs/
 # Local sandbox build cache (when esbuild/vitest TEMP is redirected to the workspace)
 .tmp/
 # 本机 pytest 的 basetemp / 日志目录（避免 Temp EPERM 时把报告落进工作区却被误提交）

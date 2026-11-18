@@ -11384,16 +11384,16 @@ a.sc-radar-name--link:hover .sc-radar-ext {
   line-height: var(--lh-meta);
   white-space: nowrap;
 }
+/* r130：三块改单列全宽流——原两栏网格在数据失衡时（岗位差距为空卡/面试表达空态
+   对上 5 个项目的长列表）左右高度差可达数百 px，空洞非常难看；报告页的 RoleFitCard
+   本就是全宽场景验证过的。单列后与 <1024 的堆叠形态完全一致。 */
 .sc-leap-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--sp-5);
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-6);
 }
 .sc-leap-block {
   min-width: 0;
-}
-.sc-leap-block--wide {
-  grid-column: 1 / -1;
 }
 .sc-leap-head {
   display: flex;
@@ -11552,12 +11552,6 @@ a.sc-radar-name--link:hover .sc-radar-ext {
 }
 
 @media (max-width: 1023px) {
-  .sc-leap-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .sc-leap-block--wide {
-    grid-column: auto;
-  }
   .sc-leap-hero {
     flex-direction: column;
   }
