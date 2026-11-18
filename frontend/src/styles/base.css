@@ -11977,93 +11977,123 @@ a.sc-radar-name--link:hover .sc-radar-ext {
   line-height: var(--lh-meta);
 }
 
-/* --- r126 侧栏多级菜单（迭代三）：向右级联浮层 --------------------------------
-   大区头常驻侧栏（仅三行），hover/点击后向右浮出面板；工具区二级分组在面板内
-   再向右级联（.sc-navsection 嵌套 → absolute 锚到各自头部）。浮层不挤占布局，
-   侧栏无滚动条。浮层被 .sc-sidebar-inner 的 overflow-y:auto 裁掉——侧栏内容
-   收敛为三个大区头后内部自滚兜底不再需要，本块放开为 visible。 */
-.sc-sidebar-inner {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-2);
-  overflow: visible;
+/* --- r127 导航重构：工具上移顶栏，侧栏只留流程 --------------------------------
+   r126 的折叠/浮层整体退役（.sc-navsection 等样式已删）。侧栏回归 r83 形态
+   （只放 Stepper，内部自滚兜底恢复原样）；工具 13 项平铺在桌面顶栏
+   （.sc-topnav），分组语义用细分隔线表达；设置收进顶栏唯一下拉（.sc-settings-menu）。 */
+.sc-topnav {
+  display: none; /* <1024：侧栏隐藏时的入口由 .sc-topstepper 的横条承接 */
 }
-.sc-navsection {
+
+.sc-settings-menu-slot {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .sc-topnav {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-1);
+    min-width: 0;
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+  .sc-topnav-group {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-1);
+  }
+  /* 组间细分隔线：分组语义纯视觉，零交互成本 */
+  .sc-topnav-sep {
+    width: 1px;
+    height: calc(var(--sp-3));
+    margin: 0 var(--sp-2);
+    background: var(--border-subtle);
+  }
+  .sc-topnav-item {
+    padding: var(--sp-1) var(--sp-2);
+    border-radius: var(--radius-4);
+    color: var(--text-secondary);
+    font-size: var(--fs-small);
+    line-height: var(--lh-small);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .sc-topnav-item:hover {
+    background: var(--overlay-04);
+    color: var(--text-primary);
+  }
+  .sc-topnav-item.is-active {
+    background: var(--accent-tint);
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .sc-settings-menu-slot {
+    display: block;
+  }
+}
+
+/* 中窄屏（1024-1279）：顶栏横向空间紧张，收起装饰性文案给工具导航让位 */
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .sc-brand-tagline,
+  .sc-storage,
+  .sc-github-label {
+    display: none;
+  }
+}
+
+/* 设置下拉：全站唯一，交互只有点击开合（级联浮层的教训） */
+.sc-settings-menu {
   position: relative;
 }
-/* 浮层面板：absolute 锚到分区头部右侧，盖在主区上；面板本体是 wrapper 的
-   DOM 子节点，鼠标滑进面板不触发 wrapper 的 mouseleave（hover 隧道）。 */
-.sc-navsection-body {
-  position: absolute;
-  left: calc(100% + var(--sp-2));
-  top: calc(var(--sp-2) * -1);
-  min-width: calc(var(--sp-4) * 12); /* 192px：容纳步骤编号 + 文案 */
-  z-index: 60; /* 高于 topbar 10 / toast 20、低于 modal 80；沿用既有裸值约定 */
-  display: flex;
-  flex-direction: column;
-  padding: var(--sp-2);
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-8);
-  box-shadow: var(--elev-2);
-}
-/* 二级级联：面板内的分区面板再向右展开一层，形成层次 */
-.sc-navsection-body .sc-navsection-body {
-  left: 100%;
-  top: calc(var(--sp-1) * -1);
-  min-width: calc(var(--sp-4) * 10); /* 160px：仅条目文案 */
-}
-/* 大区头：靠侧栏文字列起点 */
-.sc-toolnav-group {
-  width: 100%;
-  box-sizing: border-box;
-  display: flex;
+.sc-settings-menu-btn {
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  height: calc(var(--sp-2) * 2 + var(--lh-small));
-  padding: 0 var(--sp-3);
+  gap: var(--sp-1);
+  padding: var(--sp-1) var(--sp-2);
   border: none;
-  border-left: 2px solid transparent;
-  border-radius: 2px;
+  border-radius: var(--radius-4);
   background: transparent;
   color: var(--text-secondary);
   font: inherit;
   font-size: var(--fs-small);
   line-height: var(--lh-small);
-  font-weight: 600;
-  text-align: left;
   cursor: pointer;
 }
-.sc-toolnav-group:hover {
+.sc-settings-menu-btn:hover,
+.sc-settings-menu-btn.is-active {
   background: var(--overlay-04);
   color: var(--text-primary);
 }
-.sc-toolnav-group.is-active {
-  color: var(--text-primary);
+.sc-settings-menu-panel {
+  position: absolute;
+  top: calc(100% + var(--sp-1));
+  right: 0;
+  min-width: calc(var(--sp-4) * 8);
+  z-index: 30; /* 高于顶栏内容、低于 modal 80；沿用既有裸值约定 */
+  display: flex;
+  flex-direction: column;
+  padding: var(--sp-1);
+  background: var(--bg-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-8);
+  box-shadow: var(--elev-2);
 }
-.sc-toolnav-group-label {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.sc-settings-menu-item {
+  padding: var(--sp-1) var(--sp-3);
+  border-radius: var(--radius-4);
+  color: var(--text-primary);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  text-decoration: none;
   white-space: nowrap;
 }
-.sc-toolnav-chevron {
-  flex: 0 0 auto;
-  margin-left: var(--sp-2);
-  color: var(--text-tertiary);
-  font-size: var(--fs-meta, var(--fs-small));
+.sc-settings-menu-item:hover {
+  background: var(--overlay-04);
 }
-/* 面板内的行：统一贴面板内边距起排（浮层不需要侧栏那种深层缩进） */
-.sc-navsection-body .sc-toolnav-group,
-.sc-navsection-body .sc-toolnav-item {
-  width: 100%;
-  box-sizing: border-box;
-  padding-left: var(--sp-3);
-  font-size: var(--fs-small);
+.sc-settings-menu-item.is-active {
+  background: var(--accent-tint);
+  color: var(--accent);
+  font-weight: 600;
 }
-/* 工具分组容器收进浮层后不再自带顶部间距 */
-.sc-navsection-body .sc-toolnav {
-  margin-top: 0;
-  padding-top: 0;
-}
+

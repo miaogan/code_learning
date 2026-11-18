@@ -5,7 +5,7 @@ import { Button } from './components/ui/Button'
 import { ErrorBoundary } from './components/ui/ErrorBoundary'
 import { Stepper, type StepItem, type StepState } from './components/ui/Stepper'
 import { ToolNav } from './components/ui/ToolNav'
-import { NavSection, NavSectionGroup } from './components/ui/NavSection'
+import { SettingsMenu } from './components/ui/SettingsMenu'
 import { TaifuLauncher } from './components/taifu/TaifuLauncher'
 import { StreakBadge } from './components/ui/StreakBadge'
 import EvalPage from './pages/EvalPage'
@@ -131,8 +131,33 @@ export default function App() {
             />
             <span className="sc-github-label">GitHub</span>
           </a>
+          {/* r127 桌面工具导航：13 个工具平铺（两字词放得下），分组语义用细分隔线
+              表达（文房┃研习┃岗途┃雷达┃卷藏）——纯视觉、零交互成本。与手机端
+              `.sc-topstepper` 里的横条共用 TOOL_GROUPS 数据源。<1024 隐藏。 */}
+          <nav className="sc-topnav" aria-label="工具导航">
+            {TOOL_GROUPS.map((group, index) => (
+              <span className="sc-topnav-group" key={group.key}>
+                {index > 0 ? <span className="sc-topnav-sep" aria-hidden="true" /> : null}
+                {group.items.map((item) => (
+                  <Link
+                    key={item.key}
+                    to={item.to}
+                    className={isRouteActive(pathname, item.to) ? 'sc-topnav-item is-active' : 'sc-topnav-item'}
+                    aria-current={isRouteActive(pathname, item.to) ? 'page' : undefined}
+                  >
+                    {item.label}
+                  </Link>
+                ))}
+              </span>
+            ))}
+          </nav>
         </div>
         <div className="sc-topbar-right">
+          {/* r127 设置下拉：设置组收进唯一一个下拉菜单（点击开合），桌面专用；
+              <1024 由 .sc-topstepper 的平铺设置条承接。 */}
+          <span className="sc-settings-menu-slot">
+            <SettingsMenu items={SETTINGS_ITEMS} />
+          </span>
           <StreakBadge />
           <span className="sc-storage">数据按账号隔离保存</span>
           <Link className="sc-topbar-link" to="/settings" title="配置：账号与 AI 服务">
@@ -149,30 +174,10 @@ export default function App() {
           {/* r83 §11：外层 <aside> 保持撑满整列（右侧分隔线不断），sticky 交给这层，
               导航才不会随页面滚走。见 base.css .sc-sidebar-inner。 */}
           <div className="sc-sidebar-inner">
-            {/* r126 迭代四：「流程」常驻展开（Stepper 竖排自带「流程」标题，
-                日常主路径零操作直达）；「工具 / 设置」保留向右级联浮层折叠。
-                hover 停留 300ms 也可展开（互斥、带收起缓冲，见 NavSection）。
-                工具大区内部保留 5 个语义分组二级折叠。 */}
-            <NavSectionGroup>
-              <Stepper steps={steps} orientation="vertical" />
-              <NavSection
-                sectionId="tools"
-                label="工具"
-                activeInside={TOOL_ITEMS.some((item) => isRouteActive(pathname, item.to))}
-              >
-                {/* 外层大区头已承担「工具」标题，label 传空隐藏内层组标题；
-                    sectionPrefix 让二级分区的 openId 变成层级式（tools/group-*），
-                    NavSection 的互斥可见性才能识别「打开的是本大区的子分区」。 */}
-                <ToolNav groups={[...TOOL_GROUPS]} label="" sectionPrefix="tools" />
-              </NavSection>
-              <NavSection
-                sectionId="settings"
-                label="设置"
-                activeInside={SETTINGS_ITEMS.some((item) => isRouteActive(pathname, item.to))}
-              >
-                <ToolNav items={SETTINGS_ITEMS} label="" />
-              </NavSection>
-            </NavSectionGroup>
+            {/* r127：侧栏只承担「流程」——5 步线性主路径是竖向导航的本职；
+                工具上移桌面顶栏（.sc-topnav）+ 手机横条（.sc-topstepper），
+                设置收进顶栏下拉。侧栏不再有折叠/浮层，永远不滚不折。 */}
+            <Stepper steps={steps} orientation="vertical" />
           </div>
         </aside>
         <main className="sc-main">

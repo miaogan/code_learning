@@ -1,10 +1,17 @@
-import type { ToolNavItem, ToolNavGroup } from '../components/ui/ToolNav'
+import type { ToolNavItem } from '../components/ui/ToolNav'
+
+/** 工具分组：key 供渲染列表用，label 用于将来需要展示分组名的场景。 */
+export interface ToolNavGroup {
+  key: string
+  label: string
+  items: ToolNavItem[]
+}
 
 /**
- * 侧栏「工具」分组（r126 多级菜单的唯一数据源）。
+ * 工具分组数据源（r127：桌面顶栏 `.sc-topnav` 按组分隔线平铺的唯一数据源）。
  *
- * - 侧栏（vertical）按组折叠渲染：默认收起，当前项所在组自动展开；
- * - 顶部横条（<1024，horizontal）用 `TOOL_ITEMS` 平铺，入口同源不分叉；
+ * - 桌面顶栏：分组间渲染细分隔线，分组语义纯视觉、零交互成本；
+ * - 手机横条（<1024）：`TOOL_ITEMS` 平铺，入口同源不分叉；
  * - 分组语义：文房=AI 辅助（检索/讲席/修文）、研习=学习练习（学堂/演武/镜试）、
  *   岗途=岗位闭环（对岗/跃迁）、雷达=采集看板（先锋/国子监）、卷藏=记录存档（战绩/卷宗/校勘）。
  */
