@@ -14,6 +14,7 @@ import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
 import { Chip } from '../ui/Chip'
 import { MultiChipRow } from '../ui/ChipRow'
+import { ConfirmButton } from '../ui/ConfirmButton'
 import { EmptyState } from '../ui/EmptyState'
 import { Pagination } from '../ui/Pagination'
 import { Explanation } from './Explanation'
@@ -39,6 +40,10 @@ export interface WrongBookListProps {
   onToggle: (questionId: string) => void
   onFilterLanguage: (language: PracticeLanguageFilter[]) => void
   onRetrain: () => void
+  /** r129 移出一题：服务端只记移出标记，作答事件与统计口径不动。 */
+  onDismiss: (questionId: string) => void
+  /** r129 清空错题本：逐题记移出标记（之后再答错会重新进错题本）。 */
+  onClear: () => void
   /** 空态出口「开始练习」→ 切回练习 tab */
   onStartPractice: () => void
 }
@@ -63,6 +68,8 @@ export function WrongBookList({
   onToggle,
   onFilterLanguage,
   onRetrain,
+  onDismiss,
+  onClear,
   onStartPractice,
 }: WrongBookListProps) {
   if (total === 0) {
@@ -87,6 +94,11 @@ export function WrongBookList({
           <span className="sc-mono">{total}</span>
           <span>道</span>
         </p>
+        <ConfirmButton
+          label="清空错题本"
+          confirmLabel="确认清空全部？"
+          onConfirm={onClear}
+        />
       </div>
 
       {items.length === 0 ? (
@@ -99,6 +111,12 @@ export function WrongBookList({
               <li key={item.question_id} className="sc-qa-wrong-row">
                 <div className="sc-qa-wrong-prompt">
                   <span className="sc-qa-wrong-text">{promptPreview(item.prompt)}</span>
+                  <ConfirmButton
+                    label="移出"
+                    confirmLabel="确认移出？"
+                    className="sc-confirm-btn--row"
+                    onConfirm={() => onDismiss(item.question_id)}
+                  />
                   <button
                     type="button"
                     className="sc-btn sc-btn--ghost is-sm"

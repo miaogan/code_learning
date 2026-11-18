@@ -539,6 +539,32 @@ export default function PracticePage() {
           setExpandedId(null)
         }}
         onRetrain={retrainWrong}
+        onDismiss={(questionId) => {
+          void api
+            .dismissWrongQuestion(questionId)
+            .then(() => {
+              setWrongPulse((value) => value + 1) // 错题本重取
+              setWrongPage(1)
+              setExpandedId(null)
+              reloadStats() // wrong_total 与错题本同一口径，必须同步刷新
+            })
+            .catch((reason: unknown) => {
+              setWrongError(messageOf(reason, '移出失败，请稍后重试'))
+            })
+        }}
+        onClear={() => {
+          void api
+            .clearWrongBook()
+            .then(() => {
+              setWrongPulse((value) => value + 1)
+              setWrongPage(1)
+              setExpandedId(null)
+              reloadStats()
+            })
+            .catch((reason: unknown) => {
+              setWrongError(messageOf(reason, '清空失败，请稍后重试'))
+            })
+        }}
         onStartPractice={() => {
           // 空态出口「开始练习」= 回筛选重新挑题（不是回到上一轮的完成态）
           resetToSetup()

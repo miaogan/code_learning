@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { api } from '../api/client'
+import { ApiError, api } from '../api/client'
 import type { ResumeVersionDetail, ResumeVersionSummary } from '../api/types'
 import { Card } from '../components/ui/Card'
+import { ConfirmButton } from '../components/ui/ConfirmButton'
 import { EmptyState } from '../components/ui/EmptyState'
 import { InlineError } from '../components/ui/InlineError'
 import { PhaseLoader } from '../components/ui/PhaseLoader'
@@ -81,9 +82,23 @@ function ChipRow({ title, items }: { title: string; items: string[] }) {
 
 export default function VersionsPage() {
   const [picked, setPicked] = useState<Picked>({ older: null, newer: null })
+  const [deleteError, setDeleteError] = useState('')
   const listAsync = useAsync(() => api.listResumeVersions(20), [])
   // `data` 在重载期间保留上一次成功值；按 status 派生会让版本选择器闪空并级联重拉详情。
   const versions = listAsync.data
+
+  // r129 删除简历版本：服务端级联清该版本的画像 / 画像任务 / 简历时间线事件；
+  // 删的是当前最新画像来源时，全站自然回到「先上传简历」的门禁态（确认框已说明）。
+  const deleteVersion = async (resumeId: string): Promise<void> => {
+    try {
+      await api.deleteResumeVersion(resumeId)
+      setDeleteError('')
+      setPicked({ older: null, newer: null }) // 选择失效回落由 resolveSelection 兜底
+      listAsync.reload()
+    } catch (reason: unknown) {
+      setDeleteError(reason instanceof ApiError ? reason.message : '删除失败，请稍后重试')
+    }
+  }
 
   const selection = useMemo(
     () => (versions === null ? { older: null, newer: null } : resolveSelection(versions, picked)),
@@ -170,6 +185,27 @@ export default function VersionsPage() {
                 onChange={(value) => setPicked((prev) => ({ ...prev, newer: value }))}
               />
             </label>
+          </div>
+
+          {deleteError !== '' ? <InlineError message={deleteError} /> : null}
+
+          {/* r129：删除版本 = 连同该版本画像一起清（简历正文是最敏感的个人数据）。
+              若它是最新画像的来源，各功能需要重新上传简历解锁——确认文案里说清楚。 */}
+          <div className="sc-version-manage">
+            <p className="sc-coach-meta">
+              删除版本会同时删除它的画像与简历时间线事件；历史测评成绩（快照）保留。
+              若删除的是最新画像的来源，需要重新上传简历才能继续使用测评等功能。
+            </p>
+            <div className="sc-version-manage-row">
+              {versions.map((version) => (
+                <ConfirmButton
+                  key={version.resume_id}
+                  label={`删除 ${versionLabel(version)}`}
+                  confirmLabel="确认删除该版本及其画像？"
+                  onConfirm={() => void deleteVersion(version.resume_id)}
+                />
+              ))}
+            </div>
           </div>
 
           {detailAsync.status === 'loading' && (

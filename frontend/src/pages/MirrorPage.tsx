@@ -13,6 +13,7 @@ import { ApiError, api } from '../api/client'
 import type { MirrorCard, MirrorSuggestion } from '../api/types'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
+import { ConfirmButton } from '../components/ui/ConfirmButton'
 import { InlineError } from '../components/ui/InlineError'
 import { PhaseLoader } from '../components/ui/PhaseLoader'
 import { ResumeGate } from '../components/ui/ResumeGate'
@@ -198,6 +199,27 @@ export default function MirrorPage() {
     cardsState.reload()
   }
 
+  // r129 删除：单条删除后若删的正是当前展开的卡，顺手清掉主栏展开态。
+  const deleteCard = async (cardId: string): Promise<void> => {
+    try {
+      await api.deleteMirrorCard(cardId)
+      if (current?.id === cardId) setCurrent(null)
+      refreshCards()
+    } catch (reason: unknown) {
+      setError(reason instanceof ApiError ? reason.message : '删除失败，请稍后重试')
+    }
+  }
+
+  const clearHistory = async (): Promise<void> => {
+    try {
+      await api.clearMirrorCards()
+      setCurrent(null)
+      refreshCards()
+    } catch (reason: unknown) {
+      setError(reason instanceof ApiError ? reason.message : '清空失败，请稍后重试')
+    }
+  }
+
   const runAsk = async (askQuestion: string | null, source: 'custom' | 'recommended'): Promise<void> => {
     abortRef.current?.abort()
     const controller = new AbortController()
@@ -329,15 +351,24 @@ export default function MirrorPage() {
 
         <aside className="sc-mirror-side">
           <Card className="sc-mirror-side-card">
-            <h2 className="sc-mirror-subtitle">历史复盘</h2>
+            <div className="sc-mirror-side-head">
+              <h2 className="sc-mirror-subtitle">历史复盘</h2>
+              {history.length > 0 ? (
+                <ConfirmButton
+                  label="清空"
+                  confirmLabel="确认清空全部？"
+                  onConfirm={() => void clearHistory()}
+                />
+              ) : null}
+            </div>
             {history.length > 0 ? (
               <>
                 <p className="sc-mirror-note">
-                  {history.length} 条 · 按账号隔离保存，点一条即可回看
+                  {history.length} 条 · 点一条回看；删除只影响复盘记录本身
                 </p>
                 <ul className="sc-mirror-history">
                   {history.map((item) => (
-                    <li key={item.id}>
+                    <li key={item.id} className="sc-mirror-history-row">
                       <button
                         type="button"
                         className={`sc-mirror-history-item ${current?.id === item.id ? 'is-active' : ''}`}
@@ -348,6 +379,11 @@ export default function MirrorPage() {
                           {item.origin === 'custom' ? '自拟' : 'AI 推荐'} · {formatWhen(item.created_at)}
                         </span>
                       </button>
+                      <ConfirmButton
+                        label="删除"
+                        confirmLabel="确认删除？"
+                        onConfirm={() => void deleteCard(item.id)}
+                      />
                     </li>
                   ))}
                 </ul>

@@ -1257,6 +1257,11 @@ export interface TaifuClearResult {
   deleted: number
 }
 
+/** r129 清空 / 移出类操作的统一回执：实际删除条数（0 也如实返回）。 */
+export interface ClearResult {
+  deleted: number
+}
+
 /* ---------- r100 RAG 检索域 + 工程证据中心 ---------- */
 
 /** 检索模式闭集：keyword | semantic | hybrid（与后端 RAG_SEARCH_MODES 逐字对齐）。 */

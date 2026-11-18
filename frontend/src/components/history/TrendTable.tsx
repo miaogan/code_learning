@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import type { RunKind, RunSummary } from '../../api/types'
 import { formatScore, formatWhen } from '../../lib/format'
 import { Chip } from '../ui/Chip'
+import { ConfirmButton } from '../ui/ConfirmButton'
 import { settingsTextOf } from './trendModel'
 
 export interface TrendTableProps {
@@ -11,6 +12,8 @@ export interface TrendTableProps {
    * 组件内**不再二次排序**，也**不做二次统计**（分数与短板数都取后端投影）。
    */
   rows: RunSummary[]
+  /** r129 删除单场测评：传入才渲染删除入口（父组件负责请求与刷新）。 */
+  onDelete?: (runId: string) => void
 }
 
 const KIND_LABEL: Record<RunKind, string> = { interview: '召对', exam: '科考' }
@@ -88,7 +91,7 @@ function useNarrow(): boolean {
   return narrow
 }
 
-export function TrendTable({ rows }: TrendTableProps) {
+export function TrendTable({ rows, onDelete }: TrendTableProps) {
   const narrow = useNarrow()
 
   if (rows.length === 0) return null
@@ -129,6 +132,15 @@ export function TrendTable({ rows }: TrendTableProps) {
                   回放本场 →
                 </Link>
               ) : null}
+              {onDelete === undefined ? null : (
+                <div className="sc-meta-line sc-delete-row">
+                  <ConfirmButton
+                    label="删除"
+                    confirmLabel="确认删除本场？"
+                    onConfirm={() => onDelete(row.id)}
+                  />
+                </div>
+              )}
             </div>
           )
         })}
@@ -145,6 +157,7 @@ export function TrendTable({ rows }: TrendTableProps) {
           <th scope="col">分数</th>
           <th scope="col">短板条数</th>
           <th scope="col">对比上次同类</th>
+          {onDelete === undefined ? null : <th scope="col">操作</th>}
         </tr>
       </thead>
       <tbody>
@@ -173,6 +186,15 @@ export function TrendTable({ rows }: TrendTableProps) {
               <td>
                 <Delta delta={delta} />
               </td>
+              {onDelete === undefined ? null : (
+                <td>
+                  <ConfirmButton
+                    label="删除"
+                    confirmLabel="确认删除本场？"
+                    onConfirm={() => onDelete(row.id)}
+                  />
+                </td>
+              )}
             </tr>
           )
         })}

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { api } from '../api/client'
+import { ApiError, api } from '../api/client'
 import type { RunKind } from '../api/types'
 import { TimelineSection } from '../components/history/TimelineSection'
 import { TrendChart } from '../components/history/TrendChart'
@@ -36,6 +36,7 @@ const KIND_OPTIONS: ChipOption<KindFilter>[] = [
 export default function HistoryPage() {
   const [kindFilters, setKindFilters] = useState<KindFilter[]>(['all'])
   const [page, setPage] = useState(1)
+  const [deleteError, setDeleteError] = useState('')
   const pickedKinds = kindFilters.filter((kind): kind is RunKind => kind !== 'all')
   const historyAsync = useAsync(
     () =>
@@ -61,6 +62,18 @@ export default function HistoryPage() {
   const changeKinds = (next: KindFilter[]): void => {
     setKindFilters(next)
     setPage(1)
+  }
+
+  // r129 删除单场测评：服务端级联清时间线与该场次作答事件；删除后本页与热力图都重取。
+  const deleteRow = async (runId: string): Promise<void> => {
+    try {
+      await api.deleteHistoryItem(runId)
+      setDeleteError('')
+      historyAsync.reload()
+      heatAsync.reload()
+    } catch (reason: unknown) {
+      setDeleteError(reason instanceof ApiError ? reason.message : '删除失败，请稍后重试')
+    }
   }
 
   return (
@@ -144,8 +157,9 @@ export default function HistoryPage() {
               <HeatCalendar rows={heatRows} />
               <TrendChart rows={rows} />
               <Card>
-                <TrendTable rows={rows} />
+                <TrendTable rows={rows} onDelete={(runId) => void deleteRow(runId)} />
               </Card>
+              {deleteError !== '' ? <InlineError message={deleteError} /> : null}
               <Pagination
                 page={page}
                 pageSize={PAGE_SIZE}

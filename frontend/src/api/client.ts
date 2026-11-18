@@ -7,6 +7,7 @@ import type {
   CoachAdvice,
   CoachAdviceRequest,
   Course,
+  ClearResult,
   EvalSummary,
   ExamAnswers,
   ExamCreateRequest,
@@ -270,6 +271,14 @@ export const api = {
   mirrorCards: (limit = 50, signal?: AbortSignal): Promise<MirrorCardList> =>
     request<MirrorCardList>(`/api/mirror/cards?${queryString({ limit })}`, { signal }),
 
+  /** r129 删除一条复盘；不存在（或别人的）由服务端 404。 */
+  deleteMirrorCard: (cardId: string): Promise<void> =>
+    requestEmpty(`/api/mirror/cards/${encodeURIComponent(cardId)}`, { method: 'DELETE' }),
+
+  /** r129 清空全部复盘，返回删除条数。 */
+  clearMirrorCards: (): Promise<ClearResult> =>
+    request<ClearResult>('/api/mirror/cards', { method: 'DELETE' }),
+
   /* ---------- r100 B4 教练 Agent 编排（讲席）：规划 → 工具 → 反思 → 结论 ---------- */
 
   /** 跑一次编排：服务端自己调度只读工具，返回完整审计轨迹（steps 逐节点）。 */
@@ -439,6 +448,10 @@ export const api = {
   getResumeVersion: (resumeId: string, signal?: AbortSignal): Promise<ResumeVersionDetail> =>
     request<ResumeVersionDetail>(`/api/resumes/${encodeURIComponent(resumeId)}`, { signal }),
 
+  /** r129 删除一份简历版本（服务端级联清其画像 / 画像任务 / 简历时间线事件）。 */
+  deleteResumeVersion: (resumeId: string): Promise<void> =>
+    requestEmpty(`/api/resumes/${encodeURIComponent(resumeId)}`, { method: 'DELETE' }),
+
   /* ---------- r61 学习进度与计划打卡（整份状态读写，本地仅缓存） ---------- */
 
   /** 阅读进度：该账号还没同步过时返回空状态。 */
@@ -594,6 +607,10 @@ export const api = {
       })}`,
     ),
 
+  /** r129 删除一场测评记录（面试 / 笔试皆可），服务端级联清时间线与该场次作答事件。 */
+  deleteHistoryItem: (runId: string): Promise<void> =>
+    requestEmpty(`/api/history/${encodeURIComponent(runId)}`, { method: 'DELETE' }),
+
   listCourses: (): Promise<Course[]> => request<Course[]>('/api/courses'),
 
   /* ---------- r11 练习四端点（纯本地、零 AI；空结果是 200 + 空列表，不是错误） ---------- */
@@ -623,6 +640,16 @@ export const api = {
       })}`,
       { signal: options.signal },
     ),
+
+  /** r129 把一题移出错题本（服务端只记移出标记，不动作答事件与统计口径）。 */
+  dismissWrongQuestion: (questionId: string): Promise<void> =>
+    requestEmpty(`/api/practice/wrong-book/${encodeURIComponent(questionId)}`, {
+      method: 'DELETE',
+    }),
+
+  /** r129 清空错题本（逐题记移出标记；之后再答错会重新进错题本）。 */
+  clearWrongBook: (): Promise<ClearResult> =>
+    request<ClearResult>('/api/practice/wrong-book', { method: 'DELETE' }),
 
   /* ---------- r77 太傅（只读站内档案；收起面板时不发起任何请求） ---------- */
 

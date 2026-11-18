@@ -12005,6 +12005,61 @@ a.sc-radar-name--link:hover .sc-radar-ext {
   }
 }
 
+/* --- r129 历史记录删除：确认按钮 + 各列表删除入口的布局辅助 --------------------
+   两次点击式确认（ConfirmButton）：第一次点变「确认？」，再点才执行，失焦/4s 自动退回。 */
+.sc-confirm-btn {
+  flex: none;
+  white-space: nowrap;
+}
+/* 行内（列表条目头部）使用时更收敛：不占主导航视觉 */
+.sc-confirm-btn--row.sc-confirm-btn {
+  margin-left: auto;
+}
+
+/* 镜试右栏：标题行（标题 + 清空）与「选中按钮 + 删除按钮」的条目行 */
+.sc-mirror-side-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+.sc-mirror-history-row {
+  display: flex;
+  align-items: stretch;
+  gap: var(--sp-2);
+}
+.sc-mirror-history-row .sc-mirror-history-item {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.sc-mirror-history-row .sc-confirm-btn {
+  align-self: center;
+}
+
+/* 战绩页 / 错题本的行内删除落位 */
+.sc-delete-row {
+  display: flex;
+  justify-content: flex-end;
+}
+.sc-delete-error {
+  color: var(--danger, #b42318);
+}
+
+/* 校勘页（简历版本）：版本管理区的说明与删除按钮排布 */
+.sc-version-manage {
+  margin-top: var(--sp-4);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--border-hair);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.sc-version-manage-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
 /* --- r127 导航重构：工具上移顶栏，侧栏只留流程 --------------------------------
    r126 的折叠/浮层整体退役（.sc-navsection 等样式已删）。侧栏回归 r83 形态
    （只放 Stepper，内部自滚兜底恢复原样）；工具 13 项平铺在桌面顶栏
