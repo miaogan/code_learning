@@ -957,10 +957,43 @@ class PolishSuggestion(BaseModel):
     end: int = Field(default=0, description="原句结束偏移（半开区间，与 start 成对）")
 
 
+class PolishUserFact(BaseModel):
+    """镜试缺项补写（r131）：候选人亲口补充的事实。
+
+    润色提示词会把它标注为「候选人补充」并允许织入建议——反幻觉门禁只拦
+    AI 自行发明的内容；`text` 里逐字出现的数字 / 专名在校验时放行。
+    """
+
+    text: str = Field(min_length=2, max_length=500, description="补写的事实原文")
+    section: PolishSection | None = Field(
+        default=None, description="归属部分；空 = 交给模型按内容自判"
+    )
+
+
 class PolishRequest(BaseModel):
     target_role: str | None = Field(
         default=None, description="临时目标岗位：只用于本次调用，不写库（AC-12）"
     )
+    user_facts: list[PolishUserFact] = Field(
+        default_factory=list,
+        max_length=6,
+        description="候选人亲口补充的事实（r131 镜试缺项回灌）；空 = 纯润色，行为不变",
+    )
+
+
+class PolishSaveVersionRequest(BaseModel):
+    """修文成稿存为简历新版本（r131）：成稿 markdown 原样入库为新 `documents` 行。"""
+
+    markdown: str = Field(min_length=50, max_length=100_000, description="`/polish/full` 返回的成稿")
+    file_name: str | None = Field(
+        default=None, min_length=1, max_length=120, description="自定义版本名；空 = 服务端按时间生成"
+    )
+
+
+class PolishSaveVersionResponse(BaseModel):
+    resume_id: str = Field(description="新版本 id（documents.id），可直接触发画像异步任务")
+    chars: int
+    sections: int = Field(default=1, description="成稿为整篇 markdown，固定 1")
 
 
 class PolishResponse(BaseModel):

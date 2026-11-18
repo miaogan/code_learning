@@ -21,7 +21,7 @@ from dataclasses import dataclass, field
 
 from pydantic import BaseModel, Field
 
-from app.schemas import PolishSection, PolishSuggestion, Profile
+from app.schemas import PolishSection, PolishSuggestion, PolishUserFact, Profile
 from app.services.ai.ai import AIClient
 
 #: 缺数值处的占位（唯一一处，前端只认这个串，不做本地改写）。
@@ -40,6 +40,8 @@ POLISH_SYSTEM = """你是中文简历润色顾问。读候选人简历与画像�
 2. 每条 `original_text` 必须从简历正文**逐字抄录**（含标点与空格，不要缩写、不要拼接多段）；
 3. `suggested_text` 只改措辞、句式与结构，**不得新增事实**：不新增公司名、项目名、
    技术专名、奖项、数字与年份；原句缺数值时写「〈待补充〉」占位，由候选人自己补；
+   唯一例外：输入里「候选人补充的事实」小节的内容是候选人亲口提供，视为真实，
+   可以（也鼓励）把它织进对应建议的 `suggested_text`；除此之外仍不得新增任何事实；
 4. `reason` 用中文说明改动带来的表达收益（20–60 字），不要空话；
 5. `section` 只能取 project / experience / education / summary。
 
@@ -123,6 +125,17 @@ def _polish_brief(resume_text: str, profile: Profile | None, target_role: str | 
     )
 
 
+def user_facts_block(user_facts: list[PolishUserFact] | None) -> str:
+    """候选人补充事实的提示词小节（r131）：空列表返回空串（纯润色路径零变化）。"""
+    if not user_facts:
+        return ""
+    lines = "\n".join(
+        f"{index}. {fact.text}" + (f"（归属：{fact.section}）" if fact.section else "")
+        for index, fact in enumerate(user_facts, start=1)
+    )
+    return f"\n【候选人补充的事实（亲口提供，视为真实，可织入建议）】\n{lines}\n"
+
+
 def _normalize_section(section: str, original_text: str, resume_text: str) -> PolishSection:
     """`section` 归一：模型给了合法值就用它，否则按原句所在段落兜底推一个。"""
     raw = (section or "").strip().lower()
@@ -144,15 +157,17 @@ async def build_suggestions(
     target_role: str | None,
     *,
     client: AIClient | None = None,
+    user_facts: list[PolishUserFact] | None = None,
 ) -> list[PolishSuggestion]:
     """调一次模型拿建议草案，并补齐服务端独占字段（`id` / `start` / `end` / `target_role`）。
 
     `client` 走注入（单测零网络）；未注入时才构造 `AIClient`（`ai.py` 是唯一出网口）。
+    `user_facts`（r131）织入提示词；空 = 纯润色，提示词与旧行为逐字节一致。
     """
     ai = client or AIClient()
     draft = await ai.complete_model(
         POLISH_SYSTEM,
-        _polish_brief(resume_text, profile, target_role),
+        _polish_brief(resume_text, profile, target_role) + user_facts_block(user_facts),
         _SuggestDraft,
         # 超时走统一 600s；生成耗时与网络抖动都在所难免：超时/5xx/429 自动重来一次，
         # 不让一次抖动直接判死。
@@ -239,9 +254,14 @@ def _first_new_proper_noun(
     suggested_text: str,
     resume_text: str,
     vocabulary: set[str],
+    extra_text: str = "",
 ) -> str | None:
-    """返回第一个「新增专名」；没有则 `None`（该项整条丢弃，但数字降级后仍保留）。"""
-    haystack = f"{resume_text}\n" + "\n".join(vocabulary)
+    """返回第一个「新增专名」；没有则 `None`（该项整条丢弃，但数字降级后仍保留）。
+
+    `extra_text`（r131）是候选人补充的事实原文：里面逐字出现的专名视为候选人
+    亲口提供，不算 AI 发明。
+    """
+    haystack = f"{resume_text}\n{extra_text}\n" + "\n".join(vocabulary)
     lowered = haystack.lower()
     for match in _ASCII_WORD_RE.finditer(suggested_text):
         word = match.group(0)
@@ -260,15 +280,20 @@ def validate_suggestions(
     profile: Profile | None,
     *,
     target_role: str | None = None,
+    extra_text: str = "",
 ) -> tuple[list[PolishSuggestion], int]:
     """后置事实校验（纯函数）：返回 `(保留列表, 丢弃条数)`。
 
     1. `original_text` 必须在正文**逐字**出现（不做 squash / trim），否则丢弃；
     2. `start/end` 取首次出现位置（前端切片预览与服务端成稿共用同一份映射）；
     3. 新增数字 → 就地 `〈待补充〉` + `flags=["numeric_added"]`；
-    4. 新增专名 → 整条丢弃 + `dropped_count += 1`。
+    4. 新增专名 → 整条丢弃 + `dropped_count += 1`；
+    5. `extra_text`（r131）= 候选人补充的事实原文：其中逐字出现的数字与专名
+       视为候选人亲口提供而放行，AI 自行发明的仍然照拦。
     """
     allowed_numbers = _allowed_numbers(profile)
+    if extra_text:
+        allowed_numbers |= {float(token) for token in _NUMBER_RE.findall(extra_text)}
     vocabulary = _vocabulary(resume_text, profile, target_role)
     kept: list[PolishSuggestion] = []
     dropped = 0
@@ -283,7 +308,10 @@ def validate_suggestions(
         suggested_text, numeric_added = _downgrade_numbers(
             suggestion.suggested_text, resume_text, allowed_numbers
         )
-        if _first_new_proper_noun(suggested_text, resume_text, vocabulary) is not None:
+        if (
+            _first_new_proper_noun(suggested_text, resume_text, vocabulary, extra_text)
+            is not None
+        ):
             dropped += 1
             continue
 

@@ -31,6 +31,8 @@ from app.schemas import (
     PolishFullResponse,
     PolishRequest,
     PolishResponse,
+    PolishSaveVersionRequest,
+    PolishSaveVersionResponse,
     Profile,
     ResumeJobStarted,
     ResumeJobStatus,
@@ -397,11 +399,16 @@ async def polish_resume(
     )
 
     client = user_ai.client_for(user, "light")
+    user_facts = payload.user_facts if payload is not None else []
     suggestions = await resume_polish.build_suggestions(
-        text, profile, target_role, client=client
+        text, profile, target_role, client=client, user_facts=user_facts
     )
     kept, dropped = resume_polish.validate_suggestions(
-        suggestions, text, profile, target_role=target_role
+        suggestions,
+        text,
+        profile,
+        target_role=target_role,
+        extra_text="\n".join(fact.text for fact in user_facts),
     )
     polish_id = resume_polish.remember_suggestions(resume_id, target_role, kept, dropped)
     return PolishResponse(
@@ -414,6 +421,31 @@ async def polish_resume(
         dropped_count=dropped,
         insufficient_reason=resume_polish.insufficient_reason(kept),
     )
+
+
+@router.post(
+    "/{resume_id}/polish/save-version",
+    response_model=PolishSaveVersionResponse,
+    summary="把修文成稿存为简历新版本（r131，落 documents；画像任务由前端接着触发）",
+)
+async def save_polish_version(
+    resume_id: str,
+    payload: PolishSaveVersionRequest,
+    user: CurrentUser,
+) -> PolishSaveVersionResponse:
+    # 来源必须存在且属于当前账号（get_document 按账号隔离）：防跨账号探测。
+    _load_resume(resume_id)
+    markdown = payload.markdown.strip()
+    if len(markdown) < 50:
+        raise AppError(
+            VALIDATION_ERROR, "成稿内容太短，请先在修文页采纳建议并生成成稿", status=400
+        )
+    new_id = uuid.uuid4().hex
+    file_name = (payload.file_name or "").strip() or f"修文成稿-{time.strftime('%Y%m%d-%H%M')}.md"
+    meta = ResumeMeta(resume_id=new_id, file_name=file_name, chars=len(markdown), sections=1)
+    repository.insert_document(meta, markdown, mime="text/markdown")
+    # 时间线事件不在这里插：画像任务成功路径会按新 document_id 写「简历画像已更新」。
+    return PolishSaveVersionResponse(resume_id=new_id, chars=len(markdown), sections=1)
 
 
 @router.post(
