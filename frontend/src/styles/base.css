@@ -11985,6 +11985,56 @@ a.sc-radar-name--link:hover .sc-radar-ext {
   display: none; /* <1024：侧栏隐藏时的入口由 .sc-topstepper 的横条承接 */
 }
 
+@media (min-width: 1024px) {
+  .sc-topnav {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-1);
+    min-width: 0;
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+  .sc-topnav-group {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-1);
+  }
+  /* 组间细分隔线：分组语义纯视觉，零交互成本 */
+  .sc-topnav-sep {
+    width: 1px;
+    height: var(--sp-3);
+    margin: 0 var(--sp-2);
+    background: var(--border-subtle);
+  }
+  .sc-topnav-item {
+    padding: var(--sp-1) var(--sp-2);
+    border-radius: var(--radius-4);
+    color: var(--text-secondary);
+    font-size: var(--fs-small);
+    line-height: var(--lh-small);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .sc-topnav-item:hover {
+    background: var(--overlay-04);
+    color: var(--text-primary);
+  }
+  .sc-topnav-item.is-active {
+    background: var(--accent-tint);
+    color: var(--accent);
+    font-weight: 600;
+  }
+}
+
+/* 中窄屏（1024-1279）：顶栏横向空间紧张，收起装饰性文案给工具导航让位 */
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .sc-brand-tagline,
+  .sc-storage,
+  .sc-github-label {
+    display: none;
+  }
+}
+
 /* 设置按钮（r127 迭代二）：不做层级，就是顶栏右侧一个普通链接按钮；
    点击进设置区后侧栏「流程位」切换为三个设置页入口（路由推导）。 */
 .sc-settings-btn {
