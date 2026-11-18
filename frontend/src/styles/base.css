@@ -11762,3 +11762,217 @@ a.sc-radar-name--link:hover .sc-radar-ext {
   font-size: var(--fs-meta);
   line-height: var(--lh-meta);
 }
+
+/* --- r125 镜试（反向面试）：评题与复盘，不进计分链路 ------------------------- */
+.sc-mirror-hero {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.sc-mirror-hero-note,
+.sc-mirror-note {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+.sc-mirror-note {
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+}
+.sc-mirror-form-card {
+  margin-top: var(--sp-4);
+}
+.sc-mirror-form-card form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+.sc-mirror-label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  color: var(--text-primary);
+  font-size: var(--fs-card);
+  line-height: var(--lh-card);
+  font-weight: 600;
+}
+.sc-mirror-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: var(--sp-3);
+  border: 1px solid var(--border-hair);
+  border-radius: var(--radius-8);
+  background: var(--bg-inset);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  min-height: 120px;
+  resize: vertical;
+}
+.sc-mirror-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  justify-content: flex-end;
+}
+.sc-mirror-suggestions {
+  margin-top: var(--sp-4);
+}
+.sc-mirror-subtitle {
+  margin: 0 0 var(--sp-2);
+  color: var(--text-primary);
+  font-size: var(--fs-card);
+  line-height: var(--lh-card);
+}
+.sc-mirror-suggestion-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.sc-mirror-suggestion {
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  padding: var(--sp-3);
+  border: 1px solid var(--border-hair);
+  border-radius: var(--radius-8);
+  background: var(--bg-inset);
+  color: var(--text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.sc-mirror-suggestion:hover {
+  border-color: var(--border-strong);
+}
+.sc-mirror-suggestion-q {
+  font-weight: 600;
+  font-size: var(--fs-card);
+  line-height: var(--lh-card);
+}
+.sc-mirror-suggestion-why {
+  color: var(--text-secondary);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+}
+.sc-mirror-quote {
+  margin: var(--sp-1) 0 0;
+  color: var(--text-tertiary);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+}
+.sc-mirror-card {
+  margin-top: var(--sp-4);
+}
+.sc-mirror-card-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.sc-mirror-level--基础 {
+  color: var(--text-secondary);
+}
+.sc-mirror-level--合格 {
+  color: var(--accent, var(--text-primary));
+}
+.sc-mirror-level--优秀 {
+  color: var(--success, var(--text-primary));
+}
+.sc-mirror-when {
+  margin-left: auto;
+  color: var(--text-tertiary);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+}
+.sc-mirror-question {
+  margin: var(--sp-3) 0 0;
+  color: var(--text-primary);
+  font-size: var(--fs-title, var(--fs-card));
+  line-height: var(--lh-card);
+}
+.sc-mirror-block {
+  margin-top: var(--sp-4);
+}
+.sc-mirror-block-title {
+  margin: 0 0 var(--sp-2);
+  color: var(--text-primary);
+  font-size: var(--fs-card);
+  line-height: var(--lh-card);
+}
+.sc-mirror-answer {
+  margin: 0;
+  white-space: pre-wrap;
+  color: var(--text-primary);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+.sc-mirror-list {
+  margin: 0;
+  padding-left: 1.4em;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  color: var(--text-primary);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+.sc-mirror-missing {
+  color: var(--text-secondary);
+}
+.sc-mirror-evidence {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.sc-mirror-claim {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+.sc-mirror-history {
+  list-style: none;
+  margin: var(--sp-2) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.sc-mirror-history-item {
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border-hair);
+  border-radius: var(--radius-8);
+  background: var(--bg-inset);
+  color: var(--text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.sc-mirror-history-item.is-active {
+  border-color: var(--border-strong);
+}
+.sc-mirror-history-q {
+  font-size: var(--fs-card);
+  line-height: var(--lh-card);
+}
+.sc-mirror-history-meta {
+  color: var(--text-tertiary);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+}

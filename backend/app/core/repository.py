@@ -2690,6 +2690,79 @@ def _coach_run_dict(row: Any) -> dict[str, Any]:
 
 # --- r103 召回反馈（点赞 / 点踩）：个人排序信号 + 全局聚合看板 -------------------
 
+# --- r125 镜试复盘卡（反向面试）：一题一条完整复盘，按 user_id 隔离 ----------------
+#: 与 runs / question_attempts 完全分离：不创建面试场次、不生成成绩、不写成长时间线。
+
+
+def save_mirror_card(
+    card_id: str,
+    *,
+    resume_id: str,
+    file_name: str,
+    question: str,
+    payload: dict[str, Any],
+    source: str,
+) -> None:
+    """落一条镜试复盘。`payload` 是已过校验的完整结构（pydantic dump），JSON 文本存储。"""
+    with connection() as conn:
+        conn.execute(
+            "INSERT INTO mirror_cards (id, user_id, resume_id, file_name, question,"
+            " payload, source, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                card_id,
+                _uid(),
+                resume_id,
+                file_name,
+                question,
+                json.dumps(payload, ensure_ascii=False),
+                source,
+                _now(),
+            ),
+        )
+
+
+def mirror_card_row(card_id: str) -> dict[str, Any] | None:
+    """按 id 取一条复盘（`user_id` 条件保证跨用户取一律 404）。"""
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT id, resume_id, file_name, question, payload, source, created_at "
+            "FROM mirror_cards WHERE id = ? AND user_id = ?",
+            (card_id, _uid()),
+        ).fetchone()
+    return _mirror_card_dict(row) if row is not None else None
+
+
+def list_mirror_cards(limit: int = 50) -> list[dict[str, Any]]:
+    """当前账号最近若干条复盘（倒序，含完整 payload，前端刷新后直接恢复）。"""
+    size = max(1, min(int(limit), 200))
+    with connection() as conn:
+        rows = conn.execute(
+            "SELECT id, resume_id, file_name, question, payload, source, created_at "
+            "FROM mirror_cards WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT ?",
+            (_uid(), size),
+        ).fetchall()
+    return [_mirror_card_dict(row) for row in rows]
+
+
+def _mirror_card_dict(row: Any) -> dict[str, Any]:
+    """行 → dict：payload 坏值退化为空结构，不让一条脏行打挂整个列表。"""
+    try:
+        payload = json.loads(str(row["payload"]))
+        if not isinstance(payload, dict):
+            payload = {}
+    except (ValueError, TypeError):
+        payload = {}
+    return {
+        "id": str(row["id"]),
+        "resume_id": str(row["resume_id"]),
+        "file_name": str(row["file_name"] or ""),
+        "question": str(row["question"]),
+        "payload": payload,
+        "source": str(row["source"] or "custom"),
+        "created_at": str(row["created_at"]),
+    }
+
+
 def rag_feedback_upsert(
     *, query: str, chunk_id: str, verdict: str, surface: str
 ) -> dict[str, Any]:

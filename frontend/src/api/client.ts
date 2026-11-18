@@ -25,6 +25,11 @@ import type {
   LeapArchive,
   LoginRequest,
   Me,
+  MirrorAskRequest,
+  MirrorCard,
+  MirrorCardList,
+  MirrorSuggestions,
+  MirrorSuggestionsRequest,
   PasswordChangeRequest,
   PlanState,
   PlanStatePayload,
@@ -247,6 +252,23 @@ export const api = {
   /** r110 岗位对位：JD → 证据清单 / 缺口 / 召对预设（零 AI，只做字面对照）。 */
   matchJd: (payload: JdMatchRequest, signal?: AbortSignal): Promise<JdMatchResult> =>
     request<JdMatchResult>('/api/jd-match', jsonInit('POST', payload, signal)),
+
+  /* ---------- r125 镜试（反向面试）：评题与复盘，不进计分链路 ---------- */
+
+  /** 依据简历推荐自查问题；quote 已过服务端原文闸门，`dropped_count` 是被剔除的编造条数。 */
+  mirrorSuggestions: (
+    payload: MirrorSuggestionsRequest,
+    signal?: AbortSignal,
+  ): Promise<MirrorSuggestions> =>
+    request<MirrorSuggestions>('/api/mirror/suggestions', jsonInit('POST', payload, signal)),
+
+  /** 一次自问复盘：参考答案 / 答题理由 / 题目水准 / 追问 + 简历证据 + 缺失信息，落库可恢复。 */
+  mirrorAsk: (payload: MirrorAskRequest): Promise<MirrorCard> =>
+    request<MirrorCard>('/api/mirror/ask', jsonInit('POST', payload)),
+
+  /** 当前账号最近的复盘列表（刷新后恢复）。 */
+  mirrorCards: (limit = 50, signal?: AbortSignal): Promise<MirrorCardList> =>
+    request<MirrorCardList>(`/api/mirror/cards?${queryString({ limit })}`, { signal }),
 
   /* ---------- r100 B4 教练 Agent 编排（讲席）：规划 → 工具 → 反思 → 结论 ---------- */
 

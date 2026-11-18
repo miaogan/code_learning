@@ -55,6 +55,7 @@ from app.routers import (
     jobs,
     leap,
     learn,
+    mirror,
     practice,
     profile,
     radar,
@@ -839,6 +840,7 @@ def create_app() -> FastAPI:
     app.include_router(jd.router)
     # r65：AI 学习教练（检索增强 + 引用白名单校验，材料由前端组装后随请求上传）。
     app.include_router(coach.router)
+    app.include_router(mirror.router)
     # r67：技术雷达（先锋清单 / 采集 / 国子监生成任务，任务按账号隔离）。
     app.include_router(radar.router)
     app.include_router(taifu.router)

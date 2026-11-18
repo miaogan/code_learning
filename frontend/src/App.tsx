@@ -18,6 +18,7 @@ import JdPage from './pages/JdPage'
 import LearnPage from './pages/LearnPage'
 import LeapPage from './pages/LeapPage'
 import LoginPage from './pages/LoginPage'
+import MirrorPage from './pages/MirrorPage'
 import NotFoundPage from './pages/NotFoundPage'
 import PioneerPage from './pages/PioneerPage'
 import PolishPage from './pages/PolishPage'
@@ -50,6 +51,7 @@ const TOOL_ITEMS = [
   { key: 'coach', label: '讲席', to: '/coach' },
   { key: 'learn', label: '学堂', to: '/learn' },
   { key: 'practice', label: '演武', to: '/practice' },
+  { key: 'mirror', label: '镜试', to: '/mirror' },
   { key: 'history', label: '战绩', to: '/history' },
   { key: 'polish', label: '修文', to: '/polish' },
   { key: 'versions', label: '校勘', to: '/versions' },
@@ -186,6 +188,7 @@ export default function App() {
                 <Route path="/" element={<UploadPage />} />
                 <Route path="/profile" element={<ProfilePage />} />
                 <Route path="/interview" element={<InterviewPage />} />
+                <Route path="/mirror" element={<MirrorPage />} />
                 <Route path="/exam" element={<ExamPage />} />
                 <Route path="/report" element={<ReportPage />} />
                 <Route path="/history" element={<HistoryPage />} />

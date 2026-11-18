@@ -152,7 +152,7 @@ _standalone = False
 #: r113 判定「能否把空 SQLite 直接立为权威库」时要看的业务根表：任一有行就说明这个库里
 #: 有过真实数据，自动接管会把它当空库覆盖掉，必须拒绝。
 _STANDALONE_PROBE_TABLES: tuple[str, ...] = (
-    "users", "documents", "profiles", "runs", "reports", "questions",
+    "users", "documents", "profiles", "runs", "reports", "questions", "mirror_cards",
 )
 
 _SYNC_TABLES: tuple[str, ...] = ()
@@ -826,6 +826,24 @@ CREATE TABLE IF NOT EXISTS coach_runs (
     created_at  TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_coach_runs_user ON coach_runs (user_id, created_at);
+"""
+
+
+#: r125 镜试：一题一条完整复盘，结构化内容存 JSON，业务 SQL 只在 repository。
+#: 与 runs / question_attempts 完全分离；不创建面试场次、不生成成绩、不写成长时间线。
+MIRROR_SCHEMA = """
+CREATE TABLE IF NOT EXISTS mirror_cards (
+    id          TEXT PRIMARY KEY,
+    user_id     TEXT NOT NULL DEFAULT 'default',
+    resume_id   TEXT NOT NULL,
+    file_name   TEXT NOT NULL DEFAULT '',
+    question    TEXT NOT NULL,
+    payload     TEXT NOT NULL,
+    source      TEXT NOT NULL DEFAULT 'custom',
+    created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_mirror_cards_user_created
+    ON mirror_cards (user_id, created_at);
 """
 
 
@@ -1745,7 +1763,7 @@ def initialize_sqlite() -> None:
             SCHEMA, R23_SCHEMA, SCHEMA_INDEXES, R23_INDEXES, R42_SCHEMA, R42_INDEXES,
             R51_SCHEMA, R61_SCHEMA, radar_schema, R67_INDEXES, R77_SCHEMA, R77_INDEXES,
             R80_SCHEMA, R81_SCHEMA, R81_INDEXES, R100_SCHEMA, COACH_RUNS_SCHEMA,
-            RAG_FEEDBACK_SCHEMA, SYNC_SCHEMA,
+            RAG_FEEDBACK_SCHEMA, MIRROR_SCHEMA, SYNC_SCHEMA,
         ):
             conn.executescript(script)
         for columns in (_ADDED_COLUMNS, _R23_ADDED_COLUMNS, _R61_ADDED_COLUMNS, _R67_ADDED_COLUMNS):
@@ -2005,7 +2023,8 @@ def _init_pg_schema() -> None:
             )
         conn.executescript(COACH_RUNS_SCHEMA)         # 25. 教练 Agent 编排轨迹
         conn.executescript(RAG_FEEDBACK_SCHEMA)       # 26. 召回反馈（点赞 / 点踩）
-        conn.executescript(SYNC_SCHEMA)               # 27. SQLite 副本 / 离线重放回执
+        conn.executescript(MIRROR_SCHEMA)             # 27. 镜试复盘卡（r125，反向面试）
+        conn.executescript(SYNC_SCHEMA)               # 28. SQLite 副本 / 离线重放回执
         # 28. ID 游标按现有最大 id 播种。`INSERT … SELECT … ON CONFLICT` 是 PG 形态，
         #     SQLite 语法上不接受 —— 所以这里天然不能进副本镜像日志，
         #     由 `init_db()` 的 `suppress_mirror()` 保证（副本侧靠 `_sync_id_allocations()` 对齐）。

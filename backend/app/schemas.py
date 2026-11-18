@@ -1612,6 +1612,75 @@ class CoachAgentRun(BaseModel):
     created_at: str = ""
 
 
+# --- r125 镜试（反向面试）：只评题与复盘，不进入 interview/exam 计分链路 ---------------
+
+
+class MirrorEvidence(BaseModel):
+    """一条已校验的简历证据：观点可归纳，quote 必须能在原简历中连续命中。"""
+
+    claim: str = Field(min_length=1, max_length=240)
+    quote: str = Field(min_length=1, max_length=360)
+
+
+class MirrorSuggestion(BaseModel):
+    """AI 推荐的一道自问；quote 没通过原文闸门时整条不推荐。"""
+
+    question: str = Field(min_length=1, max_length=300)
+    rationale: str = Field(min_length=1, max_length=240)
+    quote: str = Field(min_length=1, max_length=360)
+
+
+class MirrorSuggestionsRequest(BaseModel):
+    resume_id: str = Field(min_length=1, max_length=100)
+    count: int = Field(default=4, ge=2, le=6)
+
+
+class MirrorSuggestions(BaseModel):
+    resume_id: str
+    items: list[MirrorSuggestion] = Field(default_factory=list)
+    dropped_count: int = Field(default=0, ge=0)
+
+
+class MirrorAskRequest(BaseModel):
+    """一次自问复盘：question 为 None/空白时让模型依据简历出题。"""
+
+    resume_id: str = Field(min_length=1, max_length=100)
+    question: str | None = Field(default=None, max_length=1000)
+
+
+class MirrorAssessment(BaseModel):
+    """题目质量评价：这是面试设计建议，不是对候选人作答的分数。"""
+
+    level: Literal["基础", "合格", "优秀"]
+    strengths: list[str] = Field(default_factory=list, max_length=4)
+    improvements: list[str] = Field(default_factory=list, max_length=4)
+
+
+class MirrorCard(BaseModel):
+    """一条完整复盘。缺失信息用问题表达，不能由 AI 代填项目、指标或职责。"""
+
+    id: str
+    resume_id: str
+    file_name: str
+    question: str
+    answer: str
+    rationale: list[str] = Field(default_factory=list)
+    assessment: MirrorAssessment
+    follow_ups: list[str] = Field(default_factory=list)
+    evidence: list[MirrorEvidence] = Field(default_factory=list)
+    missing_info: list[str] = Field(default_factory=list)
+    #: 字段名用 `origin` 而非 `source`：r12 工程门禁钉住「`source` 只住在库里」，
+    #: 契约里同名字段一律不让过，镜试沿用该纪律。
+    origin: Literal["custom", "recommended"]
+    dropped_evidence_count: int = Field(default=0, ge=0)
+    answer_sanitized: bool = False
+    created_at: str
+
+
+class MirrorCardList(BaseModel):
+    items: list[MirrorCard] = Field(default_factory=list)
+
+
 # --- r103 召回反馈（点赞 / 点踩）：用户参与召回质量提升 --------------------------
 
 #: 反馈类型闭集：只有 赞 / 踩 两种态度（不引入 1-5 星，避免「中间态不作为」）。

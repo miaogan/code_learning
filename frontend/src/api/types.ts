@@ -745,6 +745,69 @@ export interface PolishFullResponse {
   regenerated: boolean
 }
 
+/* ------------------------------------------------------------------ *
+ * r125 镜试（反向面试）：评题与复盘，与现有计分面试完全分离。
+ * ------------------------------------------------------------------ */
+
+export interface MirrorEvidence {
+  claim: string
+  /** 已通过服务端原文校验的连续简历片段。 */
+  quote: string
+}
+
+export interface MirrorSuggestion {
+  question: string
+  rationale: string
+  quote: string
+}
+
+export interface MirrorSuggestionsRequest {
+  resume_id: string
+  count?: number
+}
+
+export interface MirrorSuggestions {
+  resume_id: string
+  items: MirrorSuggestion[]
+  dropped_count: number
+}
+
+export interface MirrorAskRequest {
+  resume_id: string
+  /** 不传或空白 = AI 依据所选简历推荐一道题并生成完整复盘。 */
+  question?: string | null
+}
+
+export interface MirrorAssessment {
+  /** 对题目本身的质量评价，不是候选人作答成绩。 */
+  level: '基础' | '合格' | '优秀'
+  strengths: string[]
+  improvements: string[]
+}
+
+export interface MirrorCard {
+  id: string
+  resume_id: string
+  file_name: string
+  question: string
+  answer: string
+  rationale: string[]
+  assessment: MirrorAssessment
+  follow_ups: string[]
+  evidence: MirrorEvidence[]
+  missing_info: string[]
+  /** 字段名 origin 而非 source：r12 门禁钉住 `source` 只住在库里，不进契约。 */
+  origin: 'custom' | 'recommended'
+  dropped_evidence_count: number
+  /** true = 服务端把简历未支撑的新增数字降级为〈待补充〉。 */
+  answer_sanitized: boolean
+  created_at: string
+}
+
+export interface MirrorCardList {
+  items: MirrorCard[]
+}
+
 /* ------------------------------------------------------------------
  * r11 练习四端点（/api/practice/paper|answer|stats|wrong-book）
  * 与 `backend/app/schemas.py` 的 `Practice*` 逐字镜像（字段名 snake_case，零转换），
