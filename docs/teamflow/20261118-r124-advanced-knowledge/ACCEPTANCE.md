@@ -54,3 +54,11 @@
 ## 4. 构建环境注意
 
 `npm run build` 在本机 `C:\Users\user\AppData\Local\Temp\esbuild-*` 偶发 `Access is denied`（安全策略拦截 esbuild 清理临时文件，非代码问题）。把 `TEMP` / `TMP` 重定向到项目内 `.tmp/wintemp` 后正常通过。CI 环境不复现。
+
+## 5. CI 与部署
+
+- 内容提交：`53bd005`（18 文件）。
+- 首次 CI run `#44223562441`：backend 在 **step 6 `Dependency audit`（pip-audit）失败**（91s），早于 Lint / 题库字节门禁 / pytest（均 skipped）。经排查与本次改动无关：`requirements.txt` 未改、45 分钟前 r123 同款依赖全绿；本机 135 个已装依赖 + PyPI 最新声明版本经 OSV 批量查询均无漏洞、近三日无新增相关公告；本机 pip-audit 因沙箱网络无法完成（pip 自身版本检查挂起），判定为 pip-audit 拉取漏洞源的瞬断。
+- 重跑：空提交 `66e1c74` 触发 CI run `#44227237036`，四 job 全绿（frontend 85s / backend 333s / Deploy 36s）。
+- 生产部署：`2026-11-18T11:06:06+08:00`，服务器 HEAD 与 deploy-state 均为 `66e1c74`，写在 deploy job 窗口内；`/health` 200、`/docs` 404、TLSv1.3 证书链可信；四容器 healthy。
+- 待办（独立 infra）：pip-audit 的 `>=` 不钉版本依赖存在外部漏洞库漂移风险；若同一 step 反复出现瞬时红，应钉住具体依赖版本或给审计步骤加重试——属独立改动，不在本内容任务范围。
