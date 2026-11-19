@@ -27,6 +27,7 @@ import {
   techTagList,
   VERDICT_ORDER,
   verdictChipLabel,
+  weeklyText,
   whyText,
 } from '../lib/radar'
 import { useAsync } from '../lib/useAsync'
@@ -258,6 +259,8 @@ export default function PioneerPage() {
     [page, pageSize, verdictFilters, directionFilters],
   )
   const runAsync = useAsync((signal) => api.radarLatestRun(signal), [])
+  // r146：近 7 天速览（先锋周报卡）。手动 reload：采集完成后与「刷新清单」一起刷。
+  const weeklyAsync = useAsync((signal) => api.radarWeekly(signal), [])
 
   const [name, setName] = useState('')
   const [url, setUrl] = useState('')
@@ -411,6 +414,7 @@ export default function PioneerPage() {
   const refresh = (): void => {
     listAsync.reload()
     runAsync.reload()
+    weeklyAsync.reload()
   }
 
   const collect = async (): Promise<void> => {
@@ -553,6 +557,35 @@ export default function PioneerPage() {
         </p>
         {collectError !== '' && <p className="sc-radar-error">{collectError}</p>}
       </Card>
+
+      {weeklyAsync.data !== null && (
+        <Card>
+          <div className="sc-radar-weeklyhead">
+            <h3 className="sc-coach-blocktitle">近 7 天速览</h3>
+            <span className="sc-radar-weeklytext">{weeklyText(weeklyAsync.data)}</span>
+          </div>
+          {weeklyAsync.data.directions.length > 0 && (
+            <div className="sc-radar-weeklydirs">
+              <span className="sc-radar-weeklyhint">新增条目的方向分布：</span>
+              {weeklyAsync.data.directions.map((row) => (
+                <button
+                  key={row.direction}
+                  type="button"
+                  className={
+                    directionFilters.includes(row.direction)
+                      ? 'sc-radar-weeklydir is-active'
+                      : 'sc-radar-weeklydir'
+                  }
+                  onClick={() => changeDirections([row.direction])}
+                >
+                  {row.direction}
+                  <b>{row.count}</b>
+                </button>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
 
       <Card>
         <h3 className="sc-coach-blocktitle">手工录入线索</h3>

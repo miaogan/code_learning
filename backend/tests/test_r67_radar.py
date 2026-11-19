@@ -794,3 +794,24 @@ def test_trends_api_returns_snapshot_series(client: TestClient, radar_env: None)
     empty = client.get("/api/radar/trends")
     assert empty.status_code == 400
     assert "tech_slug" in empty.json()["error"]["message"]
+
+
+def test_weekly_summary_counts_new_techs_and_rounds(client: TestClient, radar_env: None) -> None:
+    """r146：周报卡取滚动 7 天窗口 —— 新增 / 上一周期对比 / 轮数 / 方向分布。"""
+    asyncio.run(radar.run_round(trigger="manual", user=None))
+    weekly = store.weekly_summary()
+    assert weekly["new_techs"] >= 10  # 刚跑的一轮全部落在窗口内
+    assert weekly["prev_new_techs"] == 0
+    assert weekly["rounds"] >= 1
+    assert weekly["directions"] and weekly["directions"][0]["count"] >= 1
+
+    # 把一条的 first_seen 拨到两个窗口之前：退出「新增」，进不了上一周期（窗口不重叠）。
+    slug = store.list_techs(1)[0]["tech_slug"]
+    old = (datetime.now(UTC) - timedelta(days=20)).isoformat()
+    with repository.connection() as conn:
+        conn.execute(
+            "UPDATE radar_techs SET first_seen_at = ? WHERE tech_slug = ?", [old, slug]
+        )
+    after = store.weekly_summary()
+    assert after["new_techs"] == weekly["new_techs"] - 1
+    assert after["prev_new_techs"] == 0

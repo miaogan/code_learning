@@ -13145,3 +13145,69 @@ a.sc-radar-name--link:hover .sc-radar-ext {
   flex: none;
   overflow: visible;
 }
+
+/* r146：周报卡——一句话 + 可点的方向分布（点芯片即按该方向筛选清单）。 */
+.sc-radar-weeklyhead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+.sc-radar-weeklytext {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-secondary);
+}
+
+.sc-radar-weeklydirs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: var(--sp-2);
+  gap: var(--sp-2);
+}
+
+.sc-radar-weeklyhint {
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+}
+
+.sc-radar-weeklydir {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-1) var(--sp-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-4);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color var(--fast) var(--ease), border-color var(--fast) var(--ease);
+}
+
+.sc-radar-weeklydir b {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  color: var(--text-tertiary);
+}
+
+.sc-radar-weeklydir:hover {
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+
+.sc-radar-weeklydir.is-active {
+  border-color: var(--accent-line-30);
+  background: var(--accent-wash-06);
+  color: var(--text-primary);
+}

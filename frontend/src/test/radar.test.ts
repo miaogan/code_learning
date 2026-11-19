@@ -29,6 +29,7 @@ import {
   listCountText,
   verdictChipLabel,
   verdictCountText,
+  weeklyText,
   whyText,
 } from '../lib/radar'
 
@@ -410,5 +411,23 @@ describe('r146 走势线坐标串', () => {
     // 全程同值：不除零，画在中线。
     const flat = sparklinePoints([5, 5, 5], 64, 18, 2).split(' ')
     expect(flat.every((pair) => pair.split(',')[1] === '9')).toBe(true)
+  })
+})
+
+describe('r146 周报卡文案', () => {
+  const base = { new_techs: 12, prev_new_techs: 8, rounds: 5, directions: [] }
+
+  it('weeklyText 给新增对比与轮数，多/少/持平三种说法', () => {
+    expect(weeklyText(base)).toBe('新增 12 项（比上一周期多 4 项） · 采集 5 轮')
+    expect(weeklyText({ ...base, new_techs: 5 })).toBe('新增 5 项（比上一周期少 3 项） · 采集 5 轮')
+    expect(weeklyText({ ...base, new_techs: 8, prev_new_techs: 8 })).toBe(
+      '新增 8 项（与上一周期持平） · 采集 5 轮',
+    )
+  })
+
+  it('零新增给诚实文案，不渲染「多 0 项」', () => {
+    expect(weeklyText({ ...base, new_techs: 0, prev_new_techs: 0, rounds: 0 })).toBe(
+      '还没有新增条目 · 采集 0 轮',
+    )
   })
 })

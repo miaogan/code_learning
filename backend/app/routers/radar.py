@@ -25,6 +25,7 @@ from app.schemas import (
     RadarTranslateResult,
     RadarTrendList,
     RadarTrendPoint,
+    RadarWeekly,
 )
 from app.services import radar
 from app.services.ai import user_ai
@@ -92,6 +93,11 @@ async def tech_trends(
     return RadarTrendList(
         trends={slug: [RadarTrendPoint(**point) for point in points] for slug, points in raw.items()}
     )
+
+
+@router.get("/weekly", response_model=RadarWeekly, summary="近 7 天速览（先锋周报卡）")
+async def weekly_summary() -> RadarWeekly:
+    return RadarWeekly(**store.weekly_summary())
 
 
 @router.post("/run", response_model=RadarRunSummary, summary="立即跑一轮采集与评估")

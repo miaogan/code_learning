@@ -2226,6 +2226,39 @@ def radar_tech_trends(
     return trends
 
 
+def radar_weekly_summary(*, start: str, prev_start: str) -> dict[str, Any]:
+    """近 7 天速览（r146）：新增技术数、上一周期新增、完成的采集轮数、新增条目的方向分布。
+
+    时间窗由调用方算好传入（ISO 串、字典序可比，`_now()` 全站同一格式）；本层只管 SQL。
+    「上一周期」= 同长的前一窗，用来给一句「比上周多/少 N 项」。
+    """
+    with connection() as conn:
+        new_techs = conn.execute(
+            "SELECT count(*) AS n FROM radar_techs WHERE first_seen_at >= ?", [start]
+        ).fetchone()
+        prev_new_techs = conn.execute(
+            "SELECT count(*) AS n FROM radar_techs WHERE first_seen_at >= ? AND first_seen_at < ?",
+            [prev_start, start],
+        ).fetchone()
+        rounds = conn.execute(
+            "SELECT count(*) AS n FROM radar_runs WHERE finished_at != '' AND finished_at >= ?",
+            [start],
+        ).fetchone()
+        directions = conn.execute(
+            "SELECT direction, count(*) AS n FROM radar_techs WHERE first_seen_at >= ?"
+            " GROUP BY direction ORDER BY n DESC, direction LIMIT 5",
+            [start],
+        ).fetchall()
+    return {
+        "new_techs": int(new_techs["n"]),
+        "prev_new_techs": int(prev_new_techs["n"]),
+        "rounds": int(rounds["n"]),
+        "directions": [
+            {"direction": str(row["direction"]), "count": int(row["n"])} for row in directions
+        ],
+    }
+
+
 def radar_create_run(trigger: str) -> int:
     """开一轮采集，返回自增 `run_id`（采集结束后由 `radar_finish_run` 补终态）。"""
     # ID 游标与业务行同事务：崩溃不能留下已消耗但未记录的游标。

@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import uuid
 from collections.abc import Sequence
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from app.core import repository
@@ -98,6 +99,17 @@ def tech_trends(
 ) -> dict[str, list[dict[str, Any]]]:
     """star 快照序列（时间正序）：先锋卡片走势线用；没快照的 slug 不在返回里。"""
     return repository.radar_tech_trends(slugs, max_points=max_points)
+
+
+def weekly_summary(*, days: int = 7) -> dict[str, Any]:
+    """近 N 天速览（滚动窗口，不是自然周）：新增 / 上一周期对比 / 轮数 / 方向分布。
+
+    时间窗在服务层算（`_now()` 同一 UTC 格式，字典序可比），仓储层只收字符串边界。
+    """
+    now = datetime.now(UTC)
+    start = (now - timedelta(days=days)).isoformat()
+    prev_start = (now - timedelta(days=days * 2)).isoformat()
+    return repository.radar_weekly_summary(start=start, prev_start=prev_start)
 
 
 def create_run(trigger: str) -> int:

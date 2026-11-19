@@ -1120,6 +1120,22 @@ export interface RadarTrendList {
   trends: Record<string, RadarTrendPoint[]>
 }
 
+export interface RadarWeeklyDirection {
+  direction: string
+  count: number
+}
+
+export interface RadarWeekly {
+  /** 滚动 7 天窗口内首次入清单的条目数。 */
+  new_techs: number
+  /** 上一周期（同长）的新增数，给「比上周多/少 N 项」。 */
+  prev_new_techs: number
+  /** 窗口内完成的采集轮数。 */
+  rounds: number
+  /** 新增条目的方向分布（Top 5，按条数降序）。 */
+  directions: RadarWeeklyDirection[]
+}
+
 export interface RadarTranslateRequest {
   /** 本次最多翻几条（后端上限 50，缺省走后端配置）。 */
   limit?: number

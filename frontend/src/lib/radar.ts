@@ -5,7 +5,7 @@
  * 结论中文来自服务端 `verdict_label`（`rules.VERDICT_LABELS` 单源），前端不复制第二份词表。
  */
 
-import type { RadarJobItem, RadarTechItem } from '../api/types'
+import type { RadarJobItem, RadarTechItem, RadarWeekly } from '../api/types'
 import { practiceHref } from './studyPlan'
 
 /** 在途状态：`queued` / `running`，页面据此决定是否继续轮询。 */
@@ -333,6 +333,26 @@ export function sparklinePoints(
       return `${Math.round(x * 10) / 10},${Math.round(y * 10) / 10}`
     })
     .join(' ')
+}
+
+/* ---------- r146 周报卡文案（滚动 7 天窗口，数据来自 /api/radar/weekly） ---------- */
+
+/**
+ * 周报卡一句话：新增对比上一周期 + 采集轮数；方向分布由页面渲染成可点芯片。
+ *
+ * 「持平」要如实说——上一周期 0、本周 0 时说「还没有新增条目」，不渲染成
+ * 「比上一周期多 0 项」这种没信息量的句子。
+ */
+export function weeklyText(weekly: RadarWeekly): string {
+  const delta =
+    weekly.new_techs === weekly.prev_new_techs
+      ? '与上一周期持平'
+      : weekly.new_techs > weekly.prev_new_techs
+        ? `比上一周期多 ${weekly.new_techs - weekly.prev_new_techs} 项`
+        : `比上一周期少 ${weekly.prev_new_techs - weekly.new_techs} 项`
+  const head =
+    weekly.new_techs === 0 ? '还没有新增条目' : `新增 ${weekly.new_techs} 项（${delta}）`
+  return `${head} · 采集 ${weekly.rounds} 轮`
 }
 
 /* ---------- r87 先锋 ↔ 国子监联动的纯函数层 ---------- */

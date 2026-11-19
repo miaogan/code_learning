@@ -1246,6 +1246,22 @@ class RadarTrendList(BaseModel):
     trends: dict[str, list[RadarTrendPoint]] = Field(default_factory=dict)
 
 
+class RadarWeeklyDirection(BaseModel):
+    """近 7 天新增条目的方向分布（Top 5）。"""
+
+    direction: str
+    count: int
+
+
+class RadarWeekly(BaseModel):
+    """先锋周报卡（r146）：滚动 7 天窗口，不是自然周——跨周聚合对单人仓库更稳。"""
+
+    new_techs: int = 0
+    prev_new_techs: int = 0
+    rounds: int = 0
+    directions: list[RadarWeeklyDirection] = Field(default_factory=list)
+
+
 class RadarTranslateRequest(BaseModel):
     """按需补翻英文摘要：一次最多翻多少条（默认 20，上限 50）。"""
 

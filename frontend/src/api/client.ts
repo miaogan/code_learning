@@ -77,6 +77,7 @@ import type {
   RadarTrendList,
   RadarTranslateRequest,
   RadarTranslateResult,
+  RadarWeekly,
   Report,
   ReportGenerateRequest,
   ResumeJobStarted,
@@ -338,6 +339,10 @@ export const api = {
     request<RadarTrendList>(`/api/radar/trends?slugs=${encodeURIComponent(slugs.join(','))}`, {
       signal,
     }),
+
+  /** r146：近 7 天速览（先锋周报卡）——滚动窗口，不是自然周。 */
+  radarWeekly: (signal?: AbortSignal): Promise<RadarWeekly> =>
+    request<RadarWeekly>('/api/radar/weekly', { signal }),
 
   /** 把清单里剩下的英文摘要翻成中文（可重复调用，已翻过的不会重复请求）。 */
   radarTranslate: (payload: RadarTranslateRequest = {}): Promise<RadarTranslateResult> =>
