@@ -244,6 +244,66 @@ export function matchesTechQuery(item: RadarTechItem, rawQuery: string): boolean
     .every((term) => haystack.includes(term))
 }
 
+/* ---------- r146 分面计数与「为什么」 ---------- */
+
+/** 结论四档的固定顺序：与服务端 `rules.VERDICTS` 同序，界面不因后端字典顺序抖动。 */
+export const VERDICT_ORDER = ['must_learn', 'worth_knowing', 'watch', 'skip'] as const
+
+const VERDICT_SHORT: Record<string, string> = {
+  must_learn: '必学',
+  worth_knowing: '选学',
+  watch: '观望',
+  skip: '跳过',
+}
+
+/**
+ * 分面计数 → 摘要文案：`必学 8 · 选学 21 · 观望 18 · 跳过 10`。
+ *
+ * 缺档按 0 显示而不是省略——「观望 0」本身就是信息（本轮没有需要观望的），
+ * 省略会让人以为是没算。
+ */
+export function verdictCountText(counts: Record<string, number> | undefined): string {
+  return VERDICT_ORDER.map((verdict) => {
+    const count = counts?.[verdict] ?? 0
+    return `${VERDICT_SHORT[verdict]} ${count}`
+  }).join(' · ')
+}
+
+/** 结论 chip 文案：带分面计数（`必学 8`）；`全部` 传总数。计数缺省时退回纯文案。 */
+export function verdictChipLabel(label: string, count: number | undefined): string {
+  return count === undefined ? label : `${label} ${count}`
+}
+
+/**
+ * 清单头部计数文案（r146）：搜索 / 筛选 / 常态三种口径分开说。
+ *
+ * 三种口径混在一起最容易造成误读——「共 8 项」到底是清单只有 8 条，还是筛出来 8 条？
+ * 所以筛选时同时给全量（`共 8 项 / 全部 57`），常态才顺带铺开四档分布。
+ */
+export function listCountText(input: {
+  total: number
+  pageCount: number
+  allCount: number
+  searching: boolean
+  filtering: boolean
+  counts?: Record<string, number>
+}): string {
+  const { total, pageCount, allCount, searching, filtering, counts } = input
+  if (searching) return `本页 ${pageCount} / 共 ${total} 项`
+  if (filtering) return `共 ${total} 项 / 全部 ${allCount}`
+  return `共 ${total} 项 · ${verdictCountText(counts)}`
+}
+
+/**
+ * 「为什么这么判」：折叠态只给第一条依据（岗位相关度），展开看全部。
+ *
+ * 取首条而不是拼四维，是因为 `rules.rule_assess` 的 `reasons` 顺序固定为
+ * 相关度 → 采用度 → 成熟度 → 成本，首条恰是四档结论真正的判定依据。
+ */
+export function whyText(item: RadarTechItem): string {
+  return item.reasons[0]?.trim() ?? ''
+}
+
 /* ---------- r87 先锋 ↔ 国子监联动的纯函数层 ---------- */
 /** 任务的方向读数：章节草稿优先，其次第一条题；都没有返回空串（不猜方向）。 */
 export function jobDirection(job: RadarJobItem): string {

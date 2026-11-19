@@ -146,6 +146,32 @@ def test_techs_api_filters_and_paginates(client: TestClient, radar_env: None) ->
     out_of_range = client.get("/api/radar/techs", params={"limit": 100, "page": 99}).json()
     assert out_of_range["items"] == []
 
+
+def test_techs_api_counts_are_facet_not_page(client: TestClient, radar_env: None) -> None:
+    """r146：`counts` 是分面计数 —— 四档键始终齐、总和等于 `total`、且不受结论筛选影响。
+
+    这是「必学 8 / 选学 21」这行摘要的数据来源，口径错了会让用户以为清单缩水。
+    """
+    asyncio.run(radar.run_round(trigger="manual", user=None))
+    full = client.get("/api/radar/techs", params={"limit": 10}).json()
+    assert set(full["counts"]) == set(rules.VERDICTS)
+    assert sum(full["counts"].values()) == full["total"]
+
+    # 点开「必学」后，其余档的计数必须还在（否则用户会以为别的档空了）。
+    one_verdict = next(item for item in full["counts"] if full["counts"][item] > 0)
+    filtered = client.get(
+        "/api/radar/techs", params={"limit": 10, "verdict": one_verdict}
+    ).json()
+    assert filtered["total"] == full["counts"][one_verdict]
+    assert filtered["counts"] == full["counts"]
+
+    # 方向筛选会改变分面（方向是清单范围，结论不是）。
+    direction = next(row["direction"] for row in full["items"] if row["direction"])
+    by_direction = client.get(
+        "/api/radar/techs", params={"limit": 10, "direction": direction}
+    ).json()
+    assert sum(by_direction["counts"].values()) == by_direction["total"] <= full["total"]
+
     bad_verdict = client.get("/api/radar/techs", params={"verdict": "not-a-verdict"})
     assert bad_verdict.status_code == 400
     bad_direction = client.get("/api/radar/techs", params={"direction": "不存在的方向"})

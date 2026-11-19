@@ -1104,6 +1104,8 @@ export interface RadarTechItem {
 export interface RadarTechList {
   items: RadarTechItem[]
   total: number
+  /** 各结论条目数（**不受结论筛选影响**，只受方向筛选影响）：筛选 chip 与摘要行的数据来源。 */
+  counts: Record<string, number>
   notice: string
 }
 

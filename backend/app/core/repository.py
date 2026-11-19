@@ -2182,6 +2182,23 @@ def radar_cross_source_count() -> dict[str, int]:
     return {str(row["tech_slug"]): int(row["n"]) for row in rows}
 
 
+def radar_tech_verdict_counts(
+    *, directions: str | Sequence[str] | None = None
+) -> dict[str, int]:
+    """各结论的条目数：与清单同一过滤口径，但**不看结论筛选**（否则点开必学后其余档全变 0）。
+
+    返回里只出现库里真有的档；闭集补零由调用方按 `rules.VERDICTS` 做，避免仓储层引用服务层。
+    """
+    where, params = _radar_tech_where(tech_slug="", directions=directions, verdicts=None)
+    with connection() as conn:
+        rows = conn.execute(
+            f"SELECT a.verdict AS verdict, count(*) AS n FROM radar_techs t{_RADAR_TECH_JOIN}{where}"
+            " GROUP BY a.verdict",
+            params,
+        ).fetchall()
+    return {str(row["verdict"] or "skip"): int(row["n"]) for row in rows}
+
+
 def radar_create_run(trigger: str) -> int:
     """开一轮采集，返回自增 `run_id`（采集结束后由 `radar_finish_run` 补终态）。"""
     # ID 游标与业务行同事务：崩溃不能留下已消耗但未记录的游标。

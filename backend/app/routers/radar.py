@@ -63,11 +63,14 @@ async def list_techs(
     items = store.list_techs(
         limit, directions=directions, verdicts=verdicts, offset=(page - 1) * limit
     )
+    raw_counts = store.verdict_counts(directions=directions)
     return RadarTechList(
         items=[
             RadarTechItem(**row, verdict_label=rules.label_of(row["verdict"])) for row in items
         ],
         total=store.count_techs(directions=directions, verdicts=verdicts),
+        # 闭集补零：前端四档 chip 的计数不必再判 `undefined`。
+        counts={verdict: int(raw_counts.get(verdict, 0)) for verdict in rules.VERDICTS},
         notice=_notice(),
     )
 

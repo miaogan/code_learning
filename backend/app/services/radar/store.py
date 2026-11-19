@@ -88,6 +88,11 @@ def cross_source_count() -> dict[str, int]:
     return repository.radar_cross_source_count()
 
 
+def verdict_counts(*, directions: str | Sequence[str] | None = None) -> dict[str, int]:
+    """各结论条目数（不受结论筛选影响），给「必学 8 / 选学 21…」这类分面计数用。"""
+    return repository.radar_tech_verdict_counts(directions=directions)
+
+
 def create_run(trigger: str) -> int:
     return repository.radar_create_run(trigger)
 

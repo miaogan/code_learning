@@ -25,6 +25,10 @@ import {
   summaryText,
   techMetaText,
   techTagList,
+  listCountText,
+  verdictChipLabel,
+  verdictCountText,
+  whyText,
 } from '../lib/radar'
 
 function question(overrides: Partial<RadarQuestionSample> = {}): RadarQuestionSample {
@@ -344,5 +348,42 @@ describe('r144 先锋信息流纯函数', () => {
     expect(matchesTechQuery(item, 'throughput 推理')).toBe(true)
     expect(matchesTechQuery(item, 'vllm 区块链')).toBe(false)
     expect(matchesTechQuery(item, 'github')).toBe(true)
+  })
+})
+
+describe('r146 分面计数与折叠态依据', () => {
+  it('verdictCountText 固定四档顺序，缺档补 0 而不是省略', () => {
+    expect(verdictCountText({ must_learn: 8, worth_knowing: 21, watch: 18, skip: 10 })).toBe(
+      '必学 8 · 选学 21 · 观望 18 · 跳过 10',
+    )
+    expect(verdictCountText({ must_learn: 2 })).toBe('必学 2 · 选学 0 · 观望 0 · 跳过 0')
+    expect(verdictCountText(undefined)).toBe('必学 0 · 选学 0 · 观望 0 · 跳过 0')
+  })
+
+  it('verdictChipLabel 带计数；计数缺省（首屏未就绪）时退回纯文案', () => {
+    expect(verdictChipLabel('必学', 8)).toBe('必学 8')
+    expect(verdictChipLabel('必学', 0)).toBe('必学 0')
+    expect(verdictChipLabel('必学', undefined)).toBe('必学')
+  })
+
+  it('listCountText 三种口径分开说：搜索 / 筛选同时给全量 / 常态铺四档', () => {
+    const counts = { must_learn: 8, worth_knowing: 21, watch: 18, skip: 10 }
+    expect(
+      listCountText({ total: 57, pageCount: 10, allCount: 57, searching: false, filtering: false, counts }),
+    ).toBe('共 57 项 · 必学 8 · 选学 21 · 观望 18 · 跳过 10')
+    expect(
+      listCountText({ total: 8, pageCount: 8, allCount: 57, searching: false, filtering: true, counts }),
+    ).toBe('共 8 项 / 全部 57')
+    expect(
+      listCountText({ total: 8, pageCount: 3, allCount: 57, searching: true, filtering: true, counts }),
+    ).toBe('本页 3 / 共 8 项')
+  })
+
+  it('whyText 取首条依据（相关度即四档结论的判定依据），空数组 / 空白给空串', () => {
+    expect(whyText(tech({ reasons: ['岗位相关度 5/5（方向「AI 工程」命中你的薄弱方向）', '其他'] }))).toBe(
+      '岗位相关度 5/5（方向「AI 工程」命中你的薄弱方向）',
+    )
+    expect(whyText(tech({ reasons: [] }))).toBe('')
+    expect(whyText(tech({ reasons: ['   '] }))).toBe('')
   })
 })

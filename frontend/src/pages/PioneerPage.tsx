@@ -17,12 +17,16 @@ import {
   dimensionText,
   formatCount,
   groupTechsByDay,
+  listCountText,
   matchesTechQuery,
   needsTranslation,
   safeRepoUrl,
   starDeltaText,
   summaryText,
   techTagList,
+  VERDICT_ORDER,
+  verdictChipLabel,
+  whyText,
 } from '../lib/radar'
 import { useAsync } from '../lib/useAsync'
 
@@ -46,13 +50,31 @@ const PAGE_SIZE_OPTIONS = [10, 20, 50, 100] as const
 const DEFAULT_PAGE_SIZE = 10
 
 /** 结论筛选多选：与后端 `rules.VERDICT_LABELS` 同一套措辞（「全部」是折叠后的哨兵）。 */
-const VERDICT_OPTIONS: ChipOption<string>[] = [
+const VERDICT_BASE_OPTIONS: ChipOption<string>[] = [
   { value: 'all', label: '全部' },
   { value: 'must_learn', label: '必学' },
   { value: 'worth_knowing', label: '选学' },
   { value: 'watch', label: '观望' },
   { value: 'skip', label: '跳过' },
 ]
+
+/**
+ * r146：给结论 chip 挂分面计数（`必学 8`）。
+ *
+ * 计数由服务端按**方向**过滤后统计、刻意不看结论筛选——否则点开「必学」后其余三档
+ * 全变 0，用户会以为别的档空了。`counts` 未就绪（首屏）时退回纯文案，不显示误导性的 0。
+ */
+function verdictOptions(counts: Record<string, number> | undefined): ChipOption<string>[] {
+  if (counts === undefined) return VERDICT_BASE_OPTIONS
+  const all = VERDICT_ORDER.reduce((sum, verdict) => sum + (counts[verdict] ?? 0), 0)
+  return VERDICT_BASE_OPTIONS.map((option) => ({
+    ...option,
+    label: verdictChipLabel(
+      option.label,
+      option.value === 'all' ? all : (counts[option.value] ?? 0),
+    ),
+  }))
+}
 
 /** 方向筛选多选：与题库 / 学馆同一份闭集，勾满全部具体方向自动折叠回「全部」。 */
 const DIRECTION_OPTIONS: ChipOption<string>[] = [
@@ -91,6 +113,8 @@ function TechRow({
   const link = safeRepoUrl(item.url)
   const time = assessedTimeText(item.assessed_at)
   const tags = techTagList(item)
+  // r146：折叠态也给「凭什么」——四档结论原来只有结果，用户只能展开才知道依据。
+  const why = whyText(item)
   return (
     <li
       className={hit ? 'sc-radar-slot is-hit' : 'sc-radar-slot'}
@@ -137,6 +161,12 @@ function TechRow({
           )}
         </div>
         {!expanded && summaryToShow !== '' && <p className="sc-radar-brief">{summaryToShow}</p>}
+        {!expanded && why !== '' && (
+          <p className="sc-radar-why">
+            <span className="sc-radar-whylabel">依据</span>
+            {why}
+          </p>
+        )}
         <div className="sc-radar-tagrow">
           {tags.map((tag) => (
             <span key={tag} className="sc-radar-tag">
@@ -182,6 +212,8 @@ export default function PioneerPage() {
   const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE)
   // r144：当前页关键词过滤（服务端分页是权威口径，这里只帮用户在已取回的一页里快速扫）。
   const [techQuery, setTechQuery] = useState('')
+  // r146：「怎么评的」说明面板默认收起——它是一次性的心智建设，不该长期占屏。
+  const [howtoOpen, setHowtoOpen] = useState(false)
   // 清单筛选（服务端过滤）：结论与方向都是多选，`['all']` = 不筛选；筛选值变化一律回到第 1 页。
   const [verdictFilters, setVerdictFilters] = useState<string[]>(['all'])
   const [directionFilters, setDirectionFilters] = useState<string[]>(['all'])
@@ -545,12 +577,82 @@ export default function PioneerPage() {
         <Card>
           <div className="sc-radar-listhead">
             <h3 className="sc-coach-blocktitle">技术清单</h3>
-            <span className="sc-radar-count">
-              {techQuery.trim() === ''
-                ? `共 ${techs.total} 项`
-                : `本页 ${visibleItems.length} / 共 ${techs.total} 项`}
-            </span>
+            <div className="sc-radar-listmeta">
+              <span className="sc-radar-count">
+                {listCountText({
+                  total: techs.total,
+                  pageCount: visibleItems.length,
+                  allCount: VERDICT_ORDER.reduce(
+                    (sum, verdict) => sum + (techs.counts?.[verdict] ?? 0),
+                    0,
+                  ),
+                  searching: techQuery.trim() !== '',
+                  filtering,
+                  counts: techs.counts,
+                })}
+              </span>
+              <button
+                type="button"
+                className="sc-radar-howto"
+                aria-expanded={howtoOpen}
+                aria-controls="radar-howto"
+                onClick={() => setHowtoOpen((prev) => !prev)}
+              >
+                {howtoOpen ? '收起评分说明 ▴' : '怎么评的 ▾'}
+              </button>
+            </div>
           </div>
+          {howtoOpen && (
+            <div className="sc-radar-howto-panel" id="radar-howto">
+              <p className="sc-radar-howto-lead">
+                四维都是 1–5 的粗档，用来排序和分流，不是精确评分；结论只看前两维——
+                岗位相关度与行业采用度，另外两维也照实记录，但不改变结论。
+              </p>
+              <dl className="sc-radar-howto-list">
+                <div>
+                  <dt>必学</dt>
+                  <dd>岗位相关度 ≥ 4 且 行业采用度 ≥ 3</dd>
+                </div>
+                <div>
+                  <dt>选学</dt>
+                  <dd>岗位相关度 ≥ 3（采用度不一定高，但和你当前方向相关）</dd>
+                </div>
+                <div>
+                  <dt>观望</dt>
+                  <dd>行业采用度 ≥ 3（够热，但与你当前方向关系弱）</dd>
+                </div>
+                <div>
+                  <dt>跳过</dt>
+                  <dd>其余：既不相关，也还没被行业验证</dd>
+                </div>
+              </dl>
+              <dl className="sc-radar-howto-list">
+                <div>
+                  <dt>岗位相关度</dt>
+                  <dd>属站内 8 个方向 +1；命中画像里的薄弱方向 +2；命中目标岗位关键词 +1</dd>
+                </div>
+                <div>
+                  <dt>行业采用度</dt>
+                  <dd>star 每 100 倍 +1；7 日涨 50 star +1；多源同时出现（≥2）+1</dd>
+                </div>
+                <div>
+                  <dt>成熟度</dt>
+                  <dd>仓库满 180 天 +1；近 30 天仍有推送 +1；来自 GitHub +1；多源出现 +1</dd>
+                </div>
+                <div>
+                  <dt>学习成本</dt>
+                  <dd>论文 2、新仓库 3、成熟且活跃 5、其余 4；数值越大越省力（5 = 一个下午能上手）</dd>
+                </div>
+              </dl>
+              <p className="sc-radar-howto-note">
+                疑似刷 star（新建即巨量）会把结论降一档，例如「必学」降成「选学」。
+              </p>
+              <p className="sc-radar-howto-note">
+                条目上标「规则评估」= 纯规则打分，零模型参与、可复算；没有这个标 = 模型按同一套四维与四档给分，
+                越界值会被夹到 1–5。
+              </p>
+            </div>
+          )}
           {missName !== '' && (
             <p className="sc-coach-note">
               从国子监带来的「{missName}」不在当前页：它可能在后面的分页里，翻页或换个方向筛选找找。
@@ -585,7 +687,7 @@ export default function PioneerPage() {
                 <div className="sc-lab-filter-body">
                   <MultiChipRow
                     groupLabel="技术结论筛选"
-                    options={VERDICT_OPTIONS}
+                    options={verdictOptions(techs.counts)}
                     values={verdictFilters}
                     allValue="all"
                     onChange={changeVerdicts}

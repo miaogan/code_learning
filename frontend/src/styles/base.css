@@ -13029,3 +13029,113 @@ a.sc-radar-name--link:hover .sc-radar-ext {
     padding: var(--sp-3);
   }
 }
+
+/* ---------- r146 先锋：分面计数 / 折叠态依据 / 「怎么评的」说明 ---------- */
+
+/* 清单头右侧：计数与说明入口同处一组（原先只有一个 `共 N 项` 的 span）。 */
+.sc-radar-listmeta {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+}
+
+/* 说明入口做成带边框的文字按钮：它触发面板，需要可点的边界（焦点环由全局 :focus-visible 提供）。 */
+.sc-radar-howto {
+  padding: var(--sp-1) var(--sp-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-4);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color var(--fast) var(--ease), border-color var(--fast) var(--ease);
+}
+
+.sc-radar-howto:hover {
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+
+/* 说明面板：左侧中性竖线 + 内凹底色，刻意不用橙色（那是告警条的颜色）。 */
+.sc-radar-howto-panel {
+  margin: 0 0 var(--sp-3);
+  padding: var(--sp-3);
+  border-left: 2px solid var(--border-subtle);
+  border-radius: var(--radius-4);
+  background: var(--bg-inset);
+}
+
+.sc-radar-howto-lead,
+.sc-radar-howto-note {
+  margin: 0;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--text-secondary);
+}
+
+.sc-radar-howto-note {
+  margin-top: var(--sp-2);
+  color: var(--text-tertiary);
+}
+
+.sc-radar-howto-list {
+  display: grid;
+  margin: var(--sp-2) 0;
+  gap: var(--sp-1);
+}
+
+.sc-radar-howto-list > div {
+  display: grid;
+  grid-template-columns: 6.5em minmax(0, 1fr);
+  gap: var(--sp-2);
+}
+
+.sc-radar-howto-list dt {
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.sc-radar-howto-list dd {
+  margin: 0;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-secondary);
+}
+
+/* 折叠态的「依据」：单行截断（展开态已给完整 reasons，这里只做提示，不重复占高）。 */
+.sc-radar-why {
+  margin: 0;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sc-radar-whylabel {
+  margin-right: var(--sp-2);
+  color: var(--text-secondary);
+}
+
+@media (max-width: 640px) {
+  .sc-radar-listhead {
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+  }
+
+  .sc-radar-listmeta {
+    justify-content: flex-start;
+  }
+
+  .sc-radar-howto-list > div {
+    grid-template-columns: 5.5em minmax(0, 1fr);
+  }
+}

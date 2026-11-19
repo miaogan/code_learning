@@ -1226,6 +1226,9 @@ class RadarTechItem(BaseModel):
 class RadarTechList(BaseModel):
     items: list[RadarTechItem] = Field(default_factory=list)
     total: int = 0
+    #: 各结论的条目数（**不受结论筛选影响**，只受方向筛选影响）：给筛选 chip 与摘要行用。
+    #: 键固定为 `rules.VERDICTS` 四档，缺档补 0，前端不必判空。
+    counts: dict[str, int] = Field(default_factory=dict)
     #: 本轮采集的概括说明（离线 / 降级 / 丢弃引用等），空串表示无特别情况。
     notice: str = ""
 
