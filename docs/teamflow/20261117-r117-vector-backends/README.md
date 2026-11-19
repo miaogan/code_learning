@@ -127,6 +127,22 @@ faiss 索引文件在 `data/rag-vectors/`，与 `data/app-fallback.db` 同根—
 目录即可同时带走业务库与向量索引**。索引与业务库的 embedder / 行数对账保证了
 「备份的索引配新库」也不会返回错的结果（对不上就提示重建）。
 
+### 5.1 首次部署必须建一次索引（r140 补）
+
+派生索引不在 Git 里，`questions` 表 seed 后 `question.faiss` 并不会自动生成——全新机器
+第一次检索报「faiss 索引尚未构建」是**预期状态**，不是故障。三条幂等入口任选其一：
+
+1. **启动自动补建**（r140 起默认开，`RAG_SEED_QUESTIONS=true`）：检测到题库向量不可检索
+   就重建一次（`store.has_kind('question')` 精确判定，不靠 notice 字符串匹配）；已建好跳过，
+   后端未就绪只留 WARNING 不阻断启动。远程 embedding 部署想省启动时间可设 `false`。
+2. **CLI**：`cd backend && python -m app.admin_cli rebuild-index --kind all`
+   （`question` / `tutorial` / `all`，全量替换、可重复跑；输出带 vector_mode / embedder）。
+3. **考工页**：「重建题库索引」+「推送教程正文」两个按钮，与 CLI 共用同一套 `indexer`。
+
+注意：r117 原设计里 seed 只补教程索引（`tutorial.faiss`），半年后内网部署最常见的
+「教程能搜、题库报未构建」正是这个半构建态；r140 的自动补建与 `FaissStore.notice()` 的
+按 kind 对照（业务库有 chunk 但磁盘缺文件＝不算健康）一起修掉了它。
+
 ## 6. 启动清单（r117 续）
 
 数据层 / 缓存层 / 向量库的决策日志各自回答「**为什么**用它」，用户最先要问的是「**到底**

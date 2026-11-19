@@ -179,6 +179,25 @@ RAG_SEED_TUTORIALS=false                   # 不填不会挂，但启动会因�
 没有 PostgreSQL / Redis 也一样跑（`DB_MODE` 留空即自动降级到 SQLite 单机库，见上一节），
 所以「内网单机」是最常见的组合：**不设 `DB_MODE`、不装 PG/Redis**，只填上面的 AI 三项即可。
 
+### RAG 向量索引（首次部署会问「faiss 索引未构建」的原因）
+
+单机部署选中 `VECTOR_MODE=faiss`（`auto` 在装了 faiss-cpu 的单机上也等价）后，向量索引是
+**派生文件**（`backend/data/rag-vectors/question.faiss` + `.json`），不在 Git 里、也不随题库
+seed 自动生成——所以全新机器第一次检索会提示「faiss 索引尚未构建」。**这不是故障**，按下面
+任一方式建一次即可（离线哈希 embedding 下即时完成、零出网）：
+
+- **启动自动补建**（默认开）：服务启动时若检测到题库向量不可检索就幂等重建一次，已建好则
+  跳过；远程 embedding 缺 Key / faiss 没装只留一条 WARNING，不阻断启动。要关掉设
+  `RAG_SEED_QUESTIONS=false`（与上面的 `RAG_SEED_TUTORIALS` 同理，远程 embedding 慢）。
+- **命令行一键建**（无浏览器 / 无网机器推荐）：`cd backend && python -m app.admin_cli rebuild-index --kind all`
+  （`--kind question|tutorial|all`，默认 all；输出带 engine / vector_mode / embedder，可直接诊断）。
+- **页面按钮**：登录后到「考工」→「RAG 向量索引」→「重建题库索引」/「推送教程正文」。
+
+考工页现在如实展示派生索引健康：`索引状态` 会把「元数据齐了但 faiss 文件没跟上」显示为
+**未构建**并给出中文处理指引，`向量后端` 一行直接告诉你当前是 `faiss` / `sqlite` / `pgvector`
+哪一档——不再出现「考工页显示已构建、检索页却报未构建」的自相矛盾。备份时把整个 `data/`
+目录拷走即可同时带走业务库与向量索引。
+
 改完先自查，再重启进程：
 
 ```bash
