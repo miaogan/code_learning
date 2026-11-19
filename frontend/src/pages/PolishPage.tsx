@@ -13,6 +13,7 @@ import { ConfirmModal } from '../components/ui/ConfirmModal'
 import { InlineError } from '../components/ui/InlineError'
 import { PhaseLoader } from '../components/ui/PhaseLoader'
 import { ResumeGate } from '../components/ui/ResumeGate'
+import { Select } from '../components/ui/Select'
 import { Toast } from '../components/ui/Toast'
 import { exportFileName } from '../lib/exportName'
 import {
@@ -561,21 +562,23 @@ export default function PolishPage() {
                               rows={3}
                             />
                             <div className="sc-polish-fact-formrow">
-                              <select
-                                className="sc-polish-fact-select"
+                              <Select
+                                variant="compact"
+                                ariaLabel="补写内容归属部分"
                                 value={draftSection ?? ''}
-                                onChange={(event) =>
+                                onChange={(value) =>
                                   setDraftSection(
-                                    event.target.value === '' ? null : (event.target.value as PolishSection),
+                                    value === '' ? null : (value as PolishSection),
                                   )
                                 }
-                              >
-                                <option value="">归属部分：自动判断</option>
-                                <option value="project">项目经历</option>
-                                <option value="experience">工作经历</option>
-                                <option value="education">教育经历</option>
-                                <option value="summary">技能概述</option>
-                              </select>
+                                options={[
+                                  { value: '', label: '归属部分：自动判断' },
+                                  { value: 'project', label: '项目经历' },
+                                  { value: 'experience', label: '工作经历' },
+                                  { value: 'education', label: '教育经历' },
+                                  { value: 'summary', label: '技能概述' },
+                                ]}
+                              />
                               <Button
                                 type="button"
                                 size="sm"

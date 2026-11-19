@@ -12090,6 +12090,15 @@ a.sc-radar-name--link:hover .sc-radar-ext {
 .sc-polish-fact-remove:hover {
   color: var(--text-primary);
 }
+/* r135：补写面板的按钮标签不换行；长缺项文字自己收缩换行，不把按钮挤成两行。 */
+.sc-polish-fact-row .sc-polish-fact-text {
+  min-width: 0;
+}
+.sc-polish-fact-row .sc-btn,
+.sc-polish-fact-formrow .sc-btn {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
 .sc-mirror-evidence {
   list-style: none;
   margin: 0;
