@@ -6,9 +6,7 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
-from typing import Any
 
 import pytest
 
@@ -18,7 +16,7 @@ from app.core.config import get_settings
 from app.schemas import RagStatus
 from app.services.retrieval import indexer
 from app.services.retrieval.embeddings import resolve_embedder
-from app.services.retrieval.vector_backends import FaissStore, resolve_vector_store
+from app.services.retrieval.vector_backends import FaissStore
 
 
 @pytest.fixture()
