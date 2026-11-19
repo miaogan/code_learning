@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   collectMissingFacts,
   mirrorMissingFromState,
+  rankMissingFactsByImportance,
   toUserFacts,
 } from './mirrorFacts'
 
@@ -13,16 +14,79 @@ describe('collectMissingFacts', () => {
       { id: 'card-2', missing_info: ['缺 QPS 数据', ' 缺上线时间 '] },
       { id: 'card-3', missing_info: ['', '   '] },
     ])
-    expect(items).toEqual([
-      { text: '缺 QPS 数据', sourceCardId: 'card-1' },
-      { text: '缺团队规模', sourceCardId: 'card-1' },
-      { text: '缺上线时间', sourceCardId: 'card-2' },
+    expect(
+      items.map(({ text, sourceCardId, occurrences }) => ({ text, sourceCardId, occurrences })),
+    ).toEqual([
+      { text: '缺 QPS 数据', sourceCardId: 'card-1', occurrences: 2 },
+      { text: '缺团队规模', sourceCardId: 'card-1', occurrences: 1 },
+      { text: '缺上线时间', sourceCardId: 'card-2', occurrences: 1 },
     ])
   })
 
   it('没有复盘卡或全空时返回空数组', () => {
     expect(collectMissingFacts([])).toEqual([])
     expect(collectMissingFacts([{ id: 'c', missing_info: [] }])).toEqual([])
+  })
+})
+
+describe('rankMissingFactsByImportance', () => {
+  it('量化指标优先于责任项，泛泛补充排最后', () => {
+    const items = collectMissingFacts([
+      { id: 'c1', missing_info: ['再补充一下具体细节', '缺延迟数据', '负责的模块'] },
+    ])
+    expect(rankMissingFactsByImportance(items).map((item) => item.text)).toEqual([
+      '缺延迟数据',
+      '负责的模块',
+      '再补充一下具体细节',
+    ])
+  })
+
+  it('同一条同时含泛泛措辞与量化指标时按高档位算', () => {
+    const [item] = collectMissingFacts([
+      { id: 'c1', missing_info: ['补充一下 QPS 数据'] },
+    ])
+    expect(item?.importance).toBe('high')
+  })
+
+  it('跨卡重复提及提升顺序，但不改写文本', () => {
+    const items = collectMissingFacts([
+      { id: 'c1', missing_info: ['缺架构设计细节', '缺稳定性数据'] },
+      { id: 'c2', missing_info: ['缺架构设计细节', '缺延迟数据'] },
+      { id: 'c3', missing_info: ['缺架构设计细节'] },
+    ])
+    const ranked = rankMissingFactsByImportance(items)
+    expect(ranked.map((item) => item.text)).toEqual([
+      '缺架构设计细节',
+      '缺延迟数据',
+      '缺稳定性数据',
+    ])
+    expect(ranked.map((item) => item.text).sort()).toEqual(items.map((item) => item.text).sort())
+  })
+
+  it('分数相同时保持首次出现顺序', () => {
+    const items = collectMissingFacts([
+      { id: 'c1', missing_info: ['缺并发数据', '缺 QPS 数据'] },
+    ])
+    expect(rankMissingFactsByImportance(items).map((item) => item.text)).toEqual([
+      '缺并发数据',
+      '缺 QPS 数据',
+    ])
+  })
+
+  it('按分数给出 high / medium / low 档位', () => {
+    const byText = new Map(
+      rankMissingFactsByImportance(
+        collectMissingFacts([
+          {
+            id: 'c1',
+            missing_info: ['缺 QPS 数据', '负责的模块', '再补充一下具体细节'],
+          },
+        ]),
+      ).map((item) => [item.text, item.importance]),
+    )
+    expect(byText.get('缺 QPS 数据')).toBe('high')
+    expect(byText.get('负责的模块')).toBe('medium')
+    expect(byText.get('再补充一下具体细节')).toBe('low')
   })
 })
 

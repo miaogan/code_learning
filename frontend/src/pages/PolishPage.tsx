@@ -27,6 +27,7 @@ import {
 import {
   collectMissingFacts,
   mirrorMissingFromState,
+  rankMissingFactsByImportance,
   toUserFacts,
 } from '../lib/mirrorFacts'
 import { useAsync } from '../lib/useAsync'
@@ -150,8 +151,9 @@ export default function PolishPage() {
   // --- r131 镜试缺项回灌：收集 → 编写 → user_facts 织入润色 ---------------------
   // 缺失信息来自镜试复盘卡（只读投影，零 AI 调用）；AI 失败不影响润色主流程。
   const mirrorAsync = useAsync((signal) => api.mirrorCards(10, signal), [])
+  // r136：按重要性排序——跨卡重复提及 + 量化/影响/责任/技术/泛泛的内容权重，纯本地规则。
   const missingItems = useMemo(
-    () => collectMissingFacts(mirrorAsync.data?.items ?? []),
+    () => rankMissingFactsByImportance(collectMissingFacts(mirrorAsync.data?.items ?? [])),
     [mirrorAsync.data],
   )
   /** 当前展开编写框的缺项文本（同一时刻只编辑一条）。 */
@@ -528,7 +530,7 @@ export default function PolishPage() {
                 <div className="sc-polish-facts-head">
                   <h2 className="sc-polish-facts-title">镜试缺项补写</h2>
                   <span className="sc-meta-line">
-                    镜试复盘发现简历缺这些信息；补写后 AI 会把它们织进润色建议
+                    镜试复盘发现简历缺这些信息；已按重要性排序（多次提及、量化指标优先），补写后 AI 会把它们织进润色建议
                   </span>
                 </div>
                 <ul className="sc-polish-facts-list">
