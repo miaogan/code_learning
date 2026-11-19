@@ -1,0 +1,666 @@
+[
+  {
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "用 CLIP 做图文对比学习时，一个 batch 内有 N 对图文，模型会构造出 N×N 的相似度矩阵。关于这个矩阵，正确的说法是？",
+    "options": [
+      {"key": "A", "text": "对角线上的 N 个格子是配对的图文正样本，其余是 batch 内互为负样本的组合"},
+      {"key": "B", "text": "整个矩阵每一个格子都是正样本，靠温度系数拉开它们的相似度高低的"},
+      {"key": "C", "text": "对角线上的格子是负样本，其余格子才是需要拉近的正样本对的"},
+      {"key": "D", "text": "这个矩阵只在推理阶段计算，训练时模型并不构造任何相似度矩阵的"}
+    ],
+    "answer": "A",
+    "explanation": "对比学习把 batch 内配对的图文视为正样本，放在相似度矩阵对角线上，其余跨样本组合天然构成负样本，再对行和列分别做交叉熵。batch 越大负样本越丰富，这也是对比学习吃大 batch 的原因。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "多模态大模型通常先做模态对齐预训练，再做视觉指令微调。如果跳过对齐阶段，直接在随机初始化的连接器上用少量指令数据训练，最可能出现什么结果？",
+    "options": [
+      {"key": "A", "text": "连接器尚未把视觉特征映射进语言语义空间，少量数据难以收敛且视觉幻觉明显增多"},
+      {"key": "B", "text": "模型的文本生成速度显著下降，但对图像的理解能力完全不受任何影响的"},
+      {"key": "C", "text": "视觉编码器会被自动冻结，导致整个模型退化为纯文本语言模型的"},
+      {"key": "D", "text": "指令数据会被自动改写成图文对格式，训练目标随之变为对比学习损失的"}
+    ],
+    "answer": "A",
+    "explanation": "随机初始化的连接器还没建立视觉到语言的语义映射，指令微调就要同时学对齐和任务两件事，少量数据下极易训崩或产生看图幻觉。先用海量图文对拿到稳定映射，再用高质量指令数据教任务，收敛更快也更可控。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "视觉 Transformer 把图像切成固定大小的 patch 后送入编码器。关于 patch 数量与视觉 token 的关系，下列说法正确的有哪些？",
+    "options": [
+      {"key": "A", "text": "224×224 的图像用 14×14 的 patch 切分，大约会得到 256 个视觉 patch 的"},
+      {"key": "B", "text": "336×336 的图像用 14×14 的 patch 切分，大约会得到 576 个视觉 patch 的"},
+      {"key": "C", "text": "在 patch 尺寸不变时，把输入分辨率翻倍，视觉 token 数量大约增加到四倍"},
+      {"key": "D", "text": "视觉 token 数量与输入分辨率完全无关，只由语言模型的词表大小决定的"}
+    ],
+    "answer": "A,B,C",
+    "explanation": "patch 数等于宽高方向 patch 数的乘积，二百二十四除以十四得十六、平方为二百五十六，三百三十六对应二十四的平方五百七十六。分辨率翻倍意味着宽高各翻倍、token 数约增四倍；视觉 token 由图像尺寸与 patch 大小决定，和词表无关。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "language": "",
+    "kind": "judge",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "CLIP 只能对训练时见过的类别做零样本分类，因为它的图像编码器在推理时必须知道待分类的类别数量才能工作。",
+    "options": [
+      {"key": "A", "text": "正确"},
+      {"key": "B", "text": "错误"}
+    ],
+    "answer": "错误",
+    "explanation": "零样本分类正是 CLIP 的强项：把类别名套进提示模板用文本编码器算出各类别向量，图像编码器独立算出图像向量，二者比余弦相似度取最大即可，编码器从不需要预先知道类别数量，也不要求见过该类别的标注样本。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "CLIP 的对比损失里通常带一个可学习的温度系数，把相似度除以它之后再计算交叉熵。这个系数的主要作用是什么？",
+    "options": [
+      {"key": "A", "text": "调节相似度分布的尖锐程度，影响梯度对困难负样本的敏感程度的"},
+      {"key": "B", "text": "决定图像编码器要使用多少层 Transformer 块的深度超参数的"},
+      {"key": "C", "text": "直接减少训练显存占用，让更大 batch 能够装进单张显卡的"},
+      {"key": "D", "text": "把图像特征强制截断成固定长度以便与文本特征拼接的"}
+    ],
+    "answer": "A",
+    "explanation": "温度系数对相似度做缩放，值越小分布越尖锐、模型越关注难负样本，值越大分布越平滑。它不改变网络深度、不节省显存、也不截断特征维度，本质是控制对比学习里 softmax 分布的锐度。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "构造视觉指令微调数据时，哪些做法有助于提升模型的看图推理能力，同时减少幻觉与能力退化？",
+    "options": [
+      {"key": "A", "text": "先让强模型输出详细图像描述，再基于描述和坐标生成推理型问答数据的"},
+      {"key": "B", "text": "混入一定比例的纯文本指令数据，防止语言能力在微调中发生退化的"},
+      {"key": "C", "text": "训练时只在回答部分计算损失，把指令和图片对应位置的前景屏蔽掉的"},
+      {"key": "D", "text": "只保留单一模板的短问答样本，避免模型接触到复杂多步推理任务的"}
+    ],
+    "answer": "A,B,C",
+    "explanation": "先描述后推理能生成信息量更足的问题，混入纯文本指令可缓解语言能力退化，只在回答部分算损失能避免模型学着复述问题。单一模板短问答会让模型学不到复杂推理，不是提升能力的做法。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "处理高分辨率图片时，若直接按原始尺寸切成大量 patch，视觉 token 会急剧膨胀。AnyRes 或分块缩放这类做法的核心思路是什么？",
+    "options": [
+      {"key": "A", "text": "把大图切成若干子图分别编码，再与一张缩略图一起送入模型的"},
+      {"key": "B", "text": "把所有图片无条件缩放到固定小尺寸，彻底舍弃细节换取速度"},
+      {"key": "C", "text": "只保留图片正中心的一小块裁剪区域，其余部分全部丢弃掉的"},
+      {"key": "D", "text": "先把图片转成纯文字描述，完全绕开视觉编码器的计算开销的"}
+    ],
+    "answer": "A",
+    "explanation": "分块编码加全局缩略图能同时保留局部细节与整体语义，是处理高分辨率的主流做法。无条件缩小和中心裁剪都会丢失关键信息，转成纯文字则丢掉了布局、颜色和图表趋势等视觉语义。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "language": "",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "在视觉指令微调中，通常会把用户指令和图片对应位置的损失屏蔽掉，只在模型回答的部分计算语言建模损失。",
+    "options": [
+      {"key": "A", "text": "正确"},
+      {"key": "B", "text": "错误"}
+    ],
+    "answer": "正确",
+    "explanation": "只对回答部分计算损失是指令微调的通行做法，这样模型把容量用在按指令生成答案上，而不是学着复述输入的问题和图像描述，能显著提升回答的相关性与训练效率。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "把一张图切成多个子块分别编码后，如果没有给各子块附加明确的空间位置信息，最可能直接损害哪一类任务的表现？",
+    "options": [
+      {"key": "A", "text": "判断物体位于画面左上还是右下的空间定位与图表理解的"},
+      {"key": "B", "text": "判断上传的图片文件是否是合法 PNG 格式的"},
+      {"key": "C", "text": "统计整张图片的文件体积和像素总数量的"},
+      {"key": "D", "text": "对纯文本系统提示词进行分词和词表映射的"}
+    ],
+    "answer": "A",
+    "explanation": "分块后若不标注行列位置，模型无法区分来自不同区域的视觉 token，涉及空间关系的定位、图表和版面理解会明显退化。文件格式校验、像素统计和文本分词都与视觉位置信息无关。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "训练统一 token 序列路线的大多模态模型时，哪些因素会造成多卡训练的负载不均或显存压力？",
+    "options": [
+      {"key": "A", "text": "视觉塔与文本路径的计算长度不同，流水线容易出现空转等待的"},
+      {"key": "B", "text": "动态分辨率让不同样本的视觉 token 数量不一致难以组批的"},
+      {"key": "C", "text": "过长的视觉序列需要序列并行或张量并行才能放进单卡的"},
+      {"key": "D", "text": "所有样本 token 数被强制对齐为完全相同，天然负载均衡的"}
+    ],
+    "answer": "A,B,C",
+    "explanation": "图像路径与文本路径长度不同会造成流水线空转，动态分辨率使样本间视觉 token 数波动、组批困难，长序列要靠并行切分才能装下。因此多模态训练的负载天然不均，需要在数据组织和并行策略上专门调度。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "LoRA 微调的核心做法是什么？",
+    "options": [
+      {"key": "A", "text": "冻结原权重，只训练注入的低秩矩阵，推理时可合并回原权重的"},
+      {"key": "B", "text": "把全部权重转成四比特并逐层解冻进行训练的一种方法的"},
+      {"key": "C", "text": "只替换模型的词表，而保持主干网络参数完全不改变的"},
+      {"key": "D", "text": "把训练数据压缩成低秩向量后再喂给模型进行训练的"}
+    ],
+    "answer": "A",
+    "explanation": "LoRA 在原线性层旁注入一对低秩矩阵，训练时冻结原权重只更新这对小矩阵，推理前可把它们合并回原权重从而没有额外延迟。量化权重、替换词表、压缩数据都不是它的机制。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "显存只有 24G 时想微调一个 7B 级的多模态模型，QLoRA 相比普通 LoRA 主要省在哪里？",
+    "options": [
+      {"key": "A", "text": "把基座权重量化到四比特，并用双重量化与分页优化器省显存"},
+      {"key": "B", "text": "把视觉编码器整个删除，只保留文本路径参与训练的"},
+      {"key": "C", "text": "把训练样本数量减少到原来的十分之一以缩短训练的"},
+      {"key": "D", "text": "把低秩秩数设为零，等价于完全不训练任何参数的"}
+    ],
+    "answer": "A",
+    "explanation": "QLoRA 用 NF4 之类的四比特格式保存基座权重，配合双重量化压缩量化常数、分页优化器削峰优化器状态，从而单卡装得下。删视觉塔、砍数据或把秩设为零都不是它省显存的机制。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "用有限的领域图文数据微调多模态模型时，通常会选择冻结视觉编码器。这么做的主要原因有哪些？",
+    "options": [
+      {"key": "A", "text": "保留预训练学到的通用视觉能力，避免被少量领域数据带偏"},
+      {"key": "B", "text": "大幅减少可训练参数量与优化器状态，降低显存占用的"},
+      {"key": "C", "text": "降低原有图文对齐关系被破坏、视觉幻觉增加的风险的"},
+      {"key": "D", "text": "冻结之后模型的推理速度会比微调之前变得更慢一些的"}
+    ],
+    "answer": "A,B,C",
+    "explanation": "冻结视觉塔能保住通用视觉表征、省下参数与显存，并减少小数据把对齐关系带偏的风险。冻结参与训练的参数不会让推理变慢，反而因为要保存和加载的权重更少，整体资源占用更低。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "language": "",
+    "kind": "judge",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "LoRA 训练完成后，可以在推理前把低秩增量合并回原权重，这样合并后的模型推理时没有额外的矩阵乘法开销。",
+    "options": [
+      {"key": "A", "text": "正确"},
+      {"key": "B", "text": "错误"}
+    ],
+    "answer": "正确",
+    "explanation": "低秩增量是原权重维度上的矩阵，可以直接加回原权重得到等效的新权重，合并后网络结构不变、输出一致且没有额外推理开销，这也是 LoRA 适合线上部署的重要原因。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "在什么情况下，只微调连接器而不动语言模型和视觉编码器是合理的选择？",
+    "options": [
+      {"key": "A", "text": "领域数据与预训练分布接近，只需轻微校准模态对齐关系时"},
+      {"key": "B", "text": "需要让模型彻底学会一门预训练中从未见过的新语言时"},
+      {"key": "C", "text": "希望整体替换掉语言模型主干以大幅降低推理成本时"},
+      {"key": "D", "text": "数据量极大且算力充足，追求该领域的最佳效果上限时"}
+    ],
+    "answer": "A",
+    "explanation": "当领域数据与预训练分布接近时，问题多在对齐的轻微校准，只训极小的连接器又快又稳，还能避免破坏主干能力。学新语言、换主干或追求极致效果都需要更大规模的参数更新。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "微调后模型在领域任务上变好，但通用问答变差、开始出现视觉幻觉。哪些措施有助于缓解这种灾难性遗忘？",
+    "options": [
+      {"key": "A", "text": "降低学习率并配合早停，避免参数更新幅度过大"},
+      {"key": "B", "text": "在训练数据里混入少量通用指令样本做回放的"},
+      {"key": "C", "text": "冻结视觉编码器，只更新语言模型的部分适配层的"},
+      {"key": "D", "text": "把学习率调得更高并训练更多轮，彻底覆盖旧知识的"}
+    ],
+    "answer": "A,B,C",
+    "explanation": "降低学习率和早停能限制参数漂移，混入通用数据回放可巩固旧能力，冻结视觉塔减少对齐破坏。调高学习率并延长训练只会加剧遗忘，与此目标恰好相反。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "LoRA 里秩 r 和缩放系数 alpha 通常一起出现，实际作用的更新幅度主要由什么决定？",
+    "options": [
+      {"key": "A", "text": "由 alpha 与 r 的比值缩放，它决定低秩更新的实际步长"},
+      {"key": "B", "text": "由 r 的平方决定，秩越大更新幅度就一定越大的"},
+      {"key": "C", "text": "由模型词表大小决定，与 alpha 和秩都完全无关的"},
+      {"key": "D", "text": "由输入图片的分辨率直接决定的一个固定常数的"}
+    ],
+    "answer": "A",
+    "explanation": "LoRA 的更新量按 alpha 除以秩来缩放，所以同样秩下调 alpha 就等于调有效步长。秩决定表达能力上限、并非越大越好，更新幅度与词表大小、图片分辨率都没有关系。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "language": "",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "DoRA 是对 LoRA 的改进，它把权重更新拆成幅值和方向两部分分别学习，希望在低秩预算下更接近全量微调的效果。",
+    "options": [
+      {"key": "A", "text": "正确"},
+      {"key": "B", "text": "错误"}
+    ],
+    "answer": "正确",
+    "explanation": "DoRA 确实把权重更新分解为幅值与方向两部分，方向部分沿用低秩更新、幅值部分单独学习，这样在低秩预算下的表达能力更接近全量微调，同时额外参数开销很小。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "想专门评估多模态模型是否会描述出图片里根本不存在的物体，应该优先选用哪一类评测基准？",
+    "options": [
+      {"key": "A", "text": "以物体存在性判断为核心的幻觉评测基准的"},
+      {"key": "B", "text": "只测纯文本数学计算能力的通用评测基准的"},
+      {"key": "C", "text": "只统计模型参数量大小的静态指标体系的"},
+      {"key": "D", "text": "只测量 API 响应耗时的性能压测基准的"}
+    ],
+    "answer": "A",
+    "explanation": "针对图像幻觉的基准围绕图中物体是否真实存在来设计判断题，能直接量化幻觉率。纯文本计算、参数量统计与响应耗时都不衡量视觉描述的真实性，无法反映看图幻觉问题。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "Agent",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "用强多模态模型合成视觉指令数据时，哪些环节是控制数据质量的关键？",
+    "options": [
+      {"key": "A", "text": "先让模型输出详细图像描述，再基于描述和坐标生成推理问答"},
+      {"key": "B", "text": "对合成结果做去重、长度过滤并保留一定比例的人工抽检的"},
+      {"key": "C", "text": "剔除描述中与图片明显不符的臆造内容再入库的"},
+      {"key": "D", "text": "完全不做筛选地把所有生成结果保留，样本越多越好的"}
+    ],
+    "answer": "A,B,C",
+    "explanation": "先描述后推理能提升问题的信息量，去重过滤和人工抽检能去掉噪声，剔除臆造内容可防止错误知识被学进去。不做筛选地堆量会把噪声一起放大，反而拉低模型最终效果。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "部署与推理",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "用户反馈带图片的请求的首字返回很慢，但后续每个字的输出速度正常。瓶颈最可能出现在哪个阶段？",
+    "options": [
+      {"key": "A", "text": "prefill 阶段处理大量视觉 token 耗时过长"},
+      {"key": "B", "text": "decode 阶段的采样策略配置得过于复杂的"},
+      {"key": "C", "text": "输出层的词表投影矩阵计算太慢的"},
+      {"key": "D", "text": "客户端浏览器的字体渲染占用了主线程的"}
+    ],
+    "answer": "A",
+    "explanation": "首字延迟主要由 prefill 决定，图片带来的大量视觉 token 会显著拉长这一阶段；吐字速度正常说明 decode 环节没有问题。采样策略、输出投影和客户端渲染都不会只影响首字而放过后续输出。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "部署与推理",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "估算大模型 KV cache 显存占用时，下面哪个表达式抓住了主要的影响因素？",
+    "options": [
+      {"key": "A", "text": "层数×键值头数×头维×序列长度×2×每元素字节数"},
+      {"key": "B", "text": "参数量乘以二字节，与序列长度完全无关"},
+      {"key": "C", "text": "只与并发请求数有关，与序列长度无关的"},
+      {"key": "D", "text": "等于词表大小乘以输出 token 数的一个固定值"}
+    ],
+    "answer": "A",
+    "explanation": "KV cache 随层数、键值头数、头维和序列长度线性增长，还要乘以键与值两份以及数值精度字节数。多模态请求被图片撑长序列，正是 KV cache 容易占满显存、成为 OOM 首因的原因。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "部署与推理",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "线上 7B 多模态服务显存紧张，按收益与风险综合考虑，哪些优化通常应该排在前面？",
+    "options": [
+      {"key": "A", "text": "先开启 KV cache 量化与分页注意力，提高并发利用率"},
+      {"key": "B", "text": "对语言模型权重做 INT8 或 AWQ 量化，视觉塔保持较高精度"},
+      {"key": "C", "text": "限制输入图片分辨率和数量，压缩视觉 token 总量的"},
+      {"key": "D", "text": "第一步就把视觉塔降到 INT4，且不跑任何精度评测的"}
+    ],
+    "answer": "A,B,C",
+    "explanation": "KV 量化加分页注意力收益大且可控，语言模型权重量化次之，限制图片 token 能直接减压，这些都应先做。视觉塔对量化更敏感，直接降到四比特又不评测极易在 OCR 等细粒度任务上掉点。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "部署与推理",
+    "language": "",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "视觉编码器对量化通常比语言模型主干更敏感，尤其在 OCR 和细粒度识别任务上，贸然降到 INT4 可能造成明显掉点。",
+    "options": [
+      {"key": "A", "text": "正确"},
+      {"key": "B", "text": "错误"}
+    ],
+    "answer": "正确",
+    "explanation": "视觉塔承担细粒度特征提取，低比特量化会损伤纹理与文字细节，OCR 和细粒度任务首当其冲。实践中常把视觉塔保持在较高精度，优先量化对精度更鲁棒的语言模型主干。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "部署与推理",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "Continuous batching（连续批处理）相比静态批处理的核心优势是什么？",
+    "options": [
+      {"key": "A", "text": "按迭代粒度调度，请求生成完就腾出槽位给新请求的"},
+      {"key": "B", "text": "把所有请求强制补齐到相同长度再一起计算的"},
+      {"key": "C", "text": "彻底取消 KV cache 从而大幅节省显存占用的"},
+      {"key": "D", "text": "只允许图片尺寸完全相同的请求组成一批的"}
+    ],
+    "answer": "A",
+    "explanation": "连续批处理在每轮生成后检查并移除已结束的请求，立刻把空出的槽位分配给新请求，显著提升 GPU 利用率。它不要求请求等长，也不取消 KV cache，更不限制图片尺寸。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "部署与推理",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "在多模态服务里引入 chunked prefill（分块预填充），主要是为了解决哪些问题？",
+    "options": [
+      {"key": "A", "text": "长图片的预填充一次做完会阻塞其他请求的解码的"},
+      {"key": "B", "text": "长短请求混排时长预填充造成队头阻塞的"},
+      {"key": "C", "text": "把长预填充切成小块与解码阶段交替执行的"},
+      {"key": "D", "text": "彻底消除 KV cache 的显存占用的"}
+    ],
+    "answer": "A,B,C",
+    "explanation": "分块预填充把长提示拆成多块，与正在进行的解码交替执行，缓解长视觉输入阻塞其他请求的问题。它优化的是调度公平性与首字延迟，不会消除 KV cache，反而仍要为其分配显存。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "部署与推理",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "多模态服务偶发 OOM，日志显示出错请求都带多张高清图。排查时应优先确认什么？",
+    "options": [
+      {"key": "A", "text": "这些请求的视觉 token 数及由此撑长的序列是否异常大"},
+      {"key": "B", "text": "模型的分词器词表是否存在重复条目的"},
+      {"key": "C", "text": "训练数据的标注格式是否完全统一的"},
+      {"key": "D", "text": "客户端是否使用了 HTTPS 加密协议的"}
+    ],
+    "answer": "A",
+    "explanation": "多张高清图会产生大量视觉 token，把序列撑长进而放大 KV cache 与激活占用，是这类偶发 OOM 的首要嫌疑。词表重复、标注格式和传输协议都与运行时显存峰值没有直接关系。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "部署与推理",
+    "language": "",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "前缀缓存虽然能复用相同系统提示的计算结果，但会改变模型输出，使同样的输入得到不同的答案。",
+    "options": [
+      {"key": "A", "text": "正确"},
+      {"key": "B", "text": "错误"}
+    ],
+    "answer": "错误",
+    "explanation": "前缀缓存只是把相同前缀的键值缓存结果保留下来供后续请求复用，省掉重复计算，并不改变计算语义，同样输入应得到一致输出。系统提示较长或多轮共享历史时，它能明显降低首字延迟。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "部署与推理",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "压测发现 GPU 利用率长期偏低，CPU 却接近打满，且请求的图片都比较大。瓶颈最可能在哪里？",
+    "options": [
+      {"key": "A", "text": "图像解码、缩放和归一化等预处理集中在 CPU 端"},
+      {"key": "B", "text": "GPU 的显存带宽已经不足的"},
+      {"key": "C", "text": "模型权重精度设置得过高的"},
+      {"key": "D", "text": "网络出口带宽被完全占满了的"}
+    ],
+    "answer": "A",
+    "explanation": "图像解码与缩放等预处理通常在 CPU 上做，图片一多就把 CPU 打满而 GPU 空等。应把预处理异步化、限制其并发或挪到 GPU 侧。显存带宽、权重精度和网络出口与此现象并不吻合。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "部署与推理",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "上线多模态推理服务时，哪些指标对定位延迟和容量问题最有价值？",
+    "options": [
+      {"key": "A", "text": "首字延迟与每个输出 token 的耗时的"},
+      {"key": "B", "text": "键值缓存占用率与当前并发请求数的"},
+      {"key": "C", "text": "输入图片的 token 数量分布情况的"},
+      {"key": "D", "text": "服务器机箱内部温度的"}
+    ],
+    "answer": "A,B,C",
+    "explanation": "首字延迟和单字耗时能区分预填充与解码瓶颈，缓存占用率和并发数反映容量水位，图片 token 分布能解释异常慢请求。机箱温度对日常容量和延迟定位帮助有限。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "按 OpenAI 兼容的消息格式提交图文请求，正确的组织方式是哪一种？",
+    "options": [
+      {"key": "A", "text": "把用户消息的 content 设为数组，依次放入文本块和图片块"},
+      {"key": "B", "text": "把图片二进制直接拼在系统提示字符串的末尾的"},
+      {"key": "C", "text": "把图片地址单独放在请求体最外层的字段里的"},
+      {"key": "D", "text": "把图片地址写进模型名称参数中一起提交的"}
+    ],
+    "answer": "A",
+    "explanation": "多模态消息把 content 写成数组，按顺序列出文本块和图像块，图像块里给出公网地址或 data 开头的 base64 数据。拼进字符串、放到顶层字段或写进模型名都不是合规格式，不会被正确解析。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "同一个图像问答接口，什么情况下应该优先选用低精度模式而不是高精度模式？",
+    "options": [
+      {"key": "A", "text": "只需判断图中是否含某类物体、对细节无要求时"},
+      {"key": "B", "text": "需要逐字识别小字票据上的具体金额时"},
+      {"key": "C", "text": "需要读取密集图表里的精确数值时"},
+      {"key": "D", "text": "需要辨认远处细小物体的品牌标识时"}
+    ],
+    "answer": "A",
+    "explanation": "低精度模式消耗的视觉 token 少、速度快，适合有无判断这类粗粒度任务。票据小字、图表数值和细小物体都依赖高频细节，必须用高精度模式，否则容易漏读或误读。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "搭建多模态 RAG 时，哪些环节是必要或能显著提升检索与生成效果的？",
+    "options": [
+      {"key": "A", "text": "对 PDF 先做版面分析，保留文本、坐标和表格结构的"},
+      {"key": "B", "text": "图像用多模态嵌入或转成图注后再做向量化的"},
+      {"key": "C", "text": "检索时混合文本与图像向量，并做重排的"},
+      {"key": "D", "text": "把所有图片一律丢弃，只保留 OCR 出来的文本的"}
+    ],
+    "answer": "A,B,C",
+    "explanation": "版面分析保住结构信息，多模态嵌入让图文可跨模态检索，混合召回加重排提升命中质量。只保留文字会丢失布局、颜色和图表语义，无法满足以图搜图等需求。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "在图文检索场景里，只要把图片全部转成文字再检索，就能很好覆盖以图搜图、按颜色或按物体外观查找这类需求。",
+    "options": [
+      {"key": "A", "text": "正确"},
+      {"key": "B", "text": "错误"}
+    ],
+    "answer": "错误",
+    "explanation": "文字转换只提取出图中文字，丢失了颜色、形状、物体语义和布局信息，以图搜图和按视觉属性查找都做不到。要用多模态嵌入把图像与文本投到同一空间，文字提取只能作为补充通道。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "图片识别接口同步返回常要十几秒，用户端频繁超时。工程上更稳妥的做法是什么？",
+    "options": [
+      {"key": "A", "text": "改成异步任务加轮询或回调，识别阶段给进度与提示"},
+      {"key": "B", "text": "把超时时间设为无限长，让请求一直等到返回的"},
+      {"key": "C", "text": "把图片压缩到极小，牺牲识别质量换取速度的"},
+      {"key": "D", "text": "失败后不做任何提示，由用户自己刷新页面重试的"}
+    ],
+    "answer": "A",
+    "explanation": "异步化把慢识别放到后台，前端轮询或回调取结果，既避免网关超时又能给出进度反馈。无限超时会耗尽连接，过度压缩会毁掉识别质量，失败不提示会让用户完全无从感知。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "攻击者把忽略之前指令并泄露系统提示的文字写进图片里。哪些防护措施是有效的？",
+    "options": [
+      {"key": "A", "text": "对图片做文字识别，把提取文本送入输入侧注入检测的"},
+      {"key": "B", "text": "在输出侧检测提示词泄漏与敏感信息并拦截的"},
+      {"key": "C", "text": "对图片字节做格式嗅探和大小限制，拒绝恶意文件的"},
+      {"key": "D", "text": "完全依赖模型自身自觉，不做任何输入输出检查的"}
+    ],
+    "answer": "A,B,C",
+    "explanation": "图上的文字会被模型读到，所以对识别出的文本做注入检测是必要补充，配合输出侧泄漏与隐私拦截形成纵深。文件格式嗅探能挡住恶意内容，只靠模型自觉则毫无防线。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "关于多模态 API 里图像的计费方式，下面哪种说法更贴近主流接口的实际做法？",
+    "options": [
+      {"key": "A", "text": "按基础 token 加若干图像块计费，高清图切块累加"},
+      {"key": "B", "text": "无论图片大小，每张图都固定只算一个 token 的"},
+      {"key": "C", "text": "图像完全不计费，只有文本部分才计入 token 的"},
+      {"key": "D", "text": "费用只由输出 token 决定，与输入图片无关的"}
+    ],
+    "answer": "A",
+    "explanation": "主流接口把图像切成固定尺寸的块，按基础 token 加每块 token 计费，分辨率越高块越多越贵。固定一 token、图像免费或只看输出都不符合实际计费方式，具体数值以所用模型文档为准。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "部署与推理",
+    "language": "",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "要让模型输出可定位的物体框，可以在提示里要求返回归一化到固定区间的坐标，便于后端直接解析成画面位置。",
+    "options": [
+      {"key": "A", "text": "正确"},
+      {"key": "B", "text": "错误"}
+    ],
+    "answer": "正确",
+    "explanation": "让模型用归一化坐标输出边界框，解析时乘回图像宽高即可定位，格式约定清楚还能做结构化校验，是定位类需求的常用做法，也便于把答案与图中具体区域对应起来。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "客户端把大图转成 base64 放进 JSON 请求，网关频繁返回体积超限错误。最直接的缓解办法是什么？",
+    "options": [
+      {"key": "A", "text": "限制图片大小与张数，或改走对象存储加短时效链接"},
+      {"key": "B", "text": "把 base64 再压缩一层文本后塞进同一个字段的"},
+      {"key": "C", "text": "把请求拆成更多次重试，直到网关放行的"},
+      {"key": "D", "text": "直接关闭网关的请求体大小校验的"}
+    ],
+    "answer": "A",
+    "explanation": "base64 会让体积膨胀约三分之一，根本办法是控制图片本身的大小与数量，或改用对象存储加短时效链接替代内联数据。二次文本压缩收益有限，反复重试和关闭校验都不是正确解法。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "多模态调用链路慢且成本较高，工程上哪些做法能降低重复扣费与雪崩风险？",
+    "options": [
+      {"key": "A", "text": "请求携带幂等键，服务端按 key 去重的"},
+      {"key": "B", "text": "按估算的视觉 token 数而不是请求数做限流的"},
+      {"key": "C", "text": "只对可重试错误重试，鉴权或额度错误直接失败的"},
+      {"key": "D", "text": "对所有错误一律无限重试直到成功的"}
+    ],
+    "answer": "A,B,C",
+    "explanation": "幂等键避免重试造成重复处理与扣费，按视觉 token 限流更贴近真实资源消耗，区分错误类型只对可重试错误重试能避免无效风暴。无限重试会放大故障并可能持续产生费用。"
+  }
+]

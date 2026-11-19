@@ -1,0 +1,1098 @@
+[
+  {
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "must_know",
+    "stem": "训练文本 embedding 模型用对比学习时，工程上普遍偏好大 batch。关于背后的原因，说法正确的是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "batch 内其他样本的文档天然充当负样本，batch 越大负样本越多越难，对比信号越强"
+      },
+      {
+        "key": "B",
+        "text": "大 batch 能让学习率自动跟着变大，所以收敛速度一定快于小 batch 的"
+      },
+      {
+        "key": "C",
+        "text": "大 batch 可以省掉温度系数，相似度矩阵不需要再做任何缩放的"
+      },
+      {
+        "key": "D",
+        "text": "batch 大小只影响显存占用，与对比学习损失里负样本的数量无关的"
+      }
+    ],
+    "answer": "A",
+    "explanation": "对比学习把 batch 内配对的查询与文档视为正样本，其余跨样本组合全部充当负样本，负样本数量随 batch 大小线性增长。负样本越多越难，模型被迫学到更细的相关性边界，所以训练 embedding 吃大 batch。温度系数与大 batch 无关，仍然需要。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "language": "",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "embedding 模型输出的向量都做了 L2 归一化时，cosine 相似度与内积的关系是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "数值完全等价，用哪个度量得到的排序一致"
+      },
+      {
+        "key": "B",
+        "text": "内积总比 cosine 大，必须先做平方才能比较"
+      },
+      {
+        "key": "C",
+        "text": "cosine 只能用于文本，内积只能用于图像向量"
+      },
+      {
+        "key": "D",
+        "text": "两者毫无关系，分别需要训练两个不同的模型"
+      }
+    ],
+    "answer": "A",
+    "explanation": "cosine 定义为内积除以两个向量的模长，向量归一化后模长都是一，除法因子失效，两者数值相等。主流 embedding 模型的输出已经归一化，所以工程上用内积度量与 cosine 得到的排序一致。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "接入新一代指令式 embedding 模型（如 E5、BGE、Qwen-Embedding）时，查询与文档要按模型要求加不同的任务前缀。如果漏加或用错前缀，最直接的后果是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "向量维度改变，向量库直接拒绝写入报错"
+      },
+      {
+        "key": "B",
+        "text": "检索质量明显下降，因为查询与文档的编码分布偏离了训练时的约定"
+      },
+      {
+        "key": "C",
+        "text": "模型会自动纠正前缀，几乎不受影响"
+      },
+      {
+        "key": "D",
+        "text": "只影响相似度数值大小，不影响排序结果"
+      }
+    ],
+    "answer": "B",
+    "explanation": "指令式 embedding 在训练时给查询和文档加了不同的任务前缀，让两种输入在表征上各司其职。漏加或混用前缀破坏了训练时的分布对称性，查询与文档向量落到不对齐的空间里，检索精度随之明显下降。维度与排序受影响的说法都不成立。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "must_know",
+    "stem": "把 RAG 系统的 embedding 模型从旧模型换成新模型，上线前正确的动作有哪些？",
+    "options": [
+      {
+        "key": "A",
+        "text": "确认新模型的向量维度、推荐度量与查询、文档的前缀约定"
+      },
+      {
+        "key": "B",
+        "text": "对全部存量文档重新编码并重建向量索引，新旧库可以双写灰度过渡"
+      },
+      {
+        "key": "C",
+        "text": "在评测集上重跑检索基线，确认新模型带来净收益后再切流"
+      },
+      {
+        "key": "D",
+        "text": "旧向量与新向量可以混在同一个索引里查询，无需任何重建"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "不同 embedding 模型的向量空间互不相通，旧向量与新查询向量比较相似度没有意义，必须全库重编码并重建索引，同时核对维度、度量与前缀约定。上线前要在评测集上重跑基线验证净收益，大库常用新旧索引双写灰度切流来控制风险。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "must_know",
+    "stem": "训练检索式 embedding 模型时挖难负例（hard negatives），它解决的问题主要是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "难负例能逼模型学到更细的相关性边界，否则模型只学会区分明显不相关的文档"
+      },
+      {
+        "key": "B",
+        "text": "难负例能替代正样本，让训练完全不需要人工标注的查询文档对"
+      },
+      {
+        "key": "C",
+        "text": "难负例能降低训练显存占用，让大 batch 在小显卡上跑起来"
+      },
+      {
+        "key": "D",
+        "text": "难负例只是数据增强手段，对线上检索精度没有可测量的影响"
+      }
+    ],
+    "answer": "A",
+    "explanation": "只用随机负样本训练时，模型学到的判别边界太粗，离线指标好看但线上把语义擦边的文档排得很靠前。难负例通常是 BM25 召回的表面相关实则不含答案的文档，它们逼模型学会更细粒度的区分，是 embedding 模型训练质量的关键环节。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "关于 Matryoshka 表征学习（MRL）的 embedding 模型，下列说法正确的有哪些？",
+    "options": [
+      {
+        "key": "A",
+        "text": "推理时可以把向量截断到更短的前缀维度，直接当作低维向量使用"
+      },
+      {
+        "key": "B",
+        "text": "训练时多个截断维度同时参与优化，短前缀自身就有完整的判别能力"
+      },
+      {
+        "key": "C",
+        "text": "它让一套向量服务多个精度与成本的档位，不必为每个维度单独训练模型"
+      },
+      {
+        "key": "D",
+        "text": "截断维度后必须重新训练模型，否则低维向量完全不可用"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "Matryoshka 的训练目标在多个嵌套的维度截断上同时生效，使得向量前缀本身就是一个可用的低维表征。推理时按精度与存储预算选一个截断点即可，小维度省成本、大维度保精度，一套模型覆盖多档位。截断后重新归一化是推荐做法，但重新训练模型属于误解。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "关于 ColBERT 的多向量表征与 late interaction 打分，下列说法正确的有哪些？",
+    "options": [
+      {
+        "key": "A",
+        "text": "查询与文档的每个词元各保留一个向量，而不是整段压缩成单个向量"
+      },
+      {
+        "key": "B",
+        "text": "打分用最大相似度求和：查询每个词元向量在文档词元向量集合里取最大相似度再累加"
+      },
+      {
+        "key": "C",
+        "text": "交互发生在两侧分别编码之后，文档向量仍然可以离线预计算"
+      },
+      {
+        "key": "D",
+        "text": "存储成本与单向量模型基本持平，可以无差别替代所有单向量检索"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "ColBERT 保留词元级的多向量，查询与文档先各自编码再做词元级的最大相似度匹配求和，这种先编码后交互的方式叫 late interaction。它保留了细粒度匹配信息，效果优于单向量，但每个词元一个向量使存储与检索成本高出数个量级，一般用于精排段或小规模库，不适合无差别替代单向量召回。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "关于向量相似度度量与归一化的关系，下列说法正确的有哪些？",
+    "options": [
+      {
+        "key": "A",
+        "text": "向量都归一化后，内积与 cosine 的数值相等"
+      },
+      {
+        "key": "B",
+        "text": "归一化向量之间，L2 距离最小恰好对应 cosine 相似度最大"
+      },
+      {
+        "key": "C",
+        "text": "不归一化时直接用内积，结果会被向量模长污染，偏向模长大的文档"
+      },
+      {
+        "key": "D",
+        "text": "L2 距离与 cosine 相似度在归一化向量上完全不相关"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "归一化后模长均为一，内积即 cosine；归一化向量的 L2 距离平方等于二减二倍 cosine，两者单调对应，距离最近即相似度最高。未归一化时内积混入模长因素，长文档向量模长普遍更大，会被系统性偏向。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "用户拿一个精确错误码（例如某内部系统的报错编号）在纯稠密向量检索的知识库里查询，检索效果往往不佳。最主要的原因是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "错误码是字面标识符，语义上与其上下文相近的段落反而可能排到它前面，词面精确匹配被语义泛化淹没"
+      },
+      {
+        "key": "B",
+        "text": "错误码太短，导致向量维度不足，向量库会自动截断向量"
+      },
+      {
+        "key": "C",
+        "text": "错误码是数字，embedding 模型从不输出数字相关的语义信息"
+      },
+      {
+        "key": "D",
+        "text": "错误码查询必须先翻译成英文，否则向量模型拒绝编码"
+      }
+    ],
+    "answer": "A",
+    "explanation": "稠密向量把语义泛化作为优势，但对错误码、型号、法条编号这类字面标识符，查询与目标文档的关键匹配信号是精确词面而非语义相近。语义相近的无关段落可能排到真正包含该错误码的段落之前，这正是混合检索里稀疏路存在的根本理由。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "BM25 打分公式里参数 k1 控制的是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "词频贡献的饱和速度，k1 越大词频重复的收益递减越慢"
+      },
+      {
+        "key": "B",
+        "text": "文档长度归一的强度，k1 越大长文档被惩罚得越狠"
+      },
+      {
+        "key": "C",
+        "text": "倒排索引的压缩率，k1 越大索引体积越小"
+      },
+      {
+        "key": "D",
+        "text": "查询词项的权重上限，k1 越大查询越长"
+      }
+    ],
+    "answer": "A",
+    "explanation": "BM25 的词频项随词频增长而递减收敛，k1 决定收敛的快慢：k1 越大，词反复出现带来的边际收益衰减越慢；k1 越小饱和来得越早。控制文档长度归一强度的是参数 b，两者职责不同。常用取值范围在一到二之间。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "关于 BM25 打分公式里的参数 b，下列说法正确的有哪些？",
+    "options": [
+      {
+        "key": "A",
+        "text": "b 控制文档长度归一的强度，b 越大长文档相对平均长度被惩罚得越重"
+      },
+      {
+        "key": "B",
+        "text": "b 取零表示关闭文档长度归一，长短文档按同一标准打分"
+      },
+      {
+        "key": "C",
+        "text": "b 控制的是词频饱和速度，与文档长度无关"
+      },
+      {
+        "key": "D",
+        "text": "b 是由语料自动统计出来的，不需要人为设定"
+      }
+    ],
+    "answer": "A,B",
+    "explanation": "b 是文档长度归一系数，常用值约零点七五；b 越大，超过平均长度的文档在词频项里被压得越厉害，b 为零则完全不考虑长度差异。控制词频饱和速度的是 k1，b 是人为设定的超参数而非语料统计量。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "must_know",
+    "stem": "BM25 对词频做饱和处理（词出现得越多贡献递减收敛），而不是线性累加。这样设计的主要动机是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "防止关键词被刻意堆砌的文档无限刷分，让相关性随词频增长呈现收益递减"
+      },
+      {
+        "key": "B",
+        "text": "让索引里每个词项只保留一次，大幅压缩倒排索引的体积"
+      },
+      {
+        "key": "C",
+        "text": "让 BM25 的分数取值严格限制在零到一之间，方便与向量分数相加"
+      },
+      {
+        "key": "D",
+        "text": "因为长文档的词频天然更高，饱和处理可以完全消除长度差异的影响"
+      }
+    ],
+    "answer": "A",
+    "explanation": "线性词频会让一个关键词重复几十次的文档获得不成比例的高分，容易被关键词堆砌操纵。饱和处理让词频贡献收敛，体现相关性增长的收益递减。BM25 分数并无零到一上界，完全消除长度影响也不是目的，长度另有专门的归一参数。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "关于学习型稀疏检索（如 SPLADE）与 BM25 的关系，下列说法正确的有哪些？",
+    "options": [
+      {
+        "key": "A",
+        "text": "SPLADE 的词项权重由模型学习得到，而 BM25 的权重来自统计公式"
+      },
+      {
+        "key": "B",
+        "text": "SPLADE 会给文档隐式补上语义相关但未出现的词，相当于 learned 的查询与文档扩展"
+      },
+      {
+        "key": "C",
+        "text": "SPLADE 的表示仍是词表维度上的稀疏向量，可以进倒排索引或支持稀疏向量的引擎"
+      },
+      {
+        "key": "D",
+        "text": "SPLADE 必须把文档编码成稠密向量存进 ANN 索引才能工作"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "SPLADE 用模型的词表输出层产生稀疏激活权重，权重是学出来的并且带隐式词扩展，匹配发生在词项空间，表示依旧是稀疏向量，可以直接用倒排或稀疏向量引擎服务。把它当成稠密向量送 ANN 索引是对其表示形态的误解。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "judge",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "SPLADE 这类学习型稀疏检索的输出是稠密向量，因此必须使用 ANN 索引提供服务。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "错误",
+    "explanation": "SPLADE 的输出在词表维度上只有少量非零权重，本质是稀疏向量，匹配发生在可解释的词项空间。它的服务形态是倒排索引或稀疏向量引擎，与 ANN 索引服务的稠密隐空间检索是并列的两条神经检索路线。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "通用 AI",
+    "language": "",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "向量数据库里一个稀疏向量的标准存储形态是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "只存非零维的下标和对应权重这两列数据，计算按非零元进行"
+      },
+      {
+        "key": "B",
+        "text": "把词表长度的全量数组完整存下来，零值也占存储空间"
+      },
+      {
+        "key": "C",
+        "text": "存一段压缩后的二进制串，无法还原出每个维度的权重"
+      },
+      {
+        "key": "D",
+        "text": "存模型权重文件本身的路径，查询时现场重新推理生成"
+      }
+    ],
+    "answer": "A",
+    "explanation": "稀疏向量的维度是词表大小，可能有几万到几十万维，但非零元通常只有几十到几百个，所以工程上用非零下标加权重的配对形式存储。检索计算也只在这些非零元上进行，这正是稀疏表示在存储与计算上的优势来源。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "倒排索引的基本数据组织方向是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "从词项出发，映射到包含该词的文档列表及词频、位置等信息"
+      },
+      {
+        "key": "B",
+        "text": "从文档出发，映射到该文档的近邻文档列表"
+      },
+      {
+        "key": "C",
+        "text": "从向量出发，映射到空间中最近的若干个聚类中心"
+      },
+      {
+        "key": "D",
+        "text": "从查询出发，映射到历史查询的缓存结果"
+      }
+    ],
+    "answer": "A",
+    "explanation": "倒排索引把词项作为键，值为包含该词项的文档列表（posting list），查询时按词项取出列表再合并。从文档出发找近邻是图索引或向量检索的方向，从向量找聚类中心对应倒排文件方式的 IVF 结构，都与倒排索引无关。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "基于 BM25 的稀疏检索服务线上查询，完全不需要 GPU 或任何神经网络推理资源。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "正确",
+    "explanation": "BM25 的打分是纯统计公式加倒排索引查表，查询处理只涉及词项匹配与公式计算，不依赖任何模型推理，CPU 即可服务。这也是它在无 GPU 环境、冷启动与降级方案里作为保底检索路的工程价值。注意学习型稀疏如 SPLADE 查询侧需要跑模型，不在此列。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "must_know",
+    "stem": "RRF 融合时取 k 等于六十。文档甲在两路召回里分别排第 1 和第 4，文档乙在两路里都排第 2。两份文档的 RRF 总分比较，结论是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "乙更高：两路都靠前比单路拿到第一名更稳健"
+      },
+      {
+        "key": "B",
+        "text": "甲更高：只要在某一一路拿到过第一名，总分就必然领先"
+      },
+      {
+        "key": "C",
+        "text": "两者严格相等，RRF 对排名组合不敏感"
+      },
+      {
+        "key": "D",
+        "text": "无法比较，RRF 只适用于三路以上召回的融合"
+      }
+    ],
+    "answer": "A",
+    "explanation": "按公式累计：乙得两个六十二分之一约零点零三二二六，甲得六十一个之一加六十四个之一约零点零三二零二，乙胜出。RRF 奖励的是在各路都稳定靠前的文档，而不是单路的头部，这正是混合检索追求的稳健性；同时头部名次之间的差距被 k 平滑得很钝。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "RRF 公式里的常数 k（常用 60）调大时，融合结果会怎么变化？",
+    "options": [
+      {
+        "key": "A",
+        "text": "各名次之间的分差被进一步压平，融合结果更平均、更不迷信任何一路的头部"
+      },
+      {
+        "key": "B",
+        "text": "各路第一名的话语权被急剧放大，融合结果更偏向头部"
+      },
+      {
+        "key": "C",
+        "text": "融合结果与 k 完全无关，因为 k 只是占位常数"
+      },
+      {
+        "key": "D",
+        "text": "低于 k 的排名会被直接丢弃，只保留头部 k 个结果"
+      }
+    ],
+    "answer": "A",
+    "explanation": "k 出现在分母里，k 越大第一与第五名的得分差越小，融合越趋向平均，削弱单路头部的影响力；k 越小则越偏向各路的头部名次。k 是平滑常数，通常沿用六十，不需要专门调参。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "must_know",
+    "stem": "混合检索广泛采用 RRF 做多路融合，被选中的原因主要有哪些？",
+    "options": [
+      {
+        "key": "A",
+        "text": "只依赖排名，与各路分数的尺度和量纲无关，天然回避分数不可比问题"
+      },
+      {
+        "key": "B",
+        "text": "几乎没有可调参数，上线成本极低，k 通常直接取六十"
+      },
+      {
+        "key": "C",
+        "text": "某一路召回服务失败或超时时，融合自然退化为剩余单路的排名，工程上稳健"
+      },
+      {
+        "key": "D",
+        "text": "它能充分利用各路分数的绝对差距，融合精度上限高于任何分数融合方法"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "RRF 用排名代替分数，回避了 BM25 与向量相似度尺度不可比的根本难题；参数几乎免调；单路故障时自然退化而不是整体失败。但排名丢失了分数的绝对差距信息，这恰是它的短板，精调系统常用加权 RRF 或分数融合追求更高上限。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "与 RRF 相比，加权分数融合（先归一化各路分数再加权求和）的定位是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "保留分数差距信息、调好后上限更高，但需要归一化与逐路调权重，依赖持续维护的评测集"
+      },
+      {
+        "key": "B",
+        "text": "因为不需要任何参数，永远比 RRF 更适合快速上线"
+      },
+      {
+        "key": "C",
+        "text": "分数融合必须把每路召回量扩大十倍才有意义"
+      },
+      {
+        "key": "D",
+        "text": "分数融合已被证明在所有场景下精度都低于排名融合"
+      }
+    ],
+    "answer": "A",
+    "explanation": "分数融合能表达第一名甩开第三名多少这类序之外的强度信息，有评测集支撑并持续调参时上限更高。代价是各路分数要先归一化到可比区间，且每路一个权重需要数据驱动地调。RRF 免调参、适合快速上线，两者是成本与上限的权衡而非绝对优劣。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "多路召回的结果在融合之前，工程上必须先做的一件事是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "统一文档标识并对同一内容块去重，避免同一 chunk 被算作两个不同候选"
+      },
+      {
+        "key": "B",
+        "text": "把所有文档的正文重新用 LLM 摘要一遍，缩短后送融合"
+      },
+      {
+        "key": "C",
+        "text": "把 BM25 分数和向量分数都转换成美元成本再排序"
+      },
+      {
+        "key": "D",
+        "text": "先跑一遍重排模型，把每路的候选都精排后再融合"
+      }
+    ],
+    "answer": "A",
+    "explanation": "两路召回必须落在同一文档标识空间里，否则无法判断哪些候选是同一份内容。同一段被切成的相邻 chunk 可能被两路各召回一部分，融合前要按标识去重或按父文档合并，否则重复内容会挤占最终上下文的名额。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "RRF 只依赖各路结果的排名顺序，因此 BM25 分数与向量相似度分别如何定义、取值范围多大，都不影响融合结果。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "正确",
+    "explanation": "RRF 的输入只有每路候选的名次，分数的具体定义与量纲在进入融合前就被丢弃了。这既是它规避分数尺度不可比问题的优点，也意味着它无法利用分数里包含的强度差距信息。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "judge",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "混合检索中若向量召回服务整体超时失败，RRF 融合层也会随之失败，整个检索链路不可用。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "错误",
+    "explanation": "RRF 对每一路的排名分别累加，某一路返回空或失败时，其贡献为零，融合自然退化为剩余单路的排名，链路仍可用。这种退化行为是它比需要分数归一化的融合方式在工程上更稳健的重要原因。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "实现「双路召回加 RRF 融合」的混合检索时，下列工程做法正确的有哪些？",
+    "options": [
+      {
+        "key": "A",
+        "text": "每路先取足够深的候选（例如前五十到一百条）再融合，太浅会让融合后的尾部抖动"
+      },
+      {
+        "key": "B",
+        "text": "融合后统一送一次重排，让重排器只看一遍去重后的候选集"
+      },
+      {
+        "key": "C",
+        "text": "把两路的原始分数直接相加作为最终排序依据，再另算一次 RRF"
+      },
+      {
+        "key": "D",
+        "text": "融合前对同一内容块去重或按父文档合并，避免重复内容挤占上下文名额"
+      }
+    ],
+    "answer": "A,B,D",
+    "explanation": "各路召回深度决定融合的候选池质量，融合后统一重排一次是主流架构，成本可控。把不可比的原始分数直接相加恰恰是混合检索要避免的做法，与 RRF 并用更是自相矛盾。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "部署与推理",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "must_know",
+    "stem": "关于 HNSW 图索引的参数，下列说法正确的有哪些？",
+    "options": [
+      {
+        "key": "A",
+        "text": "M 是每个节点的出边数，调大召回上升、内存占用上升"
+      },
+      {
+        "key": "B",
+        "text": "ef_search 是查询时候选队列的规模，是在线调节召回与延迟的核心旋钮"
+      },
+      {
+        "key": "C",
+        "text": "ef_construction 只影响建图阶段的质量与耗时，建好后查询不再受它影响"
+      },
+      {
+        "key": "D",
+        "text": "ef_search 只在建索引阶段起作用，查询阶段没有任何效果"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "M 控制图的稠密程度，直接影响内存与召回上限；建图候选队列规模决定图质量，只在建索引时生效；查询候选队列规模决定每次查询展开多少节点，是在线召回与延迟之间调节的第一旋钮。把查询参数误认为建图参数是常见混淆。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "部署与推理",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "must_know",
+    "stem": "估算一千万条一千零二十四维 float32 向量的向量库内存时，下列说法正确的有哪些？",
+    "options": [
+      {
+        "key": "A",
+        "text": "向量本体约每条四千字节，一千万条约四十吉字节起步"
+      },
+      {
+        "key": "B",
+        "text": "HNSW 的图邻居开销通常远小于向量本体，内存大头是原始向量"
+      },
+      {
+        "key": "C",
+        "text": "乘积量化可以把每条向量压到几十字节量级，代价是召回损失"
+      },
+      {
+        "key": "D",
+        "text": "量化压缩后检索精度完全不受影响，可以放心无条件使用"
+      }
+    ],
+    "answer": "A,B,C",
+    "explanation": "一千零二十四维乘每维四字节约四千字节，千万条即四十吉字节量级；图结构的邻居编号开销每条几百字节，远小于向量本体。乘积量化切段聚类用码本编号压缩，能省一个数量级内存，但压缩是有损的，召回会下降，通常配合取原向量精算的校正步骤使用。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "部署与推理",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "乘积量化（PQ）压缩向量的基本原理是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "把向量切成若干段，每段独立聚类，用各段所属聚类中心的编号串来近似原向量"
+      },
+      {
+        "key": "B",
+        "text": "把所有向量按余弦相似度排序后，只保留每百万条里的前一千条"
+      },
+      {
+        "key": "C",
+        "text": "把 float32 统一转成字符串存储，靠文本压缩算法减小体积"
+      },
+      {
+        "key": "D",
+        "text": "对向量做主成分分析降维后，再无损压缩存储"
+      }
+    ],
+    "answer": "A",
+    "explanation": "乘积量化把高维向量切成多段，每段用一个小码本聚类，原向量被近似为各段聚类中心的编号序列，存储从数千字节降到几十字节量级。它是有损近似，通常配合先用压缩向量粗筛、再取原向量精确重算的校正流程。优化版会先旋转坐标系再量化以减少损失。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "must_know",
+    "stem": "向量检索要叠加权限过滤（用户只能看到自己有权限的文档）。关于过滤时机，正确的做法与理由是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "必须在检索阶段就做预过滤，先按权限筛出候选再搜索；后过滤会在权限命中的候选很少时留下空洞甚至空结果"
+      },
+      {
+        "key": "B",
+        "text": "先取全量近邻再过滤就行，反正权限过滤最多丢掉一半结果"
+      },
+      {
+        "key": "C",
+        "text": "把所有向量都复制一份给每个权限组，物理隔离最简单"
+      },
+      {
+        "key": "D",
+        "text": "权限过滤放在重排之后做即可，重排器会自动处理权限问题"
+      }
+    ],
+    "answer": "A",
+    "explanation": "后过滤的流程是先取近邻再剔除无权限项，当权限命中的文档在向量空间里不密集时，返回条数会远小于请求数甚至为零，出现结果空洞。预过滤让搜索只发生在有权限的候选集上，但要求引擎支持过滤感知的图搜索，否则遍历性能会塌陷。复制全库给每个权限组的方案存储成本不可接受。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "部署与推理",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "IVF 类索引里，nprobe 参数控制的是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "查询时扫描最近聚类簇的数量，占比越大召回越高、延迟越高"
+      },
+      {
+        "key": "B",
+        "text": "聚类簇的总数，调大后索引自动重建"
+      },
+      {
+        "key": "C",
+        "text": "每条向量保留的小数位数，决定量化精度"
+      },
+      {
+        "key": "D",
+        "text": "查询结果条数上限，与召回率无关"
+      }
+    ],
+    "answer": "A",
+    "explanation": "IVF 先把全库聚成若干簇，查询只在与查询向量最近的 nprobe 个簇里搜索。nprobe 占总簇数的比例直接决定召回与延迟的权衡：全扫等价精确搜索但失去加速意义，扫得太少会漏掉落在簇边界附近的近邻。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "部署与推理",
+    "language": "",
+    "kind": "judge",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "HNSW 是精确最近邻算法，只要内存足够，它保证返回的近邻与暴力全量扫描的结果完全一致。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "错误",
+    "explanation": "HNSW 属于近似最近邻算法：贪心导航加有限候选队列，可能错过真实近邻，查询参数只控制近似程度而不提供精确性保证。要精确结果只能暴力扫描，数据量小时暴力反而更快，这也是小库不必要上 ANN 索引的原因。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "部署与推理",
+    "language": "",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "更换 embedding 模型后，向量库里的存量向量必须全部重新编码并重建索引，不能只替换编码服务地址。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "正确",
+    "explanation": "不同模型的向量空间互不相通，旧模型编码的文档向量与新模型编码的查询向量比较相似度没有意义，即使维度碰巧相同也一样。换模型意味着全库重编码、重建索引，通常配合新旧索引双写做灰度切流来控制上线风险。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "must_know",
+    "stem": "Cross-Encoder 重排器与双塔 embedding 模型最本质的差别是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "重排器把查询与文档拼在一起过模型，词元级交互带来更高精度，但每个查询文档对都要单独前向，无法离线预计算"
+      },
+      {
+        "key": "B",
+        "text": "重排器输出的向量维度更高，所以精度更高"
+      },
+      {
+        "key": "C",
+        "text": "重排器不需要训练，开箱即用精度就超过双塔模型"
+      },
+      {
+        "key": "D",
+        "text": "重排器用倒排索引加速，所以比双塔模型快得多"
+      }
+    ],
+    "answer": "A",
+    "explanation": "双塔模型两侧分别编码，文档向量可离线预算，但匹配只发生在最终向量的比较上；交叉编码器让查询与文档词元在注意力层充分交互，精度显著更高，代价是每一对都要跑一次前向计算。这决定了它的位置在候选集很小的重排阶段，而不是百万级文档的召回阶段。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "关于「重排的天花板是召回」，下列说法正确的有哪些？",
+    "options": [
+      {
+        "key": "A",
+        "text": "相关文档根本没进入召回候选集时，重排器再强也无法把它找回来"
+      },
+      {
+        "key": "B",
+        "text": "重排窗口越大，重排的计算成本线性上升，需要权衡窗口深度"
+      },
+      {
+        "key": "C",
+        "text": "只要换上更强的重排模型，就可以完全弥补召回阶段的漏检问题"
+      },
+      {
+        "key": "D",
+        "text": "召回深度与重排窗口需要配套设计，只堆重排不加深召回收益有限"
+      }
+    ],
+    "answer": "A,B,D",
+    "explanation": "重排只能对已经进入候选池的文档重新排序，无法创造候选。因此提升端到端效果要同时看召回深度与重排窗口的配套，盲目加深重排窗口会线性推高延迟与成本。重排模型再强也不能弥补召回阶段就没召回的相关文档。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "single",
+    "difficulty": "basic",
+    "essentiality": "must_know",
+    "stem": "检索评测指标 recall@5 的含义是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "标准答案里的相关文档有多少比例出现在检索返回的前五条里"
+      },
+      {
+        "key": "B",
+        "text": "前五条结果里被用户点过的比例"
+      },
+      {
+        "key": "C",
+        "text": "模型训练五轮后在验证集上的准确率"
+      },
+      {
+        "key": "D",
+        "text": "五次重复实验结果的一致程度"
+      }
+    ],
+    "answer": "A",
+    "explanation": "recall@k 衡量的是覆盖率：以人工标注的相关文档集合为分母，统计出现在返回前 k 条里的相关文档占比。它不关心这些相关文档排在第几名，排名位置的质量由平均倒数排名或折损累计增益这类指标刻画。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "single",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "相比 recall@k，nDCG@k 额外考虑了哪些信息？",
+    "options": [
+      {
+        "key": "A",
+        "text": "相关性分级与位置折扣：更相关的文档排在越靠前，得分越高"
+      },
+      {
+        "key": "B",
+        "text": "检索服务器的响应延迟与吞吐量"
+      },
+      {
+        "key": "C",
+        "text": "文档的字符长度与语言种类"
+      },
+      {
+        "key": "D",
+        "text": "召回通道的数量与每路的分数方差"
+      }
+    ],
+    "answer": "A",
+    "explanation": "recall@k 只看相关文档进没进前 k 条，是二元的覆盖视角。nDCG 引入分级相关性（如非常相关、相关、不相关）并按排名位置做对数折扣，把「最好的结果排在最前」作为目标，能更细腻地反映重排质量，是排序评测的主流指标。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "multiple",
+    "difficulty": "challenge",
+    "essentiality": "advanced",
+    "stem": "对一个效果平平的 RAG 检索链路做系统性调优，下列顺序安排合理的做法有哪些？",
+    "options": [
+      {
+        "key": "A",
+        "text": "先检查切分粒度、重叠与结构保留，因为文本单元的质量决定后续一切匹配的上限"
+      },
+      {
+        "key": "B",
+        "text": "在评测集上对比与微调 embedding，再考虑引入混合检索与重排"
+      },
+      {
+        "key": "C",
+        "text": "直接花主要精力微调 RRF 的常数 k，用最便宜的参数变化换取整体效果提升"
+      },
+      {
+        "key": "D",
+        "text": "每一处改动都在同一个固定评测集上度量，避免凭单次直觉做决策"
+      }
+    ],
+    "answer": "A,B,D",
+    "explanation": "调优应沿链路从上游往下游推进：切分质量决定匹配对象的合理性，其次才是编码模型、融合策略与重排器，参数微调放在最后。顺序颠倒会在错误的文本单元上反复调融合参数，投入产出比极低。固定评测集持续度量是所有改动的共同前提。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "检索组件的评测指标变好，端到端的 RAG 答案质量不必然随之变好，上线前仍需用端到端评测验证净收益。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "正确",
+    "explanation": "检索指标优化的是中间环节，最终答案还受上下文拼装、模型能力与提示词影响；某个组件指标的上涨可能被下游环节抵消甚至反向。工程实践要求检索优化与端到端评测双轨并行，以端到端净收益作为上线依据。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "single",
+    "difficulty": "intermediate",
+    "essentiality": "advanced",
+    "stem": "构建检索评测用的标准答案集（golden set）时，下列做法中最可靠的是？",
+    "options": [
+      {
+        "key": "A",
+        "text": "从真实查询日志抽样，人工标注相关文档，并分层覆盖短查询、长查询与精确词查询"
+      },
+      {
+        "key": "B",
+        "text": "完全用大模型为每篇文档自动生成伪查询，无需人工参与即可上线评测"
+      },
+      {
+        "key": "C",
+        "text": "用检索系统自己当前返回的前几条当标准答案，指标必然好看"
+      },
+      {
+        "key": "D",
+        "text": "只挑模型能答对的简单查询构建评测集，保证团队士气"
+      }
+    ],
+    "answer": "A",
+    "explanation": "评测集的价值在于代表真实流量并给出可信的相关性判断。真实查询加人工标注成本高但有代表性，分层抽样能覆盖不同查询形态；纯自动生成的伪查询有分布偏差，适合冷启动补充而不宜作为唯一标准；用系统自身输出当答案会掩盖问题。"
+  },
+  {
+    "direction": "AI 工程",
+    "sub_direction": "LLM 与 RAG",
+    "language": "",
+    "kind": "judge",
+    "difficulty": "intermediate",
+    "essentiality": "must_know",
+    "stem": "混合检索中，把 BM25 的原始分数与归一化向量检索的 cosine 分数直接加权求和，是最推荐的多路融合方式。",
+    "options": [
+      {
+        "key": "A",
+        "text": "正确"
+      },
+      {
+        "key": "B",
+        "text": "错误"
+      }
+    ],
+    "answer": "错误",
+    "explanation": "BM25 分数没有固定上界，取值量级与零到一之间的 cosine 完全不可比，直接加权求和几乎必然被 BM25 一路主导。主流做法要么用只依赖排名的 RRF 回避尺度问题，要么先对每路分数做归一化并有评测集支撑地调权重，裸加权求和是最应避免的融合方式。"
+  }
+]

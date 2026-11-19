@@ -193,3 +193,61 @@
   加长干扰项修正，最终全库 length>3x = 0、解析字母引用违规 = 0。
 - `question_merge --check` 与 `question_shuffle --check` 均逐字节 0 差异；
   回滚按 `question_merge.SOURCES` 删除全部登记素材（含 `acpof-` / `acpext-`），存量 260 行不受影响。
+
+## 12 追加素材 `19-multimodal-models.json`（r141，2026-11-19）
+
+| 文件 | `source` | 种子 id 前缀 | 条数 | 来源性质 | 上游 / LICENSE |
+| --- | --- | --- | --- | --- | --- |
+| `19-multimodal-models.json` | `multimodal` | `mm-` | 40 | 自建：AI 原创生成 + 逐条复核 | 无第三方题目来源，无第三方 LICENSE |
+
+- 面向「多模态大模型工程」的系统性考点，与同期学习笔记 `docs/多模态模型工程笔记.md` 同源：
+  按 **训练 / 微调 / 部署 / 调用** 四块各 10 道。训练块含对比学习 N×N 矩阵与温度系数、
+  模态对齐两阶段、ViT patch 数量、AnyRes 分块、2D 位置、分布式负载；微调块含 LoRA / QLoRA /
+  DoRA、冻结视觉塔、连接器-only、灾难性遗忘、rank 与 alpha、幻觉评测；部署块含 prefill/decode、
+  KV cache 显存估算、量化顺序、continuous batching、chunked prefill、OOM 排查、预处理瓶颈、
+  可观测指标；调用块含 messages 图文数组、detail 精度、多模态 RAG、异步任务、图像注入防护、
+  token 计费、grounding、base64 膨胀、幂等与限流。
+- 全部为 `AI 工程`、`language=""` 通用题；子方向 通用 AI 17 / 部署与推理 11 /
+  LLM 与 RAG 9 / Agent 3；题型单选 20 / 多选 12 / 判断 8；难度 challenge 14 / intermediate 22 /
+  basic 4；必备度 must_know 20 / advanced 18 / nice_to_know 2。
+- 与全库逐条执行题干归一化与字符 2-gram Jaccard 查重（阈值 0.62）：字面重复 0 / 近重复 0。
+  `--write` 实测读入 40 / 新增 40 / 越界 0 / 字面重复 0 / 近重复 0；
+  题库总量 1554 → 1594，AI 工程方向 406 → 446。
+- 质量口径遵守 r124：解析 ≥30 字且**不引用选项字母**（避免选项轮转后指代失效），
+  正确项长度比 ≤3、全库中位 ≤2.0；判断题「正确 / 错误」各 4 道，避免扰动极性分布。
+- 全部通用桶新题再次触发存量前 260 行确定性选项轮转：字节数仍为 199377，
+  `R13_SEED_SHA256` 刷新为 `fe8b6336…2f3`；`question_merge --check` 与
+  `question_shuffle --check` 均逐字节 0 差异。回滚按 `question_merge.SOURCES`
+  删除全部登记素材（含 `mm-`），存量 260 行不受影响。
+
+## 13 追加素材 `20-retrieval-vectors.json`（r143，2026-11-19）
+
+| 文件 | `source` | 种子 id 前缀 | 条数 | 来源性质 | 上游 / LICENSE |
+| --- | --- | --- | --- | --- | --- |
+| `20-retrieval-vectors.json` | `retrieval` | `ret-` | 40 | 自建：AI 原创生成 + 逐条复核 | 无第三方题目来源，无第三方 LICENSE |
+
+- 面向「检索向量化与混合检索」的系统性考点，与同期学习笔记 `docs/检索向量化与混合检索笔记.md` 同源：
+  按 **稠密向量 / 稀疏向量 / RRF 与融合 / 索引与工程 / 重排与评测** 五块组织——稠密块含对比学习
+  in-batch 负样本与大 batch、hard negatives、归一化与 cosine/内积等价、指令前缀、换模型代价清单、
+  Matryoshka 截断、ColBERT late interaction、稠密检索的精确词面盲区；稀疏块含 BM25 三参数
+  （k1 饱和 / b 长度归一 / IDF）、饱和动机、SPLADE 学习型稀疏与隐式词扩展、(indices, values)
+  稀疏存储、倒排索引方向、BM25 零模型依赖；RRF 块含公式手算题（两路都第 2 胜过 1+4）、
+  k 平滑方向、rank fusion vs score fusion、ID 对齐去重、单路失败退化、裸分数加权求和反例；
+  索引块含 HNSW 三参数、千万级向量内存账、PQ 原理与 OPQ、pre-filter vs post-filter 权限空洞、
+  IVF nprobe；重排评测块含 cross-encoder vs bi-encoder、「重排的天花板是召回」、recall@k /
+  nDCG / MRR、调优顺序（chunking → embedding → 混合 → 重排 → 参数）、端到端净收益、
+  golden set 构建。
+- 与存量题（l100-070 / iq380-237 / aieng-033 / aiadv-013 / aim-002 等已有的 RRF / HNSW /
+  混合检索基础概念题）做了差异化：本批走参数细节、数值手算、工程权衡与反例，不复述已有概念题。
+- 全部为 `AI 工程`、`language=""` 通用题；子方向 LLM 与 RAG 28 / 部署与推理 6 / 通用 AI 6；
+  题型单选 20 / 多选 12 / 判断 8（正确 / 错误各 4）；难度 challenge 20 / intermediate 16 /
+  basic 4；必备度 must_know 25 / advanced 15。
+- 与全库逐条执行题干归一化与字符 2-gram Jaccard 查重（阈值 0.62）：字面重复 0 / 近重复 0。
+  `--write` 实测读入 40 / 新增 40 / 越界 0 / 字面重复 0 / 近重复 0；
+  题库总量 1594 → 1634，AI 工程方向 446 → 486。
+- 质量口径遵守 r124/r141：解析 ≥30 字且**不引用选项字母**，正确项长度比 ≤3、
+  全库中位 ≤2.0；判断题「正确 / 错误」各 4 道。
+- 全部通用桶新题再次触发存量前 260 行确定性选项轮转：字节数仍为 199377，
+  `R13_SEED_SHA256` 刷新为 `f8c1392e…2da1`；`question_merge --check` 与
+  `question_shuffle --check` 均逐字节 0 差异。回滚按 `question_merge.SOURCES`
+  删除全部登记素材（含 `ret-`），存量 260 行不受影响。

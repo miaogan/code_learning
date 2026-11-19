@@ -60,6 +60,8 @@ SOURCES: tuple[str, ...] = (
     "kb-expand",
     "ai-mastery",
     "fullstack-adv",
+    "multimodal",
+    "retrieval",
 )
 
 #: 来源 → 素材文件名（`docs/question-bank-staging/` 下的可复现输入，必须随仓库提交）。
@@ -82,6 +84,8 @@ STAGING_FILES: dict[str, str] = {
     "kb-expand": "16-knowledge-expansion.json",
     "ai-mastery": "17-ai-engineering-mastery.json",
     "fullstack-adv": "18-fullstack-advanced.json",
+    "multimodal": "19-multimodal-models.json",
+    "retrieval": "20-retrieval-vectors.json",
 }
 
 #: 来源 → 种子 id 前缀（避开 legacy `fe-/be-/al-/cs-` 与 r11 九个语言前缀，保证
@@ -101,6 +105,8 @@ STAGING_FILES: dict[str, str] = {
 #: `aim-` 是 17 号素材：面向「精通 AI 工程」的深化题（上下文工程 / 高级召回 / 评测 /
 #: MCP / 推理量化 / Agent 记忆），独立前缀便于按批审计。
 #: `fsadv-` 是 18 号素材：面向「熟练后端 + 熟悉前端」的进阶题（含各支撑方向）。
+#: `mm-` 是 19 号素材：多模态模型工程题（训练 / 微调 / 部署 / 调用四块）。
+#: `ret-` 是 20 号素材：检索向量化与混合检索题（稠密 / 稀疏 / RRF / 索引 / 重排评测五块）。
 ID_PREFIX: dict[str, str] = {
     "tiji": "tiji-",
     "local100": "l100-",
@@ -120,6 +126,8 @@ ID_PREFIX: dict[str, str] = {
     "kb-expand": "kbx-",
     "ai-mastery": "aim-",
     "fullstack-adv": "fsadv-",
+    "multimodal": "mm-",
+    "retrieval": "ret-",
 }
 
 #: 近重复口径：字符 n-gram 的 Jaccard 下界（常量只在这里，别处不得再写一个阈值）。

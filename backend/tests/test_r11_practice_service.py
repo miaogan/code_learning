@@ -500,12 +500,12 @@ def test_sub_direction_auto_locks_parent_when_direction_is_all(tmp_db: Any) -> N
 
 
 def test_system_architecture_seed_import_is_idempotent(tmp_db: Any) -> None:
-    """真实 seed 首次导入 1554 道，重复导入与刷新均不新增或改写；只使用临时库。"""
-    assert question_bank.ensure_seeded() == 1554
-    assert repository.count_questions() == 1554
+    """真实 seed 首次导入 1634 道，重复导入与刷新均不新增或改写；只使用临时库。"""
+    assert question_bank.ensure_seeded() == 1634
+    assert repository.count_questions() == 1634
     assert question_bank.import_seed() == 0
     assert question_bank.refresh_from_seed() == 0
-    assert question_bank.ensure_seeded() == 1554
+    assert question_bank.ensure_seeded() == 1634
     batch = [row for row in question_bank.practice_pool() if row["source"] == "sys-arch"]
     assert len(batch) == 60
     assert all(
