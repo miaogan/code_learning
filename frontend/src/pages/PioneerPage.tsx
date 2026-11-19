@@ -96,8 +96,11 @@ function TechRow({
   expanded,
   hit,
   trend,
+  saved,
+  saving,
   onToggle,
   onGenerate,
+  onToggleSave,
 }: {
   item: RadarTechItem
   /** 页内全局序号（跨日期分组连续编号，aihot 同款）。 */
@@ -108,8 +111,12 @@ function TechRow({
   hit: boolean
   /** r146：star 快照序列（时间正序）；少于 2 个点时不渲染走势线。 */
   trend?: RadarTrendPoint[]
+  /** r146：当前账号是否已收藏（本地乐观态，真值在服务端）。 */
+  saved: boolean
+  saving: boolean
   onToggle: () => void
   onGenerate: (item: RadarTechItem) => void
+  onToggleSave: (item: RadarTechItem) => void
 }) {
   const detailId = `radar-tech-detail-${item.tech_slug}`
   // 中文优先：有译文展示译文；原文始终留着，展开态里可回看。
@@ -165,6 +172,15 @@ function TechRow({
             </svg>
           )}
           <div className="sc-radar-slotact">
+            <Button
+              variant="ghost"
+              size="sm"
+              loading={saving}
+              aria-pressed={saved}
+              onClick={() => onToggleSave(item)}
+            >
+              {saved ? '已在清单' : '加入清单'}
+            </Button>
             <Button variant="secondary" size="sm" loading={busy} onClick={() => onGenerate(item)}>
               {item.job_id !== '' ? '查看样例' : '生成样例'}
             </Button>
@@ -245,6 +261,11 @@ export default function PioneerPage() {
   // 清单筛选（服务端过滤）：结论与方向都是多选，`['all']` = 不筛选；筛选值变化一律回到第 1 页。
   const [verdictFilters, setVerdictFilters] = useState<string[]>(['all'])
   const [directionFilters, setDirectionFilters] = useState<string[]>(['all'])
+  // r146：学习清单。本地数组只做乐观渲染，真值在服务端（按账号隔离，UNIQUE 保证不重复）。
+  // 声明必须排在 `listAsync` 之前——`listAsync` 的 `watchlist` 入参和依赖都用到 `watchOnly`。
+  const [savedSlugs, setSavedSlugs] = useState<string[]>([])
+  const [watchOnly, setWatchOnly] = useState(false)
+  const [savingSlug, setSavingSlug] = useState('')
   const pickedVerdicts = verdictFilters.filter((item) => item !== 'all')
   const pickedDirections = directionFilters.filter((item) => item !== 'all')
   const listAsync = useAsync(
@@ -254,13 +275,19 @@ export default function PioneerPage() {
         page,
         direction: pickedDirections,
         verdict: pickedVerdicts,
+        watchlist: watchOnly,
         signal,
       }),
-    [page, pageSize, verdictFilters, directionFilters],
+    [page, pageSize, verdictFilters, directionFilters, watchOnly],
   )
   const runAsync = useAsync((signal) => api.radarLatestRun(signal), [])
   // r146：近 7 天速览（先锋周报卡）。手动 reload：采集完成后与「刷新清单」一起刷。
   const weeklyAsync = useAsync((signal) => api.radarWeekly(signal), [])
+  // r146：学习清单的服务端真值（进页面拉一次，收藏/取消只改本地乐观值）。
+  const watchlistAsync = useAsync((signal) => api.radarWatchlist(signal), [])
+  useEffect(() => {
+    if (watchlistAsync.data !== null) setSavedSlugs(watchlistAsync.data.slugs)
+  }, [watchlistAsync.data])
 
   const [name, setName] = useState('')
   const [url, setUrl] = useState('')
@@ -390,6 +417,34 @@ export default function PioneerPage() {
     setPage(1)
   }
 
+  // r146：收藏 / 取消收藏。乐观更新 + 失败回滚——清单是附加操作，失败只弹 toast 不打断清单。
+  const toggleSave = async (item: RadarTechItem): Promise<void> => {
+    const saved = savedSlugs.includes(item.tech_slug)
+    setSavingSlug(item.tech_slug)
+    setSavedSlugs((prev) =>
+      saved ? prev.filter((slug) => slug !== item.tech_slug) : [item.tech_slug, ...prev],
+    )
+    try {
+      if (saved) {
+        await api.radarWatchlistRemove(item.tech_slug)
+        // 「只看清单」模式下移出后该条会消失：总数与分面要跟着刷新，不能靠本地猜。
+        if (watchOnly) listAsync.reload()
+      } else {
+        await api.radarWatchlistAdd(item.tech_slug)
+      }
+    } catch (error) {
+      setSavedSlugs((prev) =>
+        saved ? [item.tech_slug, ...prev] : prev.filter((slug) => slug !== item.tech_slug),
+      )
+      setToast({
+        message: error instanceof Error ? error.message : '操作失败，请稍后重试',
+        seq: Date.now(),
+      })
+    } finally {
+      setSavingSlug('')
+    }
+  }
+
   const changeDirections = (next: string[]): void => {
     setDirectionFilters(next)
     setPage(1)
@@ -467,7 +522,7 @@ export default function PioneerPage() {
       setSummary('')
       setPage(1)
       refresh()
-      setToast({ message: `已加入清单：${item.name}（${item.verdict_label}）`, seq: Date.now() })
+      setToast({ message: `已录入技术清单：${item.name}（${item.verdict_label}）`, seq: Date.now() })
     } catch (error) {
       setManualError(error instanceof Error ? error.message : '录入失败，请稍后重试')
     } finally {
@@ -623,7 +678,7 @@ export default function PioneerPage() {
           </label>
           <div className="sc-btn-row">
             <Button variant="secondary" size="sm" loading={manualBusy} onClick={() => void submitManual()}>
-              加入清单
+              录入技术清单
             </Button>
           </div>
         </div>
@@ -637,7 +692,7 @@ export default function PioneerPage() {
         <InlineError message={listAsync.error.message} onRetry={listAsync.reload} />
       )}
 
-      {techs !== null && techs.items.length === 0 && !filtering && (
+      {techs !== null && techs.items.length === 0 && !filtering && !watchOnly && (
         <EmptyState
           reason="清单还是空的：点「立即采集一轮」拉一轮公开信号，或在上方手工录入一条线索。"
           actionLabel="立即采集一轮"
@@ -645,7 +700,8 @@ export default function PioneerPage() {
         />
       )}
 
-      {techs !== null && (techs.items.length > 0 || filtering) && (
+      {/* r146：`watchOnly` 也要算进来——清单为空时若整块不渲染，「只看清单」开关跟着消失，用户关不回去。 */}
+      {techs !== null && (techs.items.length > 0 || filtering || watchOnly) && (
         <Card>
           <div className="sc-radar-listhead">
             <h3 className="sc-coach-blocktitle">技术清单</h3>
@@ -780,6 +836,18 @@ export default function PioneerPage() {
               </div>
             </div>
             <div className="sc-radar-filterright">
+              <button
+                type="button"
+                className={watchOnly ? 'sc-radar-watchtoggle is-active' : 'sc-radar-watchtoggle'}
+                aria-pressed={watchOnly}
+                onClick={() => {
+                  setWatchOnly(!watchOnly)
+                  setPage(1)
+                }}
+              >
+                {watchOnly ? '正在看清单' : '只看清单'}
+                {savedSlugs.length > 0 && <b>{savedSlugs.length}</b>}
+              </button>
               <Select
                 variant="compact"
                 ariaLabel="每页条数"
@@ -818,7 +886,9 @@ export default function PioneerPage() {
           {techs.notice !== '' && <p className="sc-coach-note">{techs.notice}</p>}
           {techs.items.length === 0 ? (
             <p className="sc-radar-filtered-empty">
-              当前筛选下没有条目：换个方向或结论，或点「清除筛选」看全量清单。
+              {watchOnly && !filtering
+                ? '学习清单还是空的：关掉「只看清单」，在条目上点「加入清单」把值得学的记下来。'
+                : '当前筛选下没有条目：换个方向或结论，或点「清除筛选」看全量清单。'}
             </p>
           ) : visibleItems.length === 0 ? (
             <p className="sc-radar-filtered-empty">
@@ -842,8 +912,11 @@ export default function PioneerPage() {
                         expanded={expandedSlugs.includes(item.tech_slug)}
                         hit={hitSlug === item.tech_slug}
                         trend={trends[item.tech_slug]}
+                        saved={savedSlugs.includes(item.tech_slug)}
+                        saving={savingSlug === item.tech_slug}
                         onToggle={() => toggleExpanded(item.tech_slug)}
                         onGenerate={(row) => void generate(row)}
+                        onToggleSave={(row) => void toggleSave(row)}
                       />
                     ))}
                   </ol>

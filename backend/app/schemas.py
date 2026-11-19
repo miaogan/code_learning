@@ -1262,6 +1262,23 @@ class RadarWeekly(BaseModel):
     directions: list[RadarWeeklyDirection] = Field(default_factory=list)
 
 
+class RadarWatchlistState(BaseModel):
+    """当前账号的学习清单（r146）：tech_slug 列表，按收藏时间倒序。"""
+
+    slugs: list[str] = Field(default_factory=list)
+
+
+class RadarWatchlistMutation(BaseModel):
+    """收藏 / 取消收藏的回执：幂等操作如实报告有没有发生变更。"""
+
+    added: bool = False
+    removed: bool = False
+
+
+class RadarWatchlistRequest(BaseModel):
+    tech_slug: str
+
+
 class RadarTranslateRequest(BaseModel):
     """按需补翻英文摘要：一次最多翻多少条（默认 20，上限 50）。"""
 

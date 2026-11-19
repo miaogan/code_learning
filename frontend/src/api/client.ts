@@ -77,6 +77,8 @@ import type {
   RadarTrendList,
   RadarTranslateRequest,
   RadarTranslateResult,
+  RadarWatchlistMutation,
+  RadarWatchlistState,
   RadarWeekly,
   Report,
   ReportGenerateRequest,
@@ -310,6 +312,8 @@ export const api = {
       page?: number
       direction?: string[]
       verdict?: string[]
+      /** r146：只看当前账号的学习清单（后端 `watchlist=true`）。 */
+      watchlist?: boolean
       signal?: AbortSignal
     } = {},
   ): Promise<RadarTechList> =>
@@ -319,6 +323,7 @@ export const api = {
         page: params.page ?? 1,
         direction: params.direction,
         verdict: params.verdict,
+        watchlist: params.watchlist === true ? 'true' : undefined,
       })}`,
       { signal: params.signal },
     ),
@@ -343,6 +348,24 @@ export const api = {
   /** r146：近 7 天速览（先锋周报卡）——滚动窗口，不是自然周。 */
   radarWeekly: (signal?: AbortSignal): Promise<RadarWeekly> =>
     request<RadarWeekly>('/api/radar/weekly', { signal }),
+
+  /** r146：当前账号的学习清单（tech_slug 列表，收藏时间倒序）。 */
+  radarWatchlist: (signal?: AbortSignal): Promise<RadarWatchlistState> =>
+    request<RadarWatchlistState>('/api/radar/watchlist', { signal }),
+
+  /** r146：加入学习清单（重复收藏幂等，`added=false` 表示原本就已收藏）。 */
+  radarWatchlistAdd: (techSlug: string): Promise<RadarWatchlistMutation> =>
+    request<RadarWatchlistMutation>(
+      '/api/radar/watchlist/add',
+      jsonInit('POST', { tech_slug: techSlug }),
+    ),
+
+  /** r146：移出学习清单（`removed=false` 表示原本就没收藏）。 */
+  radarWatchlistRemove: (techSlug: string): Promise<RadarWatchlistMutation> =>
+    request<RadarWatchlistMutation>(
+      '/api/radar/watchlist/remove',
+      jsonInit('POST', { tech_slug: techSlug }),
+    ),
 
   /** 把清单里剩下的英文摘要翻成中文（可重复调用，已翻过的不会重复请求）。 */
   radarTranslate: (payload: RadarTranslateRequest = {}): Promise<RadarTranslateResult> =>

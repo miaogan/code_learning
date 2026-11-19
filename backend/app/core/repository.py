@@ -2065,12 +2065,15 @@ def _radar_tech_where(
     tech_slug: str = "",
     directions: str | Sequence[str] | None = None,
     verdicts: str | Sequence[str] | None = None,
+    watchlist_only: bool = False,
 ) -> tuple[str, list[Any]]:
     """技术清单的过滤条件（列表与计数共用，避免两处口径漂移）。
 
     `directions` / `verdicts` 都是多选，SQL 走 `IN (...)`（单值字符串仍兼容）；
     `verdict` 走 `COALESCE(a.verdict, 'skip')`：还没有评估行的技术按 `skip` 投射，
     筛「跳过」时要一并命中，与列表里的默认结论保持一致。
+    `watchlist_only`（r146）只看当前账号的学习清单——用户身份走 `_uid()`，与
+    `radar_list_techs` 的任务子查询同一来源，调用方不用再传一遍。
     """
     clauses: list[str] = []
     params: list[Any] = []
@@ -2089,6 +2092,9 @@ def _radar_tech_where(
             + ")"
         )
         params.extend(picked_verdicts)
+    if watchlist_only:
+        clauses.append("t.tech_slug IN (SELECT tech_slug FROM radar_watchlist WHERE user_id = ?)")
+        params.append(_uid())
     return (" WHERE " + " AND ".join(clauses)) if clauses else "", params
 
 
@@ -2098,11 +2104,13 @@ def radar_list_techs(
     tech_slug: str = "",
     directions: str | Sequence[str] | None = None,
     verdicts: str | Sequence[str] | None = None,
+    watchlist_only: bool = False,
     offset: int = 0,
 ) -> list[dict[str, Any]]:
     """技术清单：最新评估 + 最新快照 + 当前账号最近一条生成任务，按评估时间倒序分页。"""
     where, filter_params = _radar_tech_where(
-        tech_slug=tech_slug, directions=directions, verdicts=verdicts
+        tech_slug=tech_slug, directions=directions, verdicts=verdicts,
+        watchlist_only=watchlist_only,
     )
     params: list[Any] = [_uid(), *filter_params, limit, offset]
     with connection() as conn:
@@ -2161,10 +2169,12 @@ def radar_count_techs(
     tech_slug: str = "",
     directions: str | Sequence[str] | None = None,
     verdicts: str | Sequence[str] | None = None,
+    watchlist_only: bool = False,
 ) -> int:
     """技术清单总数：与 `radar_list_techs` 同一过滤口径，供分页器算总页数。"""
     where, params = _radar_tech_where(
-        tech_slug=tech_slug, directions=directions, verdicts=verdicts
+        tech_slug=tech_slug, directions=directions, verdicts=verdicts,
+        watchlist_only=watchlist_only,
     )
     with connection() as conn:
         row = conn.execute(
@@ -2183,13 +2193,17 @@ def radar_cross_source_count() -> dict[str, int]:
 
 
 def radar_tech_verdict_counts(
-    *, directions: str | Sequence[str] | None = None
+    *,
+    directions: str | Sequence[str] | None = None,
+    watchlist_only: bool = False,
 ) -> dict[str, int]:
     """各结论的条目数：与清单同一过滤口径，但**不看结论筛选**（否则点开必学后其余档全变 0）。
 
     返回里只出现库里真有的档；闭集补零由调用方按 `rules.VERDICTS` 做，避免仓储层引用服务层。
     """
-    where, params = _radar_tech_where(tech_slug="", directions=directions, verdicts=None)
+    where, params = _radar_tech_where(
+        tech_slug="", directions=directions, verdicts=None, watchlist_only=watchlist_only
+    )
     with connection() as conn:
         rows = conn.execute(
             f"SELECT a.verdict AS verdict, count(*) AS n FROM radar_techs t{_RADAR_TECH_JOIN}{where}"
@@ -2224,6 +2238,43 @@ def radar_tech_trends(
                     for row in reversed(rows)
                 ]
     return trends
+
+
+def radar_watchlist_add(tech_slug: str) -> tuple[bool, str]:
+    """加入学习清单（r146）：重复收藏幂等（不报错、不动原时间），返回 `(是否新加入, 收藏时间)`。"""
+    with connection() as conn:
+        existing = conn.execute(
+            "SELECT created_at FROM radar_watchlist WHERE user_id = ? AND tech_slug = ?",
+            [_uid(), tech_slug],
+        ).fetchone()
+        if existing is not None:
+            return False, str(existing["created_at"])
+        created_at = _now()
+        conn.execute(
+            "INSERT INTO radar_watchlist (id, user_id, tech_slug, created_at) VALUES (?, ?, ?, ?)",
+            (next_id("radar_watchlist", conn=conn), _uid(), tech_slug, created_at),
+        )
+    return True, created_at
+
+
+def radar_watchlist_remove(tech_slug: str) -> bool:
+    """移出学习清单：硬删（清单不是历史，不留痕）；原本就没收藏返回 False。"""
+    with connection() as conn:
+        cursor = conn.execute(
+            "DELETE FROM radar_watchlist WHERE user_id = ? AND tech_slug = ?",
+            [_uid(), tech_slug],
+        )
+    return cursor.rowcount > 0
+
+
+def radar_watchlist_slugs() -> list[str]:
+    """当前账号清单里的全部 tech_slug（按收藏时间倒序，新的在前）。"""
+    with connection() as conn:
+        rows = conn.execute(
+            "SELECT tech_slug FROM radar_watchlist WHERE user_id = ? ORDER BY created_at DESC, id DESC",
+            [_uid()],
+        ).fetchall()
+    return [str(row["tech_slug"]) for row in rows]
 
 
 def radar_weekly_summary(*, start: str, prev_start: str) -> dict[str, Any]:

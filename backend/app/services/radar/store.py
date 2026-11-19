@@ -59,6 +59,7 @@ def list_techs(
     tech_slug: str = "",
     directions: str | Sequence[str] | None = None,
     verdicts: str | Sequence[str] | None = None,
+    watchlist_only: bool = False,
     offset: int = 0,
 ) -> list[dict[str, Any]]:
     """技术清单：最新评估 + 最新快照 + 当前在途任务，按评估时间倒序取一页。
@@ -68,7 +69,8 @@ def list_techs(
     `directions` / `verdicts` 是清单页的多选筛选口径（空 = 不过滤，单值字符串仍兼容）。
     """
     return repository.radar_list_techs(
-        limit, tech_slug=tech_slug, directions=directions, verdicts=verdicts, offset=offset
+        limit, tech_slug=tech_slug, directions=directions, verdicts=verdicts,
+        watchlist_only=watchlist_only, offset=offset,
     )
 
 
@@ -77,10 +79,12 @@ def count_techs(
     tech_slug: str = "",
     directions: str | Sequence[str] | None = None,
     verdicts: str | Sequence[str] | None = None,
+    watchlist_only: bool = False,
 ) -> int:
     """技术清单命中总数（与 `list_techs` 同一过滤口径），供分页器算总页数。"""
     return repository.radar_count_techs(
-        tech_slug=tech_slug, directions=directions, verdicts=verdicts
+        tech_slug=tech_slug, directions=directions, verdicts=verdicts,
+        watchlist_only=watchlist_only,
     )
 
 
@@ -89,9 +93,15 @@ def cross_source_count() -> dict[str, int]:
     return repository.radar_cross_source_count()
 
 
-def verdict_counts(*, directions: str | Sequence[str] | None = None) -> dict[str, int]:
+def verdict_counts(
+    *,
+    directions: str | Sequence[str] | None = None,
+    watchlist_only: bool = False,
+) -> dict[str, int]:
     """各结论条目数（不受结论筛选影响），给「必学 8 / 选学 21…」这类分面计数用。"""
-    return repository.radar_tech_verdict_counts(directions=directions)
+    return repository.radar_tech_verdict_counts(
+        directions=directions, watchlist_only=watchlist_only
+    )
 
 
 def tech_trends(
@@ -99,6 +109,21 @@ def tech_trends(
 ) -> dict[str, list[dict[str, Any]]]:
     """star 快照序列（时间正序）：先锋卡片走势线用；没快照的 slug 不在返回里。"""
     return repository.radar_tech_trends(slugs, max_points=max_points)
+
+
+def watchlist_add(tech_slug: str) -> tuple[bool, str]:
+    """加入学习清单：重复收藏幂等，返回 `(是否新加入, 收藏时间)`。"""
+    return repository.radar_watchlist_add(tech_slug)
+
+
+def watchlist_remove(tech_slug: str) -> bool:
+    """移出学习清单：硬删；原本就没收藏返回 False。"""
+    return repository.radar_watchlist_remove(tech_slug)
+
+
+def watchlist_slugs() -> list[str]:
+    """当前账号清单里的 tech_slug（按收藏时间倒序）。"""
+    return repository.radar_watchlist_slugs()
 
 
 def weekly_summary(*, days: int = 7) -> dict[str, Any]:

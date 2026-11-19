@@ -815,3 +815,38 @@ def test_weekly_summary_counts_new_techs_and_rounds(client: TestClient, radar_en
     after = store.weekly_summary()
     assert after["new_techs"] == weekly["new_techs"] - 1
     assert after["prev_new_techs"] == 0
+
+
+def test_watchlist_roundtrip_and_filter(client: TestClient, radar_env: None) -> None:
+    """r146：学习清单 —— 收藏幂等、按账号隔离、「只看清单」是清单过滤而不是另一套口径。"""
+    asyncio.run(radar.run_round(trigger="manual", user=None))
+    rows = store.list_techs(3)
+    slugs = [row["tech_slug"] for row in rows]
+    other = rows[1]["tech_slug"]
+
+    first = client.post("/api/radar/watchlist/add", json={"tech_slug": slugs[0]})
+    assert first.status_code == 200 and first.json()["added"] is True
+    again = client.post("/api/radar/watchlist/add", json={"tech_slug": slugs[0]})
+    assert again.json()["added"] is False  # 幂等：重复收藏不报错、不产生第二行
+
+    missing = client.post("/api/radar/watchlist/add", json={"tech_slug": "github:ghost/none"})
+    assert missing.status_code == 404
+    assert "无法收藏" in missing.json()["error"]["message"]
+
+    client.post("/api/radar/watchlist/add", json={"tech_slug": other})
+    saved = client.get("/api/radar/watchlist").json()["slugs"]
+    assert set(saved) == {slugs[0], other}
+
+    # 「只看清单」：总数与分面都按清单收窄，且与全量口径互不污染。
+    full = client.get("/api/radar/techs", params={"limit": 100}).json()
+    only = client.get("/api/radar/techs", params={"limit": 100, "watchlist": "true"}).json()
+    assert only["total"] == 2 and full["total"] > 2
+    assert {row["tech_slug"] for row in only["items"]} == {slugs[0], other}
+    assert sum(only["counts"].values()) == 2
+    assert sum(full["counts"].values()) == full["total"]
+
+    removed = client.post("/api/radar/watchlist/remove", json={"tech_slug": slugs[0]})
+    assert removed.json()["removed"] is True
+    stale = client.post("/api/radar/watchlist/remove", json={"tech_slug": slugs[0]})
+    assert stale.json()["removed"] is False
+    assert client.get("/api/radar/watchlist").json()["slugs"] == [other]

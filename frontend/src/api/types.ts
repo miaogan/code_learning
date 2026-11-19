@@ -1136,6 +1136,18 @@ export interface RadarWeekly {
   directions: RadarWeeklyDirection[]
 }
 
+export interface RadarWatchlistState {
+  /** 当前账号收藏的 tech_slug（收藏时间倒序）。 */
+  slugs: string[]
+}
+
+export interface RadarWatchlistMutation {
+  /** 收藏回执：`added=false` 表示原本就已收藏（幂等）。 */
+  added?: boolean
+  /** 取消回执：`removed=false` 表示原本就没收藏。 */
+  removed?: boolean
+}
+
 export interface RadarTranslateRequest {
   /** 本次最多翻几条（后端上限 50，缺省走后端配置）。 */
   limit?: number

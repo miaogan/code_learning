@@ -25,6 +25,9 @@ from app.schemas import (
     RadarTranslateResult,
     RadarTrendList,
     RadarTrendPoint,
+    RadarWatchlistMutation,
+    RadarWatchlistRequest,
+    RadarWatchlistState,
     RadarWeekly,
 )
 from app.services import radar
@@ -56,6 +59,7 @@ async def list_techs(
         list[str],
         Query(description="按结论多选 must_learn|worth_knowing|watch|skip；不传 = 全部"),
     ] = _NO_FILTER,
+    watchlist: bool = Query(default=False, description="只看当前账号的学习清单（r146）"),
 ) -> RadarTechList:
     directions = [item.strip() for item in direction if item.strip()]
     verdicts = [item.strip() for item in verdict if item.strip()]
@@ -64,14 +68,17 @@ async def list_techs(
     if any(item not in rules.VERDICTS for item in verdicts):
         raise AppError(VALIDATION_ERROR, "结论不在闭集内，请从筛选器选择", status=400)
     items = store.list_techs(
-        limit, directions=directions, verdicts=verdicts, offset=(page - 1) * limit
+        limit, directions=directions, verdicts=verdicts, watchlist_only=watchlist,
+        offset=(page - 1) * limit,
     )
-    raw_counts = store.verdict_counts(directions=directions)
+    raw_counts = store.verdict_counts(directions=directions, watchlist_only=watchlist)
     return RadarTechList(
         items=[
             RadarTechItem(**row, verdict_label=rules.label_of(row["verdict"])) for row in items
         ],
-        total=store.count_techs(directions=directions, verdicts=verdicts),
+        total=store.count_techs(
+            directions=directions, verdicts=verdicts, watchlist_only=watchlist
+        ),
         # 闭集补零：前端四档 chip 的计数不必再判 `undefined`。
         counts={verdict: int(raw_counts.get(verdict, 0)) for verdict in rules.VERDICTS},
         notice=_notice(),
@@ -98,6 +105,38 @@ async def tech_trends(
 @router.get("/weekly", response_model=RadarWeekly, summary="近 7 天速览（先锋周报卡）")
 async def weekly_summary() -> RadarWeekly:
     return RadarWeekly(**store.weekly_summary())
+
+
+@router.get(
+    "/watchlist",
+    response_model=RadarWatchlistState,
+    summary="当前账号的学习清单（tech_slug 列表，收藏时间倒序）",
+)
+async def watchlist_state() -> RadarWatchlistState:
+    return RadarWatchlistState(slugs=store.watchlist_slugs())
+
+
+@router.post(
+    "/watchlist/add",
+    response_model=RadarWatchlistMutation,
+    summary="加入学习清单（重复收藏幂等，不报错）",
+)
+async def watchlist_add(payload: RadarWatchlistRequest) -> RadarWatchlistMutation:
+    tech_slug = payload.tech_slug.strip()
+    if store.count_techs(tech_slug=tech_slug) == 0:
+        raise AppError(NOT_FOUND, "清单里没有这项技术，无法收藏", status=404)
+    added, _ = store.watchlist_add(tech_slug)
+    return RadarWatchlistMutation(added=added)
+
+
+@router.post(
+    "/watchlist/remove",
+    response_model=RadarWatchlistMutation,
+    summary="移出学习清单（原本就没收藏时 removed=false）",
+)
+async def watchlist_remove(payload: RadarWatchlistRequest) -> RadarWatchlistMutation:
+    # slug 形如 `github:owner/repo`（带斜杠），走 POST + 请求体而不是 DELETE 路径参数，免踩路径转义。
+    return RadarWatchlistMutation(removed=store.watchlist_remove(payload.tech_slug.strip()))
 
 
 @router.post("/run", response_model=RadarRunSummary, summary="立即跑一轮采集与评估")
