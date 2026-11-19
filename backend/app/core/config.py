@@ -385,6 +385,9 @@ class Settings(BaseSettings):
     #: 采集跳过 TLS 证书校验：仅供企业代理 / 自签证书的内网环境**临时**排障，默认关。
     #: 打开后上游内容可被中间人篡改（会进题库与国子监生成），内网问题处理完应立刻关回。
     radar_insecure_tls: bool = False
+    #: r145 内网 CA：指向 PEM 证书文件（企业根证书 / TLS 代理证书），采集链路用它做校验。
+    #: 优先级低于 `RADAR_INSECURE_TLS`（后者为 false 时才生效）；文件不存在会 WARNING 并回退系统信任库。
+    radar_ca_bundle: str = ""
     #: 调度口径：`inapp` = 应用内 asyncio 循环（单进程 uvicorn）；`off` = 只允许手动采集。
     radar_schedule: str = "inapp"
     #: 应用内调度的采集时刻（逗号分隔 HH:MM，+08:00）。跨日空窗接受，用手动采集弥补。

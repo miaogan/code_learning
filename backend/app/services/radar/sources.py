@@ -173,8 +173,16 @@ def repo_full_name(text: str) -> str:
     return ""
 
 
-async def fetch_repo(full_name: str, settings: Settings | None = None) -> dict[str, Any] | None:
-    """按仓库补一次公开元数据（手工录入 GitHub 链接时用）；拿不到返回 None 由调用方兜底。"""
+async def fetch_repo(
+    full_name: str,
+    settings: Settings | None = None,
+    error_sink: list[str] | None = None,
+) -> dict[str, Any] | None:
+    """按仓库补一次公开元数据（手工录入 GitHub 链接时用）；拿不到返回 None 由调用方兜底。
+
+    `error_sink` 非空时把**可展示的中文原因**追加进去（`fetch_all` 用它拼本轮 notice）；
+    手工录入不传，保持「补不到就退回纯手工字段」的静默语义。
+    """
     settings = settings or get_settings()
     headers = _headers({"Accept": "application/vnd.github+json"})
     if settings.github_token:
@@ -182,7 +190,7 @@ async def fetch_repo(full_name: str, settings: Settings | None = None) -> dict[s
     timeout = httpx.Timeout(settings.radar_fetch_timeout_s)
     try:
         async with httpx.AsyncClient(
-            timeout=timeout, follow_redirects=True, verify=not settings.radar_insecure_tls
+            timeout=timeout, follow_redirects=True, verify=verify_for(settings)
         ) as client:
             payload = await _get(
                 client, f"https://api.github.com/repos/{full_name}", headers, settings
@@ -190,6 +198,16 @@ async def fetch_repo(full_name: str, settings: Settings | None = None) -> dict[s
         return _github_item(json.loads(payload.decode("utf-8", "ignore") or "{}"))
     except (httpx.HTTPError, ValueError, OSError) as error:
         logger.warning("按仓库采集 %s 失败：%s", full_name, error)
+        if error_sink is not None:
+            if _tls_failed(error):
+                message = TLS_HINT
+            elif isinstance(error, httpx.HTTPStatusError):
+                message = f"仓库元数据接口返回 {error.response.status_code}（仓库不存在或无权限）"
+            elif isinstance(error, httpx.TimeoutException):
+                message = "仓库元数据接口超时"
+            else:
+                message = "仓库元数据拉取失败（网络不可用或返回格式异常）"
+            error_sink.append(message)
         return None
 
 
@@ -339,6 +357,30 @@ def _tls_failed(error: BaseException) -> bool:
     return False
 
 
+#: 内网 TLS 失败时给用户的两条处理路径（页面 notice / 日志共用同一份措辞）。
+TLS_HINT = (
+    "上游 TLS 证书校验失败：请把企业根证书挂进容器，并让 RADAR_CA_BUNDLE 指向该 PEM 文件；"
+    "仅临时排障可设 RADAR_INSECURE_TLS=true（跳过校验，用完请关回）"
+)
+
+
+def verify_for(settings: Settings) -> bool | str:
+    """采集客户端的 `verify` 取值：显式跳过 > 指定 CA > 系统信任库。
+
+    `RADAR_CA_BUNDLE` 填了但文件不存在时不静默跳过校验（那等于把内网问题变成安全问题），
+    而是 WARNING 后回退系统信任库，让原来的证书错误继续暴露出来。
+    """
+    if settings.radar_insecure_tls:
+        return False
+    ca_bundle = settings.radar_ca_bundle.strip()
+    if ca_bundle == "":
+        return True
+    if not Path(ca_bundle).is_file():
+        logger.warning("RADAR_CA_BUNDLE 指向的文件不存在：%s（回退系统信任库）", ca_bundle)
+        return True
+    return ca_bundle
+
+
 #: r89 概要抓取：正文摘录喂给模型的上限（约 6 页 A4，足够概括「它是干啥的」）。
 _ARTICLE_MAX_BYTES = 300_000
 _ARTICLE_MAX_CHARS = 3000
@@ -368,7 +410,7 @@ async def fetch_article_text(url: str, settings: Settings | None = None) -> str:
         async with httpx.AsyncClient(
             timeout=httpx.Timeout(10.0),
             follow_redirects=True,
-            verify=not (settings or get_settings()).radar_insecure_tls,
+            verify=verify_for(settings or get_settings()),
         ) as client:
             response = await client.get(target, headers=_headers({"Accept": "text/html"}))
             response.raise_for_status()
@@ -399,11 +441,7 @@ async def _run_source(
                 "message": f"上游返回 {error.response.status_code}"}
     except (httpx.HTTPError, ET.ParseError, ValueError, OSError) as error:
         logger.warning("采集源 %s 失败：%s", key, error)
-        message = (
-            "上游 TLS 证书校验失败（可在 backend/.env 设置 RADAR_INSECURE_TLS=true 临时跳过）"
-            if _tls_failed(error)
-            else "上游不可用或返回格式异常"
-        )
+        message = TLS_HINT if _tls_failed(error) else "上游不可用或返回格式异常"
         return {"source_key": key, "status": "failed", "items": 0,
                 "latency_ms": int((time.monotonic() - started) * 1000),
                 "message": message}
@@ -436,12 +474,13 @@ async def fetch_all(
         return items, status, True
     if repo:
         started = time.monotonic()
-        item = await fetch_repo(repo, settings)
+        errors: list[str] = []
+        item = await fetch_repo(repo, settings, errors)
         latency = int((time.monotonic() - started) * 1000)
         if item is None:
             return [], [{"source_key": "github", "status": "failed", "items": 0,
                          "latency_ms": latency,
-                         "message": "仓库不存在、限流、网络或 TLS 证书校验失败"}], True
+                         "message": errors[0] if errors else "仓库不存在、限流或网络不可用"}], True
         return [normalize.normalize_item(item)], [
             {"source_key": "github", "status": "ok", "items": 1,
              "latency_ms": latency, "message": "指定仓库采集"}
@@ -451,7 +490,7 @@ async def fetch_all(
         logger.warning("RADAR_INSECURE_TLS=true：采集链路已跳过 TLS 证书校验（仅限内网排障）")
     query = _github_query(settings, direction) if direction else ""
     async with httpx.AsyncClient(
-        timeout=timeout, follow_redirects=True, verify=not settings.radar_insecure_tls
+        timeout=timeout, follow_redirects=True, verify=verify_for(settings)
     ) as client:
         results = await asyncio.gather(
             *[_run_source(key, client, settings, query) for key in _FETCHERS]

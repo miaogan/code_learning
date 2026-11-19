@@ -103,6 +103,14 @@ async def run_round(
     full_name = sources.repo_full_name(repo)
     run_id = store.create_run(trigger)
     items, status, degraded = await sources.fetch_all(settings, direction=target, repo=full_name)
+    # r145：失败原因必须跟着本轮回执走到页面（尤其内网 TLS 证书失败），不能只留在容器日志里。
+    failed_messages: list[str] = []
+    for row in status:
+        if row.get("status") != "failed":
+            continue
+        message = str(row.get("message") or "").strip()
+        if message != "" and message not in failed_messages:
+            failed_messages.append(message)
     if target and not full_name:
         items = [item for item in items if item["direction"] == target]
     summary = assess.profile_summary()
@@ -137,12 +145,22 @@ async def run_round(
     dropped_total = await _refine_top(pending, summary, digest, run_id, user, gate, notes)
     await _translate_round(gate, notes)
 
+    detail = "；".join(failed_messages[:3])
     if settings.radar_offline:
         notes.insert(0, "当前为离线模式，本轮只读取内置样本")
     elif full_name:
+        # r145：指定仓库采集失败时也要把原因带到页面，不能被「只采集指定仓库」这句盖掉。
+        if degraded:
+            reason = f"（{detail}）" if detail != "" else ""
+            notes.insert(0, f"指定仓库 {full_name} 本轮采集失败{reason}")
         notes.insert(0, f"本轮只采集指定仓库 {full_name}")
     elif degraded:
-        notes.insert(0, "部分信息源本轮不可用，只覆盖可用的来源")
+        notes.insert(
+            0,
+            f"部分信息源本轮不可用（{detail}）"
+            if detail != ""
+            else "部分信息源本轮不可用，只覆盖可用的来源",
+        )
     if target and not full_name:
         notes.append(f"本轮按方向「{target}」采集，只保留该方向的条目")
         if not pending:

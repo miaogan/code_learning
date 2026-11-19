@@ -9,6 +9,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
@@ -223,7 +224,9 @@ def test_manual_github_url_uses_repo_metadata(
     monkeypatch.setenv("RADAR_MAX_ASSESS_PER_ROUND", "0")
     get_settings.cache_clear()
 
-    async def _fake_repo(full_name: str, _settings: Any = None) -> dict[str, Any] | None:
+    async def _fake_repo(
+        full_name: str, _settings: Any = None, _error_sink: Any = None
+    ) -> dict[str, Any] | None:
         assert full_name == "HKUDS/LightRAG"
         return sources._github_item(
             {
@@ -542,6 +545,97 @@ def test_fetch_all_tls_verify_switch(radar_env: None, monkeypatch: pytest.Monkey
     assert captured["verify"] is False
 
 
+def test_verify_for_prefers_ca_bundle(
+    radar_env: None, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """r145：`verify_for` 三态 —— 显式跳过 > 指定 CA > 系统信任库；CA 文件缺失不静默放行。"""
+    monkeypatch.setenv("RADAR_CA_BUNDLE", "")
+    monkeypatch.setenv("RADAR_INSECURE_TLS", "false")
+    get_settings.cache_clear()
+    assert sources.verify_for(get_settings()) is True
+
+    missing = tmp_path / "corp-ca-missing.pem"
+    monkeypatch.setenv("RADAR_CA_BUNDLE", str(missing))
+    get_settings.cache_clear()
+    # 指向不存在的文件时回退系统信任库（继续暴露原证书错误），而不是变成「跳过校验」。
+    assert sources.verify_for(get_settings()) is True
+
+    ca = tmp_path / "corp-ca.pem"
+    ca.write_text("-----BEGIN CERTIFICATE-----\n", encoding="utf-8")
+    monkeypatch.setenv("RADAR_CA_BUNDLE", str(ca))
+    get_settings.cache_clear()
+    assert sources.verify_for(get_settings()) == str(ca)
+
+    # 显式排障开关优先级最高：即使配了 CA 也跳过校验。
+    monkeypatch.setenv("RADAR_INSECURE_TLS", "true")
+    get_settings.cache_clear()
+    assert sources.verify_for(get_settings()) is False
+
+
+def test_tls_failure_surfaces_chinese_hint(
+    radar_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """r145：TLS 校验失败要走中文指引（挂 CA / 临时跳过两条路），不能退成「网络不可用」。"""
+
+    async def _tls_boom(*_args: Any, **_kwargs: Any) -> bytes:
+        raise httpx.ConnectError(
+            "[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate"
+        )
+
+    monkeypatch.setattr(sources, "_get", _tls_boom)
+    monkeypatch.setenv("RADAR_OFFLINE", "0")
+    get_settings.cache_clear()
+
+    sink: list[str] = []
+    assert asyncio.run(sources.fetch_repo("HKUDS/LightRAG", get_settings(), sink)) is None
+    assert sink == [sources.TLS_HINT]
+    assert "RADAR_CA_BUNDLE" in sink[0]
+
+    # 手工录入不传 error_sink：保持「补不到就退回手工字段」的静默语义。
+    assert asyncio.run(sources.fetch_repo("HKUDS/LightRAG", get_settings())) is None
+
+    items, status, degraded = asyncio.run(sources.fetch_all(repo="HKUDS/LightRAG"))
+    assert items == []
+    assert degraded is True
+    assert status[0]["message"] == sources.TLS_HINT
+
+
+def test_round_notice_carries_failure_reason(
+    radar_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """r145：降级提示要带失败原因，用户不必去容器日志里翻（内网 TLS 是最常见的一例）。"""
+    monkeypatch.setenv("RADAR_OFFLINE", "0")
+    get_settings.cache_clear()
+
+    async def fake_fetch_all(_settings: Any = None, **_kwargs: Any) -> Any:
+        return [], [
+            {"source_key": "github", "status": "failed", "items": 0, "latency_ms": 900,
+             "message": sources.TLS_HINT},
+        ], True
+
+    monkeypatch.setattr(sources, "fetch_all", fake_fetch_all)
+    summary = asyncio.run(radar.run_round(trigger="manual", user=None))
+    assert "部分信息源本轮不可用" in summary["notice"]
+    assert "TLS 证书校验失败" in summary["notice"]
+
+
+def test_round_repo_failure_notice_carries_reason(
+    radar_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """r145：指定仓库采集失败时，「只采这个仓库」不能把失败原因盖掉。"""
+    monkeypatch.setenv("RADAR_OFFLINE", "0")
+    get_settings.cache_clear()
+
+    async def _tls_boom(*_args: Any, **_kwargs: Any) -> bytes:
+        raise httpx.ConnectError("[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed")
+
+    monkeypatch.setattr(sources, "_get", _tls_boom)
+    summary = asyncio.run(radar.run_round(trigger="manual", user=None, repo="HKUDS/LightRAG"))
+    assert summary["techs_seen"] == 0
+    assert "指定仓库 HKUDS/LightRAG 本轮采集失败" in summary["notice"]
+    assert "TLS 证书校验失败" in summary["notice"]
+
+
 def test_is_due_after_restart(radar_env: None) -> None:
     """重启补跑只看「上一轮是否早于最近一个已到的时点」：早于 → 补跑；已跑过 → 不重复。"""
     slots = schedule.parse_slots("08:00")
@@ -570,7 +664,9 @@ def test_fetch_all_with_repo_reads_single_repository(
     monkeypatch.setenv("RADAR_OFFLINE", "0")
     get_settings.cache_clear()
 
-    async def _fake_repo(full_name: str, _settings: Any = None) -> dict[str, Any] | None:
+    async def _fake_repo(
+        full_name: str, _settings: Any = None, _error_sink: Any = None
+    ) -> dict[str, Any] | None:
         assert full_name == "HKUDS/LightRAG"
         return sources._github_item(
             {
@@ -600,7 +696,9 @@ def test_run_api_accepts_repo_and_direction(
     monkeypatch.setenv("RADAR_OFFLINE", "0")
     get_settings.cache_clear()
 
-    async def _fake_repo(full_name: str, _settings: Any = None) -> dict[str, Any] | None:
+    async def _fake_repo(
+        full_name: str, _settings: Any = None, _error_sink: Any = None
+    ) -> dict[str, Any] | None:
         assert full_name == "HKUDS/LightRAG"
         return sources._github_item(
             {
