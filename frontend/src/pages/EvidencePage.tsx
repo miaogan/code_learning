@@ -24,6 +24,14 @@ const ENGINE_LABELS: Record<string, string> = {
   missing: '未初始化',
 }
 
+/** 向量后端档位（r117 的 VECTOR_MODE）；faiss 是内网/气隙部署的文件型索引。 */
+const VECTOR_MODE_LABELS: Record<string, string> = {
+  pgvector: 'pgvector（业务库内）',
+  sqlite: 'sqlite（业务库 JSON 向量）',
+  faiss: 'faiss（本地文件索引）',
+  milvus: 'milvus（内网向量库）',
+}
+
 /**
  * 考工（r100 工程证据中心）：把「看不见的工程深度」摆上界面。
  *
@@ -143,6 +151,13 @@ export default function EvidencePage() {
                 <td>{ENGINE_LABELS[rag?.engine ?? 'missing'] ?? rag?.engine}</td>
               </tr>
               <tr>
+                <td>向量后端</td>
+                <td>
+                  {VECTOR_MODE_LABELS[rag?.vector_mode ?? ''] ?? (rag?.vector_mode || '—')}
+                  {rag?.vector_engine ? ` · ${rag.vector_engine}` : ''}
+                </td>
+              </tr>
+              <tr>
                 <td>chunk 规模</td>
                 <td>
                   共 {rag?.chunk_count ?? 0} 条（题库 {rag?.question_chunks ?? 0} · 教程{' '}
@@ -162,6 +177,15 @@ export default function EvidencePage() {
           {actionMessage ? <p>{actionMessage}</p> : null}
           {actionError ? <InlineError message={actionError} /> : null}
           {rag?.notice ? <p>{rag.notice}</p> : null}
+          {rag?.vector_notice ? (
+            <p className="sc-inline-warning">
+              {rag.vector_notice}
+              {'　处理方式：点上方「重建题库索引」；教程结果也要用时再点「推送教程正文」。'}
+              {rag.vector_mode === 'faiss'
+                ? ' 内网离线环境可用 python -m app.admin_cli rebuild-index --kind all 一键重建。'
+                : ''}
+            </p>
+          ) : null}
           <p>
             管线：题库与教程小节分块 → embedding（默认离线确定性哈希，可配真实语义模型）→
             pgvector HNSW 余弦索引 → 向量与关键词两腿 RRF(k=60) 融合检索 → 带引用白名单的生成。

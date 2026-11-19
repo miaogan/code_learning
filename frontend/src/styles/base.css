@@ -12771,3 +12771,15 @@ a.sc-radar-name--link:hover .sc-radar-ext {
 }
 
 
+
+/* r140 · 派生索引待重建的内联提示：warn token，append-only。 */
+.sc-inline-warning {
+  margin: var(--sp-3) 0;
+  padding: var(--sp-3);
+  border-left: 2px solid var(--warn);
+  background: var(--warn-tint-12);
+  border-radius: var(--radius-4);
+  color: var(--text-primary);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}

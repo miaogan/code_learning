@@ -1306,6 +1306,10 @@ export interface RagStatus {
   stale: boolean
   embedder_kind: string
   notice: string
+  /** r140 派生索引健康：faiss 文件缺失时 vector_notice 给中文指引。 */
+  vector_mode: string
+  vector_engine: string
+  vector_notice: string
 }
 
 /** 重建 / 摄取结果：状态快照 + 本次写入条数。 */
