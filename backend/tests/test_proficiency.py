@@ -298,6 +298,21 @@ def test_same_question_same_run_counts_once(tmp_db: Path) -> None:
     assert proficient_ids(now=NOW) == set()
 
 
+def test_proficient_ids_reuses_supplied_rows(monkeypatch: pytest.MonkeyPatch) -> None:
+    """r134：调用方传入已读的作答行时不再查库，判定结果与默认路径一致。"""
+    rows = [
+        _row("q-a", True, NOW - timedelta(days=3)),
+        _row("q-a", True, NOW - timedelta(days=1)),
+        _row("q-b", True, NOW - timedelta(days=1)),
+    ]
+
+    def _boom() -> None:
+        raise AssertionError("已传 attempts 时不该再读一遍 repository.list_attempts()")
+
+    monkeypatch.setattr(proficiency.repository, "list_attempts", _boom)
+    assert proficient_ids(now=NOW, attempts=rows) == {"q-a"}
+
+
 def test_proficient_ids_uses_repository_rows_only(monkeypatch: pytest.MonkeyPatch) -> None:
     """`proficient_ids()` 只消费 `repository.list_attempts()` 的行（SQL 不越界到服务层）。"""
     rows = [

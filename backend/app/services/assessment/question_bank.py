@@ -167,14 +167,23 @@ def exam_pool() -> list[dict[str, Any]]:
 
 
 def find_question(question_id: str) -> dict[str, Any] | None:
-    """按 id 取一道**可用**题（练习提交判分用）；不存在或不可用返回 `None`（由调用方映射 404）。"""
+    """按 id 取一道**可用**题（练习提交判分用）；不存在或不可用返回 `None`（由调用方映射 404）。
+
+    r134：判分每次只找一条，不能再走 `load_questions()` 全表 + 逐行 JSON 解码。
+    改走 `repository.get_question()` 主键直查，命中后再用同一个 `_usable()` 复核；
+    空库才补一次 `ensure_seeded()`（与 `load_questions()` 的启动兜底同语义），
+    所以「库里一条都没有 → 自动导种子」的老行为不变，但正常路径只读一行。
+    """
     target = str(question_id or "").strip()
     if not target:
         return None
-    for row in load_questions():
-        if str(row.get("id") or "") == target:
-            return row
-    return None
+    row = repository.get_question(target)
+    if row is None and repository.count_questions() == 0:
+        ensure_seeded()
+        row = repository.get_question(target)
+    if row is None or not _usable(row):
+        return None
+    return row
 
 
 def sync_labels(path: Path = SEED_PATH) -> int:

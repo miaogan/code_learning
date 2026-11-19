@@ -630,3 +630,46 @@ def test_focus_backfill_skips_proficient_and_counts_honestly(tmp_db: Any) -> Non
     assert paper["sub_direction_backfill"] == 3
     assert paper["notice"] == practice._NOTICE_SUB_EMPTY
     assert paper["filtered_count"] == 2, "过滤数应等于窄池被跳过的熟练题数"
+
+
+# --- r134：判分找题 / 一次请求只读一遍作答表 -------------------------------
+
+
+def test_find_question_never_scans_whole_bank(tmp_db: Any, monkeypatch: Any) -> None:
+    """r134：判分只找一条，命中路径不能再退化成全表读 + 逐行 JSON 解码。"""
+    question_bank.ensure_seeded()
+    target = question_bank.load_seed()[0]["id"]
+
+    def _boom() -> None:
+        raise AssertionError("find_question 不该再调用 load_questions / list_questions")
+
+    monkeypatch.setattr(question_bank, "load_questions", _boom)
+    monkeypatch.setattr(repository, "list_questions", _boom)
+    row = question_bank.find_question(target)
+    assert row is not None and row["id"] == target
+
+
+def test_find_question_still_seeds_empty_db(tmp_db: Any) -> None:
+    """r134：空库自动导种子的老行为不变（get_question 未命中时兜一次 ensure_seeded）。"""
+    assert repository.count_questions() == 0
+    target = question_bank.load_seed()[0]["id"]
+    assert question_bank.find_question(target) is not None
+    assert repository.count_questions() == len(question_bank.load_seed())
+    assert question_bank.find_question("not-exist") is None
+
+
+def test_paper_and_stats_read_attempts_only_once(tmp_db: Any, monkeypatch: Any) -> None:
+    """r134：组卷 / 统计各只读一遍作答表——熟练度直接复用同一次读取的行。"""
+    question_bank.ensure_seeded()
+    calls: list[int] = []
+    original = repository.list_attempts
+
+    def _counted() -> list[dict[str, Any]]:
+        calls.append(1)
+        return original()
+
+    monkeypatch.setattr(repository, "list_attempts", _counted)
+    practice.build_paper(limit=3)
+    assert len(calls) == 1, "组卷不该把作答表读两遍"
+    practice.stats()
+    assert len(calls) == 2, "统计也不该把作答表读两遍"

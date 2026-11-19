@@ -65,15 +65,18 @@ _QUESTION_MISSING = "题目不存在或已下线"
 # --- 作答索引 --------------------------------------------------------------
 
 
-def attempt_index() -> dict[str, dict[str, Any]]:
+def attempt_index(rows: list[dict[str, Any]] | None = None) -> dict[str, dict[str, Any]]:
     """题 id → 作答汇总：`last_correct` / `last_answered_at` / `wrong_count` / `total`。
 
     `repository.list_attempts()` 已按 `(answered_at, created_at, id)` 升序返回，因此顺序遍历
     的最后一个值就是「最近一次作答」—— `unseen` / `wrong` / 错题本三处口径共用这一份索引，
     不各自再遍历一次表（多份遍历必然出现「一处按答对、一处按答错」的漂移）。
+
+    r134：同一次组卷 / 统计若已经读过作答行，可从 `rows` 直接构建索引，避免仓库层被
+    重复调用；不传时行为与原来逐字一致。
     """
     index: dict[str, dict[str, Any]] = {}
-    for row in repository.list_attempts():
+    for row in (repository.list_attempts() if rows is None else rows):
         question_id = str(row.get("question_id") or "")
         if not question_id:
             continue
@@ -303,9 +306,11 @@ def _compose_paper(
             "filtered_count": 0,
         }
 
-    index = attempt_index()
+    # r134：一次请求只读一遍作答表——索引与熟练度共用同一份行，判定口径不变。
+    attempt_rows = repository.list_attempts()
+    index = attempt_index(attempt_rows)
     #: 熟练题默认不进练习：与笔试同一份判定（阈值只在 config），不在这里写第二套口径。
-    proficient = proficiency.proficient_ids()
+    proficient = proficiency.proficient_ids(attempts=attempt_rows)
     effective_direction, focus_sub = _resolve_focus(direction, sub_direction)
     #: 聚焦时宽池必须锁在子方向的父方向上，否则补位会跨方向取题（r46 同口径）。
     wide_direction = effective_direction if focus_sub else direction
@@ -548,8 +553,10 @@ def stats(
     sub_direction = _subs(sub_direction)
 
     pool = question_bank.practice_pool()
-    index = attempt_index()
-    proficient = proficiency.proficient_ids()
+    # r134：与组卷同口径——作答行只读一次，熟练度直接复用，不再扫第二遍全表。
+    attempt_rows = repository.list_attempts()
+    index = attempt_index(attempt_rows)
+    proficient = proficiency.proficient_ids(attempts=attempt_rows)
     effective_direction, focus_sub = _resolve_focus(direction, sub_direction)
     focused = _filtered(
         pool,

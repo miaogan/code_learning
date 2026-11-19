@@ -147,10 +147,14 @@ def evaluate(
     )
 
 
-def proficient_ids(now: datetime | None = None) -> set[str]:
+def proficient_ids(
+    now: datetime | None = None, *, attempts: list[dict[str, Any]] | None = None
+) -> set[str]:
     """全库熟练题 id 集合（组卷过滤的唯一读侧入口）。
 
-    只读 `repository.list_attempts()`（SQL 只在 repository），阈值只来自 `config.get_settings()`。
+    默认只读 `repository.list_attempts()`（SQL 只在 repository），阈值只来自 `config.get_settings()`。
+    r134：调用方若已为同一次请求读过作答行，可用 `attempts=` 直接传入复用，**不再读第二遍全表**；
+    传入的仍是同一份行结构（仓库层已按时间排序），判定公式与不传时逐字节一致。
     `now=None` 时取一次 `datetime.now(UTC)`：生产不传，测试必传以摆脱时钟依赖。
     单用户全局判定，不按画像过滤（PRD §7）。
     """
@@ -158,11 +162,12 @@ def proficient_ids(now: datetime | None = None) -> set[str]:
     moment = datetime.now(UTC) if now is None else _ensure_utc(now)
     window_days = settings.proficiency_window_days
     threshold = settings.proficiency_correct_threshold
+    rows = repository.list_attempts() if attempts is None else attempts
     proficient: set[str] = set()
-    for question_id, attempts in attempts_by_question(repository.list_attempts()).items():
+    for question_id, question_attempts in attempts_by_question(rows).items():
         verdict = evaluate(
             question_id,
-            attempts,
+            question_attempts,
             moment,
             window_days=window_days,
             correct_threshold=threshold,
