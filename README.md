@@ -198,6 +198,35 @@ seed 自动生成——所以全新机器第一次检索会提示「faiss 索引
 哪一档——不再出现「考工页显示已构建、检索页却报未构建」的自相矛盾。备份时把整个 `data/`
 目录拷走即可同时带走业务库与向量索引。
 
+### 内网采集的 TLS 证书（先锋采集报 `certificate-verify-failed`）
+
+「先锋」的采集链路（`radar/sources.py`）走 `httpx` 且**默认校验证书**。内网机器通常过一层 TLS
+代理（或上游是自签证书的内网镜像），系统信任库里没有这张证书，于是整轮采集失败，容器日志里是
+`ssl: certificate-verify-failed`。两条处理路径，按安全性从高到低：
+
+1. **挂企业根证书（推荐）**：把根证书 PEM 挂进容器，让采集链路专门信任它。
+
+   ```yaml
+   # docker-compose.override.yml（`docker compose up -d` 会自动叠加；若你显式用了 -f 链，需再加 -f 这个文件）
+   services:
+     backend:
+       volumes:
+         - ./certs/corp-ca.pem:/certs/corp-ca.pem:ro
+   ```
+
+   ```bash
+   # backend/.env
+   RADAR_CA_BUNDLE=/certs/corp-ca.pem
+   ```
+
+   `verify` 取值优先级：显式跳过 > 指定 CA > 系统信任库。**路径写错不会静默跳过校验**——
+   会打一条 WARNING 并回退系统信任库，让原来的证书错误继续暴露（跳过校验永远是显式选择）。
+2. **临时跳过校验（仅排障）**：`RADAR_INSECURE_TLS=true`。会让采集链路接受任何证书，
+   用完请关回 `false`；该档启动时会留一条 warning，便于事后追溯。
+
+失败原因**不再只留在容器日志里**：轮次回执的 `notice` 会带上具体原因（`部分信息源本轮不可用：…`
+或 `指定仓库 X 本轮采集失败：…`），直接显示在先锋页工具栏的提示条上。
+
 改完先自查，再重启进程：
 
 ```bash
