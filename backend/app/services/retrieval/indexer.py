@@ -246,12 +246,24 @@ def index_status() -> dict[str, Any]:
         vector_notice = handle.store.notice(embedder=runtime.name, dim=runtime.dim)
     elif handle.reason:
         vector_notice = handle.reason
+    # r140：`built` 必须同时看派生索引健康——faiss 文件缺失 / 后端未就绪时，旧的
+    # 「state 有记录就算已构建」会让考工页显示「已构建」而检索页报「未构建」，自相矛盾。
+    # 直接探测题库向量是否可检索（不是从 notice 反推：只有教程索引时 notice 可能为空）。
+    question_ready = (
+        handle.store is not None
+        and handle.ready
+        and handle.store.has_kind("question", embedder=runtime.name, dim=runtime.dim)
+    )
+    if handle.store is not None and handle.ready and not vector_notice and not question_ready:
+        vector_notice = f"题库向量索引尚未构建（{handle.mode}），请在考工页重建题库索引"
+    healthy_vectors = handle.store is not None and handle.ready and not vector_notice
     return {
-        "built": state is not None or counts["total"] > 0,
+        "built": (state is not None or counts["total"] > 0) and healthy_vectors,
         "embedder": runtime.name,
         "dim": runtime.dim,
         "engine": rag_embedding_mode(),
         "vector_mode": handle.mode,
+        "vector_engine": handle.engine,
         "vector_notice": vector_notice,
         "chunk_count": counts["total"],
         "question_chunks": counts.get("question", 0),
@@ -261,6 +273,34 @@ def index_status() -> dict[str, Any]:
         "embedder_kind": runtime.kind,
         "notice": notice,
     }
+
+
+def ensure_question_indexed(runtime: EmbedderRuntime | None = None) -> dict[str, Any] | None:
+    """启动时补齐题库索引：**只在题库向量不可检索时**重建（幂等、不覆盖已有索引）。
+
+    r140：内网部署最常见的半构建状态是「教程 seed 已建 tutorial.faiss，题库索引
+    从未重建」——旧的启动链路只补教程，于是检索页报「faiss 索引尚未构建」。这里用
+    `store.has_kind('question')` 精确判断（不是 notice 字符串匹配），缺则补建。
+
+    为什么不无条件重建：远程 embedding 下 1334 题要几十秒并消耗配额，每次启动都跑既慢
+    又浪费；且题库内容变化有明确的「考工页重建」路径。全量替换语义保证半次写入不会
+    留下半份索引。
+    """
+    current = runtime or resolve_embedder()
+    handle = resolve_vector_store()
+    if handle.store is None or not handle.ready:
+        logger.warning(
+            "rag.question_seed.skipped vector_backend=%s reason=%s",
+            handle.mode,
+            handle.reason or "未就绪",
+        )
+        return None
+    if handle.store.has_kind("question", embedder=current.name, dim=current.dim):
+        return {"skipped": True, "vector_mode": handle.mode, "reason": "题库索引已就绪"}
+    logger.info("rag.question_seed.rebuild vector_mode=%s", handle.mode)
+    summary = rebuild_question_index(current)
+    summary["skipped"] = False
+    return summary
 
 
 def ensure_tutorials_indexed(runtime: EmbedderRuntime | None = None) -> dict[str, Any] | None:

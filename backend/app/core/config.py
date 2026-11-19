@@ -245,6 +245,9 @@ class Settings(BaseSettings):
     # --- r103 分块（按内容类型选切分器） --------------------------------------
     #: 启动时是否用种子补齐教程索引（默认开；测试与「只想要题库索引」的部署可关）。
     rag_seed_tutorials: bool = True
+    #: r140：启动时是否补齐题库向量索引（默认开；离线哈希即时完成，远程 embedding
+    #: 时在缺索引时重建一次。测试可关，避免与用例自己的造数计数抢写）。
+    rag_seed_questions: bool = True
     #: 引擎：`auto`（装有 llama-index 时用它切 prose）/ `native`（全自研）/ `llama`（强制）。
     rag_chunker: str = "auto"
     #: prose 切分的 token 上限与重叠（llama SentenceSplitter 直接生效；native 以字符近似）。

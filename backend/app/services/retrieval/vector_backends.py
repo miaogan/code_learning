@@ -107,6 +107,13 @@ class VectorStore(Protocol):
     def notice(self, *, embedder: str, dim: int) -> str:
         """派生索引与业务库的对账结论：空串 = 一致；非空 = 可直接展示的中文提示。"""
 
+    def has_kind(self, kind: str, *, embedder: str, dim: int) -> bool:
+        """某 kind 的向量是否真的可检索（r140 启动补建用）。
+
+        `notice()` 面向人（中文、含修复建议），这里面向程序（布尔、无副作用），
+        避免用「notice 里有没有 question 字样」这种脆弱判断决定要不要重建。
+        """
+
 
 @dataclass(frozen=True)
 class VectorHandle:
@@ -195,6 +202,10 @@ class _DbStore:
 
     def notice(self, *, embedder: str, dim: int) -> str:
         return ""
+
+    def has_kind(self, kind: str, *, embedder: str, dim: int) -> bool:
+        """向量在业务库里：该 kind 有 chunk 行即视为已建（形态对账由库自身保证）。"""
+        return bool(repository.rag_chunk_counts().get(kind, 0) > 0)
 
 
 # --- faiss：本地单文件派生索引 ------------------------------------------------
@@ -366,11 +377,20 @@ class FaissStore:
         return _finalize(candidates, top_k=top_k)
 
     def notice(self, *, embedder: str, dim: int) -> str:
-        """对账：文件缺失 / sidecar 不配对 / 与业务库行数不一致，都给可操作的中文提示。"""
+        """对账：文件缺失 / sidecar 不配对 / 与业务库行数不一致，都给可操作的中文提示。
+
+        r140：原来的循环只遍历**磁盘上存在的** kind，于是「tutorial.faiss 在、question.faiss
+        不在」会被当成健康——而这个正是内网部署最常见的半构建状态（seed 灌了教程索引、
+        题库索引从未重建）。这里补一层「业务库有 chunk 的 kind 必须有对应文件」的对照，
+        让检索页 notice 与考工页状态说的是同一件事。
+        """
         kinds = self._kinds_on_disk()
         if not kinds:
             return "faiss 索引尚未构建：先重建题库索引，再从学堂页推送教程正文"
         counts = repository.rag_chunk_counts()
+        for kind in VECTOR_KINDS:
+            if counts.get(kind, 0) > 0 and kind not in kinds:
+                return f"{kind} 的 faiss 索引尚未构建，请重建索引"
         for kind in kinds:
             sidecar_path = self._sidecar_path(kind)
             if not sidecar_path.exists():
@@ -381,6 +401,14 @@ class FaissStore:
             if int(meta.get("count") or 0) != counts.get(kind, 0):
                 return f"{kind} 的 faiss 索引与题库行数不一致（可能上次写入中断），请重建索引"
         return ""
+
+    def has_kind(self, kind: str, *, embedder: str, dim: int) -> bool:
+        """该 kind 的 faiss 文件存在、对账通过、且业务库确实有它的 chunk。"""
+        if kind not in self._kinds_on_disk():
+            return False
+        if repository.rag_chunk_counts().get(kind, 0) == 0:
+            return False
+        return self._load(kind, embedder=embedder, dim=dim) is not None
 
 
 # --- milvus：远端向量库（企业内网） -------------------------------------------
@@ -493,6 +521,11 @@ class MilvusStore:
 
     def notice(self, *, embedder: str, dim: int) -> str:
         return ""
+
+    def has_kind(self, kind: str, *, embedder: str, dim: int) -> bool:
+        """远端 collection 的有无要连服务才知道；启动补建不替管理员做远端写决策，
+        保守返回 True（= 不自动建），由 `notice()` / 考工页显式操作负责。"""
+        return True
 
 
 # --- 分派：resolve 永不 raise，配置错折成 ready=False + 中文 reason ------------

@@ -1449,7 +1449,13 @@ RagChunkKind = Literal["question", "tutorial"]
 
 
 class RagStatus(BaseModel):
-    """RAG 索引快照：embedder / 引擎形态 / chunk 计数 / 是否需要重建。"""
+    """RAG 索引快照：embedder / 引擎形态 / chunk 计数 / 是否需要重建。
+
+    r140：`vector_mode` / `vector_engine` / `vector_notice` 是派生索引（faiss 文件 /
+    Milvus collection）的独立健康口径。旧的 `built` 只看 `rag_state` 或 chunk 计数，
+    faiss 文件缺失时仍会报「已构建」，与检索页 notice 自相矛盾——这三个字段让前端能
+    如实展示「元数据齐了、派生索引没跟上」。
+    """
 
     built: bool
     embedder: str = ""
@@ -1462,6 +1468,9 @@ class RagStatus(BaseModel):
     stale: bool = False
     embedder_kind: str = ""
     notice: str = ""
+    vector_mode: str = ""
+    vector_engine: str = ""
+    vector_notice: str = ""
 
 
 class RagRebuildResult(RagStatus):

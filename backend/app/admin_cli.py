@@ -10,6 +10,7 @@
     python -m app.admin_cli reset-password --email a@b.com
     python -m app.admin_cli list
     python -m app.admin_cli doctor      # 只读自查：配置来源 / 数据层 / AI 端点策略（无副作用）
+    python -m app.admin_cli rebuild-index --kind question|tutorial|all   # 重建 RAG 索引
 """
 
 import argparse
@@ -31,6 +32,9 @@ _MUTATING_COMMANDS = (
     "set-mode",
     "disable",
     "reset-password",
+    # r140：重建索引会写 `rag_chunks` / `rag_index_state`，同样是非服务进程的旁路写入，
+    # 必须补副本，否则 SQLite 模式下服务进程察觉不到、/health 仍报 ready。
+    "rebuild-index",
 )
 
 
@@ -202,6 +206,47 @@ def _doctor(_args: argparse.Namespace) -> int:
     return 0
 
 
+def _rebuild_index(args: argparse.Namespace) -> int:
+    """重建 RAG 向量索引（题库 / 教程 / 全部），供无浏览器、无网的内网机器运维。
+
+    与考工页两个按钮走同一套 `indexer` 实现（全量替换、幂等），只是换一个不需要登录
+    与前端的入口；输出带 vector_mode / embedder / chunk 数，一条命令即可诊断。
+    """
+    from app.services.retrieval import indexer, tutorial_seed
+
+    kind = args.kind
+    try:
+        if kind in ("question", "all"):
+            summary = indexer.rebuild_question_index()
+            print(
+                f"题库索引已重建：{summary['question_chunks']} 条 chunk"
+                f"（engine={summary['engine']} / vector_mode={summary['vector_mode']}，"
+                f"embedder={summary['embedder']} 维度 {summary['dim']}）"
+            )
+        if kind in ("tutorial", "all"):
+            items = tutorial_seed.load_items()
+            if not items:
+                print("没有教程种子：跳过教程索引（题库索引不受影响）")
+            else:
+                summary = indexer.ingest_tutorial_chunks(items)
+                print(
+                    f"教程索引已重建：{summary['tutorial_chunks']} 条 chunk"
+                    f"（embedder={summary['embedder']}）"
+                )
+        status = indexer.index_status()
+        print(
+            f"当前状态：built={status['built']} vector_mode={status['vector_mode']} "
+            f"vector_engine={status['vector_engine']} 共 {status['chunk_count']} 条 chunk"
+        )
+        if status["vector_notice"]:
+            print(f"提示：{status['vector_notice']}")
+        if status["notice"]:
+            print(f"提示：{status['notice']}")
+    except Exception as exc:  # noqa: BLE001 - CLI 要把真实原因打给人看，不能吞成静默成功
+        return _fail(f"索引重建失败（{type(exc).__name__}）：{exc}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="产品管理员命令（r23）")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -237,6 +282,15 @@ def main(argv: list[str] | None = None) -> int:
     # 只读自查：不建库、不写库，因此**不走** `_prepare_database()`（那会 bootstrap 并可能建库）。
     doctor = sub.add_parser("doctor", help="只读自查：配置来源 / 数据层 / AI 端点策略")
     doctor.set_defaults(func=_doctor)
+
+    rebuild = sub.add_parser("rebuild-index", help="重建 RAG 向量索引（全量替换、幂等）")
+    rebuild.add_argument(
+        "--kind",
+        choices=("question", "tutorial", "all"),
+        default="all",
+        help="重建范围：题库 / 教程 / 全部（默认 all）",
+    )
+    rebuild.set_defaults(func=_rebuild_index)
 
     args = parser.parse_args(argv)
     if args.command != "doctor":

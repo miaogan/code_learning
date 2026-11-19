@@ -529,8 +529,25 @@ def _seed_business_data(*, rag_strict: bool) -> None:
     question_bank.ensure_seeded()
     # r98：题库检索由 `pg_trgm` GIN 索引支撑，重建入口保留为空操作（索引随写入自动维护）。
     repository.rebuild_question_search()
+    # r140：题库向量索引与教程索引分开补。内网 faiss 档常见「教程已建、题库未建」，
+    # 在这里按 `has_kind('question')` 幂等补齐，让检索开箱即用。两种档位都不阻断启动：
+    # 远程 embedding 缺 Key / faiss 未装都只留一条日志，服务照常起、检索页给中文提示。
+    settings = get_settings()
+    if settings.rag_seed_questions:
+        try:
+            question_summary = rag_indexer.ensure_question_indexed()
+        except Exception as exc:  # noqa: BLE001 - 可选增强，失败不阻断启动
+            logger.warning("rag.question_seed.skipped error=%s", _exc_brief(exc))
+        else:
+            if question_summary is not None:
+                logger.info(
+                    "rag.question_seed.done skipped=%s vector_mode=%s question_chunks=%s",
+                    question_summary.get("skipped"),
+                    question_summary.get("vector_mode"),
+                    question_summary.get("question_chunks"),
+                )
     # DB 初始化完成前先不让业务报 ready；教程索引在同一线程补。
-    if not get_settings().rag_seed_tutorials:
+    if not settings.rag_seed_tutorials:
         return
     if rag_strict:
         summary = rag_indexer.ensure_tutorials_indexed()
