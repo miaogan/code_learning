@@ -4,7 +4,7 @@ import { api } from '../api/client'
 import type { QuestionSearchItem, RagChunkKind, RagSearchMode } from '../api/types'
 import { LevelChip } from '../components/learn/LevelChip'
 import { Chip } from '../components/ui/Chip'
-import { MultiChipRow, type ChipOption } from '../components/ui/ChipRow'
+import { ChipRow, MultiChipRow, type ChipOption } from '../components/ui/ChipRow'
 import { InlineError } from '../components/ui/InlineError'
 import { Pagination } from '../components/ui/Pagination'
 import {
@@ -243,6 +243,31 @@ export default function SearchPage() {
             </p>
           </div>
         </div>
+        <div className="sc-lab-filter-row">
+          <span className="sc-lab-filter-label">模式</span>
+          <div className="sc-lab-filter-body">
+            <ChipRow
+              groupLabel="向量检索模式"
+              options={RAG_MODES}
+              value={ragMode}
+              onSelect={setRagMode}
+            />
+          </div>
+        </div>
+        <div className="sc-lab-filter-row">
+          <span className="sc-lab-filter-label">语料</span>
+          <div className="sc-lab-filter-body">
+            <ChipRow
+              groupLabel="向量检索语料范围"
+              options={RAG_KINDS}
+              value={ragKind}
+              onSelect={setRagKind}
+            />
+            <p className="sc-lab-filter-hint">
+              模式与语料只作用于第 03 组向量混合检索；教程与题库两组不受影响。
+            </p>
+          </div>
+        </div>
       </div>
 
       {!searchable ? (
@@ -350,32 +375,11 @@ export default function SearchPage() {
               <span className="sc-search-groupcount">
                 {ragCurrent ? `${ragCurrent.items.length} 条` : '—'}
               </span>
-            </div>
-            <div className="sc-lab-filter-row">
-              <div className="sc-lab-filter-body">
-                {RAG_MODES.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    className={ragMode === option.value ? 'is-active' : ''}
-                    onClick={() => setRagMode(option.value)}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-                <span className="sc-lab-filter-sep" aria-hidden="true" />
-                {RAG_KINDS.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    className={ragKind === option.value ? 'is-active' : ''}
-                    onClick={() => setRagKind(option.value)}
-                    title={option.value === 'tutorial' ? '只搜教程语料（后端在向量检索内部过滤）' : undefined}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
+              <span className="sc-search-barmeta">
+                {`${RAG_MODES.find((option) => option.value === ragMode)?.label} · ${
+                  RAG_KINDS.find((option) => option.value === ragKind)?.label
+                }`}
+              </span>
             </div>
             {ragFailed ? (
               <InlineError
