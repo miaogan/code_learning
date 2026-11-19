@@ -762,3 +762,35 @@ def test_run_api_without_body_keeps_default_round(client: TestClient, radar_env:
     response = client.post("/api/radar/run")
     assert response.status_code == 200, response.text
     assert response.json()["techs_seen"] >= 10
+
+
+def test_trends_api_returns_snapshot_series(client: TestClient, radar_env: None) -> None:
+    """r146：走势线取快照序列 —— 时间正序、没有快照的 slug 不出现（不画假平线）。"""
+    asyncio.run(radar.run_round(trigger="manual", user=None))
+    rows = store.list_techs(3)
+    slugs = [row["tech_slug"] for row in rows]
+    assert len(slugs) == 3
+
+    body = client.get("/api/radar/trends", params={"slugs": ",".join(slugs)}).json()
+    assert set(body["trends"]) == set(slugs)
+    assert all(len(points) == 1 for points in body["trends"].values())
+
+    # 第二份快照（模拟下一轮采集）：两个点、时间正序、末点是新值。
+    store.insert_snapshot(
+        {"slug": slugs[0], "stars": 13000, "forks": 0, "repo_created_at": "",
+         "pushed_at": "", "suspect": False}
+    )
+    points = client.get("/api/radar/trends", params={"slugs": slugs[0]}).json()["trends"][slugs[0]]
+    assert len(points) == 2
+    assert points[0]["taken_at"] <= points[1]["taken_at"]
+    assert points[1]["stars"] == 13000
+
+    # 没快照的 slug 直接缺席，而不是给一条假数据。
+    mixed = client.get(
+        "/api/radar/trends", params={"slugs": f"{slugs[0]},github:ghost/missing"}
+    ).json()
+    assert "github:ghost/missing" not in mixed["trends"]
+
+    empty = client.get("/api/radar/trends")
+    assert empty.status_code == 400
+    assert "tech_slug" in empty.json()["error"]["message"]

@@ -1233,6 +1233,19 @@ class RadarTechList(BaseModel):
     notice: str = ""
 
 
+class RadarTrendPoint(BaseModel):
+    """一个快照点：时间 + star 数（时间正序）。"""
+
+    taken_at: str
+    stars: int
+
+
+class RadarTrendList(BaseModel):
+    """star 快照序列（r146）：`tech_slug → 时间正序的点列`；没快照的 slug 不出现。"""
+
+    trends: dict[str, list[RadarTrendPoint]] = Field(default_factory=dict)
+
+
 class RadarTranslateRequest(BaseModel):
     """按需补翻英文摘要：一次最多翻多少条（默认 20，上限 50）。"""
 

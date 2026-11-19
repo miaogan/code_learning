@@ -13139,3 +13139,9 @@ a.sc-radar-name--link:hover .sc-radar-ext {
     grid-template-columns: 5.5em minmax(0, 1fr);
   }
 }
+
+/* r146：走势线塞在 meta 行里（star 数字旁），宽度固定 64px，窄屏保留。 */
+.sc-radar-spark {
+  flex: none;
+  overflow: visible;
+}

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../api/client'
-import type { RadarRunRequest, RadarTechItem } from '../api/types'
+import type { RadarRunRequest, RadarTechItem, RadarTrendPoint } from '../api/types'
 import { MultiChipRow, type ChipOption } from '../components/ui/ChipRow'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
@@ -21,6 +21,7 @@ import {
   matchesTechQuery,
   needsTranslation,
   safeRepoUrl,
+  sparklinePoints,
   starDeltaText,
   summaryText,
   techTagList,
@@ -93,6 +94,7 @@ function TechRow({
   busy,
   expanded,
   hit,
+  trend,
   onToggle,
   onGenerate,
 }: {
@@ -103,6 +105,8 @@ function TechRow({
   expanded: boolean
   /** r87：从国子监深链定位到的条目，短暂高亮便于一眼找到。 */
   hit: boolean
+  /** r146：star 快照序列（时间正序）；少于 2 个点时不渲染走势线。 */
+  trend?: RadarTrendPoint[]
   onToggle: () => void
   onGenerate: (item: RadarTechItem) => void
 }) {
@@ -115,6 +119,9 @@ function TechRow({
   const tags = techTagList(item)
   // r146：折叠态也给「凭什么」——四档结论原来只有结果，用户只能展开才知道依据。
   const why = whyText(item)
+  const starSeries = (trend ?? []).map((point) => point.stars)
+  const sparkPoints = sparklinePoints(starSeries)
+  const [lastX = '0', lastY = '0'] = sparkPoints ? sparkPoints.split(' ').at(-1)!.split(',') : []
   return (
     <li
       className={hit ? 'sc-radar-slot is-hit' : 'sc-radar-slot'}
@@ -136,6 +143,26 @@ function TechRow({
           <span className="sc-radar-slotstars">
             {`star ${formatCount(item.stars)}（7 日 ${starDeltaText(item.star_delta_7d)}）`}
           </span>
+          {sparkPoints !== '' && (
+            <svg
+              className="sc-radar-spark"
+              width="64"
+              height="18"
+              viewBox="0 0 64 18"
+              role="img"
+              aria-label={`${starSeries.length} 次采集的 star 走势`}
+            >
+              <polyline
+                fill="none"
+                stroke="var(--accent)"
+                strokeWidth="1.5"
+                strokeLinejoin="round"
+                strokeLinecap="round"
+                points={sparkPoints}
+              />
+              <circle cx={lastX} cy={lastY} r="1.8" fill="var(--accent)" />
+            </svg>
+          )}
           <div className="sc-radar-slotact">
             <Button variant="secondary" size="sm" loading={busy} onClick={() => onGenerate(item)}>
               {item.job_id !== '' ? '查看样例' : '生成样例'}
@@ -301,6 +328,18 @@ export default function PioneerPage() {
 
   // 直接读 `data`（重载期间保留上一次成功值）：按 status 派生会在采集后刷新时清空清单、闪一帧 loader。
   const techs = listAsync.data
+  // r146：走势线整页一把拉（一页 ≤100 条），失败静默——它是附加信息，不能挡清单。
+  const [trends, setTrends] = useState<Record<string, RadarTrendPoint[]>>({})
+  useEffect(() => {
+    const slugs = (techs?.items ?? []).map((item) => item.tech_slug)
+    if (slugs.length === 0) return undefined
+    const controller = new AbortController()
+    api
+      .radarTrends(slugs, controller.signal)
+      .then((data) => setTrends(data.trends))
+      .catch(() => {})
+    return () => controller.abort()
+  }, [techs])
   const lastRun = runAsync.data
   const filtering = pickedVerdicts.length > 0 || pickedDirections.length > 0
   // 当前页还有「英文且没译文」的条目时才显示补翻按钮：没待翻内容就不占位置。
@@ -769,6 +808,7 @@ export default function PioneerPage() {
                         busy={generating === item.tech_slug}
                         expanded={expandedSlugs.includes(item.tech_slug)}
                         hit={hitSlug === item.tech_slug}
+                        trend={trends[item.tech_slug]}
                         onToggle={() => toggleExpanded(item.tech_slug)}
                         onGenerate={(row) => void generate(row)}
                       />

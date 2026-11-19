@@ -2199,6 +2199,33 @@ def radar_tech_verdict_counts(
     return {str(row["verdict"] or "skip"): int(row["n"]) for row in rows}
 
 
+def radar_tech_trends(
+    slugs: Sequence[str], *, max_points: int = 30
+) -> dict[str, list[dict[str, Any]]]:
+    """star 快照序列（时间正序，每条最多 `max_points` 个点）：先锋卡片走势线的数据源。
+
+    每个仓库一条小查询而不是一个大 IN 查询——快照表小、`tech_slug` 命中即可，
+    逐条取尾部再倒序比窗口函数在 PG / SQLite 两侧都稳。没快照的 slug 不出现在返回里
+    （前端据此不渲染走势线，而不是画一条假的平线）。
+    """
+    trends: dict[str, list[dict[str, Any]]] = {}
+    if not slugs:
+        return trends
+    with connection() as conn:
+        for slug in slugs:
+            rows = conn.execute(
+                "SELECT taken_at, stars FROM radar_snapshots WHERE tech_slug = ?"
+                " ORDER BY id DESC LIMIT ?",
+                [slug, max_points],
+            ).fetchall()
+            if rows:
+                trends[slug] = [
+                    {"taken_at": str(row["taken_at"]), "stars": int(row["stars"])}
+                    for row in reversed(rows)
+                ]
+    return trends
+
+
 def radar_create_run(trigger: str) -> int:
     """开一轮采集，返回自增 `run_id`（采集结束后由 `radar_finish_run` 补终态）。"""
     # ID 游标与业务行同事务：崩溃不能留下已消耗但未记录的游标。

@@ -304,6 +304,37 @@ export function whyText(item: RadarTechItem): string {
   return item.reasons[0]?.trim() ?? ''
 }
 
+/* ---------- r146 走势线（借鉴 aihot 热点榜的 24h 走势，数据来自 radar_snapshots） ---------- */
+
+/**
+ * star 序列 → SVG polyline 的 `points` 串（宽 `width` 高 `height`，四周留 `pad`）。
+ *
+ * - 少于 2 个点返回空串：一个点画不出趋势，宁可不给也不画假线
+ * - 全程同值时画在中线：flat 也是趋势（「没涨没跌」），且 min=max 时除零要防
+ * - 坐标保留 1 位小数：polyline 属性串太长会拖慢渲染
+ */
+export function sparklinePoints(
+  values: readonly number[],
+  width = 64,
+  height = 18,
+  pad = 2,
+): string {
+  if (values.length < 2) return ''
+  const min = Math.min(...values)
+  const max = Math.max(...values)
+  const span = max - min
+  const innerWidth = width - pad * 2
+  const innerHeight = height - pad * 2
+  const step = innerWidth / (values.length - 1)
+  return values
+    .map((value, index) => {
+      const x = pad + index * step
+      const y = span === 0 ? height / 2 : pad + innerHeight - ((value - min) / span) * innerHeight
+      return `${Math.round(x * 10) / 10},${Math.round(y * 10) / 10}`
+    })
+    .join(' ')
+}
+
 /* ---------- r87 先锋 ↔ 国子监联动的纯函数层 ---------- */
 /** 任务的方向读数：章节草稿优先，其次第一条题；都没有返回空串（不猜方向）。 */
 export function jobDirection(job: RadarJobItem): string {

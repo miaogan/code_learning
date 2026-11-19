@@ -23,6 +23,8 @@ from app.schemas import (
     RadarTechList,
     RadarTranslateRequest,
     RadarTranslateResult,
+    RadarTrendList,
+    RadarTrendPoint,
 )
 from app.services import radar
 from app.services.ai import user_ai
@@ -72,6 +74,23 @@ async def list_techs(
         # 闭集补零：前端四档 chip 的计数不必再判 `undefined`。
         counts={verdict: int(raw_counts.get(verdict, 0)) for verdict in rules.VERDICTS},
         notice=_notice(),
+    )
+
+
+@router.get("/trends", response_model=RadarTrendList, summary="star 快照序列（先锋卡片走势线）")
+async def tech_trends(
+    slugs: Annotated[list[str], Query(description="tech_slug，逗号分隔或重复传；一次最多 100 项")] = _NO_FILTER,
+) -> RadarTrendList:
+    expanded: list[str] = []
+    for chunk in slugs:
+        expanded.extend(part.strip() for part in chunk.split(",") if part.strip())
+    if not expanded:
+        raise AppError(VALIDATION_ERROR, "请至少传一个 tech_slug", status=400)
+    if len(expanded) > 100:
+        raise AppError(VALIDATION_ERROR, "一次最多查 100 项技术的走势", status=400)
+    raw = store.tech_trends(expanded)
+    return RadarTrendList(
+        trends={slug: [RadarTrendPoint(**point) for point in points] for slug, points in raw.items()}
     )
 
 

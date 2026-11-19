@@ -24,6 +24,7 @@ import {
   statusLabel,
   summaryText,
   techMetaText,
+  sparklinePoints,
   techTagList,
   listCountText,
   verdictChipLabel,
@@ -385,5 +386,29 @@ describe('r146 分面计数与折叠态依据', () => {
     )
     expect(whyText(tech({ reasons: [] }))).toBe('')
     expect(whyText(tech({ reasons: ['   '] }))).toBe('')
+  })
+})
+
+describe('r146 走势线坐标串', () => {
+  it('sparklinePoints 少于 2 个点返回空串（一个点画不出趋势，不给假线）', () => {
+    expect(sparklinePoints([])).toBe('')
+    expect(sparklinePoints([12000])).toBe('')
+  })
+
+  it('sparklinePoints 首尾贴边、纵值随数据反演，全程同值画中线', () => {
+    const points = sparklinePoints([100, 200, 150], 64, 18, 2)
+    const coords = points.split(' ').map((pair) => pair.split(',').map(Number))
+    expect(coords).toHaveLength(3)
+    // 首点 x = pad，末点 x = width - pad（等距铺满）。
+    expect(coords[0]?.[0]).toBe(2)
+    expect(coords[2]?.[0]).toBe(62)
+    // 值越大 y 越小（SVG 纵轴向下）：max 在顶，min 在底。
+    const ys = coords.map((pair) => pair[1] as number)
+    expect(ys[0]).toBeGreaterThan(ys[1] as number)
+    expect(Math.min(...ys)).toBe(2)
+    expect(Math.max(...ys)).toBe(16)
+    // 全程同值：不除零，画在中线。
+    const flat = sparklinePoints([5, 5, 5], 64, 18, 2).split(' ')
+    expect(flat.every((pair) => pair.split(',')[1] === '9')).toBe(true)
   })
 })

@@ -1109,6 +1109,17 @@ export interface RadarTechList {
   notice: string
 }
 
+export interface RadarTrendPoint {
+  /** 快照时间（服务端本地 ISO 串）。 */
+  taken_at: string
+  stars: number
+}
+
+export interface RadarTrendList {
+  /** `tech_slug → 时间正序的点列`；没快照的 slug 不出现（前端不画假平线）。 */
+  trends: Record<string, RadarTrendPoint[]>
+}
+
 export interface RadarTranslateRequest {
   /** 本次最多翻几条（后端上限 50，缺省走后端配置）。 */
   limit?: number

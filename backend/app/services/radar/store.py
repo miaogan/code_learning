@@ -93,6 +93,13 @@ def verdict_counts(*, directions: str | Sequence[str] | None = None) -> dict[str
     return repository.radar_tech_verdict_counts(directions=directions)
 
 
+def tech_trends(
+    slugs: Sequence[str], *, max_points: int = 30
+) -> dict[str, list[dict[str, Any]]]:
+    """star 快照序列（时间正序）：先锋卡片走势线用；没快照的 slug 不在返回里。"""
+    return repository.radar_tech_trends(slugs, max_points=max_points)
+
+
 def create_run(trigger: str) -> int:
     return repository.radar_create_run(trigger)
 

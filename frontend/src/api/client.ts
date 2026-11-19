@@ -74,6 +74,7 @@ import type {
   RadarRunSummary,
   RadarTechItem,
   RadarTechList,
+  RadarTrendList,
   RadarTranslateRequest,
   RadarTranslateResult,
   Report,
@@ -331,6 +332,12 @@ export const api = {
   /** 最近一轮采集摘要（含每个源的可用性）。 */
   radarLatestRun: (signal?: AbortSignal): Promise<RadarRunSummary> =>
     request<RadarRunSummary>('/api/radar/runs/latest', { signal }),
+
+  /** r146：star 快照序列（时间正序）——先锋卡片尾部的走势线数据；没快照的 slug 不在返回里。 */
+  radarTrends: (slugs: string[], signal?: AbortSignal): Promise<RadarTrendList> =>
+    request<RadarTrendList>(`/api/radar/trends?slugs=${encodeURIComponent(slugs.join(','))}`, {
+      signal,
+    }),
 
   /** 把清单里剩下的英文摘要翻成中文（可重复调用，已翻过的不会重复请求）。 */
   radarTranslate: (payload: RadarTranslateRequest = {}): Promise<RadarTranslateResult> =>
