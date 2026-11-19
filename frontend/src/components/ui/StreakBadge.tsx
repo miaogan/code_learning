@@ -1,21 +1,28 @@
+import { useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
 import { api } from '../../api/client'
 import { RingProgress } from './RingProgress'
 import { useAsync } from '../../lib/useAsync'
-import { computeStreak, type StreakView } from '../../lib/streak'
+import { onActivityChanged } from '../../lib/activityEvents'
+import { computeStreakFromDays, type StreakView } from '../../lib/streak'
 
 /**
- * 顶栏 streak 徽章（r84 §3）：「连续 N 天 · 本周 x/7」+ 一枚迷你周进度环。
+ * 顶栏 streak 徽章（r84 §3 / r138 口径修正）：「连续 N 天 · 本周 x/7」+ 迷你周进度环。
  *
- * - 数据源是历史列表（本机时区按天去重），**纯前端统计**，不动后端；
- * - 拉取失败/还没登出问题一律**静默隐藏**：这是锦上添花的信息，不值得为它报错；
- * - 完全没记录时也不渲染（新用户顶栏不该多一个 0/7 的挫败感）。
+ * - 数据源是 `/api/activity/days`（测评完成 + 演武作答 + 学堂阅读，服务端按本机时区
+ *   折算去重），纯展示，不动业务数据；
+ * - 写侧完成后发 `activity-changed` 事件，切页与窗口重新聚焦也重取——不再整页刷新才更新；
+ * - 拉取失败/还没登出问题一律**静默隐藏**：这是锦上添花的信息；完全没记录也不渲染，
+ *   新用户顶栏不该多一个 0/7 的挫败感。
  */
 export function StreakBadge() {
-  // history() 不收 AbortSignal（分页接口固定形状）：取消时 useAsync 的 active 标记会丢弃结果。
-  const state = useAsync(() => api.history({ limit: 200, page: 1 }), [])
+  const { pathname } = useLocation()
+  const state = useAsync(() => api.activityDays(), [pathname])
+
+  useEffect(() => onActivityChanged(state.reload), [state.reload])
 
   if (state.status !== 'success' || state.data === null) return null
-  const view: StreakView = computeStreak(state.data.items)
+  const view: StreakView = computeStreakFromDays(state.data.days)
   if (view.weekDone === 0 && view.streakDays === 0) return null
 
   return (

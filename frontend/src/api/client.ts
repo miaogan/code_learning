@@ -3,6 +3,7 @@ import type {
   AiTestRequest,
   AiTestResult,
   AnswerRequest,
+  ActivityDays,
   ApiErrorBody,
   CoachAdvice,
   CoachAdviceRequest,
@@ -604,6 +605,19 @@ export const api = {
     requestText(`/api/reports/${encodeURIComponent(reportId)}/markdown`),
 
   /** 历史分页投影：`limit` 是每页条数、`page` 从 1 起、`kind` 是服务端类型多选。 */
+  /** r138 活跃日：测评完成 + 演武作答 + 学堂阅读，服务端按当前时区折算去重。 */
+  activityDays: (
+    params: { tzOffset?: number; limit?: number } = {},
+    signal?: AbortSignal,
+  ): Promise<ActivityDays> =>
+    request<ActivityDays>(
+      `/api/activity/days?${queryString({
+        tz_offset: params.tzOffset ?? new Date().getTimezoneOffset(),
+        limit: params.limit ?? 400,
+      })}`,
+      { signal },
+    ),
+
   history: (
     params: { limit?: number; page?: number; kind?: RunKind[] } = {},
   ): Promise<HistoryList> =>

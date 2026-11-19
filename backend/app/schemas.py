@@ -827,6 +827,18 @@ class HistoryList(BaseModel):
     exam_total: int = 0
 
 
+class ActivityDays(BaseModel):
+    """r138 活跃日：按用户当前时区折算并去重的 `YYYY-MM-DD`，新→旧。
+
+    `total` 是去重后总天数（`days` 可能被 `limit` 截断）；`tz_offset` 回显浏览器给的
+    分钟偏移（UTC+8 = -480），便于前端复核口径。
+    """
+
+    days: list[str] = Field(default_factory=list)
+    total: int = 0
+    tz_offset: int = 0
+
+
 # --- 成长时间线（r3 AC-1 / AC-2 / AC-5）---------------------------------------
 
 

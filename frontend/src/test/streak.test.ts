@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computeStreak, toDateKey } from '../lib/streak'
+import { computeStreak, computeStreakFromDays, toDateKey } from '../lib/streak'
 
 /** 固定「今天」= 2026-11-12（周四），避免用例跟着真实日期漂。 */
 const NOW = new Date(2026, 10, 12, 9, 0, 0)
@@ -16,6 +16,30 @@ describe('toDateKey', () => {
   it('解析失败给 null（调用方忽略，不抛错）', () => {
     expect(toDateKey('not-a-date')).toBeNull()
     expect(toDateKey('')).toBeNull()
+  })
+})
+
+describe('computeStreakFromDays', () => {
+  it('直接吃服务端按本地时区聚合好的日键', () => {
+    const days = ['2026-11-12', '2026-11-11', '2026-11-10', '2026-11-08']
+    expect(computeStreakFromDays(days, NOW)).toMatchObject({
+      streakDays: 3,
+      activeToday: true,
+      weekDone: 3,
+    })
+  })
+
+  it('昨天为锚点仍保留连续天数', () => {
+    expect(computeStreakFromDays(['2026-11-11', '2026-11-10'], NOW)).toMatchObject({
+      streakDays: 2,
+      activeToday: false,
+    })
+  })
+
+  it('脏日键被忽略，不影响其余统计', () => {
+    expect(
+      computeStreakFromDays(['2026-11-12', 'garbage', '', '2026-11-1'], NOW),
+    ).toMatchObject({ streakDays: 1, activeToday: true })
   })
 })
 

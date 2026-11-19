@@ -4,6 +4,14 @@ export type CourseLevel = '入门' | '进阶'
 export type Severity = 'high' | 'medium' | 'low'
 export type RunKind = 'interview' | 'exam'
 
+/** r138 活跃日：按用户当前时区折算、去重后的 YYYY-MM-DD（新→旧）。 */
+export interface ActivityDays {
+  days: string[]
+  total: number
+  /** 浏览器 getTimezoneOffset()：UTC+8 = -480。 */
+  tz_offset: number
+}
+
 export interface Health {
   status: string
   version: string

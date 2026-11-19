@@ -14,6 +14,7 @@ import { PhaseLoader } from '../components/ui/PhaseLoader'
 import { ResumeGate } from '../components/ui/ResumeGate'
 import { RingProgress } from '../components/ui/RingProgress'
 import { Select } from '../components/ui/Select'
+import { notifyActivityChanged } from '../lib/activityEvents'
 import { backfillNotice, filteredNotice, proficiencyRuleHint, subDirectionNotice } from '../lib/examNotice'
 import { formatElapsed, formatWhen } from '../lib/format'
 import { clearExamDraft, readExamDraft, writeExamDraft } from '../lib/examDraft'
@@ -296,6 +297,7 @@ export default function ExamPage() {
       setResult(graded)
       clearExamDraft(userId)
       setFlow({ hasExam: true })
+      notifyActivityChanged()
       setStage('submitted')
     } catch (error) {
       if (!mountedRef.current) return

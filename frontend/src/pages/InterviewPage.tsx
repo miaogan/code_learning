@@ -22,6 +22,7 @@ import { ConfirmModal } from '../components/ui/ConfirmModal'
 import { InlineError } from '../components/ui/InlineError'
 import { PhaseLoader } from '../components/ui/PhaseLoader'
 import { ResumeGate } from '../components/ui/ResumeGate'
+import { notifyActivityChanged } from '../lib/activityEvents'
 import { formatWhen } from '../lib/format'
 import {
   clearInterviewDraft,
@@ -446,6 +447,7 @@ export default function InterviewPage() {
       setStage('ended')
       clearInterviewSession(userId)
       setFlow({ hasInterview: true })
+      notifyActivityChanged()
     } catch (error) {
       setFinishError(messageOf(error, '结束失败，请重试'))
     } finally {

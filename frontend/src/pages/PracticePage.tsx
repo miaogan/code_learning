@@ -37,6 +37,7 @@ import {
   wrongTabLabel,
   type PracticeFiltersState,
 } from '../lib/practice'
+import { notifyActivityChanged } from '../lib/activityEvents'
 import { filteredNotice } from '../lib/examNotice'
 
 type View = 'setup' | 'running' | 'done'
@@ -294,6 +295,7 @@ export default function PracticePage() {
       })
       setFeedback(result)
       setAnswers((previous) => ({ ...previous, [current.id]: result.correct }))
+      notifyActivityChanged()
     } catch {
       // 保留已选答案：失败后重试复用同一份选择，不重开题单（DESIGN §3-6）。
       setAnswerError(ANSWER_ERROR_MESSAGE)

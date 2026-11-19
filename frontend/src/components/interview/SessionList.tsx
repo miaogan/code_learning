@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ApiError, api } from '../../api/client'
 import type { InterviewSessionSummary } from '../../api/types'
+import { notifyActivityChanged } from '../../lib/activityEvents'
 import { formatScore, formatWhen } from '../../lib/format'
 import { useAsync } from '../../lib/useAsync'
 import { Button } from '../ui/Button'
@@ -36,6 +37,7 @@ export function SessionList() {
       await api.deleteHistoryItem(runId)
       setError('')
       sessions.reload()
+      notifyActivityChanged()
     } catch (reason: unknown) {
       setError(reason instanceof ApiError ? reason.message : '删除失败，请稍后重试')
     }

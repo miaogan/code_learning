@@ -13,6 +13,7 @@ import { EmptyState } from '../components/ui/EmptyState'
 import { InlineError } from '../components/ui/InlineError'
 import { Pagination } from '../components/ui/Pagination'
 import { PhaseLoader } from '../components/ui/PhaseLoader'
+import { notifyActivityChanged } from '../lib/activityEvents'
 import { useAsync } from '../lib/useAsync'
 
 /** 每页条数：后端 `limit`（1..50），一页 10 次足够对比最近几轮，再往前翻页看更早的。 */
@@ -71,6 +72,7 @@ export default function HistoryPage() {
       setDeleteError('')
       historyAsync.reload()
       heatAsync.reload()
+      notifyActivityChanged()
     } catch (reason: unknown) {
       setDeleteError(reason instanceof ApiError ? reason.message : '删除失败，请稍后重试')
     }

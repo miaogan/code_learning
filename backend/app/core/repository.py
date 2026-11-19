@@ -606,6 +606,36 @@ def count_history_rows(kinds: str | Sequence[str] | None = None) -> int:
     return int(row["n"])
 
 
+def activity_timestamps() -> list[tuple[str, str]]:
+    """活跃日原始时间戳（不做时区换算）：测评完成 / 演武作答 / 学堂章节活跃。
+
+    r138：`StreakBadge` 过去只读 `/api/history`（已完成面试/笔试），把「连续学习」
+    算成了「连续测评」。这里按账号把三类原始时间一起取出，由 `services.activity`
+    统一按调用方时区折算成日键。返回 `(原始值, 来源)`——学堂是毫秒 epoch 整数，
+    其余是 ISO8601 串，故不在这里混成同一种类型。
+    """
+    uid = _uid()
+    out: list[tuple[str, str]] = []
+    with connection() as conn:
+        for row in conn.execute(
+            "SELECT created_at FROM runs "
+            "WHERE user_id = ? AND status = ? AND kind IN (?, ?)",
+            (uid, RUN_COMPLETED, "interview", "exam"),
+        ):
+            out.append((str(row["created_at"]), "assessment"))
+        for row in conn.execute(
+            "SELECT answered_at FROM question_attempts WHERE user_id = ? AND source = ?",
+            (uid, "practice"),
+        ):
+            out.append((str(row["answered_at"]), "practice"))
+        for row in conn.execute(
+            "SELECT updated_at FROM learn_chapters WHERE user_id = ? AND updated_at > 0",
+            (uid,),
+        ):
+            out.append((str(row["updated_at"]), "tutorial"))
+    return out
+
+
 def list_runs_for_document(document_id: str, limit: int = 100) -> list[dict[str, Any]]:
     """某份简历关联的**已完成** run（经 `profiles.document_id` 关联，倒序）。
 

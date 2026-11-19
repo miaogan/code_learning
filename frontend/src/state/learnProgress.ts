@@ -9,6 +9,7 @@
  */
 import { useSyncExternalStore } from 'react'
 import { api } from '../api/client'
+import { notifyActivityChanged } from '../lib/activityEvents'
 import {
   EMPTY_LEARN_PROGRESS,
   learnProgressFromWire,
@@ -110,6 +111,7 @@ async function pushProgress(): Promise<void> {
   if (syncUserId === null) return
   try {
     await api.saveLearnProgress(learnProgressToWire(current))
+    notifyActivityChanged()
   } catch {
     /* 离线 / 服务端 5xx：本地照常用，下一次改动会再推一次（不弹框、不重试风暴） */
   }

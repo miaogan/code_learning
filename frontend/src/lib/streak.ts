@@ -1,8 +1,9 @@
 /**
- * 学习连续性统计（r84 §3）： streak（连续天数）+ 本周完成数。
+ * 学习连续性统计（r84 §3 / r138 口径修正）：streak（连续天数）+ 本周完成数。
  *
  * 口径约定：
- * - 「一天有记录」= 当天（**本机时区**）至少一次测评/练习记录，只看日期不看次数；
+ * - 「一天有记录」= 当天（**本机时区**）至少一次活跃：测评完成 / 演武作答 / 学堂阅读；
+ *   r138 起由服务端 `/api/activity/days` 聚合三类并折算日键，不再只读战绩列表；
  * - streak 的锚点：今天有记录从今天往回数；今天没有但昨天有，**保留** streak
  *   （早上打开网页不该显示 0，否则用户每天早晨都会被劝退）；今天昨天都没有 → 0；
  * - 周口径周一为一周之始（国内习惯），weekDone 是「本周有记录的天数」，目标 7 只是
@@ -23,6 +24,7 @@ export interface StreakView {
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000
+const DAY_KEY_RE = /^\d{4}-\d{2}-\d{2}$/
 
 /** 本机时区的 YYYY-MM-DD 键。 */
 function dayKey(date: Date): string {
@@ -41,12 +43,12 @@ export function toDateKey(createdAt: string): string | null {
   return dayKey(date)
 }
 
-export function computeStreak(rows: readonly { created_at: string }[], now: Date = new Date()): StreakView {
-  const days = new Set<string>()
-  for (const row of rows) {
-    const key = toDateKey(row.created_at)
-    if (key !== null) days.add(key)
-  }
+/** r138 主入口：直接吃服务端聚合好的本地日键，脏串忽略。 */
+export function computeStreakFromDays(
+  dayKeys: readonly string[],
+  now: Date = new Date(),
+): StreakView {
+  const days = new Set(dayKeys.filter((key) => DAY_KEY_RE.test(key)))
 
   const today = startOfDay(now)
   const activeToday = days.has(dayKey(today))
@@ -71,4 +73,15 @@ export function computeStreak(rows: readonly { created_at: string }[], now: Date
   }
 
   return { streakDays, activeToday, weekDone, weekTarget: 7 }
+}
+
+/** 兼容旧调用与测试：从带时间戳的行计算，仍按本机时区归一后走同一套统计。 */
+export function computeStreak(
+  rows: readonly { created_at: string }[],
+  now: Date = new Date(),
+): StreakView {
+  const dayKeys = rows
+    .map((row) => toDateKey(row.created_at))
+    .filter((key): key is string => key !== null)
+  return computeStreakFromDays(dayKeys, now)
 }

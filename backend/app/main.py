@@ -43,6 +43,7 @@ from app.core.observability import (
     set_request_id,
 )
 from app.routers import (
+    activity,
     auth,
     coach,
     courses,
@@ -828,6 +829,7 @@ def create_app() -> FastAPI:
     app.include_router(report.router)
     app.include_router(courses.router)
     app.include_router(history.router)
+    app.include_router(activity.router)
     app.include_router(timeline.router)
     # r51：模型调用质量看板与题目全文检索（只读 / 登录态 / 按用户隔离）。
     app.include_router(eval_router.router)
