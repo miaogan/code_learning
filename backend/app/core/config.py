@@ -418,6 +418,9 @@ class Settings(BaseSettings):
     github_token: str = ""
     #: 采集后是否自动为「必学」项生成样例（默认关：每条都要烧模型配额）。
     radar_auto_generate: bool = False
+    #: r146 走势线最多画几个快照点（仓库尾部取最近 N 条；太多点挤进 64px 小图看不出形状）。
+    #: 阈值只住 config 的门禁口径：服务层不得写 30 字面量（与熟练度窗口同一守卫）。
+    radar_trend_max_points: int = 30
 
     def resolve_ai(self) -> AiRuntime:
         """唯一解析出口：把 env 收敛成一个 `AiRuntime`，**永不 raise**（配置错置 `ready=False`）。"""

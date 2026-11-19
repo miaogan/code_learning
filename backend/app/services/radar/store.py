@@ -14,6 +14,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from app.core import repository
+from app.core.config import get_settings
 from app.core.context import get_current_user_id
 
 ACTIVE_STATUSES: tuple[str, ...] = ("queued", "running")
@@ -104,10 +105,12 @@ def verdict_counts(
     )
 
 
-def tech_trends(
-    slugs: Sequence[str], *, max_points: int = 30
-) -> dict[str, list[dict[str, Any]]]:
-    """star 快照序列（时间正序）：先锋卡片走势线用；没快照的 slug 不在返回里。"""
+def tech_trends(slugs: Sequence[str]) -> dict[str, list[dict[str, Any]]]:
+    """star 快照序列（时间正序）：先锋卡片走势线用；没快照的 slug 不在返回里。
+
+    点数上限从 config 取（`radar_trend_max_points`）：窗口类阈值只住 config，服务层不写字面量。
+    """
+    max_points = max(int(get_settings().radar_trend_max_points), 2)
     return repository.radar_tech_trends(slugs, max_points=max_points)
 
 
