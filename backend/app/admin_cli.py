@@ -192,6 +192,17 @@ def _doctor(_args: argparse.Namespace) -> int:
     print(f"缓存层          : {redis_state}（memory = 未配置 Redis，进程内缓存）")
     radar = "离线样本（不访问上游）" if settings.radar_offline else f"会访问公网（调度={settings.radar_schedule}）"
     print(f"雷达采集        : {radar}")
+    # r145：TLS 这一档要把「实际生效的档位」说清楚——内网最常见的坑是设了却没被容器读到。
+    ca_bundle = settings.radar_ca_bundle.strip()
+    if settings.radar_insecure_tls:
+        tls_line = "跳过校验（RADAR_INSECURE_TLS=true，接受任意证书；仅排障，用完关回）"
+    elif ca_bundle == "":
+        tls_line = "系统信任库（内网报 certificate-verify-failed：挂企业 CA 指 RADAR_CA_BUNDLE，或临时跳过校验）"
+    elif Path(ca_bundle).is_file():
+        tls_line = f"指定 CA {ca_bundle}"
+    else:
+        tls_line = f"指定 CA {ca_bundle} —— 文件不存在，实际回退系统信任库（证书错误仍会暴露）"
+    print(f"雷达 TLS        : {tls_line}")
 
     print()
     if settings.ai_allow_private_endpoints:

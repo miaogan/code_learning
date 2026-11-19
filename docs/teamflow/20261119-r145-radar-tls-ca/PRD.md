@@ -74,11 +74,37 @@ radar_ca_bundle: str = ""
 指定仓库采集失败时 notice 只显示「本轮只采集指定仓库 X」，失败原因被完全盖住——而这恰好是
 内网用户最可能的操作路径（手填一个仓库试水）。
 
-### 4. 文档
+### 4. 让「设了没生效」一眼可查（admin_cli doctor）
+
+内网最常见的坑不是配错，而是**设了却没被容器读到**（写进 `deploy.env`、只 `restart` 没重建）。
+`admin_cli doctor` 新增一行 `雷达 TLS`，直接打印实际生效的档位：
+
+```
+系统信任库（内网报 certificate-verify-failed：挂企业 CA 指 RADAR_CA_BUNDLE，或临时跳过校验）
+跳过校验（RADAR_INSECURE_TLS=true，接受任意证书；仅排障，用完关回）
+指定 CA /certs/corp-ca.pem
+指定 CA /certs/corp-ca.pem —— 文件不存在，实际回退系统信任库（证书错误仍会暴露）
+```
+
+### 5. 文案口径：先承认「没有证书也能用」
+
+第一版 `TLS_HINT` 把挂 CA 写成唯一正路、跳过校验写成「仅临时排障」，用户读成「必须先有 CA」。
+改为两条并列、并把「没有证书可设 `RADAR_INSECURE_TLS=true` 直接跳过」写在第二句：
+
+```
+上游 TLS 证书校验失败：有企业根证书就挂进容器并让 RADAR_CA_BUNDLE 指向该 PEM；
+没有证书可设 RADAR_INSECURE_TLS=true 直接跳过校验（接受任意证书，用完关回）
+```
+
+同样地，README 该小节开头就写明「手上没有企业根证书也能用」，第 2 条从「临时排障」改成
+「没有 CA 时的实际选择」，并补上「改完必须 `docker compose up -d backend`（`restart` 不重读
+`env_file`）」这条最容易踩的坑。
+
+### 6. 文档
 
 - `backend/.env.example`：补 `RADAR_CA_BUNDLE=` 与注释（容器内路径示例）。
-- `README.md` 内网章节新增「内网采集的 TLS 证书」小节：挂载 PEM 的 compose 片段 +
-  `RADAR_CA_BUNDLE` + 临时开关两条路，并说明「路径写错不会静默跳过校验」。
+- `README.md` 内网章节新增「内网采集的 TLS 证书」小节：跳过校验与挂 CA 两条路 +
+  `admin_cli doctor` 自查 + 重建容器的提醒 + `verify=<path>` 是替换而非追加系统信任库。
 - 无需改 `docker-compose.yml`：backend 已有 `env_file: ./backend/.env`，加变量即生效；
   挂证书用本地 `docker-compose.override.yml`（`up -d` 自动叠加）。
 
@@ -92,6 +118,12 @@ radar_ca_bundle: str = ""
 | `test_tls_failure_surfaces_chinese_hint` | `fetch_repo(error_sink=)` 写入 `TLS_HINT`；不传 sink 时静默；`fetch_all(repo=)` 透传 |
 | `test_round_notice_carries_failure_reason` | 全源降级 notice 带原因 |
 | `test_round_repo_failure_notice_carries_reason` | 指定仓库失败 notice **同时**有「只采该仓库」与失败原因 |
+
+`backend/tests/test_r115_intranet.py` 新增 1 例：
+
+| 用例 | 钉住什么 |
+|---|---|
+| `test_doctor_reports_radar_tls_state` | doctor 三档输出（系统信任库 / 跳过校验 / CA 文件不存在回退） |
 
 另外把两处 `_fake_repo` 替身补上第三个参数（`fetch_all` 现在传 `error_sink`），语义不变。
 

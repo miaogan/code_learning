@@ -199,6 +199,32 @@ def test_doctor_says_yes_when_enabled(capsys: pytest.CaptureFixture[str]) -> Non
     assert "可以" in out
 
 
+def test_doctor_reports_radar_tls_state(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """r145：内网最常见的坑是「设了却没被容器读到」，doctor 要把实际生效的 TLS 档位说清楚。"""
+    from app import admin_cli
+
+    monkeypatch.setenv("RADAR_INSECURE_TLS", "false")
+    monkeypatch.setenv("RADAR_CA_BUNDLE", "")
+    get_settings.cache_clear()
+    assert admin_cli.main(["doctor"]) == 0
+    assert "系统信任库" in capsys.readouterr().out
+
+    monkeypatch.setenv("RADAR_INSECURE_TLS", "true")
+    get_settings.cache_clear()
+    assert admin_cli.main(["doctor"]) == 0
+    assert "跳过校验" in capsys.readouterr().out
+
+    # 指了不存在的 CA：如实说「实际回退系统信任库」，不让配置笔误看起来像生效了。
+    monkeypatch.setenv("RADAR_INSECURE_TLS", "false")
+    monkeypatch.setenv("RADAR_CA_BUNDLE", str(tmp_path / "corp-ca-missing.pem"))
+    get_settings.cache_clear()
+    assert admin_cli.main(["doctor"]) == 0
+    assert "文件不存在" in capsys.readouterr().out
+    get_settings.cache_clear()
+
+
 # --- 零遥测守卫 -----------------------------------------------------------------
 
 #: 统计 / 崩溃上报 / 外部静态资源域名。命中即失败 —— 内网气隙环境里这些请求

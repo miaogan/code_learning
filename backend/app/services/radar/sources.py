@@ -358,9 +358,11 @@ def _tls_failed(error: BaseException) -> bool:
 
 
 #: 内网 TLS 失败时给用户的两条处理路径（页面 notice / 日志共用同一份措辞）。
+#: 第二条是给「手上根本没有企业 CA」的人准备的：跳过校验不是好做法，但比采集整轮不可用强，
+#: 所以明确写出来，而不是让人以为必须先有证书才能用。
 TLS_HINT = (
-    "上游 TLS 证书校验失败：请把企业根证书挂进容器，并让 RADAR_CA_BUNDLE 指向该 PEM 文件；"
-    "仅临时排障可设 RADAR_INSECURE_TLS=true（跳过校验，用完请关回）"
+    "上游 TLS 证书校验失败：有企业根证书就挂进容器并让 RADAR_CA_BUNDLE 指向该 PEM；"
+    "没有证书可设 RADAR_INSECURE_TLS=true 直接跳过校验（接受任意证书，用完关回）"
 )
 
 
