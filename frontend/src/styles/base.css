@@ -3298,6 +3298,17 @@ input:not([type='radio']):not([type='checkbox']):not([type='file']):disabled {
 .sc-role-gap { color: var(--warn); }
 .sc-role-met { color: var(--success); font-size: var(--fs-meta); }
 .sc-role-prio { display: flex; flex-direction: column; gap: var(--sp-2); margin: 0; padding: 0; list-style: none; }
+/* r132：缺口 → 定向召对入口（报告 / 跃迁的 RoleFitCard 共用） */
+.sc-role-prio-cta {
+  margin-top: var(--sp-2);
+  color: var(--accent);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  text-decoration: none;
+}
+.sc-role-prio-cta:hover {
+  text-decoration: underline;
+}
 .sc-role-prio-item {
   display: flex;
   align-items: center;
@@ -3794,6 +3805,27 @@ input:not([type='radio']):not([type='checkbox']):not([type='file']):disabled {
   font-size: var(--fs-small);
   line-height: var(--lh-small);
   color: var(--text-secondary);
+}
+/* r132：错题本 → 演武/学堂的定向出口 */
+.sc-qa-wrong-retrain {
+  color: var(--accent);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  text-decoration: none;
+}
+.sc-qa-wrong-retrain:hover {
+  text-decoration: underline;
+}
+.sc-qa-wrong-link {
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  text-decoration: none;
+}
+.sc-qa-wrong-link:hover {
+  color: var(--accent);
+  text-decoration: underline;
 }
 
 .sc-qa-wrong-list {

@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom'
+
 import type { PracticeLanguageFilter, PracticeWrongItem } from '../../api/types'
 import {
   DIFFICULTY_LABEL,
@@ -8,6 +10,12 @@ import {
   languageChips,
   promptPreview,
 } from '../../lib/practice'
+import { practiceHref } from '../../lib/studyPlan'
+import {
+  wrongDirectionsOf,
+  wrongItemLearnHref,
+  wrongItemPracticeHref,
+} from '../../lib/gapLinks'
 import { askTaifu } from '../../lib/taifuBridge'
 import { PromptBody } from '../exam/PromptBody'
 import { Button } from '../ui/Button'
@@ -76,6 +84,10 @@ export function WrongBookList({
     return <EmptyState reason={WRONG_BOOK_EMPTY_REASON} actionLabel="开始练习" onAction={onStartPractice} />
   }
 
+  // r132：本页错题涉及的方向（去重、闭集过滤）→ 演武多选定向重练；推不出就不渲染。
+  const directions = wrongDirectionsOf(items.map((item) => item.direction))
+  const retrainHref = directions.length > 0 ? practiceHref({ direction: directions }) : ''
+
   return (
     <Card className="sc-qa-wrongbook">
       <div className="sc-qa-wrong-head">
@@ -94,6 +106,11 @@ export function WrongBookList({
           <span className="sc-mono">{total}</span>
           <span>道</span>
         </p>
+        {retrainHref !== '' ? (
+          <Link className="sc-qa-wrong-retrain" to={retrainHref}>
+            按错题方向去演武重练 →
+          </Link>
+        ) : null}
         <ConfirmButton
           label="清空错题本"
           confirmLabel="确认清空全部？"
@@ -111,6 +128,20 @@ export function WrongBookList({
               <li key={item.question_id} className="sc-qa-wrong-row">
                 <div className="sc-qa-wrong-prompt">
                   <span className="sc-qa-wrong-text">{promptPreview(item.prompt)}</span>
+                  <Link
+                    className="sc-qa-wrong-link"
+                    to={wrongItemLearnHref(item.direction)}
+                    aria-label={`去学堂补「${item.direction}」`}
+                  >
+                    学堂补课
+                  </Link>
+                  <Link
+                    className="sc-qa-wrong-link"
+                    to={wrongItemPracticeHref(item.direction, item.difficulty)}
+                    aria-label={`去演武重练「${item.direction}」`}
+                  >
+                    重练
+                  </Link>
                   <ConfirmButton
                     label="移出"
                     confirmLabel="确认移出？"

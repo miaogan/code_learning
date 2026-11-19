@@ -1,5 +1,8 @@
+import { Link } from 'react-router-dom'
+
 import type { RoleFit } from '../../api/types'
 import { COACH_COPY, roleGapLabel } from '../../lib/coach'
+import { roleFitInterviewHref } from '../../lib/gapLinks'
 import { Card } from '../ui/Card'
 
 export interface RoleFitCardProps {
@@ -106,6 +109,12 @@ export function RoleFitCard({ roleFit }: RoleFitCardProps) {
               </li>
             ))}
           </ol>
+          {/* r132：缺口直接驱动定向召对（与 JD 对位同一 `?focus=` 通道）；推不出链接不渲染。 */}
+          {roleFitInterviewHref(roleFit) !== '' ? (
+            <Link className="sc-role-prio-cta" to={roleFitInterviewHref(roleFit)}>
+              按这些缺口开一场定向召对 →
+            </Link>
+          ) : null}
         </div>
       ) : null}
 
