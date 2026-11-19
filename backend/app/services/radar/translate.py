@@ -136,6 +136,45 @@ async def translate_pending(limit: int, client: AIClient) -> tuple[int, int]:
     return translated, store.count_pending_translation()
 
 
+async def prepare_for_storage(
+    items: list[dict[str, Any]],
+    client: AIClient,
+    states: dict[str, dict[str, str]] | None = None,
+) -> dict[str, str]:
+    """**入库前**批量备好本轮中文简介，返回 `{slug: 中文}`；本函数不写库。
+
+    r133 的分工：这里只把「等会儿要 upsert 的条目」翻好，调用方把译文随条目一起写进去，
+    清单里不再出现「先落英文、前端再补翻」的中间态。三条复用纪律：
+
+    - 只有真正的英文摘要才请求模型；本来就是中文的直接回填自身；
+    - `states` 里「原文没变 + 旧译文仍含中文」的条目直接复用，不重复烧 token；
+    - 「标题即简介」（HN）留给 `summarize_pending` 抓正文汇总，翻标题会占用汇总队列。
+    """
+    states = states or {}
+    ready: dict[str, str] = {}
+    pending: list[dict[str, Any]] = []
+    for item in items:
+        slug = str(item.get("slug") or "")
+        summary = str(item.get("summary") or "")
+        if not slug or _is_title_only(item):
+            continue
+        if not needs_translation(summary):
+            ready[slug] = clean_zh(summary)
+            continue
+        old = states.get(slug)
+        if (
+            old is not None
+            and old.get("summary") == summary
+            and _CJK.search(old.get("summary_zh", "")) is not None
+        ):
+            ready[slug] = old["summary_zh"]
+            continue
+        pending.append({"slug": slug, "summary": summary})
+    if pending:
+        ready.update(await translate_items(pending, client))
+    return ready
+
+
 def _is_title_only(row: dict[str, Any]) -> bool:
     """「标题即简介」：summary 与 name 相同说明上游没给真实描述（HN 只回标题的典型形状）。"""
     return str(row.get("summary") or "").strip() == str(row.get("name") or "").strip()

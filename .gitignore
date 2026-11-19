@@ -110,6 +110,8 @@ frontend/logs/
 .tmp/
 # 本机 pytest 的 basetemp / 日志目录（避免 Temp EPERM 时把报告落进工作区却被误提交）
 .tmp-pytest/
+backend/logs/
+/data/
 
 # 本地演示产物（截图 / 录屏 / 一次性脚本），不进仓库
 output/

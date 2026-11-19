@@ -12,14 +12,7 @@ import { PhaseLoader } from '../components/ui/PhaseLoader'
 import { Select } from '../components/ui/Select'
 import { Toast } from '../components/ui/Toast'
 import { DIRECTIONS } from '../lib/questionDirections'
-import {
-  autoTranslateKey,
-  dimensionText,
-  needsTranslation,
-  safeRepoUrl,
-  summaryText,
-  techMetaText,
-} from '../lib/radar'
+import { dimensionText, needsTranslation, safeRepoUrl, summaryText, techMetaText } from '../lib/radar'
 import { useAsync } from '../lib/useAsync'
 
 /**
@@ -177,7 +170,7 @@ export default function PioneerPage() {
   const [collecting, setCollecting] = useState(false)
   const [collectError, setCollectError] = useState('')
   const [generating, setGenerating] = useState('')
-  // 补翻：历史清单里的英文摘要按需翻成中文（采集时已自动翻，这里只兜住没翻到的）。
+  // 补翻：录入时已在服务端翻好，这里只兜住历史遗留 / 当时没配模型的英文摘要。
   const [translating, setTranslating] = useState(false)
   // 条目的详情默认折叠：按 tech_slug 记住哪些被展开，翻页后状态天然跟着条目走。
   const [expandedSlugs, setExpandedSlugs] = useState<string[]>([])
@@ -264,33 +257,6 @@ export default function PioneerPage() {
       setTranslating(false)
     }
   }, [pageSize, listReload, runReload])
-
-  // r88 自动补翻：进页 / 翻页 / 改筛选后，当前页还有没翻的英文摘要就自动补翻一轮。
-  // 每个「页 + 条数 + 筛选」组合只自动试一次（去重键见 lib/radar.ts autoTranslateKey）：
-  // 失败不重试，手动的「翻译英文简介」按钮仍在 —— 翻译走 AI 有额度成本，不能让前端重试循环烧额度。
-  const autoTriedKeyRef = useRef('')
-  useEffect(() => {
-    if (listAsync.status !== 'success' || !pendingTranslation) return
-    const key = autoTranslateKey(
-      page,
-      pageSize,
-      verdictFilters,
-      directionFilters,
-      techs?.total ?? 0,
-    )
-    if (autoTriedKeyRef.current === key) return
-    autoTriedKeyRef.current = key
-    void translateBacklog()
-  }, [
-    listAsync.status,
-    pendingTranslation,
-    page,
-    pageSize,
-    verdictFilters,
-    directionFilters,
-    techs,
-    translateBacklog,
-  ])
 
   const changeVerdicts = (next: string[]): void => {
     setVerdictFilters(next)
@@ -572,6 +538,14 @@ export default function PioneerPage() {
                 }))}
                 onChange={changePageSize}
               />
+              {/* r133：翻页与每页条数同处筛选条右侧，找页码不用再滚到清单底部。 */}
+              <Pagination
+                page={page}
+                pageSize={pageSize}
+                total={techs.total}
+                onChange={setPage}
+                label="技术清单分页"
+              />
               {pendingTranslation && (
                 <Button
                   variant="ghost"
@@ -609,13 +583,6 @@ export default function PioneerPage() {
               ))}
             </ul>
           )}
-          <Pagination
-            page={page}
-            pageSize={pageSize}
-            total={techs.total}
-            onChange={setPage}
-            label="技术清单分页"
-          />
           <p className="sc-coach-note">
             清单是全局知识库，不按账号隔离；生成的任务按账号隔离，别人在途的任务不会占用你的额度。
           </p>

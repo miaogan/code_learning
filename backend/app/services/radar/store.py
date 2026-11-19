@@ -20,7 +20,10 @@ TERMINAL_STATUSES: tuple[str, ...] = ("succeeded", "adopted", "discarded", "fail
 
 
 def upsert_tech(item: dict[str, Any]) -> None:
-    """按 `tech_slug` 幂等写入：已存在只刷新 last_seen 与可变字段（首次见到的时间不动）。"""
+    """按 `tech_slug` 幂等写入：已存在只刷新 last_seen 与可变字段（首次见到的时间不动）。
+
+    带 `summary_zh` 的条目走 r133「翻完再入库」分支；不带则沿用旧口径（原文变化时清空旧译文）。
+    """
     repository.radar_upsert_tech(item)
 
 
@@ -153,6 +156,11 @@ def tech_name(tech_slug: str) -> str:
 def tech_card(tech_slug: str) -> dict[str, Any] | None:
     """生成用的技术卡片：名称 / 方向 / 简介 / 链接 + 最新评估结论（不存在返回 None）。"""
     return repository.radar_tech_card(tech_slug)
+
+
+def translation_states(slugs: Sequence[str]) -> dict[str, dict[str, str]]:
+    """本轮条目的旧原文 / 旧译文（入库前判「未变化可复用译文」用）。"""
+    return repository.radar_translation_states(slugs)
 
 
 def set_summary_zh(tech_slug: str, summary_zh: str) -> None:

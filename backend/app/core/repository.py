@@ -1924,25 +1924,36 @@ def delete_taifu_memories() -> int:
 def radar_upsert_tech(item: dict[str, Any]) -> None:
     """按 `tech_slug` 幂等写入：已存在只刷新 last_seen 与可变字段（首次见到的时间不动）。
 
-    英文摘要变了就清空 `summary_zh`（旧译文对应旧原文，留着就是错译），下轮翻译会重算；
+    默认口径（r74）：英文摘要变了就清空 `summary_zh`（旧译文对应旧原文，留着就是错译），
     摘要没变则保留已有译文，避免每轮采集重复烧 token。
+
+    r133：调用方若已**在入库前**翻好本次摘要，传 `item["summary_zh"]` 走直接写入分支——
+    译文与本次原文同批产生，不再出现「先落英文、随后回填」的中间态。
     """
     stamp = _now()
+    incoming_zh = item.get("summary_zh")
+    zh_assignment = (
+        "excluded.summary_zh"
+        if incoming_zh is not None
+        else "CASE WHEN excluded.summary = radar_techs.summary"
+        " THEN radar_techs.summary_zh ELSE '' END"
+    )
     with connection() as conn:
         conn.execute(
             "INSERT INTO radar_techs (tech_slug, name, direction, sub_direction, source_key, url,"
             " summary, summary_zh, first_seen_at, last_seen_at)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, '', ?, ?) "
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
             "ON CONFLICT(tech_slug) DO UPDATE SET name = excluded.name,"
             " direction = excluded.direction, sub_direction = excluded.sub_direction,"
             " url = excluded.url,"
             # 赋值顺序有意义：SQLite 的 SET 从左到右求值，summary_zh 必须先于 summary 计算。
-            " summary_zh = CASE WHEN excluded.summary = radar_techs.summary"
-            "   THEN radar_techs.summary_zh ELSE '' END,"
+            f" summary_zh = {zh_assignment},"
             " summary = excluded.summary, last_seen_at = excluded.last_seen_at",
             (
                 item["slug"], item["name"], item["direction"], item["sub_direction"],
-                item["source_key"], item["url"], item["summary"], stamp, stamp,
+                item["source_key"], item["url"], item["summary"],
+                "" if incoming_zh is None else str(incoming_zh),
+                stamp, stamp,
             ),
         )
 
@@ -2268,6 +2279,27 @@ def radar_tech_name(tech_slug: str) -> str:
             "SELECT name FROM radar_techs WHERE tech_slug = ?", (tech_slug,)
         ).fetchone()
     return "" if row is None else str(row["name"])
+
+
+def radar_translation_states(slugs: Sequence[str]) -> dict[str, dict[str, str]]:
+    """批量读本轮条目的旧原文 / 旧译文：原文没变且译文可用时入库前直接复用，不重复烧 token。"""
+    unique = list(dict.fromkeys(str(slug) for slug in slugs if str(slug)))
+    if not unique:
+        return {}
+    placeholders = ", ".join("?" for _ in unique)
+    with connection() as conn:
+        rows = conn.execute(
+            "SELECT tech_slug, summary, summary_zh FROM radar_techs"
+            f" WHERE tech_slug IN ({placeholders})",
+            unique,
+        ).fetchall()
+    return {
+        str(row["tech_slug"]): {
+            "summary": str(row["summary"] or ""),
+            "summary_zh": str(row["summary_zh"] or ""),
+        }
+        for row in rows
+    }
 
 
 def radar_set_summary_zh(tech_slug: str, summary_zh: str) -> None:

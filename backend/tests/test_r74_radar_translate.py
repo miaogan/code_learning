@@ -184,3 +184,69 @@ def test_translate_api_rejects_out_of_range_limit(
 ) -> None:
     assert client.post("/api/radar/translate", json={"limit": 0}).status_code == 422
     assert client.post("/api/radar/translate", json={"limit": 51}).status_code == 422
+
+
+def test_ingest_client_uses_server_runtime_without_user(
+    radar_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """r133：定时轮没有账号上下文，配置好服务端 Key 时应能走系统 AI 客户端。"""
+
+    from app.core.config import AiRuntime
+
+    settings = get_settings()
+    monkeypatch.setattr(
+        type(settings),
+        "resolve_ai",
+        lambda _self: AiRuntime(
+            provider="test", base_url="https://example.test/v1", model="demo",
+            api_key="not-a-real-key", ready=True,
+        ),
+    )
+    assert radar._ingest_client(None) is not None
+
+
+def test_round_stores_translation_in_same_upsert(
+    radar_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """r133：英文条目入库时 `summary_zh` 已经就位，不再「先落英文、前端再补翻」。"""
+    fake = _TranslateFake()
+    monkeypatch.setattr(user_ai, "client_for", lambda _user, _tier: fake)
+    original_upsert = store.upsert_tech
+    seen: list[str] = []
+
+    def _spy(item: dict[str, Any]) -> None:
+        if translate.needs_translation(str(item.get("summary") or "")):
+            seen.append(str(item.get("summary_zh") or ""))
+        original_upsert(item)
+
+    monkeypatch.setattr(store, "upsert_tech", _spy)
+    asyncio.run(radar.run_round(trigger="manual", user={"user_id": "u-test"}))
+    assert seen and all(zh != "" and not translate.needs_translation(zh) for zh in seen)
+    assert fake.calls == 1  # 本轮英文一次批量翻完
+
+
+def test_manual_reuses_valid_translation_without_model_call(
+    radar_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """r133：原文没变且旧译文可用时直接复用，录同一条线索不再重复烧 token。"""
+    fake = _TranslateFake()
+    monkeypatch.setattr(user_ai, "client_for", lambda _user, _tier: fake)
+    entry = {"name": "Demo", "url": "", "summary": ENGLISH}
+    item = radar.normalize.normalize_item({**entry, "source_key": "manual"})
+    store.upsert_tech({**item, "summary_zh": CHINESE})
+
+    result = asyncio.run(radar.ingest_manual(entry, user={"user_id": "u-test"}))
+    assert result["summary_zh"] == CHINESE
+    assert fake.calls == 0
+
+
+def test_scheduled_round_translates_with_server_client(
+    radar_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """r133：定时轮（无账号）也能在入库前翻好，不再把欠账留给清单页。"""
+    fake = _TranslateFake()
+    monkeypatch.setattr(radar, "_ingest_client", lambda _user: fake)
+    asyncio.run(radar.run_round(trigger="schedule", user=None))
+    rows = store.list_techs(100)
+    assert rows and all(row["summary_zh"] for row in rows)
+    assert fake.calls == 1

@@ -9140,11 +9140,17 @@ html {
 }
 
 /* 右侧控件组：方向 / 每页条数 / 清除筛选，窄屏整体折到下一行。 */
+/* r133：分页器也落在这组里（见下方 .sc-radar-filterright .sc-pager）。 */
 .sc-radar-filterright {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--sp-2);
+}
+
+/* r133：分页器嵌进筛选条后不再独占一行，去掉列表底部的上边距。 */
+.sc-radar-filterright .sc-pager {
+  margin-top: 0;
 }
 
 /* 清单筛选条下拉：比标准按钮矮一档（sm 高），但底色/圆角/边框和 .sc-filter-select 统一。
@@ -12199,7 +12205,7 @@ a.sc-radar-name--link:hover .sc-radar-ext {
   justify-content: flex-end;
 }
 .sc-delete-error {
-  color: var(--danger, #b42318);
+  color: var(--danger);
 }
 
 /* 校勘页（简历版本）：版本管理区的说明与删除按钮排布 */
