@@ -15,6 +15,7 @@ import {
   normalizeQuery,
   previewText,
   questionHref,
+  ragHref,
 } from '../lib/search'
 import { practiceHref } from '../lib/studyPlan'
 import { searchTutorials } from '../lib/tutorialSearch'
@@ -156,15 +157,35 @@ export default function SearchPage() {
   const ragCurrent = searchable && settled === query && rag.status === 'success' ? rag.data : null
   const ragFailed = searchable && settled === query && rag.status === 'error'
 
-  // r103 召回反馈：点完立即重排（后端按本人投票加权），按钮态本地即时反馈。
-  const [votes, setVotes] = useState<Record<string, 'up' | 'down'>>({})
+  // r103 召回反馈：点完立即重排（后端按本人投票加权）。
+  // r142：本地记住这票与返回票数，按钮选中态和「已记下」文案留在界面上，
+  // 不再让用户只看到一次 reload 就以为没生效。
+  type VoteState = { verdict: 'up' | 'down'; up: number; down: number }
+  const [voteState, setVoteState] = useState<Record<string, VoteState>>({})
+  const [voteError, setVoteError] = useState<Record<string, string>>({})
   const vote = async (chunkId: string, verdict: 'up' | 'down'): Promise<void> => {
     try {
-      await api.ragFeedback({ query: settled, chunk_id: chunkId, verdict, surface: 'search' })
-      setVotes((prev) => ({ ...prev, [chunkId]: verdict }))
+      const result = await api.ragFeedback({
+        query: settled,
+        chunk_id: chunkId,
+        verdict,
+        surface: 'search',
+      })
+      setVoteState((prev) => ({
+        ...prev,
+        [chunkId]: { verdict, up: result.up, down: result.down },
+      }))
+      setVoteError((prev) => {
+        const next = { ...prev }
+        delete next[chunkId]
+        return next
+      })
       rag.reload()
     } catch {
-      /* 反馈失败不影响检索本身：静默，用户可再点一次 */
+      setVoteError((prev) => ({
+        ...prev,
+        [chunkId]: '反馈没提交成功，请再点一次',
+      }))
     }
   }
 
@@ -397,36 +418,68 @@ export default function SearchPage() {
               </p>
             ) : (
               <div className="sc-search-hits">
-                {ragCurrent.items.map((item) => (
-                  <span className="sc-search-hit" key={item.chunk_id}>
-                    <span className="sc-search-hit-body">
-                      <span className="sc-search-hit-title">{item.title || item.snippet}</span>
-                      <span className="sc-search-hit-snippet">{previewText(item.snippet, 90)}</span>
-                    </span>
-                    <span className="sc-search-hit-meta">
-                      <Chip label={item.kind === 'question' ? '题目' : '教程'} tone="direction" />
-                      <button
-                        type="button"
-                        className={votes[item.chunk_id] === 'up' ? 'is-active' : ''}
-                        onClick={() => void vote(item.chunk_id, 'up')}
-                        title="这条结果对你有用（会提升它在你后续同词检索中的排序）"
+                {ragCurrent.items.map((item) => {
+                  const saved = voteState[item.chunk_id]
+                  const failed = voteError[item.chunk_id]
+                  return (
+                    <div className="sc-search-hit sc-search-hit-rag" key={item.chunk_id}>
+                      <Link
+                        className="sc-search-hit-main"
+                        to={ragHref(item)}
+                        aria-label={`打开检索命中：${item.title || item.snippet}`}
                       >
-                        有用
-                      </button>
-                      <button
-                        type="button"
-                        className={votes[item.chunk_id] === 'down' ? 'is-active' : ''}
-                        onClick={() => void vote(item.chunk_id, 'down')}
-                        title="这条结果不相关（会降低它在你后续同词检索中的排序）"
-                      >
-                        没用
-                      </button>
-                      <span className="sc-search-barmeta">{item.score.toFixed(3)}</span>
-                    </span>
-                  </span>
-                ))}
+                        <span className="sc-search-hit-body">
+                          <span className="sc-search-hit-title">{item.title || item.snippet}</span>
+                          <span className="sc-search-hit-snippet">
+                            {previewText(item.snippet, 90)}
+                          </span>
+                        </span>
+                        <span className="sc-search-go" aria-hidden="true">
+                          →
+                        </span>
+                      </Link>
+                      <span className="sc-search-hit-meta">
+                        <Chip
+                          label={item.kind === 'question' ? '题目' : '教程'}
+                          tone="direction"
+                        />
+                        <button
+                          type="button"
+                          className="sc-chip sc-iq-chip sc-qa-chip is-clickable"
+                          aria-pressed={saved?.verdict === 'up'}
+                          onClick={() => void vote(item.chunk_id, 'up')}
+                          title="这条结果对你有用（会提升它在你后续同词检索中的排序）"
+                        >
+                          {saved?.verdict === 'up' ? '✓ 有用' : '有用'}
+                        </button>
+                        <button
+                          type="button"
+                          className="sc-chip sc-iq-chip sc-qa-chip is-clickable"
+                          aria-pressed={saved?.verdict === 'down'}
+                          onClick={() => void vote(item.chunk_id, 'down')}
+                          title="这条结果不相关（会降低它在你后续同词检索中的排序）"
+                        >
+                          {saved?.verdict === 'down' ? '✓ 没用' : '没用'}
+                        </button>
+                        <span className="sc-search-barmeta">{item.score.toFixed(3)}</span>
+                      </span>
+                      {saved === undefined && failed === undefined ? null : (
+                        <span
+                          className={`sc-rag-vote-status${failed === undefined ? '' : ' is-error'}`}
+                          role="status"
+                        >
+                          {failed ??
+                            `已记下你的「${saved?.verdict === 'up' ? '有用' : '没用'}」反馈 · 该项累计 ${saved?.up ?? 0} 赞 / ${saved?.down ?? 0} 踩，会影响你后续同词检索的排序`}
+                        </span>
+                      )}
+                    </div>
+                  )
+                })}
                 <p className="sc-search-foot">
                   {`引擎 ${ragCurrent.engine === 'pgvector' ? 'pgvector 余弦' : ragCurrent.engine === 'python-cosine' ? 'Python 余弦（无扩展降级）' : 'SQL 关键词'} · 融合得分只用于排序展示`}
+                </p>
+                <p className="sc-search-foot">
+                  点标题或摘要可打开对应教程小节 / 练习页。有用 / 没用只微调你自己在「同一关键词」下的排序，换词后需要重新反馈。
                 </p>
                 {ragCurrent.notice === '' ? null : (
                   <p className="sc-search-foot">{ragCurrent.notice}</p>

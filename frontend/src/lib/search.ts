@@ -5,6 +5,7 @@
  * 题库侧是 `POST /api/search/questions`（FTS5 优先，服务端可降级到模糊匹配）。
  * 这里只补「页面零计算」需要的那点映射，**不改任何检索口径**。
  */
+import type { RagChunkItem } from '../api/types'
 import { practiceHref } from './studyPlan'
 
 /** 教程一次最多展示多少条小节命中（BM25 已排序，取前 N）。 */
@@ -31,6 +32,24 @@ export function questionHref(item: { direction: string; sub_direction: string })
     direction: direction === '' ? null : direction,
     sub_direction: item.sub_direction,
   })
+}
+
+/**
+ * RAG 命中 → 可打开的站内目标（r142）。
+ *
+ * 题目 chunk 没有详情路由：title 由后端固定写成 `方向 · 二级方向`，
+ * 据此落到练习页筛选（与题库命中同一跳转口径）；教程 chunk 的 ref_id 是章 id、
+ * section_id 可能带 `#n` 分片后缀，锚点只取 `#` 前半段。
+ */
+export function ragHref(item: RagChunkItem): string {
+  if (item.kind === 'tutorial') {
+    const chapterId = item.ref_id.trim()
+    if (chapterId === '') return '/learn'
+    const sectionId = item.section_id.split('#')[0]
+    return sectionId === '' ? `/learn/${chapterId}` : `/learn/${chapterId}#tutorial-${sectionId}`
+  }
+  const [direction = '', sub_direction = ''] = item.title.split(' · ')
+  return questionHref({ direction, sub_direction })
 }
 
 /** 题面预览：压平换行与连续空白（题面常含代码与表格），超长截断并加省略号。 */

@@ -12783,3 +12783,41 @@ a.sc-radar-name--link:hover .sc-radar-ext {
   font-size: var(--fs-body);
   line-height: var(--lh-body);
 }
+
+/* r142 · RAG 命中项：标题/摘要整块可点，反馈按钮作为兄弟节点独立可点。 */
+.sc-search-hit-rag {
+  grid-template-columns: minmax(0, 1fr) auto;
+  row-gap: var(--sp-1);
+}
+.sc-search-hit-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--sp-4);
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+.sc-search-hit-rag .sc-search-hit-meta {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.sc-rag-vote-status {
+  grid-column: 1 / -1;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--accent);
+}
+.sc-rag-vote-status.is-error {
+  color: var(--warn);
+}
+@media (max-width: 640px) {
+  .sc-search-hit-rag {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  /* 窄屏仍隐藏普通命中的标签列，但 RAG 的反馈按钮必须留着。 */
+  .sc-search-hit-rag .sc-search-hit-meta {
+    display: flex;
+    justify-content: flex-start;
+  }
+}
