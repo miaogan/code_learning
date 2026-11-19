@@ -142,8 +142,109 @@ export function summaryText(item: RadarTechItem): string {
   return item.summary_zh !== '' ? item.summary_zh : item.summary
 }
 
-/* ---------- r87 先锋 ↔ 国子监联动的纯函数层 ---------- */
+/* ---------- r144 先锋信息流（aihot 式日期分组时间线）的纯函数层 ---------- */
 
+const WEEKDAY_LABELS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'] as const
+
+function pad2(value: number): string {
+  return value < 10 ? `0${value}` : String(value)
+}
+
+/** assessed_at → 本地时区 HH:MM；解析失败返回空串（不猜时间）。 */
+export function assessedTimeText(iso: string): string {
+  const at = new Date(iso)
+  if (Number.isNaN(at.getTime())) return ''
+  return `${pad2(at.getHours())}:${pad2(at.getMinutes())}`
+}
+
+interface ParsedDay {
+  key: string
+  /** aihot 口径：`11月19日 周四`。 */
+  label: string
+  today: boolean
+}
+
+function parsedDay(iso: string, now: Date): ParsedDay | null {
+  const at = new Date(iso)
+  if (Number.isNaN(at.getTime())) return null
+  const key = `${at.getFullYear()}-${pad2(at.getMonth() + 1)}-${pad2(at.getDate())}`
+  const todayKey = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`
+  return {
+    key,
+    label: `${at.getMonth() + 1}月${at.getDate()}日 ${WEEKDAY_LABELS[at.getDay()]}`,
+    today: key === todayKey,
+  }
+}
+
+/** 一个日期分组：`key` 是 YYYY-MM-DD（未知时间落 `unknown` 组，不丢条目）。 */
+export interface RadarDayGroup {
+  key: string
+  label: string
+  items: RadarTechItem[]
+}
+
+/**
+ * 按 `assessed_at` 的**本地日**把当前页条目分组（后端本就按评估时间倒序，
+ * 分组只合并相邻同日条目，不重排——与接口顺序保持一致）。
+ */
+export function groupTechsByDay(
+  items: readonly RadarTechItem[],
+  now: Date = new Date(),
+): RadarDayGroup[] {
+  const groups: RadarDayGroup[] = []
+  const index = new Map<string, RadarDayGroup>()
+  for (const item of items) {
+    const day = parsedDay(item.assessed_at, now)
+    const key = day?.key ?? 'unknown'
+    let group = index.get(key)
+    if (group === undefined) {
+      group = {
+        key,
+        label: day === null ? '时间未记录' : day.today ? `今天 · ${day.label}` : day.label,
+        items: [],
+      }
+      index.set(key, group)
+      groups.push(group)
+    }
+    group.items.push(item)
+  }
+  return groups
+}
+
+/** 条目的标签行：方向 / 子方向（非空才出）+ 规则评估 / 疑似刷 star 两个状态标签。 */
+export function techTagList(item: RadarTechItem): string[] {
+  const tags = [item.direction, item.sub_direction]
+    .map((tag) => tag.trim())
+    .filter((tag) => tag !== '')
+  if (item.rule_based) tags.push('规则评估')
+  if (item.suspect) tags.push('疑似刷 star')
+  return tags
+}
+
+/**
+ * 当前页过滤：多词 AND，命中标题 / 中英摘要 / 方向 / 来源任一处。
+ * 只作用于已取回的当前页（服务端分页），placeholder 必须写清「当前页」。
+ */
+export function matchesTechQuery(item: RadarTechItem, rawQuery: string): boolean {
+  const query = rawQuery.trim().toLowerCase()
+  if (query === '') return true
+  const haystack = [
+    item.name,
+    item.summary,
+    item.summary_zh,
+    item.direction,
+    item.sub_direction,
+    item.source_key,
+  ]
+    .join('\n')
+    .toLowerCase()
+  return query
+    .split(/\s+/)
+    .filter((term) => term !== '')
+    .every((term) => haystack.includes(term))
+}
+
+/* ---------- r87 先锋 ↔ 国子监联动的纯函数层 ---------- */
 /** 任务的方向读数：章节草稿优先，其次第一条题；都没有返回空串（不猜方向）。 */
 export function jobDirection(job: RadarJobItem): string {
   const fromChapter = job.chapter?.direction ?? ''

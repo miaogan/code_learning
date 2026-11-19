@@ -12821,3 +12821,211 @@ a.sc-radar-name--link:hover .sc-radar-ext {
     justify-content: flex-start;
   }
 }
+
+/* ============================================================
+   r144 · 先锋信息流（参考 aihot.news/all）：日期分组 + 编号时间线
+   桌面：左侧 22px rail（序号 + 圆点 + 贯穿竖线）+ 右侧信息卡；
+   移动：隐藏序号，仅留圆点。日期组头给「N 月 N 日 周X · N 条」。
+   ============================================================ */
+.sc-radar-searchrow {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-3);
+}
+
+.sc-radar-searchinput {
+  flex: 1 1 280px;
+  min-width: 0;
+}
+
+.sc-radar-feed {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+}
+
+.sc-radar-dayhead {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-3);
+}
+
+.sc-radar-daylabel {
+  margin: 0;
+  font-size: var(--fs-section);
+  line-height: var(--lh-section);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.sc-radar-daycount {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+}
+
+.sc-radar-timeline {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.sc-radar-slot {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: var(--sp-3);
+}
+
+.sc-radar-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-1);
+}
+
+.sc-radar-rank {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  font-weight: 600;
+  color: var(--text-tertiary);
+}
+
+.sc-radar-node {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  box-shadow: 0 0 0 4px var(--bg-surface);
+  transition: transform var(--fast) var(--ease);
+}
+
+.sc-radar-slot:hover .sc-radar-node {
+  transform: scale(1.15);
+}
+
+.sc-radar-rail::after {
+  content: '';
+  flex: 1;
+  width: 1px;
+  background: var(--border-subtle);
+}
+
+.sc-radar-slot:last-child .sc-radar-rail::after {
+  display: none;
+}
+
+.sc-radar-slotcard {
+  min-width: 0;
+  margin-bottom: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-8);
+  transition: background-color var(--fast) var(--ease), border-color var(--fast) var(--ease);
+}
+
+.sc-radar-slot:last-child .sc-radar-slotcard {
+  margin-bottom: 0;
+}
+
+.sc-radar-slotcard:hover {
+  background: var(--overlay-06);
+  border-color: var(--border-subtle);
+}
+
+/* 国子监深链落点：沿用整条 accent 强调，rail 与卡同时高亮。 */
+.sc-radar-slot.is-hit .sc-radar-slotcard {
+  background: var(--accent-tint);
+  border-color: var(--accent-line-30);
+}
+
+.sc-radar-slotmeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.sc-radar-slotsrc,
+.sc-radar-slotstars {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+}
+
+.sc-radar-slotact {
+  margin-left: auto;
+  flex: none;
+}
+
+.sc-radar-slothead {
+  margin-top: var(--sp-2);
+  min-width: 0;
+}
+
+.sc-radar-slothead .sc-radar-name {
+  font-size: var(--fs-section);
+  line-height: var(--lh-section);
+  font-weight: 600;
+}
+
+.sc-radar-slotcard .sc-radar-brief {
+  margin-top: var(--sp-2);
+}
+
+.sc-radar-tagrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+}
+
+.sc-radar-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 var(--sp-2);
+  border-radius: var(--radius-pill);
+  background: var(--overlay-06);
+  color: var(--text-tertiary);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  white-space: nowrap;
+}
+
+.sc-radar-slotcard .sc-radar-expand {
+  margin-left: auto;
+  align-self: center;
+}
+
+.sc-radar-slotcard .sc-radar-rowdetail {
+  margin-top: var(--sp-2);
+}
+
+@media (max-width: 640px) {
+  /* 窄屏隐藏序号列，仅留圆点与卡片（aihot 同款降级）。 */
+  .sc-radar-slot {
+    grid-template-columns: 14px minmax(0, 1fr);
+    gap: var(--sp-2);
+  }
+
+  .sc-radar-rank {
+    display: none;
+  }
+
+  .sc-radar-slotcard {
+    padding: var(--sp-3);
+  }
+}

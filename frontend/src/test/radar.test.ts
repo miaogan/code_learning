@@ -2,17 +2,20 @@ import { describe, expect, it } from 'vitest'
 import type { RadarChapterDraft, RadarJobItem, RadarQuestionSample, RadarTechItem } from '../api/types'
 import {
   ACTIVE_JOB_STATUSES,
+  assessedTimeText,
   canAdopt,
   canDiscard,
   discardedNotice,
   dimensionText,
   formatCount,
+  groupTechsByDay,
   isActiveJob,
   isTerminalJob,
   jobDirection,
   jobPioneerHref,
   jobPracticeHref,
   jobSubDirection,
+  matchesTechQuery,
   needsTranslation,
   progressText,
   safeRepoUrl,
@@ -21,6 +24,7 @@ import {
   statusLabel,
   summaryText,
   techMetaText,
+  techTagList,
 } from '../lib/radar'
 
 function question(overrides: Partial<RadarQuestionSample> = {}): RadarQuestionSample {
@@ -283,5 +287,62 @@ describe('r87 先锋 ↔ 国子监联动：任务方向读数与跳转链接', (
     expect(bare.searchParams.get('tech')).toBe('github:demo/vllm')
     expect(bare.searchParams.get('name')).toBe('vLLM')
     expect(bare.searchParams.get('direction')).toBeNull()
+  })
+})
+
+/** 本地时区构造 ISO，避免测试结果随 CI 时区漂移。 */
+function localIso(year: number, month: number, day: number, hour: number, minute = 0): string {
+  return new Date(year, month - 1, day, hour, minute).toISOString()
+}
+
+describe('r144 先锋信息流纯函数', () => {
+  const now = new Date(2026, 10, 19, 18, 0) // 2026-11-19（本地）
+
+  it('assessedTimeText 输出本地 HH:MM，坏值返回空串', () => {
+    expect(assessedTimeText(localIso(2026, 11, 19, 9, 5))).toBe('09:05')
+    expect(assessedTimeText('')).toBe('')
+    expect(assessedTimeText('not-a-date')).toBe('')
+  })
+
+  it('groupTechsByDay 按本地日分组并保持接口顺序，今天带「今天 ·」前缀', () => {
+    const items = [
+      tech({ tech_slug: 'a', assessed_at: localIso(2026, 11, 19, 17, 40) }),
+      tech({ tech_slug: 'b', assessed_at: localIso(2026, 11, 19, 9, 0) }),
+      tech({ tech_slug: 'c', assessed_at: localIso(2026, 11, 18, 20, 0) }),
+    ]
+    const groups = groupTechsByDay(items, now)
+    expect(groups.map((group) => group.label)).toEqual(['今天 · 11月19日 周四', '11月18日 周三'])
+    expect(groups[0]?.items.map((item) => item.tech_slug)).toEqual(['a', 'b'])
+    expect(groups[1]?.items.map((item) => item.tech_slug)).toEqual(['c'])
+  })
+
+  it('groupTechsByDay：assessed_at 缺失 / 坏值落「时间未记录」组，不丢条目', () => {
+    const groups = groupTechsByDay(
+      [tech({ tech_slug: 'x', assessed_at: '' }), tech({ tech_slug: 'y', assessed_at: 'bad' })],
+      now,
+    )
+    expect(groups).toHaveLength(1)
+    expect(groups[0]?.label).toBe('时间未记录')
+    expect(groups[0]?.items.map((item) => item.tech_slug)).toEqual(['x', 'y'])
+  })
+
+  it('techTagList 出方向 / 子方向，空子方向不占位；状态标签按需出现', () => {
+    expect(techTagList(tech())).toEqual(['AI 工程', '部署与推理', '规则评估'])
+    expect(techTagList(tech({ rule_based: false, suspect: true }))).toEqual([
+      'AI 工程',
+      '部署与推理',
+      '疑似刷 star',
+    ])
+    expect(techTagList(tech({ direction: '  ', sub_direction: '', rule_based: false }))).toEqual([])
+  })
+
+  it('matchesTechQuery 多词 AND，命中标题 / 中英摘要 / 方向 / 来源；空词全过', () => {
+    const item = tech({ summary: 'high throughput inference engine' })
+    expect(matchesTechQuery(item, '')).toBe(true)
+    expect(matchesTechQuery(item, 'vllm')).toBe(true)
+    expect(matchesTechQuery(item, '推理')).toBe(true)
+    expect(matchesTechQuery(item, 'throughput 推理')).toBe(true)
+    expect(matchesTechQuery(item, 'vllm 区块链')).toBe(false)
+    expect(matchesTechQuery(item, 'github')).toBe(true)
   })
 })

@@ -12,7 +12,18 @@ import { PhaseLoader } from '../components/ui/PhaseLoader'
 import { Select } from '../components/ui/Select'
 import { Toast } from '../components/ui/Toast'
 import { DIRECTIONS } from '../lib/questionDirections'
-import { dimensionText, needsTranslation, safeRepoUrl, summaryText, techMetaText } from '../lib/radar'
+import {
+  assessedTimeText,
+  dimensionText,
+  formatCount,
+  groupTechsByDay,
+  matchesTechQuery,
+  needsTranslation,
+  safeRepoUrl,
+  starDeltaText,
+  summaryText,
+  techTagList,
+} from '../lib/radar'
 import { useAsync } from '../lib/useAsync'
 
 /**
@@ -49,8 +60,14 @@ const DIRECTION_OPTIONS: ChipOption<string>[] = [
   ...DIRECTIONS.map((item) => ({ value: item, label: item })),
 ]
 
+/**
+ * r144 信息流单条（aihot 式）：左侧编号时间线 rail + 右侧紧凑信息卡。
+ * meta 行放「结论徽章 · 时间 · 来源 · star」，标题单独一行，标签行收方向与状态词，
+ * 「生成样例」与「展开详情」仍是显式按钮（不做整卡点击，避免误触）。
+ */
 function TechRow({
   item,
+  rank,
   busy,
   expanded,
   hit,
@@ -58,6 +75,8 @@ function TechRow({
   onGenerate,
 }: {
   item: RadarTechItem
+  /** 页内全局序号（跨日期分组连续编号，aihot 同款）。 */
+  rank: number
   busy: boolean
   expanded: boolean
   /** r87：从国子监深链定位到的条目，短暂高亮便于一眼找到。 */
@@ -70,16 +89,36 @@ function TechRow({
   const summaryToShow = summaryText(item)
   const hasOriginal = item.summary_zh !== '' && item.summary !== ''
   const link = safeRepoUrl(item.url)
+  const time = assessedTimeText(item.assessed_at)
+  const tags = techTagList(item)
   return (
     <li
-      className={hit ? 'sc-radar-techrow is-hit' : 'sc-radar-techrow'}
+      className={hit ? 'sc-radar-slot is-hit' : 'sc-radar-slot'}
       id={`radar-tech-${item.tech_slug}`}
     >
-      <div className="sc-radar-rowmain">
-        <div className="sc-radar-rowtitle">
+      <div className="sc-radar-rail" aria-hidden="true">
+        <span className="sc-radar-rank">{rank}</span>
+        <span className="sc-radar-node" />
+      </div>
+      <div className="sc-radar-slotcard">
+        <div className="sc-radar-slotmeta">
           <span className={`sc-radar-verdict ${VERDICT_CLASS[item.verdict] ?? 'is-skip'}`}>
             {item.verdict_label}
           </span>
+          <span className="sc-radar-slotsrc">
+            {time !== '' ? `${time} · ` : ''}
+            {item.source_key}
+          </span>
+          <span className="sc-radar-slotstars">
+            {`star ${formatCount(item.stars)}（7 日 ${starDeltaText(item.star_delta_7d)}）`}
+          </span>
+          <div className="sc-radar-slotact">
+            <Button variant="secondary" size="sm" loading={busy} onClick={() => onGenerate(item)}>
+              {item.job_id !== '' ? '查看样例' : '生成样例'}
+            </Button>
+          </div>
+        </div>
+        <div className="sc-radar-slothead">
           {link !== '' ? (
             <a
               className="sc-radar-name sc-radar-name--link"
@@ -96,11 +135,24 @@ function TechRow({
           ) : (
             <span className="sc-radar-name">{item.name}</span>
           )}
-          <span className="sc-radar-source">{item.source_key}</span>
         </div>
-        <p className="sc-radar-meta">{techMetaText(item)}</p>
-        {/* r88：概要直接在行内露出（中文优先，最多两行），展开态里仍有完整摘要与原文，不重复渲染。 */}
         {!expanded && summaryToShow !== '' && <p className="sc-radar-brief">{summaryToShow}</p>}
+        <div className="sc-radar-tagrow">
+          {tags.map((tag) => (
+            <span key={tag} className="sc-radar-tag">
+              {`#${tag}`}
+            </span>
+          ))}
+          <button
+            type="button"
+            className="sc-radar-expand"
+            aria-expanded={expanded}
+            aria-controls={detailId}
+            onClick={onToggle}
+          >
+            {expanded ? '收起详情 ▴' : '展开详情 ▾'}
+          </button>
+        </div>
         {expanded && (
           <div className="sc-radar-rowdetail" id={detailId}>
             {summaryToShow !== '' && <p className="sc-radar-summary">{summaryToShow}</p>}
@@ -114,21 +166,6 @@ function TechRow({
             <p className="sc-radar-dims">{dimensionText(item)}</p>
           </div>
         )}
-        {/* 默认只留结论 + 名称 + 元信息，摘要/理由/分档按需展开：每页 10 条也能一屏看完。 */}
-        <button
-          type="button"
-          className="sc-radar-expand"
-          aria-expanded={expanded}
-          aria-controls={detailId}
-          onClick={onToggle}
-        >
-          {expanded ? '收起详情 ▴' : '展开详情 ▾'}
-        </button>
-      </div>
-      <div className="sc-radar-rowact">
-        <Button variant="secondary" size="sm" loading={busy} onClick={() => onGenerate(item)}>
-          {item.job_id !== '' ? '查看样例' : '生成样例'}
-        </Button>
       </div>
     </li>
   )
@@ -143,6 +180,8 @@ export default function PioneerPage() {
   const [page, setPage] = useState(1)
   // 每页条数由用户选（后端 `limit` 上限 100），改动同样回到第 1 页。
   const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE)
+  // r144：当前页关键词过滤（服务端分页是权威口径，这里只帮用户在已取回的一页里快速扫）。
+  const [techQuery, setTechQuery] = useState('')
   // 清单筛选（服务端过滤）：结论与方向都是多选，`['all']` = 不筛选；筛选值变化一律回到第 1 页。
   const [verdictFilters, setVerdictFilters] = useState<string[]>(['all'])
   const [directionFilters, setDirectionFilters] = useState<string[]>(['all'])
@@ -236,6 +275,20 @@ export default function PioneerPage() {
   const pendingTranslation = (techs?.items ?? []).some(
     (item) => item.summary_zh === '' && needsTranslation(item.summary),
   )
+
+  // r144 信息流：当前页过滤 → 按本地日分组 → 跨组连续编号（aihot 同款）。
+  const visibleItems = (techs?.items ?? []).filter((item) => matchesTechQuery(item, techQuery))
+  const dayGroups = groupTechsByDay(visibleItems)
+  const rankBySlug = new Map<string, number>()
+  {
+    let rank = 0
+    for (const group of dayGroups) {
+      for (const item of group.items) {
+        rank += 1
+        rankBySlug.set(item.tech_slug, rank)
+      }
+    }
+  }
 
   // reload 引用稳定（useAsync 内部 useCallback），补翻函数才能安全地进 effect 依赖。
   const listReload = listAsync.reload
@@ -367,8 +420,8 @@ export default function PioneerPage() {
       <header className="sc-page-header">
         <h1 className="sc-page-title">先锋</h1>
         <p className="sc-page-sub">
-          新技术与热门技术清单：服务端按「岗位相关度 / 行业采用度 / 成熟度 / 学习成本」四个粗档评估，
-          结论是 1–5 的规则档位，不是精确评分。生成样例在后台跑，进度统一到「国子监」看。
+          新技术动态流：按评估日期分组、按时间倒序编号；服务端按「岗位相关度 / 行业采用度 / 成熟度 /
+          学习成本」四个粗档评估，结论是 1–5 的规则档位，不是精确评分。生成样例在后台跑，进度统一到「国子监」看。
         </p>
       </header>
 
@@ -492,11 +545,36 @@ export default function PioneerPage() {
         <Card>
           <div className="sc-radar-listhead">
             <h3 className="sc-coach-blocktitle">技术清单</h3>
-            <span className="sc-radar-count">共 {techs.total} 项</span>
+            <span className="sc-radar-count">
+              {techQuery.trim() === ''
+                ? `共 ${techs.total} 项`
+                : `本页 ${visibleItems.length} / 共 ${techs.total} 项`}
+            </span>
           </div>
           {missName !== '' && (
             <p className="sc-coach-note">
               从国子监带来的「{missName}」不在当前页：它可能在后面的分页里，翻页或换个方向筛选找找。
+            </p>
+          )}
+          {/* r144：aihot 式搜索条放在筛选之上——先扫词，再用结论 / 方向收窄。 */}
+          <div className="sc-radar-searchrow">
+            <input
+              type="text"
+              className="sc-radar-searchinput"
+              value={techQuery}
+              onChange={(event) => setTechQuery(event.target.value)}
+              placeholder="搜索标题和摘要（当前页）"
+              aria-label="过滤当前页技术条目"
+            />
+            {techQuery !== '' && (
+              <Button variant="ghost" size="sm" onClick={() => setTechQuery('')}>
+                清空
+              </Button>
+            )}
+          </div>
+          {techQuery.trim() !== '' && (
+            <p className="sc-coach-note">
+              搜索只过滤当前已取回的 {techs.items.length} 条；更早的条目请翻页后再搜。
             </p>
           )}
           {/* 筛选放在清单卡内：筛到 0 条时卡片仍在，筛选器不会跟着消失。 */}
@@ -568,20 +646,35 @@ export default function PioneerPage() {
             <p className="sc-radar-filtered-empty">
               当前筛选下没有条目：换个方向或结论，或点「清除筛选」看全量清单。
             </p>
+          ) : visibleItems.length === 0 ? (
+            <p className="sc-radar-filtered-empty">
+              {`当前页没有匹配「${techQuery.trim()}」的条目：换个词，或清空搜索看整页。`}
+            </p>
           ) : (
-            <ul className="sc-radar-list">
-              {techs.items.map((item) => (
-                <TechRow
-                  key={item.tech_slug}
-                  item={item}
-                  busy={generating === item.tech_slug}
-                  expanded={expandedSlugs.includes(item.tech_slug)}
-                  hit={hitSlug === item.tech_slug}
-                  onToggle={() => toggleExpanded(item.tech_slug)}
-                  onGenerate={(row) => void generate(row)}
-                />
+            <div className="sc-radar-feed">
+              {dayGroups.map((group) => (
+                <section className="sc-radar-day" key={group.key}>
+                  <header className="sc-radar-dayhead">
+                    <h4 className="sc-radar-daylabel">{group.label}</h4>
+                    <span className="sc-radar-daycount">{`${group.items.length} 条`}</span>
+                  </header>
+                  <ol className="sc-radar-timeline">
+                    {group.items.map((item) => (
+                      <TechRow
+                        key={item.tech_slug}
+                        item={item}
+                        rank={rankBySlug.get(item.tech_slug) ?? 0}
+                        busy={generating === item.tech_slug}
+                        expanded={expandedSlugs.includes(item.tech_slug)}
+                        hit={hitSlug === item.tech_slug}
+                        onToggle={() => toggleExpanded(item.tech_slug)}
+                        onGenerate={(row) => void generate(row)}
+                      />
+                    ))}
+                  </ol>
+                </section>
               ))}
-            </ul>
+            </div>
           )}
           <p className="sc-coach-note">
             清单是全局知识库，不按账号隔离；生成的任务按账号隔离，别人在途的任务不会占用你的额度。
