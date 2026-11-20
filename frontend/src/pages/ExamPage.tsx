@@ -1,3 +1,4 @@
+import { HeroEm, PageHero } from '../components/ui/PageHero'
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ApiError, api } from '../api/client'
@@ -303,12 +304,16 @@ export default function ExamPage() {
 
   return (
     <section>
-      <header className="sc-page-header">
-        <h1 className="sc-page-title">科考</h1>
-        <p className="sc-page-sub">
+      <PageHero
+        index="04"
+        kicker="EXAM / 科考"
+        title={<>用客观题，验证<HeroEm>真实功底</HeroEm></>}
+        lead={
+          <>
           客观题本地判分，提交后 10 秒内出总分、用时与逐题对错；失败不会清空你的选择
-        </p>
-      </header>
+          </>
+        }
+      />
 
       {draftNotice !== null ? (
         <div className="sc-meta-line" role="status">

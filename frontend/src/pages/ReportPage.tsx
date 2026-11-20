@@ -1,3 +1,4 @@
+import { HeroEm, PageHero } from '../components/ui/PageHero'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { ApiError, api } from '../api/client'
@@ -274,18 +275,21 @@ export default function ReportPage() {
 
   return (
     <section>
-      {/* r148b：页头与其余页面同一形态（h1 + 副文）；原 kicker 删，生成时间 / 覆盖数保留为第二条副文。 */}
-      <header className="sc-page-header">
-        <h1 className="sc-page-title">医案</h1>
-        <p className="sc-page-sub">
+      <PageHero
+        index="05"
+        kicker="DIAGNOSTIC / 医案"
+        title={<>短板看证据，补强<HeroEm>有方向</HeroEm></>}
+        lead={
+          <>
           短板按严重度从高到低排序，每条都带题目证据、建议动作与推荐课程
-        </p>
-        {report !== null && !requestPending && !requestFailed ? (
-          <p className="sc-page-sub">
-            {`生成于 ${formatGeneratedAt(report.generated_at)} · ${requested ? '本场报告' : '最近一批测评'} · 覆盖 ${report.run_ids.length} 次测评`}
-          </p>
-        ) : null}
-      </header>
+          </>
+        }
+        note={
+          report !== null && !requestPending && !requestFailed
+            ? `生成于 ${formatGeneratedAt(report.generated_at)} · ${requested ? '本场报告' : '最近一批测评'} · 覆盖 ${report.run_ids.length} 次测评`
+            : undefined
+        }
+      />
       <AiHeavyNotice />
 
       {/*

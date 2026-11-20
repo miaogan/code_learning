@@ -1,3 +1,4 @@
+import { HeroEm, PageHero } from '../components/ui/PageHero'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { ApiError, api } from '../api/client'
@@ -262,14 +263,18 @@ export default function ProfilePage() {
 
   return (
     <section>
-      <header className="sc-page-header">
-        <h1 className="sc-page-title">立传</h1>
-        <p className="sc-page-sub">
+      <PageHero
+        index="02"
+        kicker="PROFILE / 立传"
+        title={<>把经历，变成<HeroEm>可验证的证据</HeroEm></>}
+        lead={
+          <>
           {profile === null
-            ? '读取简历后自动生成 5 个维度，每条结论都带简历原文出处'
-            : `${sourceCount(profile)} 条溯源 · ${profile.skills.length} 个技能 · ${profile.projects.length} 段项目 · 可选编辑后开始测评`}
-        </p>
-      </header>
+          ? '读取简历后自动生成 5 个维度，每条结论都带简历原文出处'
+          : `${sourceCount(profile)} 条溯源 · ${profile.skills.length} 个技能 · ${profile.projects.length} 段项目 · 可选编辑后开始测评`}
+          </>
+        }
+      />
 
       {mergeSummary !== null ? (
         <MergeSummaryBar

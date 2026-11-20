@@ -1,3 +1,4 @@
+import { HeroEm, PageHero } from '../components/ui/PageHero'
 import { useState } from 'react'
 import { api } from '../api/client'
 import { ENGINEERING_ARCHIVE, ENGINEERING_STATS } from '../content/engineeringArchive'
@@ -84,13 +85,17 @@ export default function EvidencePage() {
 
   return (
     <section>
-      <header className="sc-page-header">
-        <h1 className="sc-page-title">考工</h1>
-        <p className="sc-page-sub">
+      <PageHero
+        index="20"
+        kicker="EVIDENCE / 考工"
+        title={<>工程证据，<HeroEm>来自真实落库</HeroEm></>}
+        lead={
+          <>
           工程证据中心：真实落库的行数事实、RAG 向量索引状态与营造档案。所有数字来自本服务
           的实时聚合与已落盘的工程事实，零评分、零模型参与。
-        </p>
-      </header>
+          </>
+        }
+      />
 
       {loading ? <PhaseLoader title="正在读取工程证据" phases={['聚合行数与索引状态']} active={0} /> : null}
       {evidence.status === 'error' && evidence.error ? (

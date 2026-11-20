@@ -1,3 +1,4 @@
+import { HeroEm, PageHero } from '../components/ui/PageHero'
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 
@@ -184,43 +185,47 @@ export default function ArchivePage() {
 
   return (
     <div className="sc-page sc-archive">
-      <header className="sc-archive-hero">
-        <p className="sc-archive-kicker">EVIDENCE ARCHIVE</p>
-        <h1 className="sc-page-title">卷宗</h1>
-        <p className="sc-page-sub">
+      <PageHero
+        index="15"
+        kicker="ARCHIVE / 卷宗"
+        title={<>一站汇总，<HeroEm>全部痕迹</HeroEm></>}
+        lead={
+          <>
           把画像、成绩、薄弱方向、学习进度与计划打卡汇总到一处，可一键导出或复制 Markdown。
           只汇总你在本站的记录，不代表能力评级，也不承诺求职结果。
-        </p>
-        {snapshot !== null && coverage !== null && !isEmptyArchive(snapshot) && (
-          <div className="sc-archive-stats">
-            <Stat
-              label="档案齐备度"
-              value={String(coverage.percent)}
-              unit="%"
-              hint={`已齐备 ${coverage.covered} / ${coverage.total} 项痕迹`}
-              accent
-            />
-            <Stat
-              label="计分测评"
-              value={String(snapshot.scores.judgedCount)}
-              unit="场"
-              hint={`面试 ${snapshot.scores.interviewCount} · 笔试 ${snapshot.scores.examCount}`}
-            />
-            <Stat
-              label="读完章节"
-              value={String(snapshot.learn.done)}
-              unit="章"
-              hint={`小节进度 ${snapshot.learn.percent}%`}
-            />
-            <Stat
-              label="计划打卡"
-              value={planValue(snapshot)}
-              unit="个"
-              hint={snapshot.plan === null ? '生成报告后才有计划' : `完成 ${snapshot.plan.percent}%`}
-            />
-          </div>
-        )}
-      </header>
+          </>
+        }
+      />
+
+      {snapshot !== null && coverage !== null && !isEmptyArchive(snapshot) && (
+        <div className="sc-archive-stats">
+          <Stat
+            label="档案齐备度"
+            value={String(coverage.percent)}
+            unit="%"
+            hint={`已齐备 ${coverage.covered} / ${coverage.total} 项痕迹`}
+            accent
+          />
+          <Stat
+            label="计分测评"
+            value={String(snapshot.scores.judgedCount)}
+            unit="场"
+            hint={`面试 ${snapshot.scores.interviewCount} · 笔试 ${snapshot.scores.examCount}`}
+          />
+          <Stat
+            label="读完章节"
+            value={String(snapshot.learn.done)}
+            unit="章"
+            hint={`小节进度 ${snapshot.learn.percent}%`}
+          />
+          <Stat
+            label="计划打卡"
+            value={planValue(snapshot)}
+            unit="个"
+            hint={snapshot.plan === null ? '生成报告后才有计划' : `完成 ${snapshot.plan.percent}%`}
+          />
+        </div>
+      )}
 
       {dataAsync.status === 'loading' && data === null && (
         <PhaseLoader title="正在汇总你的记录" phases={['读取画像、版本与成绩']} active={0} />

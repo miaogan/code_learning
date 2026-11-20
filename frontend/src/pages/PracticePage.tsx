@@ -1,3 +1,4 @@
+import { HeroEm, PageHero } from '../components/ui/PageHero'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { ApiError, api } from '../api/client'
@@ -547,13 +548,17 @@ export default function PracticePage() {
 
   return (
     <div className="sc-qa-col">
-      <header className="sc-page-header">
-        <h1 className="sc-page-title">演武</h1>
-        <p className="sc-page-sub">
+      <PageHero
+        index="08"
+        kicker="PRACTICE / 演武"
+        title={<>练过的题，才算<HeroEm>真会</HeroEm></>}
+        lead={
+          <>
           按语言挑题，提交即出对错与解析；已熟练掌握的题默认跳过（30 天内答对 2
           次且最近答对），判分与笔试同源
-        </p>
-      </header>
+          </>
+        }
+      />
 
       <div className="sc-qa-tabs">
         <SegTabs

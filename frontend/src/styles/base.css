@@ -13268,3 +13268,116 @@ a.sc-radar-name--link:hover .sc-radar-ext {
 .sc-lab-pagehead .sc-page-title {
   margin: var(--sp-2) 0 0;
 }
+
+/* ---------- r149 · 全站统一海报页头（append-only；视觉口径对齐首页 .sc-lab-hero） ----------
+   切页落差根因：首页用 kicker 编号 + 40–72px hero 标题 + 15px lead，其余页面散落
+   .sc-page-header / .sc-archive-hero / .sc-jd-hero / .sc-coach-kicker 等 8+ 套自造变体。
+   这里提供一套统一首屏：等宽 kicker → 大标题 → lead 副文 → 底部发丝分隔线，右侧可选读数区。
+   只新增类、不覆盖旧类，历史页面迁移由 PageHero 组件逐页替换完成。 */
+.sc-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--lab-gap-lg);
+  align-items: end;
+  padding-bottom: var(--sp-7);
+  margin-bottom: var(--sp-6);
+  border-bottom: 1px solid var(--border-strong);
+}
+
+.sc-hero.is-solo {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.sc-hero-copy {
+  min-width: 0;
+}
+
+.sc-hero-kicker {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-kicker);
+  line-height: var(--lh-kicker);
+  letter-spacing: var(--ls-kicker);
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.sc-hero-kicker-idx {
+  color: var(--accent);
+  letter-spacing: 0.08em;
+}
+
+.sc-hero-title {
+  margin: var(--sp-4) 0 0;
+  font-size: var(--fs-page-hero);
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+  font-weight: 700;
+}
+
+.sc-hero-em {
+  color: var(--accent);
+  font-style: normal;
+}
+
+.sc-hero-lead {
+  margin: var(--sp-4) 0 0;
+  max-width: var(--lab-lead-w);
+  font-size: var(--fs-lead);
+  line-height: var(--lh-lead);
+  color: var(--text-secondary);
+}
+
+.sc-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-3);
+  margin-top: var(--sp-6);
+}
+
+.sc-hero-note {
+  margin: var(--sp-4) 0 0;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+}
+
+.sc-hero-note a {
+  color: var(--accent);
+}
+
+.sc-hero-aside {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--sp-2);
+  padding-bottom: var(--sp-1);
+  font-family: var(--font-mono);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.sc-hero-aside b {
+  color: var(--accent);
+  font-size: var(--fs-value-lg);
+  line-height: var(--lh-value-lg);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+@media (max-width: 1023px) {
+  .sc-hero {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sp-5);
+  }
+
+  .sc-hero-aside {
+    align-items: flex-start;
+  }
+}

@@ -6,6 +6,7 @@
  * 「不是评分」，模拟面试与 dry-run 一律不冒充生产经验。页面自身零二次统计。
  */
 
+import { HeroEm, PageHero } from '../components/ui/PageHero'
 import { Link } from 'react-router-dom'
 
 import { api } from '../api/client'
@@ -199,19 +200,18 @@ export default function LeapPage() {
 
   return (
     <div className="sc-page sc-leap">
-      <header className="sc-leap-hero">
-        <div>
-          <p className="sc-page-kicker">逃 跑 计 划 · 跃 迁 档 案</p>
-          <h1 className="sc-page-title">跃迁档案</h1>
-          <p className="sc-leap-hero-note">
-            把目标岗位差距、项目工程证据与面试表达汇成一屏。全部来自站内真实记录，
-            不把模拟评测、dry-run 或刷题量包装成生产经验。
-          </p>
-        </div>
-        {archive ? (
-          <p className="sc-leap-stamp">聚合于 {formatWhen(archive.generated_at)}</p>
-        ) : null}
-      </header>
+      <PageHero
+        index="11"
+        kicker="LEAP / 跃迁"
+        title={<>所有积累，汇成<HeroEm>一份档案</HeroEm></>}
+        lead={
+          <>
+          把目标岗位差距、项目工程证据与面试表达汇成一屏。全部来自站内真实记录，
+          不把模拟评测、dry-run 或刷题量包装成生产经验。
+          </>
+        }
+        note={archive ? `聚合于 ${formatWhen(archive.generated_at)}` : undefined}
+      />
 
       {dataAsync.status === 'loading' && archive === null ? (
         <p className="sc-coach-note">正在汇总站内证据…</p>

@@ -1,3 +1,4 @@
+import { HeroEm, PageHero } from '../components/ui/PageHero'
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { ApiError, api } from '../api/client'
@@ -171,12 +172,16 @@ export default function SettingsPage() {
 
   return (
     <section>
-      <header className="sc-page-header">
-        <h1 className="sc-page-title">典制</h1>
-        <p className="sc-page-sub">
+      <PageHero
+        index="21"
+        kicker="SETTINGS / 典制"
+        title={<>账号与 AI，<HeroEm>配置在此</HeroEm></>}
+        lead={
+          <>
           {me.display_name} · {me.email} · 账号与 AI 服务
-        </p>
-      </header>
+          </>
+        }
+      />
 
       <div className="sc-settings-grid">
         <Card>

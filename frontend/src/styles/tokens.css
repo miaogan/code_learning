@@ -346,6 +346,14 @@
   --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23737d89' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
 }
 
+/* ---------- r149 · 全站统一海报页头标题（append-only） ----------
+   首页 --fs-hero：clamp(40, 4.6vw, 72)；旧普通页头 --fs-section-title：26。
+   统一页头取中间档：桌面最大 56（明显是海报标题，但不像首屏 72 那样吃掉内容区），
+   窄屏最小 36（390 宽下两行内可容纳 6–8 字），3.6vw 让中等屏平滑过渡。 */
+:root {
+  --fs-page-hero: clamp(36px, 3.6vw, 56px);
+}
+
 /* ---------- r76 · 太傅悬浮入口（append-only；推导见 docs/teamflow/20261111-r76-taifu-launcher/TECHNICAL.md） ---------- */
 :root {
   /* 方印 56 = 7×8，与 --sp-9 同值；浮窗 400×600 = 印章 56 × 7 留出 8 的呼吸位。 */

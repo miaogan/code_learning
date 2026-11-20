@@ -1,3 +1,4 @@
+import { PageHero } from '../components/ui/PageHero'
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { TutorialArticle } from '../components/learn/TutorialArticle'
@@ -75,10 +76,12 @@ export default function TutorialPage() {
         <span>{chapter.level}</span>
       </nav>
 
-      <header className="sc-page-header">
-        <h1 className="sc-page-title">{chapter.title}</h1>
-        <p className="sc-page-sub">{chapter.summary}</p>
-      </header>
+      <PageHero
+        index="07"
+        kicker={`TUTORIAL / ${chapter.direction}`}
+        title={chapter.title}
+        lead={chapter.summary}
+      />
 
       <p className="sc-meta-line">
         <Chip label={chapter.direction} tone="direction" />

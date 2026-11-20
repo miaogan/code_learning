@@ -1,3 +1,4 @@
+import { HeroEm, PageHero } from '../components/ui/PageHero'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../api/client'
@@ -548,13 +549,17 @@ export default function PioneerPage() {
 
   return (
     <div className="sc-page">
-      <header className="sc-page-header">
-        <h1 className="sc-page-title">先锋</h1>
-        <p className="sc-page-sub">
+      <PageHero
+        index="12"
+        kicker="RADAR / 先锋"
+        title={<>技术动态，按<HeroEm>岗位相关度</HeroEm>排序</>}
+        lead={
+          <>
           新技术动态流：按评估日期分组、按时间倒序编号；服务端按「岗位相关度 / 行业采用度 / 成熟度 /
           学习成本」四个粗档评估，结论是 1–5 的规则档位，不是精确评分。生成样例在后台跑，进度统一到「国子监」看。
-        </p>
-      </header>
+          </>
+        }
+      />
 
       {toast !== null && (
         <Toast

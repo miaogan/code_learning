@@ -1,3 +1,4 @@
+import { HeroEm, PageHero } from '../components/ui/PageHero'
 import { useState } from 'react'
 import { api } from '../api/client'
 import { EmptyState } from '../components/ui/EmptyState'
@@ -21,13 +22,17 @@ export default function EvalPage() {
 
   return (
     <section>
-      <header className="sc-page-header">
-        <h1 className="sc-page-title">评鉴</h1>
-        <p className="sc-page-sub">
+      <PageHero
+        index="19"
+        kicker="EVALUATION / 评鉴"
+        title={<>调用元数据，<HeroEm>如实呈现</HeroEm></>}
+        lead={
+          <>
           最近 {days} 天的模型调用元数据：成功率、延迟分位与失败分类。数据只来自本账号的真实调用，
           不含 Key、Prompt 与简历正文；这不是模型质量评分。
-        </p>
-      </header>
+          </>
+        }
+      />
 
       <div className="sc-btn-row">
         {WINDOWS.map((window) => (

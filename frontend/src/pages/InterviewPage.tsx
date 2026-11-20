@@ -1,3 +1,4 @@
+import { HeroEm, PageHero } from '../components/ui/PageHero'
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
@@ -677,12 +678,16 @@ export default function InterviewPage() {
 
   return (
     <section>
-      <header className="sc-page-header">
-        <h1 className="sc-page-title">召对</h1>
-        <p className="sc-page-sub">
+      <PageHero
+        index="03"
+        kicker="INTERVIEW / 召对"
+        title={<>让每一次回答，都<HeroEm>有据可查</HeroEm></>}
+        lead={
+          <>
           多轮对话式面试：每题 0–10 分与逐字点评长在你的回答里；首问之后每轮只出一道，失败不会清空你的答案
-        </p>
-      </header>
+          </>
+        }
+      />
       <AiHeavyNotice />
       {content}
       <ConfirmModal

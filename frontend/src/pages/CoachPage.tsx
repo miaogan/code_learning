@@ -1,3 +1,4 @@
+import { HeroEm, PageHero } from '../components/ui/PageHero'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client'
@@ -107,13 +108,16 @@ export default function CoachPage() {
 
   return (
     <section className="sc-coach-page">
-      <header className="sc-page-header">
-        <p className="sc-coach-kicker">AGENT ORCHESTRATION</p>
-        <h1 className="sc-page-title">讲席</h1>
-        <p className="sc-page-sub">
+      <PageHero
+        index="17"
+        kicker="COACH / 讲席"
+        title={<>一个问题，走完<HeroEm>规划到作答</HeroEm></>}
+        lead={
+          <>
           把一个问题规划成工具计划，读完材料再作答。整条轨迹会留档回放——看的不是「它说了什么」，而是「它凭什么这么说」。
-        </p>
-      </header>
+          </>
+        }
+      />
 
       <div className="sc-coach-layout">
         <div className="sc-coach-main">

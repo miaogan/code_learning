@@ -6,6 +6,7 @@
  * 结果按账号保存（`/api/mirror/cards`），刷新后可恢复复盘。
  */
 
+import { HeroEm, PageHero } from '../components/ui/PageHero'
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link } from 'react-router-dom'
@@ -291,14 +292,17 @@ export default function MirrorPage() {
 
   return (
     <div className="sc-page sc-mirror">
-      <header className="sc-mirror-hero">
-        <p className="sc-page-kicker">逃 跑 计 划 · 镜 试</p>
-        <h1 className="sc-page-title">镜试</h1>
-        <p className="sc-mirror-hero-note">
+      <PageHero
+        index="09"
+        kicker="MIRROR / 镜试"
+        title={<>换个位置，<HeroEm>看清自己的题</HeroEm></>}
+        lead={
+          <>
           角色反转：你是面试官，用自己简历向自己提问。AI 给参考满分答案、解释答题思路、
           评价题目水准。只用于练习复盘，不打分、不进战绩。
-        </p>
-      </header>
+          </>
+        }
+      />
 
       {/* 左主栏 = 提问与当前复盘；右栏 = 历史复盘（窄屏退化成上下堆叠）。 */}
       <div className="sc-mirror-layout">

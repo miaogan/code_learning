@@ -1,3 +1,4 @@
+import { HeroEm, PageHero } from '../components/ui/PageHero'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { ApiError, api } from '../api/client'
@@ -452,12 +453,16 @@ export default function PolishPage() {
 
   return (
     <section className="sc-polish-page">
-      <header className="sc-page-header">
-        <h1 className="sc-page-title">修文</h1>
-        <p className="sc-page-sub">
+      <PageHero
+        index="18"
+        kicker="POLISH / 修文"
+        title={<>只改表达，<HeroEm>不改事实</HeroEm></>}
+        lead={
+          <>
           AI 只改措辞与结构，不改事实与数字；逐条对比后可采纳，成稿随时可导出
-        </p>
-      </header>
+          </>
+        }
+      />
       <AiHeavyNotice />
 
       {profilePending ? (

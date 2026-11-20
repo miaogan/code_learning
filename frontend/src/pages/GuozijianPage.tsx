@@ -1,3 +1,4 @@
+import { HeroEm, PageHero } from '../components/ui/PageHero'
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../api/client'
@@ -341,13 +342,17 @@ export default function GuozijianPage() {
 
   return (
     <div className="sc-page">
-      <header className="sc-page-header">
-        <h1 className="sc-page-title">国子监</h1>
-        <p className="sc-page-sub">
+      <PageHero
+        index="13"
+        kicker="WORKSHOP / 国子监"
+        title={<>后台进度，<HeroEm>一屏掌握</HeroEm></>}
+        lead={
+          <>
           这里统一观察样例生成进度：生成在服务端后台跑，离开页面也不会中断，回来按任务接上。
           完成后只有两个出口 —— 扩充入库（题目进练习池）或废弃（整份草稿作废），二者互斥。
-        </p>
-      </header>
+          </>
+        }
+      />
 
       {toast !== null && (
         <Toast

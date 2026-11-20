@@ -1,3 +1,4 @@
+import { HeroEm, PageHero } from '../components/ui/PageHero'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ApiError, api } from '../api/client'
@@ -80,13 +81,17 @@ export default function HistoryPage() {
 
   return (
     <section>
-      <header className="sc-page-header">
-        <h1 className="sc-page-title">战绩</h1>
-        <p className="sc-page-sub">
+      <PageHero
+        index="14"
+        kicker="HISTORY / 战绩"
+        title={<>每一场测评，都有<HeroEm>来路</HeroEm></>}
+        lead={
+          <>
           每页 {PAGE_SIZE} 次测评的面试均分、笔试总分与短板条数，按时间倒序；
           变化列只与同类型上一次对比
-        </p>
-      </header>
+          </>
+        }
+      />
 
       {loading ? (
         <PhaseLoader title="正在读取本机历史记录" phases={['读取已完成的测评']} active={0} />

@@ -1,3 +1,4 @@
+import { HeroEm, PageHero } from '../components/ui/PageHero'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../api/client'
@@ -203,12 +204,16 @@ export default function SearchPage() {
     <div className="sc-learn-page">
       {/* r148b：页头与其余页面同一形态（h1 + 副文）；原 kicker / stats 块信息重复
          （章数在副文、命中条数在各分组标题），删。 */}
-      <header className="sc-page-header">
-        <h1 className="sc-page-title">检索</h1>
-        <p className="sc-page-sub">
+      <PageHero
+        index="06"
+        kicker="SEARCH / 检索"
+        title={<>一搜，直达<HeroEm>教程与题库</HeroEm></>}
+        lead={
+          <>
           教程按小节正文与标题命中并给出摘要，题库按题面命中并带你到对应方向的练习；教程侧即时出结果，题库侧停止输入后自动检索。只读站内教程与题库，不读简历正文、立传与医案原文。
-        </p>
-      </header>
+          </>
+        }
+      />
 
       <div className="sc-search-bar">
         <input

@@ -1,3 +1,4 @@
+import { HeroEm, PageHero } from '../components/ui/PageHero'
 import { Link, useSearchParams } from 'react-router-dom'
 import { EmptyState } from '../components/ui/EmptyState'
 import { Chip } from '../components/ui/Chip'
@@ -99,12 +100,16 @@ export default function LearnPage() {
   return (
     <div className="sc-learn-page">
       {/* r148b：页头与其余页面同一形态（h1 + 副文）；原 kicker / stats 块与副文信息重复，已读率并入副文。 */}
-      <header className="sc-page-header">
-        <h1 className="sc-page-title">学堂</h1>
-        <p className="sc-page-sub">
+      <PageHero
+        index="07"
+        kicker="TUTORIAL / 学堂"
+        title={<>把知识，读成<HeroEm>自己的进度</HeroEm></>}
+        lead={
+          <>
           {`站内教程共 ${ALL_TUTORIAL_CHAPTERS.length} 章，覆盖 ${TUTORIAL_DIRECTIONS.length} 个方向与基础 / 进阶 / 高级三档难度，已读 ${summary.percent}%；每章都能回到对应专项练习`}
-        </p>
-      </header>
+          </>
+        }
+      />
 
       {resume === null ? null : <ResumeCard target={resume} />}
 

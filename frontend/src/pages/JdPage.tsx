@@ -5,6 +5,7 @@
  * 所有「未找到证据」都只是画像里没查到可复算的引用，绝不表述为能力不足或生产经验。
  */
 
+import { HeroEm, PageHero } from '../components/ui/PageHero'
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link } from 'react-router-dom'
@@ -212,14 +213,17 @@ export default function JdPage() {
 
   return (
     <div className="sc-page sc-jd">
-      <header className="sc-jd-hero">
-        <p className="sc-page-kicker">逃 跑 计 划 · 岗 位 对 位</p>
-        <h1 className="sc-page-title">岗位对位</h1>
-        <p className="sc-jd-hero-note">
+      <PageHero
+        index="10"
+        kicker="JOB MATCH / 对岗"
+        title={<>把 JD 和证据，<HeroEm>放在一起看</HeroEm></>}
+        lead={
+          <>
           把 JD 里的技术词和简历画像里的真实证据放在一起看。这里不打分，
           也不把模拟练习包装成生产经验。
-        </p>
-      </header>
+          </>
+        }
+      />
 
       <Card className="sc-jd-form-card">
         <form onSubmit={(event) => void submit(event)}>
