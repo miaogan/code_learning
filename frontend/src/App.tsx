@@ -64,6 +64,14 @@ export default function App() {
     void startAuth()
   }, [])
 
+  // r148：切页签回到页首。页签间内容高度差很大，保留旧 scrollY 会被新页面的高度
+  // clamp 到顶部/中部，看起来像整页抖动。带 hash 的深链不重置——学堂「继续学习」
+  // （`/learn/<chapter>#tutorial-…`）由目标页自己 scrollIntoView，先回顶会把它顶回去。
+  // deps 只用 pathname：search 变化（筛选、深链定位）不动滚动位置。
+  useEffect(() => {
+    if (window.location.hash === '') window.scrollTo(0, 0)
+  }, [pathname])
+
   // 登出 / 被踢回登录页时清掉 AI 能力提示与「未上传简历」会话标记，避免下一位用户看到上一轮的旧弹框。
   // 注意只认「已登录 → null」的跳变：启动首帧 auth.me 尚未知（也是 null），不能当作登出，
   // 否则每次整页刷新都会把会话引导标记清掉，「只弹一次」就失效了。

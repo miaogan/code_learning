@@ -279,7 +279,7 @@ export default function ReportPage() {
           <p className="sc-lab-kicker sc-lab-rise">
             <span className="sc-lab-kicker-idx">03</span> DIAGNOSTIC
           </p>
-          <h1 className="sc-lab-page-title sc-lab-rise is-d1">医案</h1>
+          <h1 className="sc-page-title sc-lab-rise is-d1">医案</h1>
           <p className="sc-lab-lead sc-lab-rise is-d2">
             短板按严重度从高到低排序，每条都带题目证据、建议动作与推荐课程
           </p>

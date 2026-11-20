@@ -7450,6 +7450,10 @@ body {
 
 html {
   background-color: var(--bg-canvas);
+  /* r148：视口滚动条槽位常驻。长页与短页之间切换（或页内 tab 内容高度变化）时，
+     滚动条的出现/消失会让整个视口横向挤压十几像素——Windows 宽滚动条下尤其明显，
+     是「切页签抖动」的一半来源；stable 让槽位恒定，内容不再被挤压。 */
+  scrollbar-gutter: stable;
 }
 
 @media (max-width: 1023px) {
@@ -13254,4 +13258,13 @@ a.sc-radar-name--link:hover .sc-radar-ext {
   align-items: center;
   flex-wrap: wrap;
   gap: var(--sp-1);
+}
+
+/* ---------- r148 页头 h1 统一：lab 页头改用全站统一的 .sc-page-title ----------
+   学堂 / 医案 / 检索此前用 40–60px 的 .sc-lab-page-title，与其余 17 页的普通页标题
+   两档并存；统一降为 .sc-page-title（视觉方向经确认）。原类自带的 margin-top 提供了
+   kicker → 标题的间距，换类后在页头作用域内补回同量间距。.sc-lab-page-title 的旧规则
+   按基线 append-only 保留（不再被引用）。 */
+.sc-lab-pagehead .sc-page-title {
+  margin: var(--sp-2) 0 0;
 }

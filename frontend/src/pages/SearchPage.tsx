@@ -204,7 +204,7 @@ export default function SearchPage() {
       <header className="sc-lab-pagehead">
         <div>
           <p className="sc-lab-kicker sc-lab-rise">SEARCH / 站内检索</p>
-          <h1 className="sc-lab-page-title sc-lab-rise is-d1">检索</h1>
+          <h1 className="sc-page-title sc-lab-rise is-d1">检索</h1>
           <p className="sc-lab-lead sc-lab-rise is-d2">
             教程按小节正文与标题命中并给出摘要，题库按题面命中并带你到对应方向的练习；教程侧即时出结果，题库侧停止输入后自动检索。只读站内教程与题库，不读简历正文、立传与医案原文。
           </p>

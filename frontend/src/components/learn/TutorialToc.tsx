@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type MouseEvent } from 'react'
 import type { TutorialChapter } from '../../lib/tutorialTypes'
 
 export interface TutorialTocProps {
@@ -37,10 +37,19 @@ function useWideLayout(): boolean {
  * 章内目录：4 个小节的锚点入口（锚点 id 由 `TutorialArticle` 生成，`#tutorial-<sectionId>`）。
  *
  * 三件事同时说清：读到第几节（高亮）、哪几节读过（✓）、一共几节。
- * 用 `<a href="#…">` 而不是 `Link`：只改 hash，浏览器原生滚动，链接可直接分享。
+ * r148：点击改为**模拟滚动**（`scrollIntoView({ behavior: 'smooth' })`）——浏览器原生
+ * hash 跳转是瞬移，长章节里读者会失去「自己在哪里」的位置感；目标小节自带的
+ * `scroll-margin-top` 保证落点不被粘性顶栏压住。hash 照旧更新（`pushState` 不触发
+ * 原生跳转），链接仍可直接分享；初次进页（「继续学习」深链）仍走瞬时定位。
  */
 export function TutorialToc({ chapter, activeSectionId, readIds, seen }: TutorialTocProps) {
   const wide = useWideLayout()
+
+  const jumpTo = (event: MouseEvent<HTMLAnchorElement>, sectionId: string): void => {
+    event.preventDefault()
+    document.getElementById(`tutorial-${sectionId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    window.history.pushState(null, '', `#tutorial-${sectionId}`)
+  }
 
   return (
     <details className="sc-learn-toc" open={wide}>
@@ -59,6 +68,7 @@ export function TutorialToc({ chapter, activeSectionId, readIds, seen }: Tutoria
                 <a
                   className={active ? 'sc-learn-tocitem is-active' : 'sc-learn-tocitem'}
                   href={`#tutorial-${section.id}`}
+                  onClick={(event) => jumpTo(event, section.id)}
                   aria-current={active ? 'location' : undefined}
                   aria-label={`第 ${index + 1} 节 ${section.title}${read ? '（已读）' : ''}`}
                 >
