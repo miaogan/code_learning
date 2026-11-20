@@ -199,7 +199,7 @@ export default function LeapPage() {
   const archive = dataAsync.data
 
   return (
-    <div className="sc-page sc-leap">
+    <div className="sc-leap">
       <PageHero
         index="11"
         kicker="LEAP / 跃迁"

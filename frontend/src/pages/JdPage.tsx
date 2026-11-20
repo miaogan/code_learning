@@ -212,7 +212,7 @@ export default function JdPage() {
   }
 
   return (
-    <div className="sc-page sc-jd">
+    <div className="sc-jd">
       <PageHero
         index="10"
         kicker="JOB MATCH / 对岗"

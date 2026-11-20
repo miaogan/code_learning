@@ -548,7 +548,7 @@ export default function PioneerPage() {
   }
 
   return (
-    <div className="sc-page">
+    <div>
       <PageHero
         index="12"
         kicker="RADAR / 先锋"

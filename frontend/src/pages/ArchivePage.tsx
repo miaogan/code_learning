@@ -184,7 +184,7 @@ export default function ArchivePage() {
   }
 
   return (
-    <div className="sc-page sc-archive">
+    <div className="sc-archive">
       <PageHero
         index="15"
         kicker="ARCHIVE / 卷宗"

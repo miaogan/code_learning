@@ -120,7 +120,7 @@ export default function VersionsPage() {
   const comparison = detail === null ? null : compareVersions(detail.before, detail.after)
 
   return (
-    <div className="sc-page">
+    <div>
       <PageHero
         index="16"
         kicker="VERSIONS / 校勘"

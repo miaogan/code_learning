@@ -341,7 +341,7 @@ export default function GuozijianPage() {
   }
 
   return (
-    <div className="sc-page">
+    <div>
       <PageHero
         index="13"
         kicker="WORKSHOP / 国子监"

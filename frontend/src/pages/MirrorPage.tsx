@@ -291,7 +291,7 @@ export default function MirrorPage() {
   const history = cardsState.data?.items ?? []
 
   return (
-    <div className="sc-page sc-mirror">
+    <div className="sc-mirror">
       <PageHero
         index="09"
         kicker="MIRROR / 镜试"
