@@ -20,6 +20,7 @@ import { ErrorBoundary } from '../components/ui/ErrorBoundary'
 import { RingProgress } from '../components/ui/RingProgress'
 import { Toast } from '../components/ui/Toast'
 import { polishRoleHref } from '../lib/coach'
+import { clipboardErrorMessage, copyPlainText, downloadTextFile } from '../lib/exportFile'
 import { formatScore } from '../lib/format'
 import { useAsync } from '../lib/useAsync'
 import { useAuth } from '../state/auth'
@@ -98,15 +99,7 @@ function writeCachedReport(key: string, report: Report): void {
   }
 }
 
-/** 复制失败的中文原因：浏览器拒绝/不支持剪贴板时引导用户走「导出 .md」。 */
-function clipboardErrorMessage(error: unknown): string {
-  if (error instanceof ApiError) return error.message || '复制失败，请改用「导出 .md」手动保存'
-  const name = typeof error === 'object' && error !== null ? (error as { name?: unknown }).name : null
-  if (name === 'NotAllowedError' || name === 'SecurityError') {
-    return '浏览器拒绝访问剪贴板，请改用「导出 .md」手动保存'
-  }
-  return '复制失败，请改用「导出 .md」手动保存'
-}
+// 复制失败的中文原因统一走 lib/exportFile（r147 A2，原本地实现已下沉；本页按钮名「导出 .md」）
 
 /**
  * 医案页（AC-5 / AC-6 / AC-9）。
@@ -240,15 +233,7 @@ export default function ReportPage() {
     try {
       // 文本来自后端唯一渲染源（services/markdown.py），前端只负责落盘
       const text = await api.reportMarkdown(report.id)
-      const blob = new Blob([text], { type: 'text/markdown;charset=utf-8' })
-      const url = URL.createObjectURL(blob)
-      const anchor = document.createElement('a')
-      anchor.href = url
-      anchor.download = markdownFileName(report)
-      document.body.appendChild(anchor)
-      anchor.click()
-      document.body.removeChild(anchor)
-      window.setTimeout(() => URL.revokeObjectURL(url), 0)
+      downloadTextFile(text, markdownFileName(report))
     } catch (error) {
       if (!mountedRef.current) return
       // 失败只报错不清空页面：报告仍在，用户可直接重试导出
@@ -263,19 +248,15 @@ export default function ReportPage() {
     setCopying(true)
     setCopyError(null)
     try {
-      // 前置能力判断（非安全上下文 / 旧浏览器）：不进 try 之外抛错，直接走失败分支
-      if (typeof navigator.clipboard?.writeText !== 'function') {
-        throw new ApiError('CLIPBOARD_UNAVAILABLE', '当前浏览器不支持剪贴板复制，请改用「导出 .md」手动保存', 0, true)
-      }
-      // 文本只有一个来源：后端唯一渲染（services/markdown.py）；此处全程零变换（AC-2）
+      // 能力判断（非安全上下文 / 旧浏览器）在 copyPlainText 里前置；文本全程零变换（AC-2）
       const text = await api.reportMarkdown(report.id)
-      await navigator.clipboard.writeText(text)
+      await copyPlainText(text)
       if (!mountedRef.current) return
       setToast((prev) => ({ message: COPY_TOAST_MESSAGE, seq: (prev?.seq ?? 0) + 1 }))
     } catch (error) {
       if (!mountedRef.current) return
       // 失败只报错不清空页面：报告仍在，用户可重试复制或用「导出 .md」手动兜底
-      setCopyError(clipboardErrorMessage(error))
+      setCopyError(clipboardErrorMessage(error, '导出 .md'))
     } finally {
       if (mountedRef.current) setCopying(false)
     }

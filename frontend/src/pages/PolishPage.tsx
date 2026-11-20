@@ -15,6 +15,7 @@ import { PhaseLoader } from '../components/ui/PhaseLoader'
 import { ResumeGate } from '../components/ui/ResumeGate'
 import { Select } from '../components/ui/Select'
 import { Toast } from '../components/ui/Toast'
+import { downloadTextFile } from '../lib/exportFile'
 import { exportFileName } from '../lib/exportName'
 import {
   FOCUS_ELEMENT_ID,
@@ -31,6 +32,7 @@ import {
   toUserFacts,
 } from '../lib/mirrorFacts'
 import { useAsync } from '../lib/useAsync'
+import { useLeaveGuard } from '../lib/useLeaveGuard'
 
 /** 建议生成三段文案（DESIGN §0.6：AI 等待必须有文字步进）。 */
 const ANALYSIS_PHASES = ['读取简历正文', '生成逐条建议', '事实校验']
@@ -140,7 +142,6 @@ export default function PolishPage() {
   const [exportError, setExportError] = useState<string | null>(null)
   const [tab, setTab] = useState<'original' | 'polished'>('polished')
   const [toast, setToast] = useState<{ message: string; seq: number } | null>(null)
-  const [pendingLeave, setPendingLeave] = useState<string | null>(null)
   /** 已有成稿时「按此岗位重跑」先确认：重跑会清空当前成稿。 */
   const [reanalyze, setReanalyze] = useState<{ role: string | null } | null>(null)
   const [composeOpen, setComposeOpen] = useState(false)
@@ -238,33 +239,9 @@ export default function PolishPage() {
 
   // 生成中离开保护：页签关闭/刷新 + 应用内链接跳转（DESIGN §2.4）
   // 扩展：有已采纳条目但还没生成成稿时，切页也会静默丢失本次润色进度。
+  // r147 A3：effect 下沉 lib/useLeaveGuard，与笔试/练习/上传四页共用一份。
   const guardLeave = generating || (adoptedIds.length > 0 && (full === null || stale))
-
-  useEffect(() => {
-    if (!guardLeave) {
-      setPendingLeave(null)
-      return
-    }
-    const onBeforeUnload = (event: BeforeUnloadEvent) => {
-      event.preventDefault()
-      event.returnValue = ''
-    }
-    const onClickCapture = (event: MouseEvent) => {
-      const target = event.target instanceof Element ? event.target.closest('a[href]') : null
-      if (!target) return
-      const href = target.getAttribute('href')
-      if (!href || href.startsWith('#') || /^[a-z]+:/i.test(href) || href === pathname) return
-      event.preventDefault()
-      event.stopPropagation()
-      setPendingLeave(href)
-    }
-    window.addEventListener('beforeunload', onBeforeUnload)
-    document.addEventListener('click', onClickCapture, true)
-    return () => {
-      window.removeEventListener('beforeunload', onBeforeUnload)
-      document.removeEventListener('click', onClickCapture, true)
-    }
-  }, [guardLeave, pathname])
+  const { pendingLeave, confirmLeave, cancelLeave } = useLeaveGuard(guardLeave)
 
   // --- r7 AC-5：报告页「去改这一条」→ 逐字定位 ---------------------------------
   const focusTarget = useMemo(() => parseFocusParams(new URLSearchParams(search)), [search])
@@ -394,15 +371,7 @@ export default function PolishPage() {
     setExporting(true)
     setExportError(null)
     try {
-      const blob = new Blob([full.markdown], { type: 'text/markdown;charset=utf-8' })
-      const url = URL.createObjectURL(blob)
-      const anchor = document.createElement('a')
-      anchor.href = url
-      anchor.download = exportFileName(session?.fileName)
-      document.body.appendChild(anchor)
-      anchor.click()
-      document.body.removeChild(anchor)
-      window.setTimeout(() => URL.revokeObjectURL(url), 0)
+      downloadTextFile(full.markdown, exportFileName(session?.fileName))
       if (!mountedRef.current) return
       setToast((prev) => ({ message: EXPORT_TOAST_MESSAGE, seq: (prev?.seq ?? 0) + 1 }))
     } catch (error) {
@@ -888,12 +857,8 @@ export default function PolishPage() {
         }
         confirmLabel="仍然离开"
         cancelLabel="留在本页"
-        onConfirm={() => {
-          const target = pendingLeave
-          setPendingLeave(null)
-          if (target !== null) navigate(target)
-        }}
-        onCancel={() => setPendingLeave(null)}
+        onConfirm={confirmLeave}
+        onCancel={cancelLeave}
       />
 
       {toast ? (

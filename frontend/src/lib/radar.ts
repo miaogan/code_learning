@@ -249,36 +249,19 @@ export function matchesTechQuery(item: RadarTechItem, rawQuery: string): boolean
 /** 结论四档的固定顺序：与服务端 `rules.VERDICTS` 同序，界面不因后端字典顺序抖动。 */
 export const VERDICT_ORDER = ['must_learn', 'worth_knowing', 'watch', 'skip'] as const
 
-const VERDICT_SHORT: Record<string, string> = {
-  must_learn: '必学',
-  worth_knowing: '选学',
-  watch: '观望',
-  skip: '跳过',
-}
-
-/**
- * 分面计数 → 摘要文案：`必学 8 · 选学 21 · 观望 18 · 跳过 10`。
- *
- * 缺档按 0 显示而不是省略——「观望 0」本身就是信息（本轮没有需要观望的），
- * 省略会让人以为是没算。
- */
-export function verdictCountText(counts: Record<string, number> | undefined): string {
-  return VERDICT_ORDER.map((verdict) => {
-    const count = counts?.[verdict] ?? 0
-    return `${VERDICT_SHORT[verdict]} ${count}`
-  }).join(' · ')
-}
-
 /** 结论 chip 文案：带分面计数（`必学 8`）；`全部` 传总数。计数缺省时退回纯文案。 */
 export function verdictChipLabel(label: string, count: number | undefined): string {
   return count === undefined ? label : `${label} ${count}`
 }
 
 /**
- * 清单头部计数文案（r146）：搜索 / 筛选 / 常态三种口径分开说。
+ * 清单头部计数文案（r146；r147 A4 去重）：搜索 / 筛选 / 常态三种口径分开说。
  *
  * 三种口径混在一起最容易造成误读——「共 8 项」到底是清单只有 8 条，还是筛出来 8 条？
- * 所以筛选时同时给全量（`共 8 项 / 全部 57`），常态才顺带铺开四档分布。
+ * 所以筛选时同时给全量（`共 8 项 / 全部 57`）。
+ *
+ * r147 变化：常态不再把四档分布复述成 `· 必学 a · 选学 b …`——那串信息紧挨着的
+ * 结论 chips 上**已经有了且可点**（`verdictChipLabel`），同一屏两行同一份计数是重复。
  */
 export function listCountText(input: {
   total: number
@@ -288,10 +271,22 @@ export function listCountText(input: {
   filtering: boolean
   counts?: Record<string, number>
 }): string {
-  const { total, pageCount, allCount, searching, filtering, counts } = input
+  const { total, pageCount, allCount, searching, filtering } = input
   if (searching) return `本页 ${pageCount} / 共 ${total} 项`
   if (filtering) return `共 ${total} 项 / 全部 ${allCount}`
-  return `共 ${total} 项 · ${verdictCountText(counts)}`
+  return `共 ${total} 项`
+}
+
+/**
+ * 周报卡方向点击 → 与筛选条 chips 完全一致的 toggle 语义（r147 A4）。
+ *
+ * 此前周报卡是覆盖式单选（`changeDirections([d])`），会悄悄清掉用户已勾的多选；
+ * 现在已选则取消（回「全部」），未选则追加，与 MultiChipRow 同一套状态语义。
+ */
+export function toggleDirectionFilter(current: string[], direction: string): string[] {
+  if (current.includes(direction)) return ['all']
+  const withoutAll = current.filter((item) => item !== 'all')
+  return [...withoutAll, direction]
 }
 
 /**

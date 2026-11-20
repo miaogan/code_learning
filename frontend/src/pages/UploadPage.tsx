@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ChangeEvent, DragEvent } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { ApiError, api } from '../api/client'
 import type { ProfileMergeSummary, ResumeMeta } from '../api/types'
 import { PRODUCT_FOCUS } from '../lib/brand'
@@ -39,6 +39,7 @@ import {
   writeUploadSession,
 } from '../lib/uploadSession'
 import { useAsync } from '../lib/useAsync'
+import { useLeaveGuard } from '../lib/useLeaveGuard'
 import { setFlow, useFlowState } from '../state/flow'
 import { useAuth } from '../state/auth'
 
@@ -138,7 +139,6 @@ function validateLocally(file: File): string | null {
  */
 export default function UploadPage() {
   const navigate = useNavigate()
-  const { pathname } = useLocation()
   const flow = useFlowState()
   const inputRef = useRef<HTMLInputElement>(null)
   /** r41：拍照（capture=environment，单选）与相册选择（multiple，最多 3 张）两个独立入口。 */
@@ -168,8 +168,10 @@ export default function UploadPage() {
   const [profileSec, setProfileSec] = useState(0)
   /** r42：断网 / 轮询异常的中文提示（不白屏、不误判任务失败）。 */
   const [netNotice, setNetNotice] = useState<string | null>(null)
-  /** 上传中点了站内链接：先确认再跳（后台任务阶段不拦截）。 */
-  const [pendingLeave, setPendingLeave] = useState<string | null>(null)
+  /** 上传中点了站内链接：先确认再跳（后台任务阶段不拦截）——r147 A3 下沉 lib/useLeaveGuard。 */
+  const { pendingLeave, confirmLeave, cancelLeave } = useLeaveGuard(phase === 'uploading', () =>
+    abortRef.current?.abort(),
+  )
   /** r42：本地会话的账号作用域；登录态就绪后才读本地会话。 */
   const userId = useAuth().me?.id ?? null
   /** 重接入按「恢复轮次」只跑一次；手动重试 +1 轮。 */
@@ -217,34 +219,7 @@ export default function UploadPage() {
   const controlsLocked = busy || imageLoading
 
   // 文件上传中（秒级窗口）离开会丢进度：刷新/关闭走浏览器原生提示，站内链接先确认 ——
-  // 与笔试页（作答中离开）、润色页（生成中离开）同一套写法。
   // 画像生成阶段**不拦截**：那是服务端后台任务（r30），离开照跑，回来自动接上。
-  useEffect(() => {
-    if (phase !== 'uploading') {
-      setPendingLeave(null)
-      return
-    }
-    const onBeforeUnload = (event: BeforeUnloadEvent) => {
-      event.preventDefault()
-      event.returnValue = ''
-    }
-    const onClickCapture = (event: MouseEvent) => {
-      const target = event.target instanceof Element ? event.target.closest('a[href]') : null
-      if (!target) return
-      const href = target.getAttribute('href')
-      if (!href || href.startsWith('#') || /^[a-z]+:/i.test(href) || href === pathname) return
-      event.preventDefault()
-      event.stopPropagation()
-      setPendingLeave(href)
-    }
-    window.addEventListener('beforeunload', onBeforeUnload)
-    document.addEventListener('click', onClickCapture, true)
-    return () => {
-      window.removeEventListener('beforeunload', onBeforeUnload)
-      document.removeEventListener('click', onClickCapture, true)
-    }
-  }, [phase, pathname])
-
   // 兜底：卸载时文件上传仍在途（确认离开后的跳转、登出）一律中止；
   // 画像后台任务不在中止范围 —— 它就是要活在页面之外。
   useEffect(() => () => abortRef.current?.abort(), [])
@@ -751,14 +726,6 @@ export default function UploadPage() {
   const cancel = () => {
     abortRef.current?.abort()
     setUploadSec(0)
-  }
-
-  /** 确认离开：中止在途上传再跳转；简历未入库则重传，已入库则重新上传会走合并，不重复计费。 */
-  const confirmLeave = () => {
-    const href = pendingLeave
-    setPendingLeave(null)
-    abortRef.current?.abort()
-    if (href !== null) navigate(href)
   }
 
   const reset = () => {
@@ -1389,7 +1356,7 @@ export default function UploadPage() {
         confirmLabel="仍然离开"
         cancelLabel="留在本页"
         onConfirm={confirmLeave}
-        onCancel={() => setPendingLeave(null)}
+        onCancel={cancelLeave}
       />
     </section>
   )

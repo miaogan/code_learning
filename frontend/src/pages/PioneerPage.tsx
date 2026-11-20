@@ -25,6 +25,7 @@ import {
   starDeltaText,
   summaryText,
   techTagList,
+  toggleDirectionFilter,
   VERDICT_ORDER,
   verdictChipLabel,
   weeklyText,
@@ -631,7 +632,7 @@ export default function PioneerPage() {
                       ? 'sc-radar-weeklydir is-active'
                       : 'sc-radar-weeklydir'
                   }
-                  onClick={() => changeDirections([row.direction])}
+                  onClick={() => changeDirections(toggleDirectionFilter(directionFilters, row.direction))}
                 >
                   {row.direction}
                   <b>{row.count}</b>

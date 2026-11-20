@@ -18,6 +18,7 @@ import {
   isEmptyArchive,
   type ArchiveSnapshot,
 } from '../lib/archive'
+import { clipboardErrorMessage, copyPlainText, downloadTextFile } from '../lib/exportFile'
 import { formatChars, formatScore, formatWhen } from '../lib/format'
 import { buildStudyPlan, PLAN_MINUTES } from '../lib/studyPlan'
 import { useAsync } from '../lib/useAsync'
@@ -165,26 +166,18 @@ export default function ArchivePage() {
 
   const exportArchive = () => {
     if (snapshot === null) return
-    const text = archiveMarkdown(snapshot)
-    const blob = new Blob([text], { type: 'text/markdown;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const anchor = document.createElement('a')
-    anchor.href = url
-    anchor.download = archiveFileName()
-    document.body.appendChild(anchor)
-    anchor.click()
-    document.body.removeChild(anchor)
-    window.setTimeout(() => URL.revokeObjectURL(url), 0)
+    downloadTextFile(archiveMarkdown(snapshot), archiveFileName())
   }
 
   const copyArchive = async () => {
     if (snapshot === null) return
     try {
-      await navigator.clipboard.writeText(archiveMarkdown(snapshot))
+      await copyPlainText(archiveMarkdown(snapshot))
       setToast('已复制 Markdown，可直接粘进笔记')
       setToastSeq((seq) => seq + 1)
-    } catch {
-      setToast('复制失败：浏览器没给剪贴板权限，可改用「导出 Markdown」')
+    } catch (error) {
+      // r147：本页按钮叫「导出 Markdown」，错误指引要与按钮名对上
+      setToast(clipboardErrorMessage(error, '导出 Markdown'))
       setToastSeq((seq) => seq + 1)
     }
   }

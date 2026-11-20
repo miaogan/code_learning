@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { ApiError, api } from '../api/client'
 import type { ExamResult, ExamRun } from '../api/types'
 import { ExamQuestionCard } from '../components/exam/ExamQuestionCard'
@@ -19,6 +19,7 @@ import { backfillNotice, filteredNotice, proficiencyRuleHint, subDirectionNotice
 import { formatElapsed, formatWhen } from '../lib/format'
 import { clearExamDraft, readExamDraft, writeExamDraft } from '../lib/examDraft'
 import { DIRECTIONS, SUBDIRECTIONS } from '../lib/questionDirections'
+import { useLeaveGuard } from '../lib/useLeaveGuard'
 import { useAsync } from '../lib/useAsync'
 import { setFlow } from '../state/flow'
 import { useAuth } from '../state/auth'
@@ -65,8 +66,6 @@ function isAnswered(value: string[] | string | undefined): boolean {
  */
 export default function ExamPage() {
   const profileAsync = useAsync((signal) => api.latestProfile(signal), [])
-  const { pathname } = useLocation()
-  const navigate = useNavigate()
   const { me } = useAuth()
   const userId = me?.id ?? null
   // 初始化是纯读：StrictMode 两次执行不会消费或清掉同一份草稿。
@@ -93,7 +92,6 @@ export default function ExamPage() {
   const [restartOpen, setRestartOpen] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [confirmOpen, setConfirmOpen] = useState(false)
-  const [pendingLeave, setPendingLeave] = useState<string | null>(null)
   const [createElapsed, setCreateElapsed] = useState(0)
   const [runElapsed, setRunElapsed] = useState(restored.status === 'ok' ? restored.elapsedS : 0)
   const [filterDirections, setFilterDirections] = useState<string[]>([])
@@ -204,38 +202,11 @@ export default function ExamPage() {
     : null
   const hasAnyAnswer = answeredCount > 0
 
-  // 本地存储不可用时才保留旧的离开保护；正常情况由草稿恢复兜底，不拦 SPA 返回。
-  useEffect(() => {
-    if (durable || stage !== 'running' || !hasAnyAnswer) {
-      setPendingLeave(null)
-      return
-    }
-    const onBeforeUnload = (event: BeforeUnloadEvent) => {
-      event.preventDefault()
-      event.returnValue = ''
-    }
-    const onClickCapture = (event: MouseEvent) => {
-      const target = event.target instanceof Element ? event.target.closest('a[href]') : null
-      if (!target) return
-      const href = target.getAttribute('href')
-      if (!href || href.startsWith('#') || /^[a-z]+:/i.test(href) || href === pathname) return
-      event.preventDefault()
-      event.stopPropagation()
-      setPendingLeave(href)
-    }
-    window.addEventListener('beforeunload', onBeforeUnload)
-    document.addEventListener('click', onClickCapture, true)
-    return () => {
-      window.removeEventListener('beforeunload', onBeforeUnload)
-      document.removeEventListener('click', onClickCapture, true)
-    }
-  }, [stage, hasAnyAnswer, pathname, durable])
-
-  const confirmLeave = () => {
-    const href = pendingLeave
-    setPendingLeave(null)
-    if (href !== null) navigate(href)
-  }
+  // r147 A3：离开保护下沉 lib/useLeaveGuard（原本地 effect 逐字重复四页）。本地草稿可恢复时
+  // 不拦——本地存储不可用才保留旧保护；正常情况由草稿恢复兜底，不拦 SPA 返回。
+  const { pendingLeave, confirmLeave, cancelLeave } = useLeaveGuard(
+    !durable && stage === 'running' && hasAnyAnswer,
+  )
 
   const startExam = async () => {
     if (!profile) return
@@ -650,7 +621,7 @@ export default function ExamPage() {
         confirmLabel="仍然离开"
         cancelLabel="留在本页"
         onConfirm={confirmLeave}
-        onCancel={() => setPendingLeave(null)}
+        onCancel={cancelLeave}
       />
     </section>
   )
