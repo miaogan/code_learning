@@ -274,23 +274,15 @@ export default function ReportPage() {
 
   return (
     <section>
-      <header className="sc-lab-pagehead">
-        <div>
-          <p className="sc-lab-kicker sc-lab-rise">
-            <span className="sc-lab-kicker-idx">03</span> DIAGNOSTIC
-          </p>
-          <h1 className="sc-page-title sc-lab-rise is-d1">医案</h1>
-          <p className="sc-lab-lead sc-lab-rise is-d2">
-            短板按严重度从高到低排序，每条都带题目证据、建议动作与推荐课程
-          </p>
-        </div>
+      {/* r148b：页头与其余页面同一形态（h1 + 副文）；原 kicker 删，生成时间 / 覆盖数保留为第二条副文。 */}
+      <header className="sc-page-header">
+        <h1 className="sc-page-title">医案</h1>
+        <p className="sc-page-sub">
+          短板按严重度从高到低排序，每条都带题目证据、建议动作与推荐课程
+        </p>
         {report !== null && !requestPending && !requestFailed ? (
-          <p className="sc-lab-report-meta sc-lab-rise is-d2">
-            {`生成于 ${formatGeneratedAt(report.generated_at)}`}
-            <br />
-            {`${requested ? '本场报告' : '最近一批测评'} · 覆盖 `}
-            <b>{report.run_ids.length}</b>
-            {' 次测评'}
+          <p className="sc-page-sub">
+            {`生成于 ${formatGeneratedAt(report.generated_at)} · ${requested ? '本场报告' : '最近一批测评'} · 覆盖 ${report.run_ids.length} 次测评`}
           </p>
         ) : null}
       </header>

@@ -98,39 +98,12 @@ export default function LearnPage() {
 
   return (
     <div className="sc-learn-page">
-      <header className="sc-lab-pagehead">
-        <div>
-          <p className="sc-lab-kicker sc-lab-rise">
-            <span className="sc-lab-kicker-idx">02</span> CURRICULUM
-          </p>
-          <h1 className="sc-page-title sc-lab-rise is-d1">学堂</h1>
-          <p className="sc-lab-lead sc-lab-rise is-d2">
-            {`站内教程共 ${ALL_TUTORIAL_CHAPTERS.length} 章，覆盖 ${TUTORIAL_DIRECTIONS.length} 个方向与基础 / 进阶 / 高级三档难度；每章都能回到对应专项练习`}
-          </p>
-        </div>
-        <div className="sc-lab-stats sc-lab-rise is-d2">
-          <div className="sc-lab-stat">
-            <b>
-              {ALL_TUTORIAL_CHAPTERS.length}
-              <span className="u">章</span>
-            </b>
-            <em>CHAPTERS</em>
-          </div>
-          <div className="sc-lab-stat">
-            <b>
-              {TUTORIAL_DIRECTIONS.length}
-              <span className="u">方向</span>
-            </b>
-            <em>DIRECTIONS</em>
-          </div>
-          <div className="sc-lab-stat">
-            <b>
-              {summary.percent}
-              <span className="u">%</span>
-            </b>
-            <em>READ</em>
-          </div>
-        </div>
+      {/* r148b：页头与其余页面同一形态（h1 + 副文）；原 kicker / stats 块与副文信息重复，已读率并入副文。 */}
+      <header className="sc-page-header">
+        <h1 className="sc-page-title">学堂</h1>
+        <p className="sc-page-sub">
+          {`站内教程共 ${ALL_TUTORIAL_CHAPTERS.length} 章，覆盖 ${TUTORIAL_DIRECTIONS.length} 个方向与基础 / 进阶 / 高级三档难度，已读 ${summary.percent}%；每章都能回到对应专项练习`}
+        </p>
       </header>
 
       {resume === null ? null : <ResumeCard target={resume} />}

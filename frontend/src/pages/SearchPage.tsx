@@ -201,37 +201,13 @@ export default function SearchPage() {
 
   return (
     <div className="sc-learn-page">
-      <header className="sc-lab-pagehead">
-        <div>
-          <p className="sc-lab-kicker sc-lab-rise">SEARCH / 站内检索</p>
-          <h1 className="sc-page-title sc-lab-rise is-d1">检索</h1>
-          <p className="sc-lab-lead sc-lab-rise is-d2">
-            教程按小节正文与标题命中并给出摘要，题库按题面命中并带你到对应方向的练习；教程侧即时出结果，题库侧停止输入后自动检索。只读站内教程与题库，不读简历正文、立传与医案原文。
-          </p>
-        </div>
-        <div className="sc-lab-stats sc-lab-rise is-d2">
-          <div className="sc-lab-stat">
-            <b>
-              {ALL_TUTORIAL_CHAPTERS.length}
-              <span className="u">章</span>
-            </b>
-            <em>CHAPTERS</em>
-          </div>
-          <div className="sc-lab-stat">
-            <b>
-              {searchable ? tutorialHits.length : 0}
-              <span className="u">条</span>
-            </b>
-            <em>TUTORIAL HITS</em>
-          </div>
-          <div className="sc-lab-stat">
-            <b>
-              {questionsPending || questionsFailed ? '—' : questionTotal}
-              <span className="u">题</span>
-            </b>
-            <em>QUESTION HITS</em>
-          </div>
-        </div>
+      {/* r148b：页头与其余页面同一形态（h1 + 副文）；原 kicker / stats 块信息重复
+         （章数在副文、命中条数在各分组标题），删。 */}
+      <header className="sc-page-header">
+        <h1 className="sc-page-title">检索</h1>
+        <p className="sc-page-sub">
+          教程按小节正文与标题命中并给出摘要，题库按题面命中并带你到对应方向的练习；教程侧即时出结果，题库侧停止输入后自动检索。只读站内教程与题库，不读简历正文、立传与医案原文。
+        </p>
       </header>
 
       <div className="sc-search-bar">
