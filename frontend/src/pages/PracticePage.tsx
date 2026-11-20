@@ -547,7 +547,7 @@ export default function PracticePage() {
   }
 
   return (
-    <div className="sc-qa-col">
+    <section>
       <PageHero
         index="08"
         kicker="PRACTICE / 演武"
@@ -560,58 +560,60 @@ export default function PracticePage() {
         }
       />
 
-      <div className="sc-qa-tabs">
-        <SegTabs
-          tabs={[
-            { key: 'practice', label: '练习' },
-            { key: 'wrong', label: wrongTabLabel(wrongTotal) },
-          ]}
-          active={tab}
-          onChange={changeTab}
-          ariaLabel="练习与错题本切换"
+      <div className="sc-qa-col">
+        <div className="sc-qa-tabs">
+          <SegTabs
+            tabs={[
+              { key: 'practice', label: '练习' },
+              { key: 'wrong', label: wrongTabLabel(wrongTotal) },
+            ]}
+            active={tab}
+            onChange={changeTab}
+            ariaLabel="练习与错题本切换"
+          />
+        </div>
+
+        {tab === 'practice' ? renderPractice() : renderWrong()}
+
+        {/* 出题失败 / 挑题中都放在三视图共享区：完成态与错题本发起新一轮同样能看到反馈。 */}
+        {paperError ? (
+          <InlineError
+            message={paperError}
+            onRetry={() => {
+              const last = paperRequestRef.current
+              if (last !== null) void startPaper(last.filters, last.retrain)
+            }}
+            retryLabel="重试"
+          />
+        ) : null}
+        {starting ? (
+          <PhaseLoader title="正在按筛选挑题" phases={PAPER_PHASES} active={0} />
+        ) : null}
+
+        <ConfirmModal
+          open={exitOpen}
+          title="退出本轮练习"
+          message="退出后本轮进度不保留，已提交的对错仍会计入熟练度"
+          confirmLabel="退出"
+          cancelLabel="继续练习"
+          onConfirm={() => {
+            setExitOpen(false)
+            resetToSetup()
+            reloadStats()
+          }}
+          onCancel={() => setExitOpen(false)}
+        />
+
+        <ConfirmModal
+          open={pendingLeave !== null}
+          title="离开本轮练习"
+          message="本轮进度不保留，已提交的对错仍会计入熟练度"
+          confirmLabel="离开"
+          cancelLabel="继续练习"
+          onConfirm={confirmLeave}
+          onCancel={cancelLeave}
         />
       </div>
-
-      {tab === 'practice' ? renderPractice() : renderWrong()}
-
-      {/* 出题失败 / 挑题中都放在三视图共享区：完成态与错题本发起新一轮同样能看到反馈。 */}
-      {paperError ? (
-        <InlineError
-          message={paperError}
-          onRetry={() => {
-            const last = paperRequestRef.current
-            if (last !== null) void startPaper(last.filters, last.retrain)
-          }}
-          retryLabel="重试"
-        />
-      ) : null}
-      {starting ? (
-        <PhaseLoader title="正在按筛选挑题" phases={PAPER_PHASES} active={0} />
-      ) : null}
-
-      <ConfirmModal
-        open={exitOpen}
-        title="退出本轮练习"
-        message="退出后本轮进度不保留，已提交的对错仍会计入熟练度"
-        confirmLabel="退出"
-        cancelLabel="继续练习"
-        onConfirm={() => {
-          setExitOpen(false)
-          resetToSetup()
-          reloadStats()
-        }}
-        onCancel={() => setExitOpen(false)}
-      />
-
-      <ConfirmModal
-        open={pendingLeave !== null}
-        title="离开本轮练习"
-        message="本轮进度不保留，已提交的对错仍会计入熟练度"
-        confirmLabel="离开"
-        cancelLabel="继续练习"
-        onConfirm={confirmLeave}
-        onCancel={cancelLeave}
-      />
-    </div>
+    </section>
   )
 }
