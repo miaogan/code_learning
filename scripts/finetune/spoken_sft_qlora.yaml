@@ -1,0 +1,74 @@
+###
+### 相声口播稿写稿模型 —— QLoRA (4-bit) SFT 配置（r150 制作工具链）
+### 目标仓库：llm-finetune-lab（ms-swift + Qwen3-4B-Instruct-2507 + RTX 4070 Laptop 8GB）
+### 用法：拷贝到 llm-finetune-lab/configs/spoken_sft_qlora.yaml，然后
+###       python scripts/py/train.py configs/spoken_sft_qlora.yaml
+###
+### 与仓库默认配置的差异（逐条都有理由，别随手改回去）：
+###   dataset / val_dataset → 换成本项目的口播稿数据，且**评估集按章切分**
+###   max_length: 1024 → 2048  每条样本约 1300 token（输入 900 + 输出 450）
+###   num_train_epochs: 3 → 8  小样本下 3 轮只有 60 步，LoRA 学不动
+###   split_dataset_ratio: 0.1 → 0  已显式给 val_dataset，避免再随机切（随机切会跨章泄漏）
+###
+
+### 环境变量：缓解 8GB 显存下的碎片化 OOM（不要删）
+ENV:
+  PYTORCH_CUDA_ALLOC_CONF: 'expandable_segments:True'
+
+### ───────────────────────── 模型 ─────────────────────────
+model: models/Qwen3-4B-Instruct-2507
+torch_dtype: bfloat16
+attn_impl: sdpa
+check_model: false
+
+### ───────────────────────── 微调方法 ─────────────────────────
+tuner_backend: peft
+tuner_type: lora
+target_modules: all-linear
+lora_rank: 8               # 小样本（几十~几百条）用 8 足够；数据铺到 500 条以上再考虑 16
+lora_alpha: 16
+lora_dropout: 0.05
+
+### ───────────────────────── 4bit 量化 ─────────────────────────
+quant_method: bnb
+quant_bits: 4
+bnb_4bit_quant_type: nf4
+bnb_4bit_compute_dtype: bfloat16
+bnb_4bit_use_double_quant: true
+
+### ───────────────────────── 数据集 ─────────────────────────
+custom_dataset_info: data/dataset_info.json
+dataset: spoken_sft_train
+val_dataset: spoken_sft_eval
+max_length: 2048
+truncation_strategy: right
+dataset_num_proc: 4
+load_from_cache_file: false
+
+### ───────────────────────── 输出 ─────────────────────────
+output_dir: outputs/spoken_sft_qwen3_4b
+add_version: true
+logging_steps: 5
+save_steps: 40
+save_total_limit: 3
+report_to: tensorboard
+
+### ───────────────────────── 训练超参 ─────────────────────────
+per_device_train_batch_size: 1
+per_device_eval_batch_size: 1
+gradient_accumulation_steps: 4   # 等效 batch=4；显存紧张时抬到 8，步数变少要相应加 epoch
+learning_rate: 1.5e-4
+num_train_epochs: 8
+lr_scheduler_type: cosine
+warmup_ratio: 0.1
+gradient_checkpointing: true
+dataloader_num_workers: 0        # Windows 必须为 0
+split_dataset_ratio: 0.0         # 评估集已显式给出，禁止再随机切（跨章泄漏）
+
+### ───────────────────────── 评估 ─────────────────────────
+eval_strategy: steps
+eval_steps: 40
+per_device_eval_batch_size: 1
+
+### ───────────────────────── 断点续训（需要时取消注释）─────────────────────────
+# resume_from_checkpoint: outputs/spoken_sft_qwen3_4b/v1-20261122-000000/checkpoint-40

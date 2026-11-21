@@ -117,3 +117,6 @@ backend/logs/
 output/
 # vitest 每次跑测试会在 frontend 根生成 vite.config.ts.timestamp-*.mjs 临时文件
 frontend/vite.config.ts.timestamp-*
+
+# r150 离线训练产物（SFT jsonl 由 scripts/export_spoken_sft.mjs 生成）
+scripts/finetune/out/

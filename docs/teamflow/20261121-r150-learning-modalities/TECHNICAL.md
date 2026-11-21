@@ -89,3 +89,23 @@
 2. `scripts/tts/` 离线链路 + 本机显存实测（§7.2 待确认第 1 条）。
 3. 3 章合成 → 人工盲听评审 → 定音色与情绪参数 → 再付音频资产。
 4. 学习进度契约双改（`heard` 等三字段）与「听听」入口，最后接目录页。
+
+## 9. 微调写稿模型（M1 制作链，2026-11-21 追加）
+
+用户提供既有仓库 [`llm-finetune-lab`](https://github.com/miaogan/llm-finetune-lab)（ms-swift 4.5 + QLoRA 4bit + Qwen3-4B-Instruct-2507，RTX 4070 Laptop 8GB），要求参照它训练「编排相声脚本」的模型。
+本轮打通「数据 → 训练 → 评估」的最小链路，**不产出训练结果**（seed 只有 12 条）：
+
+| 文件 | 作用 |
+|---|---|
+| `frontend/src/lib/spokenSft.ts` | 写稿任务：系统提示词（与质量闸同口径）、小节提示词、目标 JSON、样本构造与统计 |
+| `frontend/src/lib/spokenSftExport.ts` | esbuild 打包入口（只给脚本用，不进运行时） |
+| `scripts/export_spoken_sft.mjs` | 导出全量 / 训练 / 评估三份 jsonl + `dataset_info` 条目，**评估集按章切分** |
+| `scripts/finetune/validate_spoken.py` | 结构与口径校验（`spoken.ts` 的离线镜像，`--strict` 可进 CI） |
+| `scripts/finetune/spoken_sft_qlora.yaml` | ms-swift 训练配置（`max_length` 2048 / 8 epochs / `split_dataset_ratio: 0`） |
+| `scripts/finetune/README.md` | 从导出到评估的执行手册 |
+| `FINETUNE-PLAN.md` | 方案、数据路线、评估三关、风险 |
+
+关键取舍：**小节级**任务（一份音频一个文件、4B 在 2048 token 内写不出整章）、**按章切分**评估集（同章 4 节共享梗会泄漏）、**规则双源**（改了 `spoken.ts` 必须同改 `validate_spoken.py`）。
+`VERSION-PLAN §7.2` 的「本机显卡型号与显存」由此确认为 8GB。
+
+验证：12 条样本 100% 通过校验、粗估 1346 token/条；`typecheck` / `lint` / `build` 通过，全量 52 files / 658 passed。
