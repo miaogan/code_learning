@@ -130,6 +130,7 @@ def main() -> int:
     parser.add_argument('--dry-run', action='store_true', help='显式声明只统计、不出网（默认行为，便于脚本里写清楚）')
     parser.add_argument('--limit', type=int, default=0, help='只跑前 N 节（0 = 全部）')
     parser.add_argument('--retries', type=int, default=0, help='校验未过时带错误信息重试的次数（0 = 不重试）')
+    parser.add_argument('--only-invalid', default='', help='只重跑上一次结果里校验未过的小节（传上次的 drafts_out.jsonl）')
     parser.add_argument('--out', default=str(OUT_DIR / 'drafts_out.jsonl'))
     parser.add_argument('--review', default=str(OUT_DIR / 'drafts_review.md'))
     args = parser.parse_args()
@@ -140,6 +141,15 @@ def main() -> int:
         return 2
 
     rows = [json.loads(line) for line in drafts_path.read_text(encoding='utf-8').splitlines() if line.strip()]
+    if args.only_invalid:
+        previous = [
+            json.loads(line)
+            for line in Path(args.only_invalid).read_text(encoding='utf-8').splitlines()
+            if line.strip()
+        ]
+        failed = {(row['chapter'], row['section']) for row in previous if row.get('issues')}
+        rows = [row for row in rows if (row['chapter'], row['section']) in failed]
+        print(f'--only-invalid：只重跑 {len(rows)} 节（上次未过的小节）')
     if args.limit:
         rows = rows[: args.limit]
     chapters = len({row['chapter'] for row in rows})

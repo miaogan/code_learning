@@ -20,7 +20,7 @@ import { isListenable, spokenFormFor, type SpokenCoverageEntry } from './spokenC
 import type { TutorialBlock, TutorialChapter, TutorialSection } from './tutorialTypes'
 
 /** 样本格式版本：改提示词或目标结构就升版本，训练记录里要能对上（与 schema 化的评估同源）。 */
-export const SPOKEN_SFT_VERSION = 'spoken-sft-v1'
+export const SPOKEN_SFT_VERSION = 'spoken-sft-v2'
 
 export interface SpokenSftMessage {
   role: 'system' | 'user' | 'assistant'
@@ -47,7 +47,7 @@ export const SPOKEN_SFT_SYSTEM_PROMPT = [
   '4. lines 一句一个元素；单个逗号小句不超过 20 字。',
   '5. 逗哏连续发言不超过 5 句，中间必须有捧哏插话。',
   '6. 捧哏只推矛盾、不讲解；「嗯」「对」「是啊」这类纯附和最多占捧哏发言的 1/3。',
-  '7. 本节 punch（抖包袱）2–6 处；至少 1 处以「说白了」开头的小结。',
+  '7. punch（抖包袱）硬上限 6 处：写完自己数一遍，多一个都不合格；少于 2 处也不合格。至少 1 处以「说白了」开头的小结。',
   '8. 笑点只来自认知反转，不用网络流行语、谐音梗，不贬低任何技术栈。',
   '9. 代码和表格不逐行念，转述成「这段干三件事」。',
   '10. 用「你」不用「您」（抬杠调侃除外）；语气词每处最多一个。',

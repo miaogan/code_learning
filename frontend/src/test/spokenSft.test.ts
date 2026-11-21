@@ -29,7 +29,7 @@ describe('SFT 样本构造', () => {
       expect(sample.messages[0].content).toBe(SPOKEN_SFT_SYSTEM_PROMPT)
     }
     expect(SPOKEN_SFT_SYSTEM_PROMPT).toContain(SPOKEN_SFT_VERSION)
-    for (const rule of ['只输出一个 JSON 对象', '不超过 20 字', '不超过 5 句', '2–6 处', '说白了']) {
+    for (const rule of ['只输出一个 JSON 对象', '不超过 20 字', '不超过 5 句', '硬上限 6 处', '说白了']) {
       expect(SPOKEN_SFT_SYSTEM_PROMPT).toContain(rule)
     }
   })
