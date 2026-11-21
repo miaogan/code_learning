@@ -69,9 +69,11 @@ await writeFile(join(OUT_DIR, 'spoken_sft_eval.jsonl'), toJsonl(evalSamples), 'u
 await writeFile(
   join(OUT_DIR, 'dataset_info_entry.json'),
   JSON.stringify(
+    // ms-swift 的 dataset_path 相对 DATA_DIR（即 data/）解析，**不能带 data/ 前缀**，
+    // 否则会拼成 data/data/xxx.jsonl（r150 实测踩过）。
     ['spoken_sft', 'spoken_sft_train', 'spoken_sft_eval'].map((name) => ({
       dataset_name: name,
-      dataset_path: `data/${name}.jsonl`,
+      dataset_path: `${name}.jsonl`,
     })),
     null,
     2,

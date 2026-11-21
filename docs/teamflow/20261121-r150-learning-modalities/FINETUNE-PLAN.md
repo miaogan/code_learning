@@ -90,3 +90,25 @@
 | `scripts/finetune/README.md` | 从导出到评估的完整执行手册 |
 
 验证：12 条样本 100% 通过结构与口径检查；粗估每条 1346 token，2048 `max_length` 够用（见 README）。
+
+## 9. 实测（2026-11-22 · RTX 4070 Laptop 8GB · ms-swift 4.5.2 · 本机）
+
+数据与配置已直接写进用户本地仓库 `D:\work_space\llm-finetune-lab`（3 份 jsonl + `dataset_info.json` 三条注册 + 两份配置）。
+
+| 环节 | 实测 |
+|---|---|
+| 训练（8 条 × 8 轮） | 16 步 / 111 秒 / 6.9 s/step / **显存峰值 4.5 GiB** |
+| loss | train 1.385 · eval 1.275 · token_acc ≈ 0.73 |
+| 推理（评估章 4 节） | A `1200`：494 s / 8.0 tok/s；B `2048`：729 s / 8.9 tok/s；C `2048 + repetition_penalty 1.1`：683 s / 8.9 tok/s |
+| 校验 | **三试次均 4 条 0 通过**：A/B 三条截断（自我复读）、C 三条 `Extra data`（不知道在哪停）、另有逗哏 6 句 / 捧哏全「嗯」 |
+
+**结论（重要）**：
+- **格式在 16 步就学会了** —— 4/4 都吐出 `form` + `segments` + `emotion` 的合法骨架，说明「结构 + 情绪标签」是可学的，容器搭对了。
+- **规则、去重与「知道在哪停」学不会** —— 抬上限到 2048 仍是同样 3 条截断；加 `repetition_penalty=1.1` 压住了复读，却换成「吐完第一个 JSON 继续写」。这不是长度问题，也不是 epoch 问题，而是**数据量问题**（8 条样本里规则句式占比太低），正好落在 §5.8 的「系统性偏差靠数据补」。
+- 生成速度 8–9 tok/s：40 章 × 4 节 ≈ 160 次生成 ≈ **7–8 小时**，M2 要考虑批推理或更小/更快的解码方案。
+
+**上线前三道兜底（未做）**：生成侧 stop/长度约束 + 「只取第一个 JSON 对象」容错；校验失败带错误重试一次；160 条训练数据。
+
+**两个工程坑（已修进代码与文档）**：
+1. `dataset_info.json` 的 `dataset_path` 相对 `DATA_DIR` 解析，**不能带 `data/` 前缀**（否则 `data/data/xxx.jsonl` 直接 `FileNotFoundError`）——exporter 已改。
+2. 生成长 JSON 必须显式给 `max_new_tokens`（≥2048），并加 `repetition_penalty`（1.05–1.1）；默认 1200 一定截断。
