@@ -60,12 +60,30 @@ const EVAL_CHAPTERS = new Set(['mw-observability'])
 const train = samples.filter((sample) => !EVAL_CHAPTERS.has(sample.chapterId))
 const evalSamples = samples.filter((sample) => EVAL_CHAPTERS.has(sample.chapterId))
 
+// 起草请求：全部可听章（A/B）× 各自小节，只带 system + user，用于提示词版 baseline。
+const coverage = mod.coverageStats(mod.SPOKEN_COVERAGE, mod.ALL_TUTORIAL_CHAPTERS)
+const drafts = mod.buildSpokenDraftRequests(mod.ALL_TUTORIAL_CHAPTERS, mod.SPOKEN_COVERAGE)
+
 const toJsonl = (list) => list.map((sample) => JSON.stringify({ messages: sample.messages })).join('\n') + '\n'
 
 await mkdir(OUT_DIR, { recursive: true })
 await writeFile(join(OUT_DIR, 'spoken_sft.jsonl'), toJsonl(samples), 'utf8')
 await writeFile(join(OUT_DIR, 'spoken_sft_train.jsonl'), toJsonl(train), 'utf8')
 await writeFile(join(OUT_DIR, 'spoken_sft_eval.jsonl'), toJsonl(evalSamples), 'utf8')
+await writeFile(
+  join(OUT_DIR, 'spoken_drafts.jsonl'),
+  drafts
+    .map((draft) =>
+      JSON.stringify({
+        chapter: draft.chapterId,
+        section: draft.sectionId,
+        form: draft.form,
+        messages: draft.messages,
+      }),
+    )
+    .join('\n') + '\n',
+  'utf8',
+)
 await writeFile(
   join(OUT_DIR, 'dataset_info_entry.json'),
   JSON.stringify(
@@ -89,5 +107,11 @@ console.log(
   `切分：训练 ${train.length} 条（${stats.chapters - EVAL_CHAPTERS.size} 章）/ 评估 ${evalSamples.length} 条（${[...EVAL_CHAPTERS].join('、')}）`,
 )
 console.log(`粗估每条总长：≈${Math.ceil(stats.estimateTokens / Math.max(1, stats.samples))} token（中文约 1.5 字/token）`)
-console.log('已写出：scripts/finetune/out/{spoken_sft,spoken_sft_train,spoken_sft_eval}.jsonl + dataset_info_entry.json')
-console.log('下一步：把三个 jsonl 复制到 llm-finetune-lab/data/，并按其格式追加 dataset_info 条目。')
+console.log(
+  `可听分层：A ${coverage.byLayer.A} / B ${coverage.byLayer.B} / C ${coverage.byLayer.C} / C′ ${coverage.byLayer.C2} = ${coverage.chapters} 章`,
+)
+console.log(
+  `起草请求：${drafts.length} 节 / ${coverage.listenable} 章（A+B）→ scripts/finetune/out/spoken_drafts.jsonl`,
+)
+console.log('已写出：scripts/finetune/out/{spoken_sft,spoken_sft_train,spoken_sft_eval,spoken_drafts}.jsonl + dataset_info_entry.json')
+console.log('下一步：把三个 sft jsonl 复制到 llm-finetune-lab/data/，并按其格式追加 dataset_info 条目。')

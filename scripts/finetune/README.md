@@ -143,3 +143,41 @@ seed 的定位不变：验证链路（数据 → 训练 → 推理 → 校验四
 2. 生成长 JSON 要显式抬 `max_new_tokens`（≥2048），并按情况加 `repetition_penalty`（1.05–1.1）；
    但注意：惩罚解决的是复读，解决不了「不知道在哪停」。
 
+## 9. 提示词版 baseline（先别训练，先测修改率）
+
+§5.8 的决策门是：**先看强模型按同一套提示词写出来的初稿，人工要改多少**。
+改得少（≤20%）→ 微调是过度工程；改得多且问题集中（≥35% 且 top3 问题占 60%+）→ 微调才划算。
+
+所以先跑这条**不训练、只调模型**的链路：
+
+```bash
+cd frontend && node ../scripts/export_spoken_sft.mjs     # 产出起草请求 + 分层统计
+python scripts/finetune/draft_spoken.py --dry-run        # 只统计，不出网
+python scripts/finetune/draft_spoken.py --live --limit 3 # 真调前 3 节（省点钱）
+python scripts/finetune/draft_spoken.py --live           # 全量 185 节
+```
+
+- 模型端点 / 模型名 / Key 从 `backend/.env` 读（也认同名环境变量），**不打印 Key**
+- 产物：`out/drafts_out.jsonl`（逐节初稿 + 校验码）、`out/drafts_review.md`（人工审阅：原文骨架 + 初稿 + 问题）
+- 人工按 review 改稿后另存 `edited.jsonl`，再算修改率：
+
+```bash
+python scripts/finetune/score_edits.py --draft out/drafts_out.jsonl --edited out/edited.jsonl
+```
+
+### 实测（2026-11-22 · deepseek-chat · 45 章 185 节）
+
+| 项 | 结果 |
+|---|---|
+| 用时 | 608 秒（≈3.3 s/节，含重试） |
+| 调用 | 185/185 成功，0 失败 |
+| **自动过闸** | **84/185 = 45.4%** |
+| 问题分布 | `punch_count`×75 · `clause_too_long`×31 · `dou_turn_too_long`×25 |
+
+三条失败全是**结构性偏差**（包袱堆太多、小句超 20 字、逗哏连说太长），不是内容跑题——
+这恰好落在「微调擅长解决系统性偏差」的那一档，但**是否值得微调仍取决于人工修改率**，
+需要先把 `drafts_review.md` 改一轮再跑 `score_edits.py`。
+
+> 注意：这里的「自动过闸率」**不能替代** §5.8 的人工修改率。前者量的是规则，
+> 后者量的是「人要不要重写」——两个指标分开记，别混着用。
+

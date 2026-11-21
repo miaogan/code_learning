@@ -16,6 +16,7 @@
  */
 import type { SpokenChapter } from './spokenTypes'
 import { sectionForm } from './spoken'
+import { isListenable, spokenFormFor, type SpokenCoverageEntry } from './spokenCoverage'
 import type { TutorialBlock, TutorialChapter, TutorialSection } from './tutorialTypes'
 
 /** 样本格式版本：改提示词或目标结构就升版本，训练记录里要能对上（与 schema 化的评估同源）。 */
@@ -143,6 +144,43 @@ export interface SpokenSftStats {
   promptChars: number
   /** 粗估 token（中文约 1.5 字/token）：只用来判断 max_length 够不够，不是精确值。 */
   estimateTokens: number
+}
+
+/**
+ * 起草请求（只有 system + user，没有 assistant）：给「提示词版 baseline」用。
+ * 覆盖范围 = 全部可听章（A/B）× 各自小节，形态按 coverage 的默认值
+ * （A → 单口，B → 对口；混合章可在 coverage 表里显式覆盖）。
+ */
+export interface SpokenDraftRequest {
+  chapterId: string
+  sectionId: string
+  form: 'solo' | 'duo'
+  messages: SpokenSftMessage[]
+}
+
+export function buildSpokenDraftRequests(
+  tutorials: readonly TutorialChapter[],
+  coverage: readonly SpokenCoverageEntry[],
+): SpokenDraftRequest[] {
+  const byId = new Map(coverage.map((entry) => [entry.chapterId, entry]))
+  const requests: SpokenDraftRequest[] = []
+  for (const chapter of tutorials) {
+    const entry = byId.get(chapter.id)
+    if (!entry || !isListenable(entry.layer)) continue
+    const form = spokenFormFor(entry)
+    chapter.sections.forEach((section, index) => {
+      requests.push({
+        chapterId: chapter.id,
+        sectionId: section.id,
+        form,
+        messages: [
+          { role: 'system', content: SPOKEN_SFT_SYSTEM_PROMPT },
+          { role: 'user', content: renderSectionPrompt(chapter, section, index, form, form) },
+        ],
+      })
+    })
+  }
+  return requests
 }
 
 export function spokenSftStats(samples: readonly SpokenSftSample[]): SpokenSftStats {

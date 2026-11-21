@@ -144,3 +144,5 @@
 - **进度语义**：「听过」= 听到小节末尾即计入 `seen`（与读过同义），`heard` 只用于区分来源，不改「已读完 N 章」。`heard` / `listen_section_id` / `listen_position_ms` 三字段等播放器落地时按契约双改同步，现在不提前改契约。
 
 - **写稿模型训练栈（2026-11-21 追加 · r150 续）**：复用 `llm-finetune-lab`（ms-swift 4.5 + QLoRA 4bit + Qwen3-4B-Instruct-2507，RTX 4070 Laptop 8GB，训练占约 5GB）。样本是**小节级**「教程原文骨架 → 口播稿 JSON」，评估集**按章切分**（同章 4 节共享梗，随机切会泄漏）。训练规则与 `frontend/src/lib/spoken.ts` 的质量闸同口径，`scripts/finetune/validate_spoken.py` 是离线镜像——改规则两边一起改。seed 12 条只验证链路，真实训练等 40 章 ≈ 160 条；微调是否值得做仍按 VERSION-PLAN §5.8 的决策门（人工修改率 >35% 且 top3 问题占 60%）。
+
+- **提示词版 baseline 是微调的前置门（2026-11-22 · r150 续）**：可听分层 **45 章 / 185 节**（A 29 / B 16 / C 11 / C′ 4，单点 `frontend/src/content/spoken/coverage.ts`，教程新增章必须同步，测试会红）。先让强模型按同一套提示词起草（`scripts/finetune/draft_spoken.py`），人工改稿后用 `score_edits.py` 算**字符级加权修改率**：≤20% 不做微调、≥35% 且问题集中（top3 占 60%+）才铺 185 条训练数据。实测首轮自动过闸 45.4%，问题集中 punch 超限 / 小句超 20 字 / 逗哏长段——**自动过闸率 ≠ 人工修改率，两个指标分开记**。

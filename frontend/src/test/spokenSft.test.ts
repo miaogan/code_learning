@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest'
+import { SPOKEN_COVERAGE } from '../content/spoken/coverage'
 import { SPOKEN_SCRIPTS } from '../content/spoken'
 import {
   SPOKEN_SFT_SYSTEM_PROMPT,
   SPOKEN_SFT_VERSION,
+  buildSpokenDraftRequests,
   buildSpokenSftSamples,
   sectionOutline,
   spokenSftStats,
 } from '../lib/spokenSft'
+import { isListenable, spokenFormFor } from '../lib/spokenCoverage'
 import type { SpokenForm } from '../lib/spokenTypes'
 import { ALL_TUTORIAL_CHAPTERS, chapterById } from '../lib/tutorials'
 
@@ -86,5 +89,46 @@ describe('SFT 样本构造', () => {
     expect(outline.length).toBeGreaterThan(2)
     expect(outline.join('\n')).toContain('|')
     expect(outline.every((line) => line.trim().length > 0)).toBe(true)
+  })
+})
+
+describe('提示词版 baseline 的起草请求', () => {
+  const DRAFTS = buildSpokenDraftRequests(ALL_TUTORIAL_CHAPTERS, SPOKEN_COVERAGE)
+
+  it('只覆盖可听章（A/B），章数与分层表一致', () => {
+    const listenable = ALL_TUTORIAL_CHAPTERS.filter((chapter) =>
+      isListenable(SPOKEN_COVERAGE.find((entry) => entry.chapterId === chapter.id)!.layer),
+    )
+    expect(DRAFTS).toHaveLength(listenable.reduce((sum, chapter) => sum + chapter.sections.length, 0))
+    expect(new Set(DRAFTS.map((draft) => draft.chapterId)).size).toBe(listenable.length)
+    const ids = new Set(listenable.map((chapter) => chapter.id))
+    expect(DRAFTS.every((draft) => ids.has(draft.chapterId))).toBe(true)
+  })
+
+  it('每条是 system + user（没有 assistant），形态按 coverage 默认值', () => {
+    for (const draft of DRAFTS) {
+      expect(draft.messages.map((message) => message.role)).toEqual(['system', 'user'])
+      const entry = SPOKEN_COVERAGE.find((item) => item.chapterId === draft.chapterId)
+      expect(draft.form).toBe(spokenFormFor(entry))
+      const tutorial = chapterById(draft.chapterId)!
+      expect(draft.messages[1].content).toContain(tutorial.title)
+    }
+  })
+
+  it('A 章默认单口、B 章默认对口；混合章按条目覆盖', () => {
+    for (const draft of DRAFTS) {
+      const entry = SPOKEN_COVERAGE.find((item) => item.chapterId === draft.chapterId)!
+      if (entry.form) {
+        expect(draft.form).toBe(entry.form)
+      } else {
+        expect(draft.form).toBe(entry.layer === 'A' ? 'solo' : 'duo')
+      }
+    }
+  })
+
+  it('可听章之外（C / C′）不会进起草队列', () => {
+    const excluded = SPOKEN_COVERAGE.filter((entry) => !isListenable(entry.layer)).map((entry) => entry.chapterId)
+    const drafted = new Set(DRAFTS.map((draft) => draft.chapterId))
+    for (const id of excluded) expect(drafted.has(id)).toBe(false)
   })
 })
