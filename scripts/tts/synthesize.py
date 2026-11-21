@@ -32,15 +32,19 @@ AUDIO_DIR = HERE / 'out' / 'audio'
 SAMPLE_RATE = 24000
 CHARS_PER_SECOND = 4.5
 
-# 7 类情绪的 instruct 模板（与 VERSION-PLAN §5.6 同源；只在这里维护一份）
+# 7 类情绪的 instruct 模板。
+# **必须带 `<|endofprompt|>` 结束符**：CosyVoice2 的 instruct2 把 instruct 当 prompt_text 喂给 LLM，
+# 没有结束符它会把指令当正文念出来（r150 实测：第一版音频开头就是「就像跟朋友聊天…」）。
+# 措辞也要短祈使句（「用…的语气说这句话」），描述性长句同样会被念。
+INSTRUCT_SUFFIX = '<|endofprompt|>'
 INSTRUCT = {
-    'banter': '就像跟朋友聊天，随便点儿，语速偏快，别端着',
-    'setup': '一本正经地下个结论，说得越肯定越好',
-    'deadpan': '面无表情地回一句，短、平，不要演',
-    'punch': '抖包袱，前面收着，最后一个字咬住——别喊',
-    'realize': '突然反应过来，短促地"哟"一声',
-    'contrast': '前半句轻飘飘，后半句压下来',
-    'wrap': '收住，放慢，像把话轻轻放桌上',
+    'banter': '用轻松随意的语气说这句话',
+    'setup': '用一本正经的语气说这句话',
+    'deadpan': '用冷淡平板的语气说这句话',
+    'punch': '用抖包袱、收尾咬住的语气说这句话',
+    'realize': '用惊讶恍然的语气说这句话',
+    'contrast': '用先轻后重的语气说这句话',
+    'wrap': '用放慢收束的语气说这句话',
 }
 
 # 不同 speaker 用不同音色参考：pilot 阶段两个参考音色，M2 再定音色库
@@ -143,7 +147,9 @@ class CosyVoiceBackend:
     def synthesize(self, unit: dict) -> tuple[bytes, int]:
         import numpy as np
 
-        instruct = INSTRUCT.get(unit['emotion'], INSTRUCT['banter'])
+        instruct = INSTRUCT.get(unit['emotion'], INSTRUCT['banter']) + INSTRUCT_SUFFIX
+        if not instruct.endswith(INSTRUCT_SUFFIX):  # 防御：改模板时别漏结束符
+            sys.exit(f'instruct 缺少结束符：{instruct}')
         chunks = []
         for output in self.model.inference_instruct2(unit_text(unit), instruct, self.prompt, stream=False):
             chunks.append(output['tts_speech'].squeeze(0).cpu().numpy())

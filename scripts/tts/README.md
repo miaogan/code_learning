@@ -46,6 +46,20 @@ D:/ProgramData/miniconda3/envs/cosyvoice/python.exe scripts/tts/synthesize.py   
 首节实测（`mw-cache-strategy/where`）：14 个合成单元 / 32 句 cue / **152.8 秒** / RTF 0.84–0.87 /
 峰值 32439（接近满幅，说明没被判静音，也提示要做响度归一化）。
 
+### 踩坑：instruct 必须带 `<|endofprompt|>`
+
+第一版音频**把情绪指令念了出来**（开头是「就像跟朋友聊天，随便点儿，语速偏快…」）。
+根因不是模型能力，是调用约定：`inference_instruct2` 把 instruct 当 `prompt_text` 喂给 LLM，
+官方示例（`example.py:57`）的 instruct 结尾必须带 **`<|endofprompt|>`**，长描述同样会被念。
+
+- 正确：`'用开心的语气说这句话<|endofprompt|>'`
+- 错误：`'就像跟朋友聊天，随便点儿，语速偏快，别端着'`（无结束符 + 描述性长句）
+
+验证方法：合成后跑 whisper 转写，开头出现指令文本就说明又踩了。
+驱动里已加 `<|endofprompt|>` 与「缺结束符直接退出」的防御。
+
+修复前后同节对比：`mw-cache-strategy/where` 152.8s（含念指令）→ **88.1s**（正常）。
+
 ### 换机器 / 重建环境（未验证，仅供参照）
 
 ```bash
