@@ -120,3 +120,6 @@ frontend/vite.config.ts.timestamp-*
 
 # r150 离线训练产物（SFT jsonl 由 scripts/export_spoken_sft.mjs 生成）
 scripts/finetune/out/
+
+# r150 TTS 制作产物（音频 / 计划 / 时间轴，由 scripts/tts 生成）
+scripts/tts/out/

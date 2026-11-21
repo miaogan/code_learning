@@ -122,3 +122,23 @@
 影响：同一批 185 节只重跑校验 → 不重试 **90.8%**、重试 2 次 **98.4%**、拼接最终 **100%**；
 此前 45.4% / 77.8% 的结论作废。v2「硬上限」实验因只重测误判样本而**被污染**，其收益不引用。
 新增 `spoken.test.ts` 两条口径测试，全量 53 files / 671 passed。
+
+## 11. 音频合成链路（2026-11-22 落地）
+
+口播稿 → 音频计划 → 合成 → 时间轴 → 质检，四条命令串起来，唯一真源仍是口播稿：
+
+| 步骤 | 命令 | 产物 |
+|---|---|---|
+| 1. 计划 | `cd frontend && node ../scripts/export_spoken_audio.mjs` | `scripts/tts/out/plans/*.json`（合成单元 = 情绪段，停顿取自情绪表） |
+| 2. 合成（mock） | `python scripts/tts/synthesize.py --backend mock` | 静音占位 + 比例时间轴，用于播放器契约与 CI |
+| 2. 合成（真） | `synthesize.py --backend cosyvoice --repo-dir … --model-dir … --prompt-wav …` | `out/audio/<章>/<节>.wav` + `.timeline.json` + `manifest.json` |
+| 3. 质检 | 同上（自动写 `out/qa.json`） | duration / estimate / peak / silenceRatio / cues |
+
+实测（RTX 4070 Laptop 8GB）：首节 `mw-cache-strategy/where` 14 单元 → **152.8 秒 / 32 cue / RTF 0.84–0.87**；
+真实时长约为估算的 **1.55 倍**（估算按 4.5 字/秒，实测约 2.9 字/秒含停顿）。
+
+环境：`D:/ProgramData/miniconda3/envs/cosyvoice/python.exe`（torch 2.3.1+cu121）+ 新克隆的 CosyVoice 代码 +
+`models/CosyVoice2-0.5B` + 参考音 `alt_cunningham/.../da_feiyu/prompt.wav`；`wget` 用本地 stub。
+
+已知限制：句级时间轴是**按字数比例摊分**（不是 VAD）、**单音色**（对口章两端同声）、cue 里没有响度归一化、
+`estimateMs` 与真实时长差 1.55 倍待校准。
