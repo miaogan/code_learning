@@ -133,3 +133,12 @@
 - **检索 mode 闭集** `keyword|semantic|hybrid` 唯一出处是 `services/retrieval/hybrid.py`；hybrid 走 RRF(k=60)（只看名次，免疫向量余弦与 ILIKE 的量纲不可比）。换 embedding 配置后旧向量**不删**：`rag_embedder_breakdown` 检测 stale，status 亮提示等重建；检索按当前 embedder 过滤，旧向量自然退出结果。
 - **评测两轨**：`scripts/eval_rag.py`（三态检索门禁：hybrid recall@5 ≥ 70% 且不比 keyword 回退超 5pp）与 `scripts/eval_rag_judge.py`（LLM-as-judge，DRY-RUN 进 CI / `--live` 需 `AI_LIVE=1`）；共用 `scripts_eval_shared.py` 准备评测库。
 - **一次升级说明**：r100 前的存量库执行 `init_db()` 即得新表（`CREATE TABLE IF NOT EXISTS`）；无存量数据需迁移。
+
+## 学习多形态化与口播稿（r150）
+
+- **音频是离线预生成的发布资产**：运行期零 TTS、零新增出网（`test_r115_intranet.py` 的 5 处登记不变）；生成链只在本机 GPU 跑，产物不进 Git、不进镜像，nginx 挂 `/audio/` 独立分发（公网 rsync、内网 `audio-pack-vX.tar.zst`）。生产机 2 vCPU，绝不放 TTS 推理。
+- **音色只用可商用开源模型**（CosyVoice2-0.5B 首选 / IndexTTS-2 备选；ChatTTS 为 CC-BY-NC，排除）。7 类情绪在制作期烘焙进音频，运行期只能整段播放，不做运行时调节。
+- **口播稿是独立文本，不是原文**：代码块转述成「这段干三件事」，表格转述成对比句；听模式渲染口播稿并靠 `timeline.json` 做句级高亮，原文只在读模式出现。
+- **脚本质量闸进代码**（`frontend/src/lib/spoken.ts`），不靠人工约定：逗哏单次 ≤5 句、捧哏纯附和 ≤1/3、小句 ≤20 字、punch 2–6 次、每 5 分钟一个「说白了」、单口只能 narrator、对口必须有 support 音色、情绪强度 0.4–0.7。黄金稿零 issue 是门禁，改稿先过闸再录音。
+- **章节分层按「能否脱离视觉独立成立」**：A 复杂概念 / B 常见场景做音频（约 40 章），C 语法/布局/命令类不做音频走「读 + 做」；混合章用「章级 form + 小节覆盖」表达单口/对口，不追求每章四种表征。
+- **进度语义**：「听过」= 听到小节末尾即计入 `seen`（与读过同义），`heard` 只用于区分来源，不改「已读完 N 章」。`heard` / `listen_section_id` / `listen_position_ms` 三字段等播放器落地时按契约双改同步，现在不提前改契约。
