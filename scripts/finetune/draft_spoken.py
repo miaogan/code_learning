@@ -114,7 +114,8 @@ def draft_once(base: str, model: str, key: str, messages: list[dict], retries: i
         feedback = (
             '上一次输出有以下问题：'
             + '；'.join(f'{code}：{msg}' for code, msg in issues[:4])
-            + '。请只输出修正后的 JSON，不要解释。'
+            + '。修正要求：punch 超限就**直接删掉多余的包袱段**（不要改情绪标签凑数，也不要合并句子），'
+            '小句超长就在逗号处拆成两行，逗哏长段就在中间让捧哏插一句。只输出修正后的 JSON，不要解释。'
         )
         conversation = conversation + [
             {'role': 'assistant', 'content': response},

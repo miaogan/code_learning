@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from collections import Counter
 from pathlib import Path
@@ -51,6 +52,13 @@ def clauses(line: str) -> list[str]:
     for sep in SEPARATORS:
         parts = [piece for part in parts for piece in part.split(sep)]
     return [piece.strip() for piece in parts if piece.strip()]
+
+
+def spoken_clause_length(text: str) -> int:
+    """念起来多长：中文按字、拉丁词按词计（与 spoken.ts 同口径）。"""
+    cjk = len(re.findall(r'[\u4e00-\u9fff]', text))
+    latin = len(re.findall(r'[A-Za-z0-9_]+', text))
+    return cjk + latin
 
 
 def is_peng_promoting(text: str) -> bool:
@@ -118,7 +126,7 @@ def validate(record: dict) -> list[tuple[str, str]]:
 
     for _, _, line in utterances:
         for clause in clauses(line):
-            if len(clause.replace(' ', '')) > CLAUSE_MAX_CHARS:
+            if spoken_clause_length(clause) > CLAUSE_MAX_CHARS:
                 issues.append(('clause_too_long', f'「{clause}」超过 {CLAUSE_MAX_CHARS} 字'))
 
     run = 0
@@ -131,7 +139,8 @@ def validate(record: dict) -> list[tuple[str, str]]:
             issues.append(('dou_turn_too_long', f'逗哏连说 {run} 句（「{line[:12]}…」）'))
             run = 0
 
-    punch = sum(1 for _, emotion, _ in utterances if emotion == 'punch')
+    # 包袱按**情绪段**数，不按行数：一个 4 行的包袱是 1 次（与 spoken.ts 同口径）。
+    punch = sum(1 for segment in segments if isinstance(segment, dict) and segment.get('emotion') == 'punch')
     if punch > PUNCH_MAX:
         issues.append(('punch_count', f'punch {punch} 次，超过 {PUNCH_MAX}'))
     if not any(RECAP_MARKER in line for _, _, line in utterances):

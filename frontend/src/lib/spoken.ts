@@ -123,6 +123,14 @@ export interface SpokenSummary {
   recaps: number
 }
 
+/** 包袱次数按**情绪段**数，不按行数：一个 4 行的包袱是 1 次，不是 4 次（r150 实测修正）。 */
+export function countPunch(chapter: SpokenChapter): number {
+  return chapter.sections.reduce(
+    (sum, section) => sum + section.segments.filter((segment) => segment.emotion === 'punch').length,
+    0,
+  )
+}
+
 /** 章节规格摘要：目录卡「听」入口与「本音频约 N 分钟」都用它，页面零计算。 */
 export function summarizeSpoken(chapter: SpokenChapter): SpokenSummary {
   const utterances = flattenSpoken(chapter)
@@ -131,7 +139,7 @@ export function summarizeSpoken(chapter: SpokenChapter): SpokenSummary {
     lines: utterances.length,
     chars: spokenChars(chapter),
     minutes: Math.round((estimateSpokenMs(chapter) / 60000) * 10) / 10,
-    punch: utterances.filter((u) => u.emotion === 'punch').length,
+    punch: countPunch(chapter),
     recaps: utterances.filter((u) => u.text.includes(RECAP_MARKER)).length,
   }
 }
@@ -145,6 +153,16 @@ export function requiredRecaps(chapter: SpokenChapter): number {
 /** 按逗号级切小句：质检与「一句话太长」的修稿都按这个口径，不按整行切。 */
 export function splitClauses(line: string): string[] {
   return line.split(CLAUSE_SEPARATORS).filter((clause) => clause.trim().length > 0)
+}
+
+/**
+ * 小句「念起来多长」：中文按字、拉丁词按词计（`requestAnimationFrame` 算 1 个，
+ * 不是 21 个字）。按字符数算会把 API 名、缩写误判成超长句——r150 实测踩过。
+ */
+export function spokenClauseLength(clause: string): number {
+  const cjk = clause.match(/[\u4e00-\u9fff]/g)?.length ?? 0
+  const latin = clause.match(/[A-Za-z0-9_]+/g)?.length ?? 0
+  return cjk + latin
 }
 
 /** 捧哏这一句算不算推进：短于 4 字且不含疑问词，就是纯附和。 */
@@ -257,7 +275,7 @@ export function validateSpokenChapter(chapter: SpokenChapter, tutorial?: Tutoria
         continue
       }
       const long = splitClauses(utterance.text).find(
-        (clause) => clause.replace(/\s/g, '').length > CLAUSE_MAX_CHARS,
+        (clause) => spokenClauseLength(clause) > CLAUSE_MAX_CHARS,
       )
       if (long) {
         push(
@@ -290,7 +308,7 @@ export function validateSpokenChapter(chapter: SpokenChapter, tutorial?: Tutoria
   }
 
   const all = flattenSpoken(chapter)
-  const punch = all.filter((u) => u.emotion === 'punch').length
+  const punch = countPunch(chapter)
   if (punch < PUNCH_MIN || punch > PUNCH_MAX) {
     push('punch_count', `本章 punch ${punch} 次，要落在 ${PUNCH_MIN}–${PUNCH_MAX} 次之间`)
   }

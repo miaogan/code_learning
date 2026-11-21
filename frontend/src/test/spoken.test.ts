@@ -8,11 +8,13 @@ import {
   PUNCH_MIN,
   RECAP_MARKER,
   SPOKEN_EMOTIONS,
+  countPunch,
   estimateSpokenMs,
   flattenSpoken,
   isPengPromoting,
   requiredRecaps,
   sectionForm,
+  spokenClauseLength,
   splitClauses,
   summarizeSpoken,
   validateSpokenChapter,
@@ -158,8 +160,7 @@ describe('质量闸逐条生效', () => {
     expect(codes(chapter)).toContain('clause_too_long')
   })
 
-  it('逗哏单次超过 5 句被拦下', () => {
-    const chapter = baseChapter(
+  it('逗哏单次超过 5 句被拦下', () => {    const chapter = baseChapter(
       {
         segments: [
           { speaker: 'dou', emotion: 'banter', lines: ['一。', '二。', '三。', '四。', '五。', '六。'] },
@@ -245,6 +246,33 @@ describe('质量闸逐条生效', () => {
   })
 })
 
+describe('两个判定口径（r150 实测修正）', () => {
+  it('包袱按情绪段计，不按行数', () => {
+    const chapter = baseChapter({
+      segments: [
+        { speaker: 'narrator', emotion: 'banter', lines: ['开场。'] },
+        { speaker: 'narrator', emotion: 'punch', lines: ['包袱一。', '包袱一的第二行。', '包袱一的第三行。'] },
+        { speaker: 'narrator', emotion: 'punch', lines: ['包袱二。'] },
+      ],
+    })
+    expect(countPunch(chapter)).toBe(2)
+    expect(summarizeSpoken(chapter).punch).toBe(2)
+    expect(codes(chapter)).not.toContain('punch_count')
+  })
+
+  it('小句长度按「字 + 拉丁词」计，API 名不算 21 个字', () => {
+    expect(spokenClauseLength('或者用 requestAnimationFrame')).toBe(4)
+    expect(spokenClauseLength('这是一句很长的中文小句用来测试长度')).toBe(17)
+    const chapter = baseChapter({
+      segments: [
+        { speaker: 'narrator', emotion: 'banter', lines: ['或者用 requestAnimationFrame。'] },
+        { speaker: 'narrator', emotion: 'punch', lines: ['第一个包袱。', '第二个包袱。'] },
+      ],
+    })
+    expect(codes(chapter)).not.toContain('clause_too_long')
+  })
+})
+
 describe('派生函数', () => {
   it('splitClauses 按中英标点切句并丢掉空段', () => {
     expect(splitClauses('先说缓存，再说 TTL；最后说雪崩。')).toEqual(['先说缓存', '再说 TTL', '最后说雪崩'])
@@ -271,7 +299,7 @@ describe('派生函数', () => {
     const summary = summarizeSpoken(chapter)
     expect(summary.lines).toBe(flattenSpoken(chapter).length)
     expect(summary.sections).toBe(1)
-    expect(summary.punch).toBe(2)
+    expect(summary.punch).toBe(1)
     expect(summary.recaps).toBe(1)
     expect(estimateSpokenMs(chapter)).toBeGreaterThan(0)
     expect(requiredRecaps(chapter)).toBe(1)
