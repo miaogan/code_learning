@@ -155,10 +155,16 @@ cd frontend && node ../scripts/export_spoken_sft.mjs     # 产出起草请求 + 
 python scripts/finetune/draft_spoken.py --dry-run        # 只统计，不出网
 python scripts/finetune/draft_spoken.py --live --limit 3 # 真调前 3 节（省点钱）
 python scripts/finetune/draft_spoken.py --live           # 全量 185 节
+python scripts/finetune/draft_spoken.py --live --retries 2   # 校验失败时带错误信息重试
+python scripts/finetune/sample_review.py                 # 抽 40 节人工改稿清单
 ```
 
 - 模型端点 / 模型名 / Key 从 `backend/.env` 读（也认同名环境变量），**不打印 Key**
 - 产物：`out/drafts_out.jsonl`（逐节初稿 + 校验码）、`out/drafts_review.md`（人工审阅：原文骨架 + 初稿 + 问题）
+- `--retries N` 会做「生成 → 校验 → 把问题塞回对话重试」，报告里分开记「首轮通过 / 重试救回 / 仍未过」——
+  **重试救回的比例是「提示词能不能约束住规则」的直接证据**，别和首轮通过率混算。
+- 人工抽样：`sample_review.py` 按问题类型分桶（clean / punch / clause / dou）抽 40 节，
+  一次性生成 `review_sample.md`（人看）与 `review_sample.jsonl`（人改），确定性抽样（seed 固定）可复算。
 - 人工按 review 改稿后另存 `edited.jsonl`，再算修改率：
 
 ```bash
@@ -167,16 +173,18 @@ python scripts/finetune/score_edits.py --draft out/drafts_out.jsonl --edited out
 
 ### 实测（2026-11-22 · deepseek-chat · 45 章 185 节）
 
-| 项 | 结果 |
-|---|---|
-| 用时 | 608 秒（≈3.3 s/节，含重试） |
-| 调用 | 185/185 成功，0 失败 |
-| **自动过闸** | **84/185 = 45.4%** |
-| 问题分布 | `punch_count`×75 · `clause_too_long`×31 · `dou_turn_too_long`×25 |
+| 试次 | 参数 | 用时 | 最终通过 | 明细 |
+|---|---|---|---|---|
+| A | 不加重试 | 608 s | **84/185 = 45.4%** | 首轮全过；`punch_count`×75 · `clause_too_long`×31 · `dou_turn_too_long`×25 |
+| B | `--retries 2` | 987 s（含 152 次重试调用） | **144/185 = 77.8%** | 首轮 87 + **重试救回 57** · 仍未过 41（`punch_count`×39 / `dou`×4 / `clause`×2） |
 
-三条失败全是**结构性偏差**（包袱堆太多、小句超 20 字、逗哏连说太长），不是内容跑题——
-这恰好落在「微调擅长解决系统性偏差」的那一档，但**是否值得微调仍取决于人工修改率**，
-需要先把 `drafts_review.md` 改一轮再跑 `score_edits.py`。
+**读法**：
+1. 重试把通过率从 45.4% 拉到 **77.8%（+32.4pp）**——说明**规则是可以被提示词约束的**，
+   只是第一次不一定听；瓶颈在「有没有把校验结果塞回对话」，不在模型能力。
+2. 剩下的 41 节几乎全是 `punch_count`（包袱超 6 个）：模型倾向于「多抖几个」，而规则要求 2–6。
+   这是**偏好型偏差**，提示词与重试都压不住，属于微调/负向样本能解决的那一类。
+3. 三条失败全是**结构性**的（包袱多、小句长、逗哏长），不是内容跑题——问题集中，符合 §5.8
+   「top3 问题占修改量 60%+」的微调前提，但**是否值得仍要看人工修改率**。
 
 > 注意：这里的「自动过闸率」**不能替代** §5.8 的人工修改率。前者量的是规则，
 > 后者量的是「人要不要重写」——两个指标分开记，别混着用。
