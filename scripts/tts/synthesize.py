@@ -37,14 +37,26 @@ CHARS_PER_SECOND = 4.5
 # 没有结束符它会把指令当正文念出来（r150 实测：第一版音频开头就是「就像跟朋友聊天…」）。
 # 措辞也要短祈使句（「用…的语气说这句话」），描述性长句同样会被念。
 INSTRUCT_SUFFIX = '<|endofprompt|>'
+# 措辞只用**模型认的基础情绪词**（实测：自创的表演腔如「先轻后重」「收尾咬住」它基本无感）。
 INSTRUCT = {
-    'banter': '用轻松随意的语气说这句话',
-    'setup': '用一本正经的语气说这句话',
-    'deadpan': '用冷淡平板的语气说这句话',
-    'punch': '用抖包袱、收尾咬住的语气说这句话',
-    'realize': '用惊讶恍然的语气说这句话',
-    'contrast': '用先轻后重的语气说这句话',
-    'wrap': '用放慢收束的语气说这句话',
+    'banter': '用轻松的语气说这句话',
+    'setup': '用自信的语气说这句话',
+    'deadpan': '用平静的语气说这句话',
+    'punch': '用兴奋的语气说这句话',
+    'realize': '用惊讶的语气说这句话',
+    'contrast': '用无奈的语气说这句话',
+    'wrap': '用温柔的语气说这句话',
+}
+
+# 语速是相声节奏的主要杠杆：instruct 管音色冷暖，speed 管快慢（实测 0.85→5.6s / 1.35→3.82s）。
+SPEED = {
+    'banter': 1.10,
+    'setup': 1.00,
+    'deadpan': 0.92,
+    'punch': 1.15,
+    'realize': 1.05,
+    'contrast': 1.00,
+    'wrap': 0.88,
 }
 
 # 不同 speaker 用不同音色参考：pilot 阶段两个参考音色，M2 再定音色库
@@ -159,7 +171,8 @@ class CosyVoiceBackend:
         if not instruct.endswith(INSTRUCT_SUFFIX):  # 防御：改模板时别漏结束符
             sys.exit(f'instruct 缺少结束符：{instruct}')
         chunks = []
-        for output in self.model.inference_instruct2(unit_text(unit), instruct, self.prompt, stream=False):
+        speed = SPEED.get(unit['emotion'], 1.0)
+        for output in self.model.inference_instruct2(unit_text(unit), instruct, self.prompt, stream=False, speed=speed):
             chunks.append(output['tts_speech'].squeeze(0).cpu().numpy())
         if not chunks:
             return b'', 0
