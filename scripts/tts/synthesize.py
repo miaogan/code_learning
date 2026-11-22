@@ -124,7 +124,7 @@ def mock_unit(unit: dict) -> tuple[bytes, int]:
 
 class CosyVoiceBackend:
     def __init__(self, model_dir: str, repo_dir: str, spk: str = '中文男', prompt_wav: str | None = None,
-                 model_kind: str = 'auto'):
+                 model_kind: str = 'auto', prompt_by_speaker: dict[str, str] | None = None):
         repo = Path(repo_dir)
         # flow matching 依赖 third_party/Matcha-TTS（submodule），要一起进 sys.path
         sys.path.insert(0, str(repo / 'third_party' / 'Matcha-TTS'))
@@ -150,6 +150,12 @@ class CosyVoiceBackend:
             self.model = CosyVoice2(model_dir, load_jit=False, load_trt=False, fp16=False)
         self.sample_rate = self.model.sample_rate
         self.prompt = self._make_prompt(spk, prompt_wav)
+        # 对口章：不同 speaker 用不同参考音（盲听可辨），缺省回落主参考音
+        self.prompts = {'dou': self.prompt, 'peng': self.prompt, 'narrator': self.prompt}
+        for speaker, path in (prompt_by_speaker or {}).items():
+            if path:
+                self.prompts[speaker] = self._make_prompt(spk, path)
+        self.loudness = None
 
     def _make_prompt(self, spk: str, prompt_wav: str | None = None) -> str:
         """参考音色：返回**路径**（CosyVoice 的 inference_instruct2 自己读+重采样）。
@@ -176,7 +182,8 @@ class CosyVoiceBackend:
             sys.exit(f'instruct 缺少结束符：{instruct}')
         chunks = []
         speed = SPEED.get(unit['emotion'], 1.0)
-        for output in self.model.inference_instruct2(unit_text(unit), instruct, self.prompt, stream=False, speed=speed):
+        prompt = self.prompts.get(unit['speaker'], self.prompt)
+        for output in self.model.inference_instruct2(unit_text(unit), instruct, prompt, stream=False, speed=speed):
             chunks.append(output['tts_speech'].squeeze(0).cpu().numpy())
         if not chunks:
             return b'', 0
@@ -189,6 +196,45 @@ class CosyVoiceBackend:
 
 def silence(ms: int) -> bytes:
     return b'\x00\x00' * int(SAMPLE_RATE * ms / 1000)
+
+
+def normalize_loudness(pcm: bytes, target_lufs: float = -22.0) -> tuple[bytes, float]:
+    """整节归一到 -20 LUFS（有声书区间）；归一后做峰值保护，返回（新 pcm, 最终 LUFS）。
+
+    为什么不是 -16：口播稿有大量短句与停顿，峰值因子高，-16 会被峰值保护拉回 -21 左右；
+    -20 能在不削顶的前提下保持一致响度。
+    """
+    import numpy as np
+
+    audio = np.frombuffer(pcm, dtype='<i2').astype(np.float32) / 32768.0
+    if audio.size == 0:
+        return pcm, float('nan')
+    meter = None
+    try:
+        import pyloudnorm as pyln
+
+        meter = pyln.Meter(SAMPLE_RATE)
+        loudness = meter.integrated_loudness(audio)
+        if loudness == float('-inf') or np.isnan(loudness):
+            raise ValueError('silence')
+        audio = pyln.normalize.loudness(audio, loudness, target_lufs)
+    except Exception:
+        peak = float(np.max(np.abs(audio))) or 1.0
+        audio = audio / peak * 0.89
+
+    # 峰值保护：归一化常把峰值推过满幅，直接 clip 会失真并让响度反向变低
+    peak = float(np.max(np.abs(audio)))
+    if peak > 0.95:
+        audio = audio * (0.95 / peak)
+
+    final = float('nan')
+    if meter is not None:
+        try:
+            final = float(meter.integrated_loudness(audio))
+        except Exception:
+            final = float('nan')
+    audio = np.clip(audio, -1.0, 1.0)
+    return (audio * 32767).astype('<i2').tobytes(), final
 
 
 def write_wav(path: Path, pcm: bytes) -> None:
@@ -217,21 +263,37 @@ def silence_ratio(pcm: bytes) -> float:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description='口播稿合成（mock / CosyVoice）')
-    parser.add_argument('--backend', choices=['mock', 'cosyvoice'], default='mock')
+    parser.add_argument('--backend', choices=['mock', 'cosyvoice', 'pilot'], default='mock')
     parser.add_argument('--chapter', action='append', default=None, help='只跑指定章（可重复）')
     parser.add_argument('--limit-sections', type=int, default=0, help='每章最多跑几节（0 = 全部）')
     parser.add_argument('--model-dir', default='D:/work_space/_tts/models/CosyVoice2-0.5B')
     parser.add_argument('--repo-dir', default='D:/work_space/_tts/CosyVoice', help='CosyVoice 代码目录（加进 sys.path）')
     parser.add_argument('--spk', default='中文男', help='CosyVoice SFT 参考音色')
     parser.add_argument('--prompt-wav', default=None, help='零样本参考音频（16k/24k 均可，自动重采样）')
+    parser.add_argument('--prompt-dou', default=None, help='逗哏参考音（对口章用，缺省用 --prompt-wav）')
+    parser.add_argument('--prompt-peng', default=None, help='捧哏参考音（对口章用，缺省用 --prompt-wav）')
     parser.add_argument('--model-kind', choices=['auto', 'cv2', 'cv3'], default='auto', help='模型代际（auto 按 cosyvoice3.yaml 识别）')
     parser.add_argument('--out-audio', default=str(AUDIO_DIR), help='音频输出目录（A/B 对比时分开）')
+    parser.add_argument('--pilot-repo', default='D:/work_space/_tts/PilotTTS', help='PilotTTS 代码目录')
     args = parser.parse_args()
 
     plans = load_plans(args.chapter)
     out_audio = Path(args.out_audio)
     out_audio.mkdir(parents=True, exist_ok=True)
-    backend = CosyVoiceBackend(args.model_dir, args.repo_dir, args.spk, args.prompt_wav, args.model_kind) if args.backend == 'cosyvoice' else None
+    if args.backend == 'cosyvoice':
+        backend = CosyVoiceBackend(
+            args.model_dir, args.repo_dir, args.spk, args.prompt_wav, args.model_kind,
+            {'dou': args.prompt_dou, 'peng': args.prompt_peng},
+        )
+    elif args.backend == 'pilot':
+        from pilot_backend import PilotBackend  # 同目录，延迟导入（依赖 sys.path 调整）
+
+        backend = PilotBackend(
+            args.pilot_repo, prompts={'dou': args.prompt_dou, 'peng': args.prompt_peng},
+            prompt_wav=args.prompt_wav,
+        )
+    else:
+        backend = None
     qa: list[dict] = []
 
     for plan in plans:
@@ -254,6 +316,7 @@ def main() -> int:
                 durations.append(duration)
                 pauses.append((unit['pauseBeforeMs'], unit['pauseAfterMs']))
             pcm = b''.join(pcm_parts)
+            pcm, loudness = normalize_loudness(pcm)
             wav_path = chapter_dir / f'{section["sectionId"]}.wav'
             write_wav(wav_path, pcm)
             cues = build_cues(units, durations, pauses)
@@ -279,6 +342,7 @@ def main() -> int:
                     'estimateMs': section['estimateMs'],
                     'peak': peak_of(pcm),
                     'silenceRatio': round(silence_ratio(pcm), 3),
+                    'loudnessLufs': round(loudness, 1) if loudness == loudness else None,
                 }
             )
             print(f'[{plan["chapterId"]}/{section["sectionId"]}] {len(cues)} 句 · {duration_ms / 1000:.1f}s')

@@ -136,3 +136,30 @@ pip install torch==2.3.1 torchaudio==2.3.1 --index-url https://download.pytorch.
 3. 音色只有「中文男」一个参考；对口章需要第二个能盲听区分的音色（§5.7），M2 补。
 4. 没有做响度归一化与爆音检测（只报 peak）。
 5. CosyVoice2 权重与代码是 Apache-2.0；**生成的音频许可口径仍待产品拍板**（VERSION-PLAN §7.2 第 3 条）。
+
+## 5. PilotTTS 后端（推荐，情绪标签驱动）
+
+CosyVoice 的 instruct 只能粗调音色冷暖（全量类间基频极差 10–36Hz、方向不稳）；PilotTTS（高德开源，Apache-2.0）
+是**显式情绪标签 + 副语言标记**，同一句能量差可达 2 倍，更接近"在演"。
+
+```bash
+# 仓库与权重（一次性）
+git clone --depth 1 https://github.com/AMAPVOICE/PilotTTS.git D:/work_space/_tts/PilotTTS
+python -c "from modelscope.hub.snapshot_download import snapshot_download; snapshot_download('AmapVoice/PilotTTS', local_dir='D:/work_space/_tts/PilotTTS/pretrained_models')"
+python -c "from modelscope.hub.snapshot_download import snapshot_download; snapshot_download('facebook/w2v-bert-2.0', local_dir='D:/work_space/_tts/PilotTTS/pretrained_models/w2v-bert-2.0')"
+# 合计约 9.7GB（含 Qwen3-0.6B 与 CosyVoice3 声码器）
+
+# 合成
+D:/ProgramData/miniconda3/envs/cosyvoice/python.exe scripts/tts/synthesize.py --backend pilot \
+  --prompt-wav scripts/tts/out/refs/ref_中文男.wav \
+  --prompt-dou scripts/tts/out/refs/ref_中文男.wav \
+  --prompt-peng scripts/tts/out/refs/ref_中文女.wav
+```
+
+情绪映射（`scripts/tts/pilot_backend.py`）：banter→happy、setup→serious、deadpan→无标签、
+punch/realize→surprise、contrast→blue、wrap→serious。PilotTTS 另支持 `LAUGH/BREATH/CRY/COUGH` 与 14 种方言。
+
+两个环境坑：
+1. **wetext 每次初始化都向 ModelScope 请求 revisions，匿名已 403**（`Authentication token does not exist`）——
+   已用本地缓存绕开（`wetext.wetext.snapshot_download` 指向 `~/.cache/modelscope/hub/pengzhendong/wetext`）。
+2. PilotTTS 的 demo 依赖相对路径，加载时会 `chdir`——加载完必须切回，否则输出的相对路径会落到它的仓库目录。
