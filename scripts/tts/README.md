@@ -60,6 +60,17 @@ D:/ProgramData/miniconda3/envs/cosyvoice/python.exe scripts/tts/synthesize.py   
 
 修复前后同节对比：`mw-cache-strategy/where` 152.8s（含念指令）→ **88.1s**（正常）。
 
+### 踩坑 2：CV3 的 instruct 还要加 `You are a helpful assistant. ` 前缀
+
+换到 CV3 后，第一版音频**又把指令念了出来**——CV3 的官方写法是：
+
+```python
+'You are a helpful assistant. 请用广东话表达。<|endofprompt|>'   # example.py: cosyvoice3_example
+```
+
+CV2 不需要这个前缀，CV3 少了它就把指令当正文。驱动已按 `model_kind` 自动加前缀，
+并新增 `scripts/tts/check_instruction_leak.py`：转写每节前 25 秒，命中「语气说这句话」等特征串即报错。
+
 ### 试听结论：CV2 的 instruct 太弱，换 CosyVoice3
 
 修好结束符后，指令不再被念，但**语气也没真正生效**。客观量化（`analyze_emotion.py`，按句切段量基频/能量）：

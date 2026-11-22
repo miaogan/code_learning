@@ -37,6 +37,9 @@ CHARS_PER_SECOND = 4.5
 # 没有结束符它会把指令当正文念出来（r150 实测：第一版音频开头就是「就像跟朋友聊天…」）。
 # 措辞也要短祈使句（「用…的语气说这句话」），描述性长句同样会被念。
 INSTRUCT_SUFFIX = '<|endofprompt|>'
+# CosyVoice3 的 instruct 必须带这个前缀（官方 cosyvoice3_example）；CV2 不需要。
+# 少了前缀，CV3 会把指令当正文念出来（r150 实测，第二次踩）。
+INSTRUCT_PREFIX = 'You are a helpful assistant. '
 # 措辞只用**模型认的基础情绪词**（实测：自创的表演腔如「先轻后重」「收尾咬住」它基本无感）。
 INSTRUCT = {
     'banter': '用轻松的语气说这句话',
@@ -167,7 +170,8 @@ class CosyVoiceBackend:
     def synthesize(self, unit: dict) -> tuple[bytes, int]:
         import numpy as np
 
-        instruct = INSTRUCT.get(unit['emotion'], INSTRUCT['banter']) + INSTRUCT_SUFFIX
+        prefix = INSTRUCT_PREFIX if getattr(self, 'model_kind', 'cv2') == 'cv3' else ''
+        instruct = prefix + INSTRUCT.get(unit['emotion'], INSTRUCT['banter']) + INSTRUCT_SUFFIX
         if not instruct.endswith(INSTRUCT_SUFFIX):  # 防御：改模板时别漏结束符
             sys.exit(f'instruct 缺少结束符：{instruct}')
         chunks = []
@@ -221,14 +225,17 @@ def main() -> int:
     parser.add_argument('--spk', default='中文男', help='CosyVoice SFT 参考音色')
     parser.add_argument('--prompt-wav', default=None, help='零样本参考音频（16k/24k 均可，自动重采样）')
     parser.add_argument('--model-kind', choices=['auto', 'cv2', 'cv3'], default='auto', help='模型代际（auto 按 cosyvoice3.yaml 识别）')
+    parser.add_argument('--out-audio', default=str(AUDIO_DIR), help='音频输出目录（A/B 对比时分开）')
     args = parser.parse_args()
 
     plans = load_plans(args.chapter)
+    out_audio = Path(args.out_audio)
+    out_audio.mkdir(parents=True, exist_ok=True)
     backend = CosyVoiceBackend(args.model_dir, args.repo_dir, args.spk, args.prompt_wav, args.model_kind) if args.backend == 'cosyvoice' else None
     qa: list[dict] = []
 
     for plan in plans:
-        chapter_dir = AUDIO_DIR / plan['chapterId']
+        chapter_dir = out_audio / plan['chapterId']
         sections = plan['sections'][: args.limit_sections] if args.limit_sections else plan['sections']
         tracks = []
         for section in sections:
@@ -281,7 +288,7 @@ def main() -> int:
             encoding='utf-8',
         )
 
-    out_qa = HERE / 'out' / 'qa.json'
+    out_qa = out_audio / 'qa.json'
     out_qa.parent.mkdir(parents=True, exist_ok=True)
     out_qa.write_text(json.dumps(qa, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     total_minutes = sum(item['durationMs'] for item in qa) / 60000

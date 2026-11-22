@@ -224,3 +224,22 @@
 3. **P2 备选**：IndexTTS-2（情绪参考音频单独录制）。
 
 来源：WaytoAGI《9 款主流开源 TTS 大测评》（2025-12-17 更新）、TokenHub《2026 年最佳开源 TTS 模型》、Compshare PilotTTS 镜像页、HF `Jmica/IndexTTS2` 许可标注。
+
+### 13.2 踩坑 2：CV3 的 instruct 前缀（2026-11-22）
+
+切到 CosyVoice3 后音频再次把指令念出来。原因：CV3 的 instruct 必须是
+`'You are a helpful assistant. 用…说这句话<|endofprompt|>'`（`example.py` 的 `cosyvoice3_example`），
+CV2 则不需要前缀。驱动按 `model_kind` 自动补前缀。
+
+新增回归闸 `scripts/tts/check_instruction_leak.py`：whisper 转写每节前 25 秒，
+命中「语气说这句话 / You are a helpful」等特征串即判失败——**这类 bug 已经发生两次，必须自动化**。
+
+顺带做了一次参考音 A/B（同一节 `mw-observability/signals`）：
+
+| 参考音 | 基频均值 | 峰值 | 静音比 |
+|---|---|---|---|
+| `da_feiyu`（ACG 角色音） | 238.9 Hz | 28517 | 0.410 |
+| `ref_中文男`（CosyVoice-300M-SFT 合成） | 97.5 Hz | 16395 | 0.504 |
+
+男声版本明显更接近"说书/唠嗑"的低音区，但响度只有女声的 35%（峰值 16395 vs 28517），
+**上线前需要做响度归一化**。A/B 文件：`scripts/tts/out/ab2/<ref>/mw-observability/signals.wav`。
