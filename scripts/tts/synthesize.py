@@ -108,7 +108,8 @@ def mock_unit(unit: dict) -> tuple[bytes, int]:
 # ---------------------------------------------------------------- CosyVoice 后端
 
 class CosyVoiceBackend:
-    def __init__(self, model_dir: str, repo_dir: str, spk: str = '中文男', prompt_wav: str | None = None):
+    def __init__(self, model_dir: str, repo_dir: str, spk: str = '中文男', prompt_wav: str | None = None,
+                 model_kind: str = 'auto'):
         repo = Path(repo_dir)
         # flow matching 依赖 third_party/Matcha-TTS（submodule），要一起进 sys.path
         sys.path.insert(0, str(repo / 'third_party' / 'Matcha-TTS'))
@@ -118,13 +119,20 @@ class CosyVoiceBackend:
         try:
             import torch
             import torchaudio
-            from cosyvoice.cli.cosyvoice import CosyVoice2
+            from cosyvoice.cli.cosyvoice import CosyVoice2, CosyVoice3
         except Exception as exc:  # pragma: no cover - 依赖缺失时给出可执行提示
             sys.exit(f'CosyVoice 依赖未就绪（{exc}）。先按 scripts/tts/README.md 装环境。')
+        kind = model_kind
+        if kind == 'auto':
+            kind = 'cv3' if (Path(model_dir) / 'cosyvoice3.yaml').exists() else 'cv2'
         self.torch = torch
         self.torchaudio = torchaudio
         self.repo_dir = str(repo)
-        self.model = CosyVoice2(model_dir, load_jit=False, load_trt=False, fp16=False)
+        self.model_kind = kind
+        if kind == 'cv3':
+            self.model = CosyVoice3(model_dir, load_trt=False, load_vllm=False, fp16=False)
+        else:
+            self.model = CosyVoice2(model_dir, load_jit=False, load_trt=False, fp16=False)
         self.sample_rate = self.model.sample_rate
         self.prompt = self._make_prompt(spk, prompt_wav)
 
@@ -199,10 +207,11 @@ def main() -> int:
     parser.add_argument('--repo-dir', default='D:/work_space/_tts/CosyVoice', help='CosyVoice 代码目录（加进 sys.path）')
     parser.add_argument('--spk', default='中文男', help='CosyVoice SFT 参考音色')
     parser.add_argument('--prompt-wav', default=None, help='零样本参考音频（16k/24k 均可，自动重采样）')
+    parser.add_argument('--model-kind', choices=['auto', 'cv2', 'cv3'], default='auto', help='模型代际（auto 按 cosyvoice3.yaml 识别）')
     args = parser.parse_args()
 
     plans = load_plans(args.chapter)
-    backend = CosyVoiceBackend(args.model_dir, args.repo_dir, args.spk, args.prompt_wav) if args.backend == 'cosyvoice' else None
+    backend = CosyVoiceBackend(args.model_dir, args.repo_dir, args.spk, args.prompt_wav, args.model_kind) if args.backend == 'cosyvoice' else None
     qa: list[dict] = []
 
     for plan in plans:

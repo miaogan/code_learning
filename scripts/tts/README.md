@@ -60,6 +60,18 @@ D:/ProgramData/miniconda3/envs/cosyvoice/python.exe scripts/tts/synthesize.py   
 
 修复前后同节对比：`mw-cache-strategy/where` 152.8s（含念指令）→ **88.1s**（正常）。
 
+### 试听结论：CV2 的 instruct 太弱，换 CosyVoice3
+
+修好结束符后，指令不再被念，但**语气也没真正生效**。客观量化（`analyze_emotion.py`，按句切段量基频/能量）：
+
+| 模型 | 12 节全量·类间基频极差 | 四种反差指令（开心/悲伤/生气/平静） |
+|---|---|---|
+| CosyVoice2-0.5B | **6.0 Hz**（≈没区分） | 时长 3.56–3.88s、基频无方向，悲伤只是音量小 |
+| Fun-CosyVoice3-0.5B | 单节 16.6 Hz（全量待测） | **悲伤 10.2s vs 平静 3.2s**（慢 3 倍）、开心/生气更响 |
+
+结论：这一层是**模型代际差异**，不是调用约定。驱动已支持 `--model-kind auto|cv2|cv3`（按 `cosyvoice3.yaml` 自动识别），
+默认建议用 CV3。注意 CV3 的构造参数不同（无 `load_jit`，用 `load_vllm`）。
+
 ### 换机器 / 重建环境（未验证，仅供参照）
 
 ```bash
