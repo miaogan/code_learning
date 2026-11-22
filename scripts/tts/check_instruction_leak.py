@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import glob
 import sys
+import tempfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -62,9 +63,12 @@ def main() -> int:
     for wav in wavs:
         target = wav
         if sf is not None:
+            # 剪辑写到系统临时目录，别污染音频产物目录
             data, sr = sf.read(wav)
             clip = data[: sr * args.seconds]
-            target = str(Path(wav).with_suffix('.head.wav'))
+            handle = tempfile.NamedTemporaryFile(suffix='.wav', delete=False)
+            handle.close()
+            target = handle.name
             sf.write(target, clip, sr)
         result = model.transcribe(target, language='zh', fp16=False)
         text = result['text']

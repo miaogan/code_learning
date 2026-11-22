@@ -260,3 +260,20 @@ CV2 则不需要前缀。驱动按 `model_kind` 自动补前缀。
 
 情绪方向也对了：`deadpan` 176.5Hz / `punch` 178.3Hz 偏高，`wrap` 141.8Hz / `contrast` 144.8Hz 偏低。
 `check_instruction_leak.py` 对 12 节全绿（不念指令）。
+
+## 15. PilotTTS 落地（2026-11-22，替换 CosyVoice 作为默认合成后端）
+
+| 项 | CosyVoice3 + 情绪词 + 语速 | PilotTTS（instruct） |
+|---|---|---|
+| 情绪控制 | 自然语言 instruct（弱，靠猜） | **显式标签**（happy/serious/surprise/blue/…） |
+| 副语言 | 需手写 `[laughter]` 等标记 | 内置 `LAUGH/BREATH/CRY/COUGH` |
+| 同句能量差（实测） | ≈1.3× | **1.7–2×**（dou banter 0.0591 vs contrast 0.0341；narrator punch 0.0938 vs setup 0.0479） |
+| 同说话人音高差 | 22–40Hz | 22–40Hz（相当） |
+| 12 节耗时 | 14.0 min | 15.6 min |
+| 许可 | Apache-2.0 | Apache-2.0 |
+
+要点：**PilotTTS 也做零样本克隆**——用我们自己的 SFT 男声当 prompt（实测 f0 85–107Hz），所以既保留自有音色，又能吃情绪标签。
+对口双音色沿用 `--prompt-dou/--prompt-peng`（逗哏 ~91–113Hz、捧哏 ~198–224Hz，盲听可分）。
+
+已知待修：① 响度一致性（−25.4 ~ −22.0 LUFS，峰值保护在长句上提前触发）；② punch 段还没接 `LAUGH` 标记；
+③ deadpan/punch 在稿子里多由捧哏承担，混合统计会把"音色差"误算成"情绪差"——量化必须按 speaker 分开。
