@@ -126,8 +126,9 @@
 - **发布链路已跑通**（2026-11-23）：写稿模型生成 → `build_spoken_plan.py` → VoxCPM2 零样本合成 → `out/release_v1/`
   - 参考音用 AISHELL-3 sample_192（Apache-2.0），但**带宽不合格**（6-8k 0.45%），成品同样闷——链路通、音质待换源
   - 换源只需改 `--vox-ref` 一个参数；Common Voice/WenetSpeech 需用户注册/拿密码
-- AI 标识：**r151 已补**（manifest `aiGenerated: true` + 播放器角标），隐式文件元数据（wav info chunk）仍待补
-- **平台分发层已就绪（r151）**：播放器 + 「听听」入口上线，当前生产因素材未上线渲染「素材筹备中」态；
+- AI 标识：**r151 已补齐**——manifest `aiGenerated: true` + 播放器角标 + wav 隐式元数据（RIFF LIST/INFO chunk：ICMT/ISFT/ICRD，`synthesize.py` 落盘时自动写入）
+- **平台分发层已就绪（r151）**：播放器 + 「听听」入口上线，入口真源是 `/audio/index.json`（索引驱动，素材上线后入口自动出现）。
+  当前生产因素材未上线渲染「素材筹备中」态；
   素材上线 = 合成产物放进服务器 `~/skillcoach/audio/<章>/`（nginx 只读挂载 `/audio/`），**前端零发版**
 - 三个坑已解：`swift infer` 用 `--dataset` 会卡死须用 `--val_dataset`；桥接脚本 src 前缀不带斜杠传（绕开 Git Bash MSYS 转换）；`--id-map` 从正式 plans 取稳定 sectionId
 
@@ -145,3 +146,26 @@
 
 上线 checklist：①素材过本 SOP 四必要条件 → ②合成（`synthesize.py`，manifest 自动带 `aiGenerated: true`）→
 ③放入 `~/skillcoach/audio/<章>/` → ④浏览器打开 `/learn/<章>?mode=listen` 验证角标与播放 → ⑤把素材 hash 补进 `assets/manifest.json`。
+
+## 9. 全量流水线（r151，所有文字都有音频 + 新知识同链路）
+
+用户口径：**站内所有文字都要有音频素材，之后加入的新知识也走同一条链路**。
+统一入口是 `scripts/tts/make_audio.py`，四阶段：
+
+| 阶段 | 命令 | 产出 |
+|---|---|---|
+| plan | `python make_audio.py plan [--edits review_sample-edited.jsonl]` | `plans_full/<章>.json`（185 节全过质量闸；人工定稿用 `--edits` 覆盖；标题从 spoken_drafts.jsonl 的 prompt 清单解析，`--title-source` 可换） |
+| synth | `python make_audio.py synth --vox-ref <合规参考音> [--python <voxcpm venv>]` | 各章 `manifest.json` + wav（断点续跑：manifest 覆盖全部 plan 小节则跳过；自动写 AI 元数据） |
+| index | `python make_audio.py index` | `index.json`（聚合所有章 manifest，前端入口唯一真源） |
+| deploy | `python make_audio.py deploy [--dest audio/]` | 拷入仓库 `audio/` → push dev → nginx 挂卷分发 |
+
+当前进度：plan 阶段 185/185 全过闸、45 章 plans 带可读标题；synth 待合法参考音到位后启动
+（voxcpm RTF≈0.85，185 节估 5-6 小时 GPU）。
+
+**新知识接入路径（固化口径）**——新增一章内容后按序做：
+1. coverage 登记该章，跑 `draft_spoken` 生成口播稿草稿；
+2. 人工修稿后放进定稿覆盖表（`--edits`）；
+3. `make_audio.py plan → synth → index → deploy`——前端零改动：索引里多了这章，「听听」入口与目录页 chip 自动出现。
+
+前端接入（r151 收尾）：`useSpokenAudioIndex()`（模块级缓存，一次会话只拉一次）+ `audioIndexHasChapter()`；
+目录页 chip 与章页「听听」入口条件 = 内嵌口播稿 **或** 索引含该章（S 类试点章与全量合成章同权）。

@@ -5,8 +5,12 @@
  */
 import { describe, expect, it } from 'vitest'
 import {
+  audioIndexHasChapter,
+  loadAudioIndex,
   loadSpokenAudio,
+  parseSpokenAudioIndex,
   parseSpokenManifest,
+  spokenAudioIndexUrl,
   spokenManifestUrl,
   spokenSectionDurationMs,
 } from '../lib/spokenAudio'
@@ -115,5 +119,103 @@ describe('spokenSectionDurationMs', () => {
     expect(manifest).not.toBeNull()
     expect(spokenSectionDurationMs(manifest!, 'concept')).toBe(61610)
     expect(spokenSectionDurationMs(manifest!, 'nope')).toBeNull()
+  })
+})
+
+/* ---------- r151 全量流水线：/audio/index.json（入口真源） ---------- */
+
+const validIndex = {
+  generatedAt: '2026-11-23T10:00:00Z',
+  chapters: [
+    {
+      chapterId: 'fe-react-render',
+      title: 'React 状态与渲染',
+      form: 'duo',
+      aiGenerated: true,
+      sections: [
+        { sectionId: 'concept', title: '状态驱动的渲染模型', durationMs: 45000 },
+        { sectionId: 'pitfall', title: '闭包陷阱', durationMs: 38000 },
+      ],
+      totalMs: 83000,
+    },
+    {
+      chapterId: 'mw-cache-strategy',
+      title: '缓存策略',
+      form: 'solo',
+      sections: [{ sectionId: 'concept', title: '缓存失效', durationMs: 30000 }],
+      totalMs: 30000,
+    },
+  ],
+}
+
+describe('spokenAudioIndexUrl', () => {
+  it('固定在 /audio/index.json（章目录的上一层）', () => {
+    expect(spokenAudioIndexUrl()).toBe('/audio/index.json')
+  })
+})
+
+describe('parseSpokenAudioIndex', () => {
+  it('合法索引全量解析；aiGenerated 缺省兜底为 true（宁可错标不可漏标）', () => {
+    const parsed = parseSpokenAudioIndex(validIndex)
+    expect(parsed).not.toBeNull()
+    expect(parsed?.chapters).toHaveLength(2)
+    expect(parsed?.chapters[1].aiGenerated).toBe(true)
+    expect(parsed?.chapters[0].sections[0].title).toBe('状态驱动的渲染模型')
+  })
+
+  it.each([
+    ['null 输入', null],
+    ['缺 chapters 数组', { generatedAt: 'x' }],
+    ['chapters 非数组', { chapters: 'two' }],
+    ['章缺 title', { chapters: [{ ...validIndex.chapters[0], title: undefined }] }],
+    ['章 form 非法', { chapters: [{ ...validIndex.chapters[0], form: 'lecture' }] }],
+    ['小节缺 durationMs', {
+      chapters: [{
+        ...validIndex.chapters[0],
+        sections: [{ sectionId: 'concept', title: 'x' }],
+      }],
+    }],
+    ['数组里混入 null', { chapters: [...validIndex.chapters, null] }],
+  ])('%s → 整体判废（半坏索引比没有索引更误导）', (_name, raw) => {
+    expect(parseSpokenAudioIndex(raw)).toBeNull()
+  })
+})
+
+describe('loadAudioIndex', () => {
+  it('200 + 合法 JSON → 索引', async () => {
+    const fetchImpl = (async () =>
+      new Response(JSON.stringify(validIndex), { status: 200 })) as typeof fetch
+    const index = await loadAudioIndex(fetchImpl)
+    expect(index?.chapters).toHaveLength(2)
+  })
+
+  it('404（素材还没部署）→ null，不抛错', async () => {
+    const fetchImpl = (async () => new Response('not found', { status: 404 })) as typeof fetch
+    expect(await loadAudioIndex(fetchImpl)).toBeNull()
+  })
+
+  it('网络层异常（离线）→ null', async () => {
+    const fetchImpl = (async () => {
+      throw new TypeError('Failed to fetch')
+    }) as unknown as typeof fetch
+    expect(await loadAudioIndex(fetchImpl)).toBeNull()
+  })
+
+  it('200 但结构非法（HTML 错误页兜不住）→ null', async () => {
+    const fetchImpl = (async () => new Response('<html>404</html>', { status: 200 })) as typeof fetch
+    expect(await loadAudioIndex(fetchImpl)).toBeNull()
+  })
+})
+
+describe('audioIndexHasChapter', () => {
+  const index = parseSpokenAudioIndex(validIndex)
+  it('索引里有 → true', () => {
+    expect(audioIndexHasChapter(index, 'fe-react-render')).toBe(true)
+  })
+  it('索引里没有 → false', () => {
+    expect(audioIndexHasChapter(index, 'not-a-chapter')).toBe(false)
+  })
+  it('索引还没拉回来（null）→ false（入口先不亮，内侧了再来就有）', () => {
+    expect(audioIndexHasChapter(null, 'fe-react-render')).toBe(false)
   })
 })

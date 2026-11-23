@@ -2,6 +2,7 @@ import { PageHero } from '../components/ui/PageHero'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { spokenChapterById } from '../content/spoken'
+import { audioIndexHasChapter, useSpokenAudioIndex } from '../lib/spokenAudio'
 import { SpokenPlayer } from '../components/learn/SpokenPlayer'
 import { TutorialArticle } from '../components/learn/TutorialArticle'
 import { TutorialToc } from '../components/learn/TutorialToc'
@@ -33,19 +34,29 @@ export default function TutorialPage() {
    * URL 手输也只回落到读模式（不渲染空播放器）。
    */
   const spokenScript = chapter === undefined ? undefined : spokenChapterById(chapter.id)
-  const isListenMode = searchParams.get('mode') === 'listen' && spokenScript !== undefined
   /**
-   * 泛听跨章续播（r151）：沿教程顺序找下一个有稿章，整章播完自动跳过去接着听；
+   * r151 全量流水线：入口真源是 `/audio/index.json`（部署期资产）。
+   * 内嵌口播稿（S 类试点章）与索引章都可进听模式——素材上线后入口自动出现，零发版。
+   * 索引还没拉回来时先按「无」处理：内侧了再来就有（一次会话只拉一次，缓存模块级）。
+   */
+  const audioIndex = useSpokenAudioIndex()
+  const hasAudio =
+    spokenScript !== undefined ||
+    (chapter !== undefined && audioIndexHasChapter(audioIndex, chapter.id))
+  const isListenMode = searchParams.get('mode') === 'listen' && hasAudio
+  /**
+   * 泛听跨章续播（r151）：沿教程顺序找下一个有音频章（内嵌稿或索引），整章播完自动跳过去接着听；
    * `autoplay=1` 由播放器接（浏览器拒自动播放时静默降级为暂停态）。
    */
   const nextListenHref = useMemo(() => {
     if (chapter === undefined) return null
     const currentIndex = ALL_TUTORIAL_CHAPTERS.findIndex((item) => item.id === chapter.id)
     const next = ALL_TUTORIAL_CHAPTERS.slice(currentIndex + 1).find(
-      (item) => spokenChapterById(item.id) !== undefined,
+      (item) =>
+        spokenChapterById(item.id) !== undefined || audioIndexHasChapter(audioIndex, item.id),
     )
     return next === undefined ? null : `${chapterHref(next.id)}?mode=listen&autoplay=1`
-  }, [chapter])
+  }, [chapter, audioIndex])
   const autoplay = searchParams.get('autoplay') === '1'
 
   // 打开即记「最近在读」；只翻一眼不写已读小节，避免把进度刷成虚高。
@@ -110,7 +121,7 @@ export default function TutorialPage() {
         <Chip label={chapter.direction} tone="direction" />
         <LevelChip level={chapter.level} />
         <Chip label={`${chapter.sections.length} 节`} />
-        {spokenScript !== undefined && (
+        {hasAudio && (
           <Link
             className={isListenMode ? 'sc-listen-entry is-active' : 'sc-listen-entry'}
             to={isListenMode ? chapterHref(chapter.id) : `${chapterHref(chapter.id)}?mode=listen`}
@@ -141,10 +152,11 @@ export default function TutorialPage() {
       </p>
 
       <div className="sc-learn-layout">
-        {isListenMode && spokenScript !== undefined ? (
+        {isListenMode && hasAudio ? (
           <div className="sc-learn-listenwrap">
             <SpokenPlayer
-              chapter={spokenScript}
+              chapterId={chapter.id}
+              chapter={spokenScript ?? null}
               chapterTitle={chapter.title}
               nextListenHref={nextListenHref}
               autoplay={autoplay}

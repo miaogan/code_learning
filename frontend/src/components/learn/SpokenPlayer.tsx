@@ -7,6 +7,10 @@
  * 2. 任何播放出来的音频都是 AI 生成（manifest `aiGenerated` 缺省 true）——角标常驻，
  *    音色溯源（模型 / LoRA / 参考音）放 title 提示，不进产品文案。
  *
+ * `chapter`（内嵌口播稿）可选：全量流水线（make_audio.py）合成的章只存在于
+ * `/audio/index.json` + manifest，前端没有内嵌文本——ready 态完全由 manifest 驱动
+ * （小节 tab 用 track.title），missing 态有内嵌稿才渲染口播稿浏览，没有就只给提示。
+ *
  * 断点续听与阅读进度同源同链路：写 `state/learnProgress`（本地缓存 + 防抖整份 PUT 上云），
  * 契约字段为 `heard` / `listen_section_id` / `listen_position_ms`（r151 双侧同步，跨设备合并取新）。
  * 泛听三档（VERSION-PLAN §4.1）：本节循环 / 整章连播 / 跨章续播（`nextListenHref`）。
@@ -50,7 +54,7 @@ function emotionLabel(cue: SpokenAudioCue): string | null {
   return spec?.label ?? null
 }
 
-/* ---------- 素材缺失态：口播稿浏览 ---------- */
+/* ---------- 素材缺失态：提示 + 口播稿浏览（有内嵌稿才有） ---------- */
 
 function MissingNotice({ chapterId }: { chapterId: string }) {
   return (
@@ -60,7 +64,6 @@ function MissingNotice({ chapterId }: { chapterId: string }) {
         这一章的口播稿已完成并通过质量闸，但可发布的合规音频素材还在整理中（当前持有的配音素材
         授权不允许公开分发）。素材上线后这里就是完整播放器——届时无需升级前端，服务器放入音频即可。
       </p>
-      <p className="sc-listen-missinghint">下面可以先按口播稿通读：结构与正式音频逐句一致。</p>
       <p className="sc-listen-missingmeta">素材目录约定：/audio/{chapterId}/（nginx 静态分发）</p>
     </div>
   )
@@ -86,10 +89,9 @@ function ScriptBrowse({ chapter }: { chapter: SpokenChapter }) {
   )
 }
 
-/* ---------- 就绪态：播放器 ---------- */
+/* ---------- 就绪态：播放器（纯 manifest 驱动，不依赖内嵌口播稿） ---------- */
 
 interface ReadyPlayerProps {
-  chapter: SpokenChapter
   chapterTitle: string
   manifest: SpokenAudioManifest
   /** 下一章的听模式链接（有稿才给）：整章播完后的跨章续播入口，`null` 表示没有下一章。 */
@@ -98,13 +100,14 @@ interface ReadyPlayerProps {
   autoplay: boolean
 }
 
-function ReadyPlayer({ chapter, chapterTitle, manifest, nextListenHref, autoplay }: ReadyPlayerProps) {
+function ReadyPlayer({ chapterTitle, manifest, nextListenHref, autoplay }: ReadyPlayerProps) {
   const navigate = useNavigate()
-  const sectionIds = useMemo(() => chapter.sections.map((s) => s.sectionId), [chapter])
+  const chapterId = manifest.chapterId
+  const sectionIds = useMemo(() => manifest.tracks.map((t) => t.sectionId), [manifest])
 
   const [sectionId, setSectionId] = useState<string | null>(() => {
     // 断点存在进度 store（本地缓存 + 服务端合并结果）：只认仍有效的小节，失效从章首开始。
-    const stored = getLearnProgress().chapters[chapter.chapterId]
+    const stored = getLearnProgress().chapters[chapterId]
     const valid = validResume(
       stored === undefined
         ? null
@@ -126,14 +129,14 @@ function ReadyPlayer({ chapter, chapterTitle, manifest, nextListenHref, autoplay
   loopRef.current = loopSection
 
   const track = manifest.tracks.find((item) => item.sectionId === sectionId) ?? manifest.tracks[0]
-  const section = chapter.sections.find((item) => item.sectionId === track.sectionId)
+  const sectionLabel = track.title ?? track.sectionId
   const durationMs = spokenSectionDurationMs(manifest, track.sectionId) ?? track.durationMs
   const cues = track.cues
-  const sessionTitle = section === undefined ? chapterTitle : `${chapterTitle} · ${section.title}`
+  const sessionTitle = `${chapterTitle} · ${sectionLabel}`
 
   // 换章 / 换账号后重读断点：只认仍然有效的小节，失效就从章首开始。
   useEffect(() => {
-    const stored = getLearnProgress().chapters[chapter.chapterId]
+    const stored = getLearnProgress().chapters[chapterId]
     const valid = validResume(
       stored === undefined
         ? null
@@ -146,17 +149,16 @@ function ReadyPlayer({ chapter, chapterTitle, manifest, nextListenHref, autoplay
         ? prev
         : (valid?.sectionId ?? sectionIds[0] ?? null),
     )
-  }, [chapter.chapterId, sectionIds])
+  }, [chapterId, sectionIds])
 
   const persistResume = useCallback(
     (ms: number, force: boolean) => {
-      if (sectionId === null) return
       const last = lastSavedMsRef.current
       if (!force && Math.abs(ms - last) < 3000) return
       lastSavedMsRef.current = ms
-      markListenPosition(chapter.chapterId, sectionId, ms)
+      markListenPosition(chapterId, track.sectionId, ms)
     },
-    [chapter.chapterId, sectionId],
+    [chapterId, track.sectionId],
   )
 
   // 播放速率：换节 / 改档都同步到 audio 元素。
@@ -170,7 +172,7 @@ function ReadyPlayer({ chapter, chapterTitle, manifest, nextListenHref, autoplay
   useEffect(() => {
     const audio = audioRef.current
     if (audio === null) return
-    const stored = getLearnProgress().chapters[chapter.chapterId]
+    const stored = getLearnProgress().chapters[chapterId]
     const valid = validResume(
       stored === undefined
         ? null
@@ -250,7 +252,7 @@ function ReadyPlayer({ chapter, chapterTitle, manifest, nextListenHref, autoplay
 
   const handleEnded = useCallback(() => {
     // 听完一节 = `heard` 一节（与 `seen` 并列，不进阅读口径）。
-    markSectionHeard(chapter.chapterId, track.sectionId)
+    markSectionHeard(chapterId, track.sectionId)
     persistResume(durationMs, true)
     // 泛听第一档：本节循环——回到节首继续播，不推进。
     if (loopRef.current) {
@@ -272,10 +274,9 @@ function ReadyPlayer({ chapter, chapterTitle, manifest, nextListenHref, autoplay
     }
     // 泛听第三档：跨章续播——整章播完跳下一章听模式（autoplay 让下一章接着播）。
     if (nextListenHref !== null) {
-      persistResume(durationMs, true)
       navigate(nextListenHref)
     }
-  }, [chapter.chapterId, durationMs, navigate, nextListenHref, persistResume, sectionIds, track.sectionId])
+  }, [chapterId, durationMs, navigate, nextListenHref, persistResume, sectionIds, track.sectionId])
 
   const seekTo = useCallback((ms: number) => {
     const audio = audioRef.current
@@ -294,9 +295,10 @@ function ReadyPlayer({ chapter, chapterTitle, manifest, nextListenHref, autoplay
       </div>
 
       <div className="sc-listen-sections" role="tablist" aria-label="口播小节">
-        {chapter.sections.map((item) => {
-          const ms = spokenSectionDurationMs(manifest, item.sectionId)
+        {manifest.tracks.map((item) => {
           const isActive = item.sectionId === track.sectionId
+          const label = item.title ?? item.sectionId
+          const ms = spokenSectionDurationMs(manifest, item.sectionId)
           return (
             <button
               key={item.sectionId}
@@ -306,7 +308,7 @@ function ReadyPlayer({ chapter, chapterTitle, manifest, nextListenHref, autoplay
               className={isActive ? 'sc-listen-sectab is-active' : 'sc-listen-sectab'}
               onClick={() => setSectionId(item.sectionId)}
             >
-              <span>{item.title}</span>
+              <span>{label}</span>
               {ms !== null && <span className="sc-listen-sectabmeta">{formatMs(ms)}</span>}
             </button>
           )
@@ -417,12 +419,16 @@ function ReadyPlayer({ chapter, chapterTitle, manifest, nextListenHref, autoplay
 /* ---------- 组件本体 ---------- */
 
 export function SpokenPlayer({
+  chapterId,
   chapter,
   chapterTitle,
   nextListenHref = null,
   autoplay = false,
 }: {
-  chapter: SpokenChapter
+  /** 章 id（探测 /audio/<chapterId>/manifest.json 的依据）。 */
+  chapterId: string
+  /** 内嵌口播稿（3 章黄金稿有；全量流水线合成的章为 `null`——文案只存在于音频产物里）。 */
+  chapter: SpokenChapter | null
   chapterTitle: string
   /** 下一章听模式链接（跨章续播）；缺省 `null` = 没有下一章。 */
   nextListenHref?: string | null
@@ -434,13 +440,13 @@ export function SpokenPlayer({
   useEffect(() => {
     let cancelled = false
     setAudioState({ status: 'loading' })
-    void loadSpokenAudio(chapter.chapterId).then((state) => {
+    void loadSpokenAudio(chapterId).then((state) => {
       if (!cancelled) setAudioState(state)
     })
     return () => {
       cancelled = true
     }
-  }, [chapter.chapterId])
+  }, [chapterId])
 
   if (audioState.status === 'loading') {
     return <div className="sc-listen-loading">正在探测音频资产…</div>
@@ -449,15 +455,14 @@ export function SpokenPlayer({
   if (audioState.status === 'missing') {
     return (
       <div className="sc-listen">
-        <MissingNotice chapterId={chapter.chapterId} />
-        <ScriptBrowse chapter={chapter} />
+        <MissingNotice chapterId={chapterId} />
+        {chapter !== null && <ScriptBrowse chapter={chapter} />}
       </div>
     )
   }
 
   return (
     <ReadyPlayer
-      chapter={chapter}
       chapterTitle={chapterTitle}
       manifest={audioState.manifest}
       nextListenHref={nextListenHref}

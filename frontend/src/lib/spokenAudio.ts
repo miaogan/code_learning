@@ -7,9 +7,13 @@
  * 前端零改动、零发版。manifest 拉不到（404 / 解析失败）就是「素材缺失」态，
  * 播放器据此渲染口播稿浏览视图，绝不渲染一个点了没声音的空播放器。
  *
+ * r151 全量流水线追加：`/audio/index.json`（make_audio.py 聚合所有章 manifest）是
+ * 「听听」入口的唯一真源——新章音频部署后入口自动出现，覆盖所有文字与后续新知识。
+ *
  * AI 标识（RELEASE-DATA-SOP 合规红线 #4）：`aiGenerated` 缺省按 `true` 处理——
  * 宁可错标、不可漏标；manifest 里显式写了才允许按 false 展示。
  */
+import { useEffect, useState } from 'react'
 import type { SpokenCue, SpokenForm, SpokenSpeaker } from './spokenTypes'
 
 /** manifest 里的音色块：比 `SpokenVoice` 多 lora / ref / note（制作期溯源信息）。 */
@@ -31,6 +35,8 @@ export interface SpokenAudioCue extends SpokenCue {
 export interface SpokenAudioTrack {
   sectionId: string
   src: string
+  /** 可读小节标题（工具链从 plans 带出；缺省回落 sectionId）。 */
+  title?: string
   durationMs: number
   sampleRate?: number
   cues: SpokenAudioCue[]
@@ -104,6 +110,7 @@ export function parseSpokenManifest(raw: unknown): SpokenAudioManifest | null {
     tracks.push({
       sectionId: track.sectionId,
       src: track.src,
+      title: typeof track.title === 'string' ? track.title : undefined,
       durationMs: track.durationMs,
       sampleRate: typeof track.sampleRate === 'number' ? track.sampleRate : undefined,
       cues,
@@ -156,4 +163,117 @@ export function spokenSectionDurationMs(
   sectionId: string,
 ): number | null {
   return manifest.tracks.find((track) => track.sectionId === sectionId)?.durationMs ?? null
+}
+
+/* ---------- r151 全量流水线：/audio/index.json（新章部署后入口自动出现） ---------- */
+
+/** 索引里的一章（与 make_audio.py / synthesize.py 聚合产物同构）。 */
+export interface SpokenAudioIndexEntry {
+  chapterId: string
+  title: string
+  form: SpokenForm
+  aiGenerated: boolean
+  sections: { sectionId: string; title: string; durationMs: number }[]
+  totalMs: number
+}
+
+export interface SpokenAudioIndex {
+  generatedAt: string
+  chapters: SpokenAudioIndexEntry[]
+}
+
+/** 索引路径单点：章目录的上一层。 */
+export function spokenAudioIndexUrl(): string {
+  return '/audio/index.json'
+}
+
+/** 严格解析索引；半坏数据整体判废（入口多显示一章比 404 播放器好，但脏数据不行）。 */
+export function parseSpokenAudioIndex(raw: unknown): SpokenAudioIndex | null {
+  if (raw === null || typeof raw !== 'object') return null
+  const data = raw as Record<string, unknown>
+  if (!Array.isArray(data.chapters)) return null
+  const chapters: SpokenAudioIndexEntry[] = []
+  for (const item of data.chapters) {
+    if (item === null || typeof item !== 'object') return null
+    const entry = item as Record<string, unknown>
+    if (
+      typeof entry.chapterId !== 'string' ||
+      typeof entry.title !== 'string' ||
+      (entry.form !== 'solo' && entry.form !== 'duo') ||
+      !Array.isArray(entry.sections)
+    ) {
+      return null
+    }
+    const sections: SpokenAudioIndexEntry['sections'] = []
+    for (const secRaw of entry.sections) {
+      if (secRaw === null || typeof secRaw !== 'object') return null
+      const sec = secRaw as Record<string, unknown>
+      if (
+        typeof sec.sectionId !== 'string' ||
+        typeof sec.title !== 'string' ||
+        typeof sec.durationMs !== 'number'
+      ) {
+        return null
+      }
+      sections.push({ sectionId: sec.sectionId, title: sec.title, durationMs: sec.durationMs })
+    }
+    chapters.push({
+      chapterId: entry.chapterId,
+      title: entry.title,
+      form: entry.form,
+      aiGenerated: entry.aiGenerated === undefined ? true : entry.aiGenerated === true,
+      sections,
+      totalMs: typeof entry.totalMs === 'number' ? entry.totalMs : 0,
+    })
+  }
+  return {
+    generatedAt: typeof data.generatedAt === 'string' ? data.generatedAt : '',
+    chapters,
+  }
+}
+
+/** 拉全量音频索引；网络层失败 / 404 / 脏数据统一返回 `null`（=没有任何章有音频）。 */
+export async function loadAudioIndex(fetchImpl: typeof fetch = fetch): Promise<SpokenAudioIndex | null> {
+  let response: Response
+  try {
+    response = await fetchImpl(spokenAudioIndexUrl())
+  } catch {
+    return null
+  }
+  if (!response.ok) return null
+  try {
+    return parseSpokenAudioIndex(await response.json())
+  } catch {
+    return null
+  }
+}
+
+let indexCache: SpokenAudioIndex | null | undefined
+
+/** 入口判断用的索引 hook：模块级缓存（一次会话只拉一次；404 页/null 也缓存，不反复探测）。 */
+export function useSpokenAudioIndex(): SpokenAudioIndex | null {
+  const [index, setIndex] = useState<SpokenAudioIndex | null>(() => indexCache ?? null)
+  useEffect(() => {
+    if (indexCache !== undefined) {
+      setIndex(indexCache)
+      return
+    }
+    let cancelled = false
+    void loadAudioIndex().then((result) => {
+      indexCache = result
+      if (!cancelled) setIndex(result)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+  return index
+}
+
+/** 某章是否有已部署音频（入口判断的唯一依据）。 */
+export function audioIndexHasChapter(
+  index: SpokenAudioIndex | null,
+  chapterId: string,
+): boolean {
+  return index?.chapters.some((entry) => entry.chapterId === chapterId) ?? false
 }

@@ -7,6 +7,7 @@ import { LevelChip } from '../components/learn/LevelChip'
 import { ResumeCard } from '../components/learn/ResumeCard'
 import { progressView, resumeTarget, summarizeProgress } from '../lib/learnProgress'
 import { spokenChapterById } from '../content/spoken'
+import { audioIndexHasChapter, useSpokenAudioIndex } from '../lib/spokenAudio'
 import {
   ALL_TUTORIAL_CHAPTERS,
   TUTORIAL_DIRECTIONS,
@@ -44,6 +45,8 @@ export default function LearnPage() {
   const levels = parseLearnLevels(search)
 
   const progressState = useLearnProgress()
+  // 听听入口真源是 /audio/index.json（r151 全量流水线）：素材部署后 chip 自动出现，零发版。
+  const audioIndex = useSpokenAudioIndex()
   const resume = resumeTarget(progressState)
   const summary = summarizeProgress(progressState, ALL_TUTORIAL_CHAPTERS)
 
@@ -209,7 +212,8 @@ export default function LearnPage() {
                   </span>
                   <span className="sc-lab-ctags sc-lab-clevel">
                     <LevelChip level={chapter.level} />
-                    {spokenChapterById(chapter.id) !== undefined && (
+                    {(spokenChapterById(chapter.id) !== undefined ||
+                      audioIndexHasChapter(audioIndex, chapter.id)) && (
                       <Chip label="听听 🎧" />
                     )}
                   </span>
