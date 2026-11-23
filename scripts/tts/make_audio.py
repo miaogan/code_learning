@@ -248,6 +248,9 @@ def _synth_cmd(args: argparse.Namespace, chapters: list[str], plans_dir: Path,
         cmd += ['--vox-ref', args.vox_ref]
     if args.vox_lora:
         cmd += ['--vox-lora', args.vox_lora]
+    # 形态开关：缺省不传（synthesize.py 默认只跑 solo）；跑对口章用 --only-form all
+    if args.only_form:
+        cmd += ['--only-form', args.only_form]
     # 速度/质量旋钮：不传就用 synthesize.py 的默认（timesteps=10 / cfg=1.5）
     if args.vox_timesteps is not None:
         cmd += ['--vox-timesteps', str(args.vox_timesteps)]
@@ -395,6 +398,8 @@ def main() -> int:
     p_synth.add_argument('--vox-cfg', type=float, default=None, help='VoxCPM2 引导强度（默认 1.5）')
     p_synth.add_argument('--anchor-prev', action='store_true',
                          help='VoxCPM2：把上一句并进缓存当 continuation 锚（长文音色更稳）')
+    p_synth.add_argument('--only-form', choices=['solo', 'duo', 'all'], default=None,
+                         help='形态过滤（缺省不传 = synthesize 默认只跑 solo；对口章用 all）')
     p_synth.set_defaults(func=stage_synth)
 
     p_index = sub.add_parser('index', help='重建 /audio/index.json（不重跑合成）')
