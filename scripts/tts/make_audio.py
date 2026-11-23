@@ -16,9 +16,12 @@
         --plans-dir scripts/tts/out/plans_full
 
     # 2) 合成（须在 voxcpm venv 的 python 下跑；已合成齐全的章自动跳过，断点续跑）
+    #    批量单进程：模型每批只加载一次（默认 8 章/批，--batch-size 0 = 全部一批）；
+    #    一批硬崩就拆成单章重试，坏章只影响自己。
     D:/work_space/_tts/venv_voxcpm/Scripts/python.exe scripts/tts/make_audio.py synth \
         --plans-dir scripts/tts/out/plans_full --out-audio scripts/tts/out/audio_full \
-        --vox-ref D:/work_space/_tts/dataset/slices/<合规参考音>.wav [--only <chapterId>]
+        --vox-ref D:/work_space/_tts/dataset/slices/<合规参考音>.wav \
+        [--vox-lora <checkpoint>] [--batch-size 8] [--vox-timesteps 10] [--only <chapterId>]
 
     # 3) 索引（synthesize.py 每次合成后自动重建；本子命令用于不重跑合成的手动重建）
     python scripts/tts/make_audio.py index --out-audio scripts/tts/out/audio_full
@@ -43,8 +46,8 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent.parent
 sys.path.insert(0, str(HERE.parent / 'finetune'))
-from validate_spoken import validate  # noqa: E402
-from build_spoken_plan import to_plan  # noqa: E402
+from build_spoken_plan import to_plan
+from validate_spoken import validate
 
 #: prompt 里「小节：标题（1/4）」与「章节：React 状态与渲染」的可读名提取。
 _SECTION_TITLE = re.compile(r'^小节：(.+?)（\d+/\d+）\s*$')
@@ -206,21 +209,17 @@ def _plan_sections(plans_dir: Path, chapter: str) -> set[str]:
     return {str(s['sectionId']) for s in data.get('sections', [])}
 
 
-def stage_synth(args: argparse.Namespace) -> int:
-    plans_dir = Path(args.plans_dir)
-    out_audio = Path(args.out_audio)
+def _chapters_todo(plans_dir: Path, out_audio: Path, only: str | None, force: bool) -> list[str]:
+    """需要合成的章（已齐全的跳过=断点续跑）。"""
     plan_files = sorted(plans_dir.glob('*.json'))
-    if args.only:
-        plan_files = [p for p in plan_files if p.stem == args.only]
-    if not plan_files:
-        print('没有可合成的 plan（检查 --plans-dir / --only）')
-        return 1
-
+    if only:
+        plan_files = [p for p in plan_files if p.stem == only]
+    todo: list[str] = []
     for plan_path in plan_files:
         chapter = plan_path.stem
         needed = _plan_sections(plans_dir, chapter)
         manifest_path = out_audio / chapter / 'manifest.json'
-        if manifest_path.exists() and not args.force:
+        if manifest_path.exists() and not force:
             existing: set[str] = set()
             try:
                 data = json.loads(manifest_path.read_text(encoding='utf-8'))
@@ -230,23 +229,76 @@ def stage_synth(args: argparse.Namespace) -> int:
             if needed <= existing:
                 print(f'[synth] {chapter}: 已齐全（{len(existing)} 节），跳过')
                 continue
+        todo.append(chapter)
+    return todo
 
-        cmd = [
-            args.python,
-            str(HERE / 'synthesize.py'),
-            '--backend', args.backend,
-            '--plan-dir', str(plans_dir),
-            '--out-audio', str(out_audio),
-            '--chapter', chapter,
-        ]
-        if args.vox_ref:
-            cmd += ['--vox-ref', args.vox_ref]
-        if args.vox_lora:
-            cmd += ['--vox-lora', args.vox_lora]
-        print(f'[synth] {chapter}: 开始（{len(needed)} 节）→', ' '.join(cmd[1:4]))
-        result = subprocess.run(cmd)
-        if result.returncode != 0:
-            print(f'[synth] {chapter}: 失败（exit {result.returncode}），继续下一章', file=sys.stderr)
+
+def _synth_cmd(args: argparse.Namespace, chapters: list[str], plans_dir: Path,
+               out_audio: Path) -> list[str]:
+    cmd = [
+        args.python,
+        str(HERE / 'synthesize.py'),
+        '--backend', args.backend,
+        '--plan-dir', str(plans_dir),
+        '--out-audio', str(out_audio),
+    ]
+    for chapter in chapters:
+        cmd += ['--chapter', chapter]
+    if args.vox_ref:
+        cmd += ['--vox-ref', args.vox_ref]
+    if args.vox_lora:
+        cmd += ['--vox-lora', args.vox_lora]
+    # 速度/质量旋钮：不传就用 synthesize.py 的默认（timesteps=10 / cfg=1.5）
+    if args.vox_timesteps is not None:
+        cmd += ['--vox-timesteps', str(args.vox_timesteps)]
+    if args.vox_cfg is not None:
+        cmd += ['--vox-cfg', str(args.vox_cfg)]
+    if args.anchor_prev:
+        cmd += ['--anchor-prev']
+    return cmd
+
+
+def stage_synth(args: argparse.Namespace) -> int:
+    """合成：**多章一个进程**（模型只加载一次）。
+
+    为什么批量（2026-11-23 实测）：VoxCPM2 每启动一个进程都要重新加载 4GB 权重 +
+    LoRA（约 30s），45 章逐章 spawn 光重载就 ~22 分钟；批量后随 --batch-size 摊薄。
+    实测单节 CPU 后处理（裁静音/句切分/响度/写盘）合计仅 0.3–0.4s，而单节合成
+    2–4 分钟——所以**不做**「CPU 后处理与 GPU 合成流水线」，收益 0.5% 属噪声。
+
+    容错：一批失败（OOM/段错误等硬崩溃）就把这批拆成单章逐个重试，
+    保住「坏一章不拖累其它章」；单章仍失败则记录并继续。
+    """
+    plans_dir = Path(args.plans_dir)
+    out_audio = Path(args.out_audio)
+    todo = _chapters_todo(plans_dir, out_audio, args.only, args.force)
+    if not todo:
+        print('没有需要合成的章（全部已齐全；--force 可强制重合成）')
+        return 0
+
+    batch = len(todo) if args.batch_size <= 0 else args.batch_size
+    groups = [todo[i:i + batch] for i in range(0, len(todo), batch)]
+    print(f'[synth] 待合成 {len(todo)} 章，分 {len(groups)} 批（每批 ≤{batch} 章，模型每批只加载一次）')
+
+    failed: list[str] = []
+    for index, group in enumerate(groups, 1):
+        cmd = _synth_cmd(args, group, plans_dir, out_audio)
+        print(f'[synth] 批 {index}/{len(groups)}：{", ".join(group)}')
+        result = subprocess.run(cmd, check=False)
+        if result.returncode == 0:
+            continue
+        # 硬崩溃兜底：拆成单章重试，隔离坏章
+        print(f'[synth] 批 {index} 失败（exit {result.returncode}），逐章重试', file=sys.stderr)
+        for chapter in group:
+            single = _synth_cmd(args, [chapter], plans_dir, out_audio)
+            if subprocess.run(single, check=False).returncode != 0:
+                failed.append(chapter)
+                print(f'[synth] {chapter}: 失败，跳过', file=sys.stderr)
+
+    if failed:
+        print(f'[synth] 未完成 {len(failed)} 章：{", ".join(failed)}（重跑本命令会断点续跑）',
+              file=sys.stderr)
+        return 1
     return 0
 
 
@@ -335,6 +387,14 @@ def main() -> int:
     p_synth.add_argument('--vox-lora', default=None)
     p_synth.add_argument('--only', default=None, help='只合成指定章')
     p_synth.add_argument('--force', action='store_true', help='已齐全的章也重合成')
+    p_synth.add_argument('--batch-size', type=int, default=8,
+                         help='每批章数（一个进程=一次模型加载；0 或负数 = 全部一批）')
+    # 速度/质量旋钮（透传给 synthesize.py；不传走其默认 timesteps=10 / cfg=1.5）
+    p_synth.add_argument('--vox-timesteps', type=int, default=None,
+                         help='VoxCPM2 CFM 采样步数（10 默认；降到 8 约快 15-20%%，音质轻微下降）')
+    p_synth.add_argument('--vox-cfg', type=float, default=None, help='VoxCPM2 引导强度（默认 1.5）')
+    p_synth.add_argument('--anchor-prev', action='store_true',
+                         help='VoxCPM2：把上一句并进缓存当 continuation 锚（长文音色更稳）')
     p_synth.set_defaults(func=stage_synth)
 
     p_index = sub.add_parser('index', help='重建 /audio/index.json（不重跑合成）')
