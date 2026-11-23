@@ -3,6 +3,11 @@
 > 定位：**离线生产工具**。音频是发布资产，运行期零 TTS、零新增出网（VERSION-PLAN C1/C4）。
 > 合成在制作机（RTX 4070 Laptop 8GB）跑，产物走 `/audio/` 静态分发，不进 Git、不进镜像。
 
+> **当前口径（2026-11-23）**：音频生产**唯一后端是 VoxCPM2**，CosyVoice（CV2/CV3）
+> 已全量归档到 `D:/work_space/_archive/sc_tts_cosyvoice_2026-11-23/`。
+> 主线两种方式：零样本 `--vox-ref`（发布用合规音），或挂 `--vox-lora`（gdg 音色仅本地试听）。
+> `out/audio/` 原 12 节 CV2 产物也已归档，前端音源改指向 VoxCPM2 LoRA 样片。
+
 ## 1. 链路
 
 ```
@@ -26,140 +31,84 @@ cd .. && python scripts/tts/synthesize.py --backend mock --limit-sections 2
 mock 后端生成**等长静音** + 比例时间轴：用来先把播放器、断点续听、句级高亮的契约跑通，
 不能拿来听。产物结构与真合成完全一致，播放器不需要为 mock 写分支。
 
-## 3. 真合成（CosyVoice2-0.5B，Apache-2.0）
+## 3. 音频生产（VoxCPM2）
 
-**实际跑通的环境（2026-11-22 实测，别再从头试）**：
-
-| 件 | 路径 / 版本 |
-|---|---|
-| Python | `D:/ProgramData/miniconda3/envs/cosyvoice/python.exe`（torch 2.3.1+cu121，非 lab venv） |
-| CosyVoice 代码 | `D:/work_space/_tts/CosyVoice`（**新克隆这份**；`alt_cunningham/third_party/CosyVoice` 的 `weights_only=True` 与这份权重不兼容，会 `UnpicklingError`） |
-| 权重 | `D:/work_space/_tts/models/CosyVoice2-0.5B`（modelscope 下载，21 文件 / 2.0GB） |
-| 参考音 | `alt_cunningham/ldt-mvp/data/voices/xb3/da_feiyu/prompt.wav`（中文女声；0.5B 版 `spk2info` 为空，必须给参考音） |
-| 依赖补丁 | `scripts/tts/stubs/wget.py`（PyPI 的 wget 在本机反复校验失败，推理用不到它） |
+主线只有 VoxCPM2；零样本用 `--vox-ref`，可选用 `--vox-lora` 挂音色 LoRA
+（**gdg 系素材及 LoRA 仅供本地试听，不得发布**）。
 
 ```bash
-cd D:/work_space/code_learning
-D:/ProgramData/miniconda3/envs/cosyvoice/python.exe scripts/tts/synthesize.py   --backend cosyvoice   --repo-dir D:/work_space/_tts/CosyVoice   --model-dir D:/work_space/_tts/models/CosyVoice2-0.5B   --prompt-wav D:/work_space/alt_cunningham/ldt-mvp/data/voices/xb3/da_feiyu/prompt.wav   --chapter mw-cache-strategy --limit-sections 1
+D:/work_space/_tts/venv_voxcpm/Scripts/python.exe scripts/tts/synthesize.py \
+  --backend voxcpm --vox-ref <合规参考音> --plan-dir scripts/tts/out/plans_gen
 ```
 
-首节实测（`mw-cache-strategy/where`）：14 个合成单元 / 32 句 cue / **152.8 秒** / RTF 0.84–0.87 /
-峰值 32439（接近满幅，说明没被判静音，也提示要做响度归一化）。
+> **CosyVoice 已全量归档（2026-11-23）**：CV2/CV3 权重、仓库、后端代码、12 节产物、
+> AB 评测全部移到 `D:/work_space/_archive/sc_tts_cosyvoice_2026-11-23/`（不删除，可还原）。
+> 原因：主线定稿 VoxCPM2；AB 实测 CV2 情绪相对变异 27.3% vs CV3 9.1%，
+> 但 CV2 参考音授权存疑、CV3 带宽不合格。命令与踩坑记录见归档 `INDEX.md`
+> 和 `code/synthesize_cv_backup.py`。发布合规口径见 `RELEASE-DATA-SOP.md`。
 
-### 踩坑：instruct 必须带 `<|endofprompt|>`
+## VoxCPM2 工具链（r150 后期新增）
 
-第一版音频**把情绪指令念了出来**（开头是「就像跟朋友聊天，随便点儿，语速偏快…」）。
-根因不是模型能力，是调用约定：`inference_instruct2` 把 instruct 当 `prompt_text` 喂给 LLM，
-官方示例（`example.py:57`）的 instruct 结尾必须带 **`<|endofprompt|>`**，长描述同样会被念。
+四个脚本，覆盖「拿权重 → 验环境 → 挑参考音 → 合成 → 量质感」：
 
-- 正确：`'用开心的语气说这句话<|endofprompt|>'`
-- 错误：`'就像跟朋友聊天，随便点儿，语速偏快，别端着'`（无结束符 + 描述性长句）
-
-验证方法：合成后跑 whisper 转写，开头出现指令文本就说明又踩了。
-驱动里已加 `<|endofprompt|>` 与「缺结束符直接退出」的防御。
-
-修复前后同节对比：`mw-cache-strategy/where` 152.8s（含念指令）→ **88.1s**（正常）。
-
-### 踩坑 2：CV3 的 instruct 还要加 `You are a helpful assistant. ` 前缀
-
-换到 CV3 后，第一版音频**又把指令念了出来**——CV3 的官方写法是：
-
-```python
-'You are a helpful assistant. 请用广东话表达。<|endofprompt|>'   # example.py: cosyvoice3_example
-```
-
-CV2 不需要这个前缀，CV3 少了它就把指令当正文。驱动已按 `model_kind` 自动加前缀，
-并新增 `scripts/tts/check_instruction_leak.py`：转写每节前 25 秒，命中「语气说这句话」等特征串即报错。
-
-### 试听结论：CV2 的 instruct 太弱，换 CosyVoice3
-
-修好结束符后，指令不再被念，但**语气也没真正生效**。客观量化（`analyze_emotion.py`，按句切段量基频/能量）：
-
-| 模型 | 12 节全量·类间基频极差 | 四种反差指令（开心/悲伤/生气/平静） |
+| 脚本 | 作用 | 典型用法 |
 |---|---|---|
-| CosyVoice2-0.5B | **6.0 Hz**（≈没区分） | 时长 3.56–3.88s、基频无方向，悲伤只是音量小 |
-| Fun-CosyVoice3-0.5B | 单节 16.6 Hz（全量待测） | **悲伤 10.2s vs 平静 3.2s**（慢 3 倍）、开心/生气更响 |
+| `fetch_weights.py` | 从 **ModelScope** 并行分块下载 + sha256 校验；也支持直给 URL | `--repo OpenBMB/VoxCPM2 --out <dir>` |
+| `smoke_voxcpm.py` | 30 秒环境冒烟：能加载、能出声、带宽正常 | 换机器后先跑这个 |
+| `screen_dry_refs.py` | 扫切片库按「最干」排序，直接给 `--ref` 路径 | `--dir <slices> --top 12` |
+| `infer_voxcpm.py` | 正式推理：参考音只编码一次、多句复用、可开音色延续 | `--ref X --text-file L --out Y` |
+| `measure_echo.py` | 回音体检：衰减斜率 / t20 / 谷底 | 判断「有回音」到底来自哪 |
 
-结论：这一层是**模型代际差异**，不是调用约定。驱动已支持 `--model-kind auto|cv2|cv3`（按 `cosyvoice3.yaml` 自动识别），
-默认建议用 CV3。注意 CV3 的构造参数不同（无 `load_jit`，用 `load_vllm`）。
+**下载一定要走对源**（这是本次最大的时间黑洞）：
 
-### 第三层：情绪词 + 语速（当前方案）
+- HF / hf-mirror 实测 **0.2–0.8MB/s**（4.4GB 要 6 小时）；同一份模型在 **ModelScope
+  是 12–40MB/s**。国内团队（OpenBMB / 阿里 / 智谱）优先去魔搭。
+- PyTorch 轮子：官方源 0.25MB/s；**阿里云 `mirrors.aliyun.com/pytorch-wheels/cu121/`
+  配 12 路分块是 20MB/s**。单连接会被限速，并行才有用。
+- **Windows 上别用 `os.open` + `os.write` 写二进制**：缺 `O_BINARY` 时 fd 是文本模式，
+  `\n` 会被翻成 `\r\n`，整块数据错位——文件大小对、开头魔数对，但内容全坏。
+  用 `open(path, 'r+b')`。而且**只校验大小抓不到这种损坏，必须校验 sha256**。
 
-七词探测（同一句、同一参考音，CV3）：轻松/自信/平静/兴奋/惊讶/无奈/温柔 的基频 247–264Hz、时长 4.16–4.84s——**只靠 instruct 拉不开**。
-但 `speed` 参数很有效：0.85→5.6s、1.35→3.82s（约 1.7 倍跨度）。
+**CFG 的正确用法**（实测反直觉）：
 
-于是改成组合拳：**instruct 只管音色冷暖（基础情绪词），speed 管快慢（喜剧节奏）**。
+- `cfg_value` 调高能补高频，但**同时把衰减尾巴拉长**（1.5→4.5 时 186ms→363ms），
+  听感就是回音加重。所以默认 1.5，需要补高频时小步上调并端到端复测。
+- 想解决回音，优先级是「**换更干的参考音**」> 调 CFG。混响是参考音频谱包络的一部分，
+  模型会一起克隆（输出 t20 186ms ≈ 参考音 174ms）。
+- 但「参考音最干」≠「输出最干」：`ep2-0253`（73ms，最干）配 cfg2.0 输出 244ms，
+  `ep3-0386`（110ms）配 cfg1.5 才 100ms。**必须测输出，不能只看参考音指标。**
 
-| 情绪 | instruct | speed |
-|---|---|---|
-| banter | 用轻松的语气说这句话 | 1.10 |
-| setup | 用自信的语气说这句话 | 1.00 |
-| deadpan | 用平静的语气说这句话 | 0.92 |
-| punch | 用兴奋的语气说这句话 | 1.15 |
-| realize | 用惊讶的语气说这句话 | 1.05 |
-| contrast | 用无奈的语气说这句话 | 1.00 |
-| wrap | 用温柔的语气说这句话 | 0.88 |
+## 单口相声流水线（r150 当前主线）
 
-全量 12 节实测：基频极差 7.6 → **10.2 Hz**（两节的 31.4 是小样本波动，别引用）；但**语速分层是真的**：
-banter 4.62 字/秒 > contrast 4.39 > punch 4.24 > setup 4.15 > wrap 3.83 > deadpan 2.66。
-
-**自创的表演腔（「先轻后重」「收尾咬住」）模型基本不认，别再往里加**；
-基频（冷暖）最多做到轻微区分，喜剧感主要靠语速与文本节奏。
-
-### 换机器 / 重建环境（未验证，仅供参照）
+用户决定先做单口，对口搁置。入口只有一个：
 
 ```bash
-git clone --depth 1 https://github.com/FunAudioLLM/CosyVoice.git D:/work_space/_tts/CosyVoice
-git -C D:/work_space/_tts/CosyVoice submodule update --init --recursive --depth 1
-# 用 conda 建 Python 3.10 环境（Windows 上 pynini 只有 conda-forge 有 wheel）
-conda create -n cosyvoice -y python=3.10
-conda install -n cosyvoice -y -c conda-forge pynini=2.1.6
-pip install torch==2.3.1 torchaudio==2.3.1 --index-url https://download.pytorch.org/whl/cu121
+# 单口章（默认只跑 form=solo，duo 章自动跳过并打印提示）
+D:/work_space/_tts/venv_voxcpm/Scripts/python.exe scripts/tts/synthesize.py \
+    --backend voxcpm --vox-ref D:/work_space/_tts/dataset/slices/ep3-0386.wav
 ```
 
-## 4. 质检口径
+**为什么必须用 `venv_voxcpm` 的解释器**：VoxCPM2 要 torch≥2.5，CosyVoice 那套是 2.3.1，
+两者不能共存。用错解释器会在 import 阶段报错，脚本会提示正确路径。
 
-`out/qa.json` 每节一条：`units` / `cues` / `durationMs` / `estimateMs` / `peak` / `silenceRatio`。
+单口相比对口只改节奏，不改模型（详见 TTS-GAP-REVIEW §2.14）：
 
-| 指标 | 用来判断 |
+| 参数 | 作用 |
 |---|---|
-| `durationMs` vs `estimateMs` | 偏差 > 40% 说明语速或停顿没按情绪表走 |
-| `peak` | 接近 0 说明合成失败（静音）；接近 32767 说明爆音 |
-| `silenceRatio` | 过高说明停顿堆太多或合成截断 |
-| `cues` | 与口播稿句数一致；少了说明句子被合并 |
+| `--punch-hold-ms 900` | 包袱落地后的留白（= 给观众笑声留位置）。单口最像「说相声」的一下 |
+| `--no-pace-scale` | 关闭按情绪缩放停顿（默认开：铺垫 0.95 收、收尾 1.25 拖） |
+| `--only-form all` | 连 duo 章一起跑（抢话逻辑仍生效，但当前不做） |
+| `--recue-only` | 只重算句级时间轴，不重跑 TTS（秒级） |
 
-## 5. 已知限制
+**两个质量闸，改切分逻辑前先读**：
 
-1. **句级时间轴是比例摊分**（按字数），不是 VAD 采样级对齐；M1 收尾要接 silero-vad 精修，
-   播放器的高亮精度取决于这一步。
-2. 每节一个 wav 是 pilot 形态；正式版按 §5.3 改 m4a（需要 ffmpeg，本机未验证转码）。
-3. 音色只有「中文男」一个参考；对口章需要第二个能盲听区分的音色（§5.7），M2 补。
-4. 没有做响度归一化与爆音检测（只报 peak）。
-5. CosyVoice2 权重与代码是 Apache-2.0；**生成的音频许可口径仍待产品拍板**（VERSION-PLAN §7.2 第 3 条）。
+1. **`trim_edges` 不能用固定阈值**。VoxCPM2 句首静音的底噪偶尔会短暂越过 −44dB，
+   固定门限会停在那里留下 0.5–1s 静音。现在按包络分位数自适应（底噪 10 分位、
+   语音 90 分位、门限在两者之间 8% 处）。
+2. **`build_cues` 不能按字数摊句长**。实测 41.5% 的 cue 起点落在静音里，播放器高亮会提前跳。
+   现在从音频检测内部停顿（`split_lines()`），并且：
+   - 切点放在**停顿结束处**（下一句开口），不是停顿中点
+   - **首段要对齐到真正开口**，单句 unit 也不例外（这里踩过一次：`n_lines<=1` 早退绕过了对齐）
 
-## 5. PilotTTS 后端（推荐，情绪标签驱动）
-
-CosyVoice 的 instruct 只能粗调音色冷暖（全量类间基频极差 10–36Hz、方向不稳）；PilotTTS（高德开源，Apache-2.0）
-是**显式情绪标签 + 副语言标记**，同一句能量差可达 2 倍，更接近"在演"。
-
-```bash
-# 仓库与权重（一次性）
-git clone --depth 1 https://github.com/AMAPVOICE/PilotTTS.git D:/work_space/_tts/PilotTTS
-python -c "from modelscope.hub.snapshot_download import snapshot_download; snapshot_download('AmapVoice/PilotTTS', local_dir='D:/work_space/_tts/PilotTTS/pretrained_models')"
-python -c "from modelscope.hub.snapshot_download import snapshot_download; snapshot_download('facebook/w2v-bert-2.0', local_dir='D:/work_space/_tts/PilotTTS/pretrained_models/w2v-bert-2.0')"
-# 合计约 9.7GB（含 Qwen3-0.6B 与 CosyVoice3 声码器）
-
-# 合成
-D:/ProgramData/miniconda3/envs/cosyvoice/python.exe scripts/tts/synthesize.py --backend pilot \
-  --prompt-wav scripts/tts/out/refs/ref_中文男.wav \
-  --prompt-dou scripts/tts/out/refs/ref_中文男.wav \
-  --prompt-peng scripts/tts/out/refs/ref_中文女.wav
-```
-
-情绪映射（`scripts/tts/pilot_backend.py`）：banter→happy、setup→serious、deadpan→无标签、
-punch/realize→surprise、contrast→blue、wrap→serious。PilotTTS 另支持 `LAUGH/BREATH/CRY/COUGH` 与 14 种方言。
-
-两个环境坑：
-1. **wetext 每次初始化都向 ModelScope 请求 revisions，匿名已 403**（`Authentication token does not exist`）——
-   已用本地缓存绕开（`wetext.wetext.snapshot_download` 指向 `~/.cache/modelscope/hub/pengzhendong/wetext`）。
-2. PilotTTS 的 demo 依赖相对路径，加载时会 `chdir`——加载完必须切回，否则输出的相对路径会落到它的仓库目录。
+改完用 `--recue-only` 重算即可验证，不必重跑 6 分钟的合成。
+**对齐的验收指标：cue 起点落在有声处的比例应 = 100%**（当前 82/82）。

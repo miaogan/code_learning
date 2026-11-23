@@ -4,6 +4,12 @@
 > 本轮只交付 **M1 的第一块**：口播稿数据模型 + 脚本质量闸 + 3 章黄金稿。
 > 播放器、TTS 工具链、音频资产分发**刻意不在本轮**（清单见 §6）。
 
+> **当前口径（2026-11-23）**：本文是 M1 当时的技术变更记录，文中 CosyVoice/PilotTTS
+> 相关结论保留为**历史证据链**（说明为什么换掉它们）。当前唯一 TTS 后端是 **VoxCPM2**
+> （见 `TECH-ROADMAP.md`），CosyVoice 全量产物已归档
+> `D:/work_space/_archive/sc_tts_cosyvoice_2026-11-23/`；`analyze_emotion.py` 等 CV 专用脚本
+> 随同归档，文中对其的引用请按此路径理解。
+
 ## 1. 本轮做了什么
 
 | 交付 | 位置 | 说明 |
@@ -277,3 +283,19 @@ CV2 则不需要前缀。驱动按 `model_kind` 自动补前缀。
 
 已知待修：① 响度一致性（−25.4 ~ −22.0 LUFS，峰值保护在长句上提前触发）；② punch 段还没接 `LAUGH` 标记；
 ③ deadpan/punch 在稿子里多由捧哏承担，混合统计会把"音色差"误算成"情绪差"——量化必须按 speaker 分开。
+
+## 16. 听模式播放器 + 素材缺失态 + nginx 分发（2026-11-23，r151）
+
+§6 刻意未做的 1/3/5 三项在本轮落地（音频资产仍空缺——用户明确「先标注素材缺失」）：
+
+| 层 | 实现 | 关键口径 |
+|---|---|---|
+| 探测 | `lib/spokenAudio.ts` fetch `manifest.json` | 严格解析、缺字段整体判废；404/离线 → missing；`aiGenerated` 缺省 true |
+| 播放器 | `components/learn/SpokenPlayer.tsx` | ready=播放器全套；missing=「素材筹备中」+ 口播稿浏览；AI 角标常驻 |
+| 纯逻辑 | `lib/spokenPlayer.ts` | activeCueIndex / validResume / 断点存取，vitest 锁死 |
+| 入口 | `?mode=listen` + 「听听」切换 | 无稿章不出现；听模式不采集阅读进度 |
+| 分发 | nginx `location /audio/` + compose 挂卷 | 404 不回落 index.html；上线=服务器放文件、前端零发版 |
+
+断点续听当前只在 localStorage（按账号分区），`heard` / `listen_position_ms` 服务端契约
+等音频真正上线时双侧同步（避免半成品字段）；泛听跨章续播未做。
+验证：tsc / lint / build 全绿，vitest 54 files / 659 passed（新增 28 条）。

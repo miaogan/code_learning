@@ -1,0 +1,37 @@
+{
+  "version": "1.0",
+  "updated": "2026-11-23",
+  "note": "r150 可发布音频的素材溯源清单（见 RELEASE-DATA-SOP.md）。每条素材必须记 source/license/author/url/hash；发布前逐条核对。",
+  "assets": [
+    {
+      "id": "ref_aishell3_192",
+      "type": "voice_ref",
+      "source": "AISHELL-3 (OpenSLR SLR93) sample_192.wav，经 ModelScope OmniData/AISHELL-3 镜像下载",
+      "license": "Apache-2.0",
+      "author": "Beijing Shell Shell Technology Co., Ltd.",
+      "url": "https://www.openslr.org/93/ ; https://www.modelscope.cn/datasets/OmniData/AISHELL-3",
+      "hash": "sha256:dd9056f9f42952f2f60978fb13e8f733e5ead8944b722e968b085dd44bdcb84c",
+      "local_path": "D:/work_space/_tts/opensrc_refs/aishell3_samples/sample_192.wav",
+      "usage": "voxcpm2-zero-shot-ref (release_v1)",
+      "quality": "带宽不合格（6-8k 仅 0.47% < 1% 门槛）；仅用于跑通发布链路，待换更优素材",
+      "expires": null
+    }
+  ],
+  "excluded": [
+    {
+      "id": "ref_gdg_ep3_0386",
+      "reason": "郭德纲真人切片，名人声音，民法典 1023 条 2 款；不得进入产品/公开发布",
+      "local_path": "D:/work_space/_tts/dataset/slices/ep3-0386.wav"
+    },
+    {
+      "id": "lora_gdg_v1",
+      "reason": "gdg 数据训练的 LoRA，仅技术验证；发布链路禁止挂载",
+      "local_path": "D:/work_space/_tts/voxcpm_lora/gdg_v1/checkpoints/latest"
+    },
+    {
+      "id": "emilia_dataset",
+      "reason": "主体 CC-BY-NC，不可用于带收益发布；仅 YODAS 子集 CC-BY",
+      "local_path": null
+    }
+  ]
+}
