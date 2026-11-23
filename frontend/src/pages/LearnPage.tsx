@@ -6,6 +6,7 @@ import { MultiChipRow, type ChipOption } from '../components/ui/ChipRow'
 import { LevelChip } from '../components/learn/LevelChip'
 import { ResumeCard } from '../components/learn/ResumeCard'
 import { progressView, resumeTarget, summarizeProgress } from '../lib/learnProgress'
+import { spokenChapterById } from '../content/spoken'
 import {
   ALL_TUTORIAL_CHAPTERS,
   TUTORIAL_DIRECTIONS,
@@ -208,6 +209,9 @@ export default function LearnPage() {
                   </span>
                   <span className="sc-lab-ctags sc-lab-clevel">
                     <LevelChip level={chapter.level} />
+                    {spokenChapterById(chapter.id) !== undefined && (
+                      <Chip label="听听 🎧" />
+                    )}
                   </span>
                   <span className="sc-lab-cprog">
                     <span className="sc-lab-segbar" aria-hidden="true">

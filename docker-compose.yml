@@ -205,6 +205,11 @@ services:
     # r23：nginx 层 Basic Auth 已撤掉（鉴权改由应用登录态承担），故不再挂载 frontend/.htpasswd。
     # 如需回滚到 r21 的公网 Basic Auth，恢复 nginx.conf 的 auth_basic 两行，并加回：
     #   volumes: [./frontend/.htpasswd:/etc/nginx/.htpasswd:ro]
+    volumes:
+      # r151 有声书音频资产：离线预生成的 /audio/ 静态分发目录（nginx.conf 的 location /audio/）。
+      # 目录可空：没有素材时 nginx 对 /audio/ 404，前端播放器渲染「素材缺失」态；
+      # 上线素材 = 把 `<章>/<节>.wav + manifest.json` 放进宿主 ./audio/<章>/，容器即时可见、零发版。
+      - ./audio:/usr/share/nginx/html/audio:ro
     depends_on:
       backend:
         # 后端进程启动即探活（PG/Redis 可随后恢复），前端不因依赖故障被卡在未创建状态。

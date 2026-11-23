@@ -1,6 +1,8 @@
 import { PageHero } from '../components/ui/PageHero'
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { spokenChapterById } from '../content/spoken'
+import { SpokenPlayer } from '../components/learn/SpokenPlayer'
 import { TutorialArticle } from '../components/learn/TutorialArticle'
 import { TutorialToc } from '../components/learn/TutorialToc'
 import { LevelChip } from '../components/learn/LevelChip'
@@ -20,10 +22,18 @@ import { markChapterOpened, markSectionSeen, useLearnProgress } from '../state/l
  */
 export default function TutorialPage() {
   const { chapterId } = useParams<{ chapterId: string }>()
+  const [searchParams] = useSearchParams()
   const chapter = chapterId === undefined ? undefined : chapterById(chapterId)
   const progress = useLearnProgress()
   /** 目录高亮的当前小节，由正文的可见性观察回填。 */
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null)
+
+  /**
+   * 听模式（r151）：`?mode=listen` 且该章有口播稿才进；C 类章与没稿的章不出现入口，
+   * URL 手输也只回落到读模式（不渲染空播放器）。
+   */
+  const spokenScript = chapter === undefined ? undefined : spokenChapterById(chapter.id)
+  const isListenMode = searchParams.get('mode') === 'listen' && spokenScript !== undefined
 
   // 打开即记「最近在读」；只翻一眼不写已读小节，避免把进度刷成虚高。
   useEffect(() => {
@@ -87,6 +97,15 @@ export default function TutorialPage() {
         <Chip label={chapter.direction} tone="direction" />
         <LevelChip level={chapter.level} />
         <Chip label={`${chapter.sections.length} 节`} />
+        {spokenScript !== undefined && (
+          <Link
+            className={isListenMode ? 'sc-listen-entry is-active' : 'sc-listen-entry'}
+            to={isListenMode ? chapterHref(chapter.id) : `${chapterHref(chapter.id)}?mode=listen`}
+            aria-label={isListenMode ? '切回读模式' : '进入听模式'}
+          >
+            {isListenMode ? '回到读原文' : '听听 🎧'}
+          </Link>
+        )}
       </p>
 
       {/* 进度用文字说清（进度条只是辅助），屏幕阅读器读到的是 aria-valuenow 与这句文案。 */}
@@ -109,18 +128,27 @@ export default function TutorialPage() {
       </p>
 
       <div className="sc-learn-layout">
-        <TutorialToc
-          chapter={chapter}
-          activeSectionId={activeSectionId}
-          readIds={readIds}
-          seen={readState.seen}
-        />
-
-        <TutorialArticle
-          chapter={chapter}
-          onSectionSeen={handleSectionSeen}
-          onActiveSectionChange={setActiveSectionId}
-        />
+        {isListenMode && spokenScript !== undefined ? (
+          <div className="sc-learn-listenwrap">
+            <SpokenPlayer chapter={spokenScript} chapterTitle={chapter.title} />
+          </div>
+        ) : (
+          <TutorialArticle
+            chapter={chapter}
+            onSectionSeen={handleSectionSeen}
+            onActiveSectionChange={setActiveSectionId}
+          />
+        )}
+        {isListenMode ? (
+          <TutorialToc chapter={chapter} activeSectionId={null} readIds={new Set()} seen={0} />
+        ) : (
+          <TutorialToc
+            chapter={chapter}
+            activeSectionId={activeSectionId}
+            readIds={readIds}
+            seen={readState.seen}
+          />
+        )}
       </div>
 
       <div className="sc-learn-foot">

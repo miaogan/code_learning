@@ -58,6 +58,8 @@ services:
       # 覆盖镜像内自带的 default.conf：TLS 入口 + 全站安全头。
       - ./frontend/nginx.prod.conf:/etc/nginx/conf.d/default.conf:ro
       - ./frontend/security-headers.conf:/etc/nginx/conf.d/security-headers.conf:ro
+      # r151 有声书音频资产：与基础 compose 同一条挂载（/audio/ 静态分发，素材上线零发版）。
+      - ./audio:/usr/share/nginx/html/audio:ro
     logging:
       driver: json-file
       options:
