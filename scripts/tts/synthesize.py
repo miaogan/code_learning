@@ -767,6 +767,8 @@ def main() -> int:
             track = {
                 'sectionId': section['sectionId'],
                 'src': section['src'],
+                # 小节标题（可读名，播放器切节 tab 用；plans 由导出器/流水线写入）
+                'title': str(section.get('title') or section['sectionId']),
                 'durationMs': duration_ms,
                 'sampleRate': sample_rate,
                 # 存下 unit 级坐标：以后只想重算句级切分时不必重新合成
@@ -802,7 +804,9 @@ def main() -> int:
                 + (f' · 抢话 {overlap_count} 处' if overlap_count else '')
             )
         (chapter_dir / 'manifest.json').write_text(
-            json.dumps({'chapterId': plan['chapterId'], 'form': form,
+            json.dumps({'chapterId': plan['chapterId'],
+                        'title': str(plan.get('title') or plan['chapterId']),
+                        'form': form,
                         'sampleRate': sample_rate, 'voice': plan['voice'],
                         # AI 生成标识（RELEASE-DATA-SOP 合规红线 #4，隐式标识）：
                         # 播放器缺省也按 true 兜底，但工具链显式写出才算完整。
@@ -811,6 +815,39 @@ def main() -> int:
             + '\n',
             encoding='utf-8',
         )
+
+    # 全量音频索引（r151 流水线）：前端「听听」入口只认这一份 —— 新章音频部署后，
+    # 入口自动出现，前端零发版。聚合 out_audio 下**所有**章的 manifest（含历史章）。
+    chapters_index = []
+    for chapter_manifest in sorted(out_audio.glob('*/manifest.json')):
+        try:
+            data = json.loads(chapter_manifest.read_text(encoding='utf-8'))
+        except (json.JSONDecodeError, OSError):
+            continue
+        tracks_idx = [
+            {'sectionId': t.get('sectionId'), 'title': t.get('title') or t.get('sectionId'),
+             'durationMs': t.get('durationMs', 0)}
+            for t in data.get('tracks', []) if isinstance(t, dict) and t.get('sectionId')
+        ]
+        if not tracks_idx:
+            continue
+        chapters_index.append({
+            'chapterId': data.get('chapterId', chapter_manifest.parent.name),
+            'title': data.get('title') or data.get('chapterId', chapter_manifest.parent.name),
+            'form': data.get('form', 'solo'),
+            'aiGenerated': data.get('aiGenerated', True),
+            'sections': tracks_idx,
+            'totalMs': sum(t['durationMs'] for t in tracks_idx),
+        })
+    if chapters_index:
+        index_path = out_audio / 'index.json'
+        index_path.write_text(
+            json.dumps({'generatedAt': datetime.now().isoformat(timespec='seconds'),
+                        'chapters': chapters_index},
+                       ensure_ascii=False, indent=2) + '\n',
+            encoding='utf-8',
+        )
+        print(f'音频索引 → {index_path}（{len(chapters_index)} 章）')
 
     out_qa = out_audio / 'qa.json'
     out_qa.parent.mkdir(parents=True, exist_ok=True)
