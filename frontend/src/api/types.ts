@@ -411,6 +411,11 @@ export interface LearnChapterProgress {
   seen: string[]
   last_section_id: string | null
   updated_at: number
+  /** r151 听模式：已听完的小节 id（与 seen 并列）。 */
+  heard: string[]
+  /** r151 听模式断点。 */
+  listen_section_id: string | null
+  listen_position_ms: number
 }
 
 export interface LearnProgress {

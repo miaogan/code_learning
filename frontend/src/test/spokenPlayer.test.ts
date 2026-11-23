@@ -1,17 +1,13 @@
 /**
  * 播放器纯逻辑（`lib/spokenPlayer.ts`）的契约测试：
- * 句级定位、断点有效性守卫、localStorage 存取——这些逻辑错了会直接变成「高亮乱跳」和「断点复活旧章」。
+ * 句级定位、断点有效性守卫——这些逻辑错了会直接变成「高亮乱跳」和「断点复活旧章」。
+ * 断点的存取走 `state/learnProgress`（其契约测试见 learnProgress 相关用例），这里只测判定。
  */
 import { describe, expect, it } from 'vitest'
 import {
   PLAYBACK_SPEEDS,
   activeCueIndex,
   formatMs,
-  listenStorageKey,
-  loadListenResume,
-  parseListenResume,
-  saveListenResume,
-  serializeListenResume,
   validResume,
   type ListenResume,
 } from '../lib/spokenPlayer'
@@ -90,58 +86,5 @@ describe('validResume', () => {
 
   it('null 输入直接无效', () => {
     expect(validResume(null, sectionIds, undefined)).toBeNull()
-  })
-})
-
-describe('localStorage 存取', () => {
-  class MemoryStorage {
-    private map = new Map<string, string>()
-    getItem(key: string): string | null {
-      return this.map.get(key) ?? null
-    }
-    setItem(key: string, value: string): void {
-      this.map.set(key, value)
-    }
-  }
-
-  it('存取回环一致', () => {
-    const storage = new MemoryStorage()
-    const resume: ListenResume = { sectionId: 'concept', positionMs: 1234.6 }
-    saveListenResume(storage, 'k', resume)
-    expect(loadListenResume(storage, 'k')).toEqual({ sectionId: 'concept', positionMs: 1235 })
-  })
-
-  it('存储为 null（SSR / 测试环境）时静默降级', () => {
-    const resume: ListenResume = { sectionId: 'concept', positionMs: 1000 }
-    expect(() => saveListenResume(null, 'k', resume)).not.toThrow()
-    expect(loadListenResume(null, 'k')).toBeNull()
-  })
-
-  it('损坏数据返回 null，不抛错', () => {
-    const storage = new MemoryStorage()
-    storage.setItem('k', '{broken')
-    expect(loadListenResume(storage, 'k')).toBeNull()
-    storage.setItem('k2', '["not","an","object"]')
-    expect(loadListenResume(storage, 'k2')).toBeNull()
-  })
-
-  it('序列化口径固定（字段名 short，供跨版本兼容判断）', () => {
-    expect(serializeListenResume({ sectionId: 'concept', positionMs: 1500 })).toBe(
-      '{"section":"concept","ms":1500}',
-    )
-    expect(parseListenResume('{"section":"concept","ms":1500}')).toEqual({
-      sectionId: 'concept',
-      positionMs: 1500,
-    })
-    expect(parseListenResume(null)).toBeNull()
-  })
-})
-
-describe('listenStorageKey', () => {
-  it('与 learnProgress 同款分区：匿名裸前缀，登录按用户后缀', () => {
-    expect(listenStorageKey(null, 'be-distributed-consistency')).toBe(
-      'sc.listen.be-distributed-consistency',
-    )
-    expect(listenStorageKey('u1', 'be-distributed-consistency')).toBe('sc.listen.u1.be-distributed-consistency')
   })
 })

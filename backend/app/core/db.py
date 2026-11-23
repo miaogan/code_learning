@@ -625,6 +625,11 @@ CREATE TABLE IF NOT EXISTS learn_chapters (
     -- PostgreSQL 的 INTEGER 只有 4 字节（上限 2147483647），存 1.7e12 直接
     -- NumericValueOutOfRange。凡是「存时间戳」的整数列一律 BIGINT。
     updated_at      BIGINT NOT NULL DEFAULT 0,
+    -- r151 听模式（与前端口播稿结构同构）：`heard` 是已听完的小节 id（JSON 数组，
+    -- 与 `seen` 并列、互不顶替——听过 ≠ 读过）；断点是「该章听到哪一节的哪个毫秒」。
+    heard              TEXT NOT NULL DEFAULT '[]',
+    listen_section_id  TEXT NOT NULL DEFAULT '',
+    listen_position_ms BIGINT NOT NULL DEFAULT 0,
     PRIMARY KEY (user_id, chapter_id)
 );
 
@@ -641,8 +646,12 @@ CREATE TABLE IF NOT EXISTS plan_states (
 
 #: r95 存量库补列：`plan_states` 由 `R61_SCHEMA` 建表，补列须在它之后执行。
 #: `started_on` 是「计划起始日」（用户本机日历日 `YYYY-MM-DD`），空串＝还没开始计时。
+#: r151 听模式三列：存量库按同一机制补（新库由 R61_SCHEMA 直接建出）。
 _R61_ADDED_COLUMNS: tuple[tuple[str, str, str], ...] = (
     ("plan_states", "started_on", "TEXT NOT NULL DEFAULT ''"),
+    ("learn_chapters", "heard", "TEXT NOT NULL DEFAULT '[]'"),
+    ("learn_chapters", "listen_section_id", "TEXT NOT NULL DEFAULT ''"),
+    ("learn_chapters", "listen_position_ms", "BIGINT NOT NULL DEFAULT 0"),
 )
 
 

@@ -37,6 +37,7 @@ import random
 import struct
 import sys
 import wave
+from datetime import datetime
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -473,6 +474,56 @@ def write_wav(path: Path, pcm: bytes, sr: int = SAMPLE_RATE) -> None:
         handle.writeframes(pcm)
 
 
+def _riff_chunk(cid: bytes, body: bytes) -> bytes:
+    """单个 RIFF 顶层块（含 word 对齐 pad）。"""
+    return cid + struct.pack('<I', len(body)) + body + (b'\x00' if len(body) & 1 else b'')
+
+
+def embed_ai_metadata(path: Path, model: str) -> bool:
+    """在 RIFF 头里插一个 LIST/INFO 块（r151，《标识办法》隐式标识）。
+
+    wave 模块不支持 INFO 块，这里手写 RIFF 顶层重排：读出全部顶层块，
+    在 `fmt ` 之后插 `LIST (INFO)`，`data` 等其它块原样搬运（PCM 字节零改动）。
+    不认识 INFO 的解码器会跳过未知块，音频内容与时长不变。
+
+    尽力而为：非标准 RIFF / 解析越界一律放弃并返回 False，标识失败不打断合成；
+    显式标识（界面角标 + manifest `aiGenerated`）不依赖这里，是主口径。
+    """
+    raw = path.read_bytes()
+    if len(raw) < 12 or raw[:4] != b'RIFF' or raw[8:12] != b'WAVE':
+        return False
+    pos = 12
+    chunks: list[tuple[bytes, bytes]] = []
+    while pos + 8 <= len(raw):
+        cid = raw[pos:pos + 4]
+        size = struct.unpack('<I', raw[pos + 4:pos + 8])[0]
+        if pos + 8 + size > len(raw):
+            return False
+        chunks.append((cid, raw[pos + 8:pos + 8 + size]))
+        pos += 8 + size + (size & 1)
+
+    info: list[bytes] = []
+
+    def _add(tag: bytes, text: str) -> None:
+        data = text.encode('ascii', 'replace') + b'\x00'  # INFO 文本以 NUL 结尾
+        info.append(tag + struct.pack('<I', len(data)) + data + (b'\x00' if len(data) & 1 else b''))
+
+    _add(b'ICMT', 'AI-generated speech (SkillCoach) - synthesized voice, not a human recording')
+    _add(b'ISFT', model[:120])
+    _add(b'ICRD', datetime.now().strftime('%Y-%m-%d'))
+    list_body = b'INFO' + b''.join(info)
+
+    fmt_chunks = [item for item in chunks if item[0] == b'fmt ']
+    rest = [item for item in chunks if item[0] != b'fmt ']
+    parts = [b'WAVE']
+    parts += [_riff_chunk(cid, body) for cid, body in fmt_chunks]
+    parts.append(_riff_chunk(b'LIST', list_body))
+    parts += [_riff_chunk(cid, body) for cid, body in rest]
+    payload = b''.join(parts)
+    path.write_bytes(b'RIFF' + struct.pack('<I', len(payload)) + payload)
+    return True
+
+
 def peak_of(pcm: bytes) -> int:
     if not pcm:
         return 0
@@ -708,6 +759,9 @@ def main() -> int:
             pcm, loudness = normalize_loudness(pcm, sr=sample_rate)
             wav_path = chapter_dir / f'{section["sectionId"]}.wav'
             write_wav(wav_path, pcm, sr=sample_rate)
+            # 隐式 AI 标识：写进 RIFF INFO（ICMT/ISFT/ICRD），随文件走、与发布渠道无关
+            if not embed_ai_metadata(wav_path, str(plan.get('voice', {}).get('model', 'unknown'))):
+                print(f'  [warn] {wav_path.name} 非标准 RIFF，隐式标识未写入（显式标识不受影响）')
             cues = build_cues(units, spans, line_spans)
             duration_ms = int(len(pcm) / 2 / sample_rate * 1000)
             track = {

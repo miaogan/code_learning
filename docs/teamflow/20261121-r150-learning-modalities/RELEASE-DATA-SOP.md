@@ -109,7 +109,7 @@
 | 1 | 声音权益 | 只用本人或书面授权声音；名人原声一律不碰 |
 | 2 | 模型许可 | 代码许可 ≠ 权重许可；排除 CC-BY-NC 权重用于商用 |
 | 3 | 数据集切片 | 原始数据集许可 + 是否允许再分发；数据集切片不能直接当参考音发布 |
-| 4 | AI 标识 | 显式（界面角标）+ 隐式（文件元数据），符合《AI 生成合成内容标识办法》。**r151 已补**：manifest 落盘 `aiGenerated: true`（`synthesize.py`，旧产物已回补）；播放器常驻「AI 生成音频」角标 + 模型溯源 title；前端解析层对缺省字段按 `true` 兜底（宁可错标不可漏标）。隐式文件元数据（wav info chunk）仍待补 |
+| 4 | AI 标识 | 显式（界面角标）+ 隐式（文件元数据），符合《AI 生成合成内容标识办法》。**r151 已全部补齐**：manifest 落盘 `aiGenerated: true`（`synthesize.py`，旧产物已回补）；播放器常驻「AI 生成音频」角标 + 模型溯源 title；前端解析层对缺省字段按 `true` 兜底；wav 内嵌 RIFF LIST/INFO 隐式标识（ICMT「AI-generated speech」/ISFT 模型名/ICRD 日期，`embed_ai_metadata`，解码器兼容实测） |
 | 5 | 不进 git | 音频（约 95–115MB）走独立分发通道，`.gitignore` 已覆盖 `scripts/tts/out/`（C7） |
 | 6 | 运行期零出网 | 发布的是静态文件；生产机不跑 TTS（C4/C5） |
 

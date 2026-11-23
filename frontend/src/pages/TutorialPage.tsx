@@ -1,5 +1,5 @@
 import { PageHero } from '../components/ui/PageHero'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { spokenChapterById } from '../content/spoken'
 import { SpokenPlayer } from '../components/learn/SpokenPlayer'
@@ -10,7 +10,7 @@ import { Chip } from '../components/ui/Chip'
 import { EmptyState } from '../components/ui/EmptyState'
 import { progressView } from '../lib/learnProgress'
 import { practiceHref } from '../lib/studyPlan'
-import { chapterById, chapterHref, chapterNeighbors, tutorialHref } from '../lib/tutorials'
+import { chapterById, chapterHref, chapterNeighbors, tutorialHref, ALL_TUTORIAL_CHAPTERS } from '../lib/tutorials'
 import { markChapterOpened, markSectionSeen, useLearnProgress } from '../state/learnProgress'
 
 /**
@@ -34,6 +34,19 @@ export default function TutorialPage() {
    */
   const spokenScript = chapter === undefined ? undefined : spokenChapterById(chapter.id)
   const isListenMode = searchParams.get('mode') === 'listen' && spokenScript !== undefined
+  /**
+   * 泛听跨章续播（r151）：沿教程顺序找下一个有稿章，整章播完自动跳过去接着听；
+   * `autoplay=1` 由播放器接（浏览器拒自动播放时静默降级为暂停态）。
+   */
+  const nextListenHref = useMemo(() => {
+    if (chapter === undefined) return null
+    const currentIndex = ALL_TUTORIAL_CHAPTERS.findIndex((item) => item.id === chapter.id)
+    const next = ALL_TUTORIAL_CHAPTERS.slice(currentIndex + 1).find(
+      (item) => spokenChapterById(item.id) !== undefined,
+    )
+    return next === undefined ? null : `${chapterHref(next.id)}?mode=listen&autoplay=1`
+  }, [chapter])
+  const autoplay = searchParams.get('autoplay') === '1'
 
   // 打开即记「最近在读」；只翻一眼不写已读小节，避免把进度刷成虚高。
   useEffect(() => {
@@ -130,7 +143,12 @@ export default function TutorialPage() {
       <div className="sc-learn-layout">
         {isListenMode && spokenScript !== undefined ? (
           <div className="sc-learn-listenwrap">
-            <SpokenPlayer chapter={spokenScript} chapterTitle={chapter.title} />
+            <SpokenPlayer
+              chapter={spokenScript}
+              chapterTitle={chapter.title}
+              nextListenHref={nextListenHref}
+              autoplay={autoplay}
+            />
           </div>
         ) : (
           <TutorialArticle

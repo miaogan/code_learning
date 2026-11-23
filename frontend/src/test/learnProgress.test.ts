@@ -24,7 +24,7 @@ function mustChapter(id: string): TutorialChapter {
 /** 造一条「整章读完」的记录：小节全在 `seen` 里，最后停在第 `lastSectionId`。 */
 function readAll(chapter: TutorialChapter): ChapterProgress {
   const ids = chapter.sections.map((section) => section.id)
-  return { seen: ids, lastSectionId: ids[ids.length - 1] ?? null, updatedAt: 1000 }
+  return { seen: ids, lastSectionId: ids[ids.length - 1] ?? null, updatedAt: 1000, heard: [], listenSectionId: null, listenPositionMs: 0 }
 }
 
 describe('阅读进度视图', () => {
@@ -40,7 +40,7 @@ describe('阅读进度视图', () => {
 
   it('读到一半给出已读小节数、百分比与续读锚点', () => {
     const view = progressView(
-      { seen: ['why', 'order'], lastSectionId: 'order', updatedAt: 1000 },
+      { seen: ['why', 'order'], lastSectionId: 'order', updatedAt: 1000, heard: [], listenSectionId: null, listenPositionMs: 0 },
       chapter,
     )
     expect(view.status).toBe('reading')
@@ -62,7 +62,7 @@ describe('阅读进度视图', () => {
 
   it('内容改版后失效的小节 id 不计入，也不会把锚点指到不存在的小节', () => {
     const view = progressView(
-      { seen: ['why', 'removed-section'], lastSectionId: 'removed-section', updatedAt: 1000 },
+      { seen: ['why', 'removed-section'], lastSectionId: 'removed-section', updatedAt: 1000, heard: [], listenSectionId: null, listenPositionMs: 0 },
       chapter,
     )
     expect(view.seen).toBe(1)
@@ -87,7 +87,7 @@ describe('继续学习目标', () => {
     const anchor = chapter.sections[2].id
     const state: LearnProgressState = {
       lastChapterId: chapter.id,
-      chapters: { [chapter.id]: { seen: ['why', anchor], lastSectionId: anchor, updatedAt: 1000 } },
+      chapters: { [chapter.id]: { seen: ['why', anchor], lastSectionId: anchor, updatedAt: 1000, heard: [], listenSectionId: null, listenPositionMs: 0 } },
     }
     const target = resumeTarget(state)
     expect(target?.chapter.id).toBe(chapter.id)
@@ -119,7 +119,7 @@ describe('页头统计', () => {
     const first = ALL_TUTORIAL_CHAPTERS[0]
     const state: LearnProgressState = {
       lastChapterId: first.id,
-      chapters: { [first.id]: { seen: [first.sections[0].id], lastSectionId: null, updatedAt: 1 } },
+      chapters: { [first.id]: { seen: [first.sections[0].id], lastSectionId: null, updatedAt: 1, heard: [], listenSectionId: null, listenPositionMs: 0 } },
     }
     const summary = summarizeProgress(state, [first])
     expect(summary.chapters).toBe(1)
@@ -219,13 +219,13 @@ describe('进度上云的序列化', () => {
   it('服务端 snake_case 映射回本地 camelCase，缺字段按空值兜底', () => {
     const wire = learnProgressFromWire({
       last_chapter_id: 'fe-event-loop',
-      chapters: { 'fe-event-loop': { seen: ['why', 'order'], last_section_id: 'order', updated_at: 1000 } },
+      chapters: { 'fe-event-loop': { seen: ['why', 'order'], last_section_id: 'order', updated_at: 1000, heard: [], listen_section_id: null, listen_position_ms: 0 } },
     })
     expect(wire.lastChapterId).toBe('fe-event-loop')
     expect(wire.chapters['fe-event-loop']).toEqual({
       seen: ['why', 'order'],
       lastSectionId: 'order',
-      updatedAt: 1000,
+      updatedAt: 1000, heard: [], listenSectionId: null, listenPositionMs: 0,
     })
 
     const empty = learnProgressFromWire({ last_chapter_id: null, chapters: {} })
@@ -236,15 +236,15 @@ describe('进度上云的序列化', () => {
     const a: LearnProgressState = {
       lastChapterId: 'b',
       chapters: {
-        b: { seen: ['x', 'x', 'y'], lastSectionId: 'y', updatedAt: 2 },
-        a: { seen: ['z'], lastSectionId: null, updatedAt: 1 },
+        b: { seen: ['x', 'x', 'y'], lastSectionId: 'y', updatedAt: 2, heard: [], listenSectionId: null, listenPositionMs: 0 },
+        a: { seen: ['z'], lastSectionId: null, updatedAt: 1, heard: [], listenSectionId: null, listenPositionMs: 0 },
       },
     }
     const b: LearnProgressState = {
       lastChapterId: 'b',
       chapters: {
-        a: { seen: ['z'], lastSectionId: null, updatedAt: 1 },
-        b: { seen: ['y', 'x'], lastSectionId: 'y', updatedAt: 2 },
+        a: { seen: ['z'], lastSectionId: null, updatedAt: 1, heard: [], listenSectionId: null, listenPositionMs: 0 },
+        b: { seen: ['y', 'x'], lastSectionId: 'y', updatedAt: 2, heard: [], listenSectionId: null, listenPositionMs: 0 },
       },
     }
     expect(JSON.stringify(learnProgressToWire(a))).toBe(JSON.stringify(learnProgressToWire(b)))
@@ -254,12 +254,12 @@ describe('进度上云的序列化', () => {
   it('只要有一处不同就判成有差异', () => {
     const base: LearnProgressState = {
       lastChapterId: 'a',
-      chapters: { a: { seen: ['x'], lastSectionId: 'x', updatedAt: 1 } },
+      chapters: { a: { seen: ['x'], lastSectionId: 'x', updatedAt: 1, heard: [], listenSectionId: null, listenPositionMs: 0 } },
     }
     expect(
       sameLearnProgress(base, {
         lastChapterId: 'a',
-        chapters: { a: { seen: ['x', 'y'], lastSectionId: 'y', updatedAt: 2 } },
+        chapters: { a: { seen: ['x', 'y'], lastSectionId: 'y', updatedAt: 2, heard: [], listenSectionId: null, listenPositionMs: 0 } },
       }),
     ).toBe(false)
   })
@@ -268,8 +268,8 @@ describe('进度上云的序列化', () => {
 describe('进度跨设备合并', () => {
   it('已读小节取并集，续读位置听较新的那份', () => {
     const merged = mergeLearnProgress(
-      { lastChapterId: 'ch', chapters: { ch: { seen: ['a'], lastSectionId: 'a', updatedAt: 1000 } } },
-      { lastChapterId: 'ch', chapters: { ch: { seen: ['a', 'b'], lastSectionId: 'b', updatedAt: 2000 } } },
+      { lastChapterId: 'ch', chapters: { ch: { seen: ['a'], lastSectionId: 'a', updatedAt: 1000, heard: [], listenSectionId: null, listenPositionMs: 0 } } },
+      { lastChapterId: 'ch', chapters: { ch: { seen: ['a', 'b'], lastSectionId: 'b', updatedAt: 2000, heard: [], listenSectionId: null, listenPositionMs: 0 } } },
     )
     expect(merged.chapters.ch.seen).toEqual(['a', 'b'])
     expect(merged.chapters.ch.lastSectionId).toBe('b')
@@ -278,8 +278,8 @@ describe('进度跨设备合并', () => {
 
   it('活跃时间平局时本机优先，且不影响并集', () => {
     const merged = mergeLearnProgress(
-      { lastChapterId: 'ch', chapters: { ch: { seen: ['a'], lastSectionId: 'a', updatedAt: 1000 } } },
-      { lastChapterId: 'ch', chapters: { ch: { seen: ['b'], lastSectionId: 'b', updatedAt: 1000 } } },
+      { lastChapterId: 'ch', chapters: { ch: { seen: ['a'], lastSectionId: 'a', updatedAt: 1000, heard: [], listenSectionId: null, listenPositionMs: 0 } } },
+      { lastChapterId: 'ch', chapters: { ch: { seen: ['b'], lastSectionId: 'b', updatedAt: 1000, heard: [], listenSectionId: null, listenPositionMs: 0 } } },
     )
     expect(merged.chapters.ch.seen).toEqual(['a', 'b'])
     expect(merged.chapters.ch.lastSectionId).toBe('a')
@@ -287,8 +287,8 @@ describe('进度跨设备合并', () => {
 
   it('两侧独有的章节都保留，「继续学习」跟着最活跃的一章走', () => {
     const merged = mergeLearnProgress(
-      { lastChapterId: 'local-only', chapters: { 'local-only': { seen: ['a'], lastSectionId: 'a', updatedAt: 500 } } },
-      { lastChapterId: 'remote-only', chapters: { 'remote-only': { seen: ['b'], lastSectionId: 'b', updatedAt: 900 } } },
+      { lastChapterId: 'local-only', chapters: { 'local-only': { seen: ['a'], lastSectionId: 'a', updatedAt: 500, heard: [], listenSectionId: null, listenPositionMs: 0 } } },
+      { lastChapterId: 'remote-only', chapters: { 'remote-only': { seen: ['b'], lastSectionId: 'b', updatedAt: 900, heard: [], listenSectionId: null, listenPositionMs: 0 } } },
     )
     expect(Object.keys(merged.chapters).sort()).toEqual(['local-only', 'remote-only'])
     expect(merged.lastChapterId).toBe('remote-only')
@@ -325,7 +325,7 @@ describe('登录后与云端对齐', () => {
       'sc.learn.user-a',
       JSON.stringify({
         lastChapterId: 'fe-event-loop',
-        chapters: { 'fe-event-loop': { seen: ['order'], lastSectionId: 'order', updatedAt: 1000 } },
+        chapters: { 'fe-event-loop': { seen: ['order'], lastSectionId: 'order', updatedAt: 1000, heard: [], listenSectionId: null, listenPositionMs: 0 } },
       }),
     )
     const pushes: unknown[] = []
@@ -355,7 +355,7 @@ describe('登录后与云端对齐', () => {
       'sc.learn.user-a',
       JSON.stringify({
         lastChapterId: 'fe-event-loop',
-        chapters: { 'fe-event-loop': { seen: ['why'], lastSectionId: 'why', updatedAt: 1000 } },
+        chapters: { 'fe-event-loop': { seen: ['why'], lastSectionId: 'why', updatedAt: 1000, heard: [], listenSectionId: null, listenPositionMs: 0 } },
       }),
     )
     const pushes: unknown[] = []
@@ -377,7 +377,7 @@ describe('登录后与云端对齐', () => {
       'sc.learn.user-a',
       JSON.stringify({
         lastChapterId: 'fe-event-loop',
-        chapters: { 'fe-event-loop': { seen: ['why'], lastSectionId: 'why', updatedAt: 1000 } },
+        chapters: { 'fe-event-loop': { seen: ['why'], lastSectionId: 'why', updatedAt: 1000, heard: [], listenSectionId: null, listenPositionMs: 0 } },
       }),
     )
     vi.stubGlobal(
@@ -390,5 +390,99 @@ describe('登录后与云端对齐', () => {
     const state = await import('../state/learnProgress')
     expect(() => state.bindLearnProgressToUser('user-a')).not.toThrow()
     expect(state.getLearnProgress().chapters['fe-event-loop']?.seen).toEqual(['why'])
+  })
+})
+
+/* ---------- r151 听模式：heard / listen_section_id / listen_position_ms ---------- */
+
+describe('听侧契约（r151）', () => {
+  it('wire 往返：heard 与断点 snake_case ↔ camelCase 保真', () => {
+    const state: LearnProgressState = {
+      lastChapterId: 'ch',
+      chapters: {
+        ch: {
+          seen: ['a'],
+          lastSectionId: 'a',
+          updatedAt: 1000,
+          heard: ['a', 'b'],
+          listenSectionId: 'b',
+          listenPositionMs: 65432,
+        },
+      },
+    }
+    const round = learnProgressFromWire(learnProgressToWire(state))
+    expect(round.chapters.ch).toEqual(state.chapters.ch)
+    // heard 排序产出：序列化逐字节可比
+    expect(learnProgressToWire(state).chapters.ch.heard).toEqual(['a', 'b'])
+  })
+
+  it('合并：heard 取并集，断点取 updatedAt 较新的一份', () => {
+    const merged = mergeLearnProgress(
+      {
+        lastChapterId: 'ch',
+        chapters: {
+          ch: {
+            seen: ['a'],
+            lastSectionId: 'a',
+            updatedAt: 1000,
+            heard: ['a'],
+            listenSectionId: 'a',
+            listenPositionMs: 11111,
+          },
+        },
+      },
+      {
+        lastChapterId: 'ch',
+        chapters: {
+          ch: {
+            seen: ['b'],
+            lastSectionId: 'b',
+            updatedAt: 2000,
+            heard: ['b'],
+            listenSectionId: 'b',
+            listenPositionMs: 22222,
+          },
+        },
+      },
+    )
+    expect(merged.chapters.ch.heard).toEqual(['a', 'b'])
+    expect(merged.chapters.ch.listenSectionId).toBe('b')
+    expect(merged.chapters.ch.listenPositionMs).toBe(22222)
+  })
+
+  it('合并：旧客户端数据缺听侧字段时按空值兜底，不报错', () => {
+    const merged = mergeLearnProgress(
+      {
+        lastChapterId: 'ch',
+        chapters: {
+          ch: { seen: ['a'], lastSectionId: 'a', updatedAt: 1000, heard: [], listenSectionId: null, listenPositionMs: 0 },
+        },
+      },
+      {
+        lastChapterId: 'ch',
+        chapters: {
+          ch: { seen: [], lastSectionId: null, updatedAt: 500, heard: [], listenSectionId: null, listenPositionMs: 0 },
+        },
+      },
+    )
+    expect(merged.chapters.ch.listenSectionId).toBeNull()
+    expect(merged.chapters.ch.listenPositionMs).toBe(0)
+  })
+
+  it('进度视图不受听侧字段影响：听过 ≠ 读过（阅读口径不掺听）', () => {
+    const chapter = mustChapter('fe-event-loop')
+    const view = progressView(
+      {
+        seen: [],
+        lastSectionId: null,
+        updatedAt: 1000,
+        heard: chapter.sections.map((section) => section.id),
+        listenSectionId: chapter.sections[chapter.sections.length - 1]?.id ?? null,
+        listenPositionMs: 1000,
+      },
+      chapter,
+    )
+    expect(view.status).toBe('unread')
+    expect(view.seen).toBe(0)
   })
 })

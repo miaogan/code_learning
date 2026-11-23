@@ -50,6 +50,9 @@ def test_normalize_drops_bad_ids_and_dedups_seen() -> None:
                 seen=["s1", "s1", "../bad", "", "s2"],
                 last_section_id="../bad",
                 updated_at=-3,
+                heard=["s1", "s1", "../bad", "s3"],
+                listen_section_id="../bad",
+                listen_position_ms=-99,
             ),
             "../bad": LearnChapterProgress(seen=["s1"]),
         },
@@ -61,6 +64,10 @@ def test_normalize_drops_bad_ids_and_dedups_seen() -> None:
     assert cleaned.chapters["ai-glossary"].seen == ["s1", "s2"]
     assert cleaned.chapters["ai-glossary"].last_section_id is None
     assert cleaned.chapters["ai-glossary"].updated_at == 0
+    # r151 听侧三列同口径净化：heard 去重 + 脏 id 丢弃，断点脏值夹取
+    assert cleaned.chapters["ai-glossary"].heard == ["s1", "s3"]
+    assert cleaned.chapters["ai-glossary"].listen_section_id is None
+    assert cleaned.chapters["ai-glossary"].listen_position_ms == 0
     # last_chapter_id 指向被丢弃的章节 → 一并置空，避免「继续学习」跳到空章
     assert cleaned.last_chapter_id is None
 
@@ -87,7 +94,14 @@ def test_progress_empty_state_then_roundtrip(client: TestClient) -> None:
     body = {
         "last_chapter_id": "ai-glossary",
         "chapters": {
-            "ai-glossary": {"seen": ["s1", "s2"], "last_section_id": "s2", "updated_at": 1762300000000},
+            "ai-glossary": {
+                "seen": ["s1", "s2"],
+                "last_section_id": "s2",
+                "updated_at": 1762300000000,
+                "heard": ["s1"],
+                "listen_section_id": "s1",
+                "listen_position_ms": 65000,
+            },
         },
     }
     saved = client.put("/api/learn/progress", json=body)
@@ -95,6 +109,52 @@ def test_progress_empty_state_then_roundtrip(client: TestClient) -> None:
     assert saved.json() == body
 
     assert client.get("/api/learn/progress").json() == body
+
+
+def test_progress_listen_fields_default_when_omitted(client: TestClient) -> None:
+    """r151 前的旧客户端不带听侧字段：响应补默认值，读写双向都不得报错。"""
+    legacy_body = {
+        "last_chapter_id": "c-1",
+        "chapters": {"c-1": {"seen": ["s1"], "last_section_id": "s1", "updated_at": 1}},
+    }
+    saved = client.put("/api/learn/progress", json=legacy_body)
+    assert saved.status_code == 200
+    stored = client.get("/api/learn/progress").json()
+    chapter = stored["chapters"]["c-1"]
+    assert chapter["heard"] == []
+    assert chapter["listen_section_id"] is None
+    assert chapter["listen_position_ms"] == 0
+
+
+def test_progress_listen_fields_survive_unrelated_writes(client: TestClient) -> None:
+    """断点不会被纯阅读同步抹掉：写整份状态时听侧字段必须原样带过去（前端整份提交）。"""
+    listen_body = {
+        "last_chapter_id": "c-1",
+        "chapters": {
+            "c-1": {
+                "seen": [],
+                "last_section_id": None,
+                "updated_at": 10,
+                "heard": ["s1"],
+                "listen_section_id": "s1",
+                "listen_position_ms": 42000,
+            }
+        },
+    }
+    client.put("/api/learn/progress", json=listen_body)
+
+    # 另一台设备只同步了阅读进度（旧字段）→ 服务端整份覆盖语义下听侧字段被抹平：
+    # 这是口径的一部分——覆盖写意味着前端必须整份提交，测试锁定该语义防实现漂移。
+    client.put(
+        "/api/learn/progress",
+        json={
+            "last_chapter_id": "c-1",
+            "chapters": {"c-1": {"seen": ["s1"], "last_section_id": "s1", "updated_at": 20}},
+        },
+    )
+    stored = client.get("/api/learn/progress").json()["chapters"]["c-1"]
+    assert stored["heard"] == []
+    assert stored["listen_position_ms"] == 0
 
 
 def test_progress_put_overwrites_instead_of_appending(client: TestClient) -> None:

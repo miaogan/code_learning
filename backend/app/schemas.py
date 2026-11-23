@@ -637,11 +637,18 @@ class QuestionSearchResponse(BaseModel):
 
 
 class LearnChapterProgress(BaseModel):
-    """单个教程章节的已读状态（r61 上云：与前端 localStorage 结构逐字同构）。"""
+    """单个教程章节的已读状态（r61 上云：与前端 localStorage 结构逐字同构）。
+
+    r151 听模式追加三列：`heard` 与 `seen` 并列（听过 ≠ 读过，不进阅读口径），
+    `listen_section_id` + `listen_position_ms` 是断点（该章听到哪一节的哪个毫秒）。
+    """
 
     seen: list[str] = Field(default_factory=list, description="已读小节 id（章节内唯一）")
     last_section_id: str | None = Field(default=None, description="该章读到的小节 id")
     updated_at: int = Field(default=0, description="毫秒时间戳，仅用于跨设备合并取新")
+    heard: list[str] = Field(default_factory=list, description="已听完的小节 id（听模式，与 seen 并列）")
+    listen_section_id: str | None = Field(default=None, description="听模式断点小节 id")
+    listen_position_ms: int = Field(default=0, description="听模式断点位置（节内毫秒）；服务层夹到非负")
 
 
 class LearnProgress(BaseModel):

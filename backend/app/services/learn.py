@@ -51,7 +51,12 @@ def clean_id(value: Any) -> str:
 
 
 def normalize_progress(payload: LearnProgress) -> LearnProgress:
-    """章节上限 / 已读去重 / 脏 id 丢弃；`last_chapter_id` 指向不存在的章节时置空。"""
+    """章节上限 / 已读去重 / 脏 id 丢弃；`last_chapter_id` 指向不存在的章节时置空。
+
+    r151 听模式三列同口径净化：`heard` 与 `seen` 完全同构（去重 + 上限 + 脏 id 丢弃），
+    断点小节 id 走 `clean_id`、位置夹到非负——听进度与阅读进度一样由后台自动同步，
+    任何脏值都静默夹取而不是报错。
+    """
     chapters: dict[str, LearnChapterProgress] = {}
     for chapter_id, item in list(payload.chapters.items())[:MAX_CHAPTERS]:
         cid = clean_id(chapter_id)
@@ -62,10 +67,18 @@ def normalize_progress(payload: LearnProgress) -> LearnProgress:
             sid = clean_id(section)
             if sid and sid not in seen:
                 seen.append(sid)
+        heard: list[str] = []
+        for section in list(item.heard or [])[:MAX_SEEN]:
+            hid = clean_id(section)
+            if hid and hid not in heard:
+                heard.append(hid)
         chapters[cid] = LearnChapterProgress(
             seen=seen,
             last_section_id=clean_id(item.last_section_id) or None,
             updated_at=max(0, int(item.updated_at or 0)),
+            heard=heard,
+            listen_section_id=clean_id(item.listen_section_id) or None,
+            listen_position_ms=max(0, int(item.listen_position_ms or 0)),
         )
     last = clean_id(payload.last_chapter_id)
     return LearnProgress(

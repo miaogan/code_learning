@@ -36,6 +36,15 @@ function normalizeChapter(value: unknown): ChapterProgress | null {
     seen: entry.seen.filter((id): id is string => typeof id === 'string'),
     lastSectionId: typeof entry.lastSectionId === 'string' ? entry.lastSectionId : null,
     updatedAt: typeof entry.updatedAt === 'number' ? entry.updatedAt : 0,
+    // r151 旧记录没有听侧字段（升级兼容）：空数组 / 无断点。
+    heard: Array.isArray(entry.heard)
+      ? entry.heard.filter((id): id is string => typeof id === 'string')
+      : [],
+    listenSectionId: typeof entry.listenSectionId === 'string' ? entry.listenSectionId : null,
+    listenPositionMs:
+      typeof entry.listenPositionMs === 'number' && Number.isFinite(entry.listenPositionMs)
+        ? Math.max(0, entry.listenPositionMs)
+        : 0,
   }
 }
 
@@ -168,7 +177,10 @@ export function markChapterOpened(chapterId: string, now: number = Date.now()): 
   if (prev === undefined) {
     commit({
       lastChapterId: chapterId,
-      chapters: { ...current.chapters, [chapterId]: { seen: [], lastSectionId: null, updatedAt: now } },
+      chapters: {
+        ...current.chapters,
+        [chapterId]: { seen: [], lastSectionId: null, updatedAt: now, heard: [], listenSectionId: null, listenPositionMs: 0 },
+      },
     })
     return
   }
@@ -201,6 +213,69 @@ export function markSectionSeen(
         seen: alreadySeen ? seen : [...seen, sectionId],
         lastSectionId: sectionId,
         updatedAt: now,
+        heard: prev?.heard ?? [],
+        listenSectionId: prev?.listenSectionId ?? null,
+        listenPositionMs: prev?.listenPositionMs ?? 0,
+      },
+    },
+  })
+}
+
+/**
+ * r151 听模式：记「这一节听完了」（`heard` 与 `seen` 并列，不进阅读口径）。
+ * 听进度与阅读进度同源同链路：本地缓存 + 防抖整份 PUT 上云。
+ */
+export function markSectionHeard(chapterId: string, sectionId: string, now: number = Date.now()): void {
+  const prev = current.chapters[chapterId]
+  const heard = prev?.heard ?? []
+  const alreadyHeard = prev !== undefined && prev.heard.includes(sectionId)
+  if (alreadyHeard && current.lastChapterId === chapterId) return
+  commit({
+    lastChapterId: chapterId,
+    chapters: {
+      ...current.chapters,
+      [chapterId]: {
+        seen: prev?.seen ?? [],
+        lastSectionId: prev?.lastSectionId ?? null,
+        updatedAt: now,
+        heard: alreadyHeard ? heard : [...heard, sectionId],
+        listenSectionId: prev?.listenSectionId ?? null,
+        listenPositionMs: prev?.listenPositionMs ?? 0,
+      },
+    },
+  })
+}
+
+/**
+ * r151 听模式：记断点（听到哪一节、节内哪个毫秒）。
+ * 播放中会被节流调用，位置没动就不写；断点不是阅读位置，`lastSectionId`（续读）不动。
+ */
+export function markListenPosition(
+  chapterId: string,
+  sectionId: string,
+  positionMs: number,
+  now: number = Date.now(),
+): void {
+  const prev = current.chapters[chapterId]
+  if (
+    prev !== undefined &&
+    prev.listenSectionId === sectionId &&
+    prev.listenPositionMs === positionMs &&
+    current.lastChapterId === chapterId
+  ) {
+    return
+  }
+  commit({
+    lastChapterId: chapterId,
+    chapters: {
+      ...current.chapters,
+      [chapterId]: {
+        seen: prev?.seen ?? [],
+        lastSectionId: prev?.lastSectionId ?? null,
+        updatedAt: now,
+        heard: prev?.heard ?? [],
+        listenSectionId: sectionId,
+        listenPositionMs: Math.max(0, Math.round(positionMs)),
       },
     },
   })

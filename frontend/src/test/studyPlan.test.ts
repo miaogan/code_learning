@@ -181,12 +181,12 @@ describe('buildStudyPlan', () => {
         [advanced!.id]: {
           seen: advanced!.sections.map((section) => section.id),
           lastSectionId: null,
-          updatedAt: 0,
+          updatedAt: 0, heard: [], listenSectionId: null, listenPositionMs: 0,
         },
         [base!.id]: {
           seen: base!.sections.map((section) => section.id),
           lastSectionId: null,
-          updatedAt: 0,
+          updatedAt: 0, heard: [], listenSectionId: null, listenPositionMs: 0,
         },
       },
     }

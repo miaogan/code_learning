@@ -155,6 +155,9 @@ function progressOfFirstChapter(): LearnProgressState {
         seen: chapter.sections.map((section) => section.id),
         lastSectionId: chapter.sections[chapter.sections.length - 1]?.id ?? null,
         updatedAt: 1,
+        heard: [],
+        listenSectionId: null,
+        listenPositionMs: 0,
       },
     },
   }

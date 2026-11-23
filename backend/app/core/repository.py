@@ -1687,7 +1687,8 @@ def get_learn_progress() -> dict[str, Any]:
             "SELECT last_chapter_id FROM learn_progress WHERE user_id = ?", (_uid(),)
         ).fetchone()
         rows = conn.execute(
-            "SELECT chapter_id, seen, last_section_id, updated_at FROM learn_chapters "
+            "SELECT chapter_id, seen, last_section_id, updated_at, heard, listen_section_id, "
+            "listen_position_ms FROM learn_chapters "
             "WHERE user_id = ? ORDER BY chapter_id",
             (_uid(),),
         ).fetchall()
@@ -1696,6 +1697,9 @@ def get_learn_progress() -> dict[str, Any]:
             "seen": [str(item) for item in _json_list(row["seen"])],
             "last_section_id": str(row["last_section_id"]) or None,
             "updated_at": int(row["updated_at"] or 0),
+            "heard": [str(item) for item in _json_list(row["heard"])],
+            "listen_section_id": str(row["listen_section_id"]) or None,
+            "listen_position_ms": int(row["listen_position_ms"] or 0),
         }
         for row in rows
     }
@@ -1716,8 +1720,8 @@ def save_learn_progress(last_chapter_id: str | None, chapters: dict[str, dict[st
         )
         conn.execute("DELETE FROM learn_chapters WHERE user_id = ?", (_uid(),))
         conn.executemany(
-            "INSERT INTO learn_chapters (user_id, chapter_id, seen, last_section_id, updated_at) "
-            "VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO learn_chapters (user_id, chapter_id, seen, last_section_id, updated_at, "
+            "heard, listen_section_id, listen_position_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             [
                 (
                     _uid(),
@@ -1725,6 +1729,9 @@ def save_learn_progress(last_chapter_id: str | None, chapters: dict[str, dict[st
                     _json_text(item.get("seen") or []),
                     str(item.get("last_section_id") or ""),
                     int(item.get("updated_at") or 0),
+                    _json_text(item.get("heard") or []),
+                    str(item.get("listen_section_id") or ""),
+                    max(0, int(item.get("listen_position_ms") or 0)),
                 )
                 for chapter_id, item in chapters.items()
             ],

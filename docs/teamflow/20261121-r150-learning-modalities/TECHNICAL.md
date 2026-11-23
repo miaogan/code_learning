@@ -296,6 +296,8 @@ CV2 则不需要前缀。驱动按 `model_kind` 自动补前缀。
 | 入口 | `?mode=listen` + 「听听」切换 | 无稿章不出现；听模式不采集阅读进度 |
 | 分发 | nginx `location /audio/` + compose 挂卷 | 404 不回落 index.html；上线=服务器放文件、前端零发版 |
 
-断点续听当前只在 localStorage（按账号分区），`heard` / `listen_position_ms` 服务端契约
-等音频真正上线时双侧同步（避免半成品字段）；泛听跨章续播未做。
+断点续听与 `heard` / `listen_section_id` / `listen_position_ms` 服务端契约（r151 追记：**双侧同步已完成**——
+后端 `learn_chapters` 增三列 + 净化 + 整份覆盖读写，前端 `ChapterProgress` 同构 + 合并规则
+heard 取并集 / 断点取 `updatedAt` 较新；旧客户端缺字段按空值兜底）；泛听跨章续播与
+本节循环亦已落地；wav 隐式 AI 标识（RIFF INFO）已内嵌进合成链路。
 验证：tsc / lint / build 全绿，vitest 54 files / 659 passed（新增 28 条）。

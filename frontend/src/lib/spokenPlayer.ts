@@ -1,9 +1,10 @@
 /**
- * 播放器的纯逻辑层（r151）：倍速档位、时间格式化、句级定位、断点续听的存取。
+ * 播放器的纯逻辑层（r151）：倍速档位、时间格式化、句级定位、断点有效性守卫。
  *
  * 抽出来的原因与 `learnProgress.ts` 相同：播放器组件要快进快出，
  * 这些逻辑要在 vitest（node 环境、无 `<audio>`）里单测锁死。
- * 存取 `localStorage` 的函数带 `window` 守卫——SSR / 测试环境静默降级为「无断点」。
+ * 断点的**存取**走 `state/learnProgress`（本地缓存 + 服务端契约同步），
+ * 本文件只负责「这条断点还有效吗」的判定。
  */
 import type { SpokenAudioCue } from './spokenAudio'
 
@@ -49,50 +50,4 @@ export function validResume(
   if (!Number.isFinite(resume.positionMs) || resume.positionMs <= 0) return null
   if (durationMs !== undefined && resume.positionMs >= durationMs) return null
   return resume
-}
-
-/** 与 learnProgress 同口径：匿名用裸前缀，登录用户各用自己的后缀。 */
-export function listenStorageKey(userId: string | null, chapterId: string): string {
-  const prefix = userId === null ? 'sc.listen' : `sc.listen.${userId}`
-  return `${prefix}.${chapterId}`
-}
-
-export function serializeListenResume(resume: ListenResume): string {
-  return JSON.stringify({ section: resume.sectionId, ms: Math.round(resume.positionMs) })
-}
-
-export function parseListenResume(raw: string | null): ListenResume | null {
-  if (raw === null) return null
-  try {
-    const parsed = JSON.parse(raw) as { section?: unknown; ms?: unknown }
-    if (typeof parsed.section !== 'string' || typeof parsed.ms !== 'number') return null
-    return { sectionId: parsed.section, positionMs: parsed.ms }
-  } catch {
-    return null
-  }
-}
-
-export function loadListenResume(
-  storage: Pick<Storage, 'getItem'> | null,
-  key: string,
-): ListenResume | null {
-  if (storage === null) return null
-  try {
-    return parseListenResume(storage.getItem(key))
-  } catch {
-    return null
-  }
-}
-
-export function saveListenResume(
-  storage: Pick<Storage, 'setItem'> | null,
-  key: string,
-  resume: ListenResume,
-): void {
-  if (storage === null) return
-  try {
-    storage.setItem(key, serializeListenResume(resume))
-  } catch {
-    /* 隐私模式 / 配额满：断点丢了不影响本会话播放 */
-  }
 }

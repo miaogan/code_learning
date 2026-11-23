@@ -18,6 +18,11 @@ export interface ChapterProgress {
   lastSectionId: string | null
   /** 最后活跃时间（epoch ms）。 */
   updatedAt: number
+  /** r151 听模式：已听完的小节 id（与 `seen` 并列，听过 ≠ 读过，不进阅读口径）。 */
+  heard: string[]
+  /** r151 听模式断点：听到哪一节、节内哪个毫秒。 */
+  listenSectionId: string | null
+  listenPositionMs: number
 }
 
 export interface LearnProgressState {
@@ -186,7 +191,17 @@ export function summarizeProgress(
 /** 服务端口径（snake_case，`LearnProgress` 逐字镜像）；本文件的内部状态用 camelCase。 */
 export interface LearnProgressWire {
   last_chapter_id: string | null
-  chapters: Record<string, { seen: string[]; last_section_id: string | null; updated_at: number }>
+  chapters: Record<
+    string,
+    {
+      seen: string[]
+      last_section_id: string | null
+      updated_at: number
+      heard: string[]
+      listen_section_id: string | null
+      listen_position_ms: number
+    }
+  >
 }
 
 export function learnProgressFromWire(wire: LearnProgressWire): LearnProgressState {
@@ -196,12 +211,15 @@ export function learnProgressFromWire(wire: LearnProgressWire): LearnProgressSta
       seen: [...(item.seen ?? [])],
       lastSectionId: item.last_section_id ?? null,
       updatedAt: item.updated_at ?? 0,
+      heard: [...(item.heard ?? [])],
+      listenSectionId: item.listen_section_id ?? null,
+      listenPositionMs: item.listen_position_ms ?? 0,
     }
   }
   return { lastChapterId: wire.last_chapter_id ?? null, chapters }
 }
 
-/** 章节与已读小节都排序产出：同一份数据序列化后逐字节可比，避免「顺序不同被判成有差异」。 */
+/** 章节与已读/已听小节都排序产出：同一份数据序列化后逐字节可比，避免「顺序不同被判成有差异」。 */
 export function learnProgressToWire(state: LearnProgressState): LearnProgressWire {
   const chapters: LearnProgressWire['chapters'] = {}
   for (const id of Object.keys(state.chapters).sort()) {
@@ -210,6 +228,9 @@ export function learnProgressToWire(state: LearnProgressState): LearnProgressWir
       seen: [...new Set(item.seen)].sort(),
       last_section_id: item.lastSectionId,
       updated_at: item.updatedAt,
+      heard: [...new Set(item.heard)].sort(),
+      listen_section_id: item.listenSectionId,
+      listen_position_ms: item.listenPositionMs,
     }
   }
   return { last_chapter_id: state.lastChapterId, chapters }
@@ -221,11 +242,11 @@ export function sameLearnProgress(a: LearnProgressState, b: LearnProgressState):
 }
 
 /**
- * 跨设备合并：`seen` 取并集（读过就是读过，不存在「取消读过」），
- * 章节内「续读位置 / 活跃时间」取 `updatedAt` 较新的那份（相同则本设备优先）。
+ * 跨设备合并：`seen` / `heard` 取并集（读过 / 听过就是读过 / 听过，不存在「取消」），
+ * 章节内「续读位置 / 听断点 / 活跃时间」取 `updatedAt` 较新的那份（相同则本设备优先）。
  *
  * 「继续学习」入口按合并后最活跃的章节推导 —— 打开旧章不会刷新 `updatedAt`，
- * 所以这条规则等价于「哪台设备最近真正读过东西」。
+ * 所以这条规则等价于「哪台设备最近真正学过东西」。
  */
 export function mergeLearnProgress(
   local: LearnProgressState,
@@ -233,19 +254,37 @@ export function mergeLearnProgress(
 ): LearnProgressState {
   const chapters: Record<string, ChapterProgress> = {}
   for (const [id, item] of Object.entries(remote.chapters)) {
-    chapters[id] = { seen: [...item.seen], lastSectionId: item.lastSectionId, updatedAt: item.updatedAt }
+    chapters[id] = {
+      seen: [...item.seen],
+      lastSectionId: item.lastSectionId,
+      updatedAt: item.updatedAt,
+      heard: [...item.heard],
+      listenSectionId: item.listenSectionId,
+      listenPositionMs: item.listenPositionMs,
+    }
   }
   for (const [id, item] of Object.entries(local.chapters)) {
     const other = chapters[id]
     if (other === undefined) {
-      chapters[id] = { seen: [...item.seen], lastSectionId: item.lastSectionId, updatedAt: item.updatedAt }
+      chapters[id] = {
+        seen: [...item.seen],
+        lastSectionId: item.lastSectionId,
+        updatedAt: item.updatedAt,
+        heard: [...item.heard],
+        listenSectionId: item.listenSectionId,
+        listenPositionMs: item.listenPositionMs,
+      }
       continue
     }
     const localIsNewer = item.updatedAt >= other.updatedAt
+    const newer = localIsNewer ? item : other
     chapters[id] = {
       seen: [...new Set([...other.seen, ...item.seen])].sort(),
-      lastSectionId: localIsNewer ? item.lastSectionId : other.lastSectionId,
+      lastSectionId: newer.lastSectionId,
       updatedAt: Math.max(item.updatedAt, other.updatedAt),
+      heard: [...new Set([...other.heard, ...item.heard])].sort(),
+      listenSectionId: newer.listenSectionId,
+      listenPositionMs: newer.listenPositionMs,
     }
   }
 
