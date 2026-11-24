@@ -108,7 +108,13 @@ export default function App() {
   }
 
   if (auth.me === null) {
-    return <LoginPage />
+    // 登录页也是懒加载 chunk：必须自带 Suspense，否则未登录时整页白屏
+    // （认证分支在下方路由 Suspense 之外，React #426 会直接崩掉根节点）。
+    return (
+      <Suspense fallback={<p className="sc-boot">正在加载…</p>}>
+        <LoginPage />
+      </Suspense>
+    )
   }
 
   const me = auth.me
