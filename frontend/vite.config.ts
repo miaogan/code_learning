@@ -16,22 +16,11 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: false,
-    rollupOptions: {
-      output: {
-        /**
-         * vendor 单独成块（r151 性能收尾）：框架代码几乎不随业务变化，
-         * 拆出去后每次发版用户只需重下业务代码，vendor 长期命中缓存。
-         *
-         * 教程正文**不拆**：实测它被 Learn/Tutorial/Search 多个懒加载页共享，
-         * Rollup 会把它提升为入口依赖——拆出来只是多一个请求（跨境 RTT 上更慢），
-         * 并没有延后加载（实测登录页 0.6s → 2.2s 的回退已回退）。
-         */
-        manualChunks(id: string) {
-          if (id.includes('node_modules')) return 'vendor'
-          return undefined
-        },
-      },
-    },
+    /**
+     * 不分 manualChunks（r151 性能结论）：实测按 `node_modules` 一刀切会把
+     * 只有个别页面用的库也塞进共享 chunk，被入口提前加载（首屏更慢）；
+     * 交给 Rollup 按真实引用关系拆分 + 路由级 lazy 已经拿到主要收益。
+     */
   },
   test: {
     environment: 'node',
