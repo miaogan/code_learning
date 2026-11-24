@@ -47,16 +47,20 @@ def _remote_has_m4a() -> set[str]:
     return {line.strip() for line in result.stdout.splitlines() if line.strip()}
 
 
+def _limit_args() -> list[str]:
+    """UPLOAD_KBIT > 0 时给 scp 加 -l 限速；0 表示全力上传。"""
+    return ['-l', str(UPLOAD_KBIT)] if UPLOAD_KBIT > 0 else []
+
+
 def _ssh(cmd: str) -> subprocess.CompletedProcess:
     return subprocess.run([*SSH_BASE, HOST, cmd], capture_output=True, text=True,
                           check=False, timeout=60)
 
 
-#: scp 带宽限速（Kbit/s）。线路本身是 30M 套餐，但**中国→首尔跨境实测只有 100–950KB/s
-#: 且波动极大**：不限速的 scp 会把这个窗口全部吃掉——用户同时浏览站点会明显变慢
-#: （实测上传窗口内首屏 0.6s → 3.5s）。留 2Mbit/s ≈ 250KB/s 给上传，
-#: 2–5MB 的章多花十几秒，但浏览几乎无感。
-UPLOAD_KBIT = 2000
+#: scp 带宽限速（Kbit/s）；0 = 不限速（2026-11-24 用户要求全力上传）。
+#: 背景：跨境链路实测 100–950KB/s 且波动大，不限速时上传会吃掉整个窗口
+#: （曾实测上传窗口内首屏 0.6s → 3.5s）。若要恢复"浏览优先"，改回 2000 即可。
+UPLOAD_KBIT = 0
 
 
 def upload_tick(audio_src: Path, bitrate: str) -> None:
@@ -86,7 +90,7 @@ def upload_tick(audio_src: Path, bitrate: str) -> None:
         print(f'[upload] 上传 {chapter_dir.name}（{len(files)} 个文件 / {size_mb:.1f} MB）…',
               flush=True)
         _ssh(f'mkdir -p {REMOTE_DIR}/{chapter_dir.name}')
-        scp = ['scp', '-l', str(UPLOAD_KBIT), *SSH_BASE[1:], *[str(f) for f in files],
+        scp = ['scp', *_limit_args(), *SSH_BASE[1:], *[str(f) for f in files],
                f'{HOST}:{REMOTE_DIR}/{chapter_dir.name}/']
         subprocess.run(scp, check=True, timeout=600)
         # 清掉该章旧 wav（转 m4a 后不再需要，白占带宽与磁盘）
@@ -98,7 +102,7 @@ def upload_tick(audio_src: Path, bitrate: str) -> None:
     build_index(audio_src)
     index_path = audio_src / 'index.json'
     if index_path.exists():
-        scp_index = ['scp', '-l', str(UPLOAD_KBIT), *SSH_BASE[1:], str(index_path),
+        scp_index = ['scp', *_limit_args(), *SSH_BASE[1:], str(index_path),
                      f'{HOST}:{REMOTE_DIR}/index.json']
         subprocess.run(scp_index, check=True, timeout=120)
         print(f'[upload] index.json 已同步（{len(manifests)} 章）')
