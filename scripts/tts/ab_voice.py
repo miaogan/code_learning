@@ -65,6 +65,7 @@ def main() -> int:
     ap.add_argument('--section', default=None, help='只跑指定小节（默认第一节）')
     ap.add_argument('--out', default='scripts/tts/out/ab_voices')
     ap.add_argument('--only', default=None, help='只跑指定变体名（如 B-aish-7）')
+    ap.add_argument('--index-only', action='store_true', help='只重建对比页，不重新合成')
     args = ap.parse_args()
 
     out_root = ROOT / args.out
@@ -74,6 +75,13 @@ def main() -> int:
 
     variants = [v for v in VARIANTS if args.only is None or v[0] == args.only]
     results: list[tuple[str, Path, str]] = []
+    if args.index_only:
+        # 只重建对比页：合成早就跑完了，没必要再动 GPU
+        for name, _ref, _cfg, _steps, _lora, note in variants:
+            wavs = sorted((out_root / name).rglob('*.wav'))
+            if wavs:
+                results.append((name, wavs[0], note))
+        variants = []
     for name, ref, cfg, steps, lora, note in variants:
         if not Path(ref).exists():
             print(f'[skip] {name}：参考音不存在 {ref}')
@@ -98,7 +106,7 @@ def main() -> int:
         if result.returncode != 0:
             print(f'[ab] {name} 失败（exit {result.returncode}）')
             continue
-        wavs = sorted(audio_dir.glob('*.wav'))
+        wavs = sorted(audio_dir.rglob('*.wav'))
         if wavs:
             results.append((name, wavs[0], note))
 
