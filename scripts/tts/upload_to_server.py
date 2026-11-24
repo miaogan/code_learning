@@ -41,8 +41,8 @@ def _remote_chapters() -> set[str]:
 
 
 def _scp(src: Path, remote_name: str) -> None:
-    scp = ['scp', '-i', SSH_BASE[2], '-o', SSH_BASE[6], '-o', SSH_BASE[8], '-o', SSH_BASE[10],
-           '-r', str(src), f'{HOST}:{REMOTE_DIR}/{remote_name}']
+    # 复用 SSH_BASE[1:]（-i key + 三组 -o 选项），ssh 与 scp 的认证参数一致
+    scp = ['scp', *SSH_BASE[1:], '-r', str(src), f'{HOST}:{REMOTE_DIR}/{remote_name}']
     subprocess.run(scp, check=True, timeout=600)
 
 
