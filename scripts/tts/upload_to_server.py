@@ -40,33 +40,59 @@ def _remote_chapters() -> set[str]:
     return {line.strip() for line in result.stdout.splitlines() if line.strip()}
 
 
-def _scp(src: Path, remote_name: str) -> None:
-    # 复用 SSH_BASE[1:]（-i key + 三组 -o 选项），ssh 与 scp 的认证参数一致
-    scp = ['scp', *SSH_BASE[1:], '-r', str(src), f'{HOST}:{REMOTE_DIR}/{remote_name}']
-    subprocess.run(scp, check=True, timeout=600)
+def _remote_has_m4a() -> set[str]:
+    """远端已经有 m4a 的章（用来判断哪些章还需要补传压缩版）。"""
+    result = _ssh(f'cd {REMOTE_DIR} && for d in */; do ls "$d"*.m4a >/dev/null 2>&1 '
+                  '&& echo "${d%/}"; done')
+    return {line.strip() for line in result.stdout.splitlines() if line.strip()}
 
 
-def upload_tick(audio_src: Path) -> None:
+def _ssh(cmd: str) -> subprocess.CompletedProcess:
+    return subprocess.run([*SSH_BASE, HOST, cmd], capture_output=True, text=True,
+                          check=False, timeout=60)
+
+
+def upload_tick(audio_src: Path, bitrate: str) -> None:
     manifests = sorted(audio_src.glob('*/manifest.json'))
     if not manifests:
         print('[upload] 本地还没有完整章（等 manifest 落盘）')
         return
 
+    # 先把本地新章转成 m4a（服务器 3M 带宽实测 ~196KB/s，wav 768kbps 会卡；
+    # 64k AAC 体积 1/12，manifest 的 src 同步改写为 .m4a）
+    sys.path.insert(0, str(HERE))
+    from transcode_audio import transcode_chapter
+    for manifest_path in manifests:
+        made = transcode_chapter(manifest_path.parent, bitrate)
+        if made:
+            print(f'[upload] 转码 {manifest_path.parent.name}：{len(made)} 节 → m4a')
+
     remote = _remote_chapters()
-    new = [m.parent for m in manifests if m.parent.name not in remote]
-    for chapter_dir in new:
-        size_mb = sum(f.stat().st_size for f in chapter_dir.rglob('*') if f.is_file()) / 1e6
-        print(f'[upload] 上传 {chapter_dir.name}（{size_mb:.0f} MB）…', flush=True)
-        _scp(chapter_dir, chapter_dir.name)
+    remote_m4a = _remote_has_m4a()
+    todo = [m.parent for m in manifests
+            if m.parent.name not in remote or m.parent.name not in remote_m4a]
+    for chapter_dir in todo:
+        files = sorted([*chapter_dir.glob('*.m4a'), *chapter_dir.glob('*.json')])
+        if not files:
+            continue
+        size_mb = sum(f.stat().st_size for f in files) / 1e6
+        print(f'[upload] 上传 {chapter_dir.name}（{len(files)} 个文件 / {size_mb:.1f} MB）…',
+              flush=True)
+        _ssh(f'mkdir -p {REMOTE_DIR}/{chapter_dir.name}')
+        scp = ['scp', *SSH_BASE[1:], *[str(f) for f in files],
+               f'{HOST}:{REMOTE_DIR}/{chapter_dir.name}/']
+        subprocess.run(scp, check=True, timeout=600)
+        # 清掉该章旧 wav（转 m4a 后不再需要，白占带宽与磁盘）
+        _ssh(f'cd {REMOTE_DIR}/{chapter_dir.name} && rm -f *.wav; true')
         print(f'[upload] {chapter_dir.name} 完成')
 
     # index.json：每轮重建（新章点亮前端入口）并同步
-    sys.path.insert(0, str(HERE))
     from make_audio import build_index
     build_index(audio_src)
     index_path = audio_src / 'index.json'
     if index_path.exists():
-        _scp(index_path, 'index.json')
+        scp_index = ['scp', *SSH_BASE[1:], str(index_path), f'{HOST}:{REMOTE_DIR}/index.json']
+        subprocess.run(scp_index, check=True, timeout=120)
         print(f'[upload] index.json 已同步（{len(manifests)} 章）')
 
 
@@ -75,6 +101,7 @@ def main() -> int:
     ap.add_argument('--audio-src', default='scripts/tts/out/audio_release')
     ap.add_argument('--interval', type=int, default=600, help='轮询秒（0 = 单轮）')
     ap.add_argument('--max-iterations', type=int, default=0, help='最多轮数（0 = 不限）')
+    ap.add_argument('--bitrate', default='64k', help='AAC 码率（口播 48–64k 够用）')
     args = ap.parse_args()
 
     audio_src = Path(args.audio_src)
@@ -84,7 +111,7 @@ def main() -> int:
     for round_no in range(1, rounds + 1):
         print(f'\n===== upload 第 {round_no} 轮（{time.strftime("%H:%M:%S")}） =====', flush=True)
         try:
-            upload_tick(audio_src)
+            upload_tick(audio_src, args.bitrate)
         except (OSError, subprocess.SubprocessError) as exc:
             print(f'[upload] 本轮异常（{exc!r}），继续下一轮', file=sys.stderr)
         if interval == 0:
