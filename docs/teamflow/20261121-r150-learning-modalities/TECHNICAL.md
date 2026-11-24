@@ -301,3 +301,49 @@ CV2 则不需要前缀。驱动按 `model_kind` 自动补前缀。
 heard 取并集 / 断点取 `updatedAt` 较新；旧客户端缺字段按空值兜底）；泛听跨章续播与
 本节循环亦已落地；wav 隐式 AI 标识（RIFF INFO）已内嵌进合成链路。
 验证：tsc / lint / build 全绿，vitest 54 files / 659 passed（新增 28 条）。
+
+## 17. 官方演示音全量上线 · 前端性能 · 音质诊断（2026-11-24）
+
+### 17.1 全量音频上线（45 章 / 185 节 / 293 分钟）
+
+- 绕过第 15 节「CosyVoice 归档」后的新事实：**VoxCPM2 零样本 + 官方演示参考音**跑完全量，
+  产物 `scripts/tts/out/audio_release/`（与 gdg LoRA 版 `audio_full/` 完全隔离，后者仅本地试听）。
+- 分发：`transcode_audio.py` 把 wav（48kHz/16bit，768kbps）转 **AAC 64k m4a**（实测压缩 12.8×），
+  `upload_to_server.py` 按章增量 scp 到 `~/skillcoach/audio/`，服务器现 **45 章 / 185 个 m4a / 130MB**。
+- 线上 `index.json` 45 章 / 293 分钟；前端入口随索引自动点亮，零发版。
+
+### 17.2 三个线上问题与修复
+
+| 现象 | 根因 | 修复 |
+|---|---|---|
+| 音频 200 但播放失败 | nginx 默认 mime.types 无 `.wav`/`.m4a` → `application/octet-stream` + `nosniff` | `location /audio/` 显式 `types { audio/wav wav; audio/mp4 m4a; }` |
+| 播放不流畅（界面顿） | `timeupdate` 4 次/秒带着 40+ 句 cue 列表整体重渲染 | `CueList` 改 `memo`，只在当前句变化时重渲染 |
+| 网站整体慢 | ①单包 1.1MB JS 全量加载；②上传 scp 不限速抢占链路 | ①24 页改 `React.lazy`（主包→557KB）；②`scp -l` 限速（后按用户要求改 0=不限速） |
+
+缓存策略三档：`/audio/index.json` 60s（入口真源）、`/audio/*/manifest.json` **no-cache**
+（内容随转码变化，旧 manifest 会指向已删文件）、媒体 1 天。
+
+### 17.3 音色与音质诊断（用户反馈「电音、回声」）
+
+- **混响不是问题**：成品衰减 190ms（gdg 版 350ms）、噪声底 -120dB（纯数字静音）。
+- **电音主因是 64kbps AAC 压缩伪影**：同源对比 SNR 64k=19.5dB / 96k=26.1dB / 128k=31.3dB；
+  对比页 `scripts/tts/out/bitrate_ab/index.html`（源 wav vs 64/96/128k）。
+- **音色不如 gdg 的两个来源**：①LoRA（1718 条同音色微调，不可复制——名人音色红线）；
+  ②官方演示参考音偏「平」（多半是英文演示音，零样本克隆会连韵律一起学走）。
+- 已备好音色 A/B 工具 `scripts/tts/ab_voice.py`：7 变体（官方音基线 / AISHELL-3 中文音色 ×4 /
+  cfg 2.0 / 步数 16），产物 `scripts/tts/out/ab_voices/index.html`（用户决定「先这样，遗留后续优化」）。
+- 合规口径：官方演示音属「授权存疑」，上服务器是按用户决定先验证链路；正式发布仍需合规音色。
+
+### 17.4 自动化与吞吐
+
+- `make_audio.py watch`：新章草稿 → 自动合成 → 索引 → （`voice_compliant.marker` 存在才）发布。
+- 实测吞吐：单节 2–4 分钟、每章 ~12 分钟（45 章约 8 小时）；批量单进程把模型重载从 45 次降到 6 次；
+  单节 CPU 后处理仅 0.3–0.4s，故不做 CPU-GPU 流水线。
+- 带宽口径修正：套餐 30M（非 3M），实测单连接峰值 951KB/s，瓶颈是**跨境链路波动**（100–950KB/s）。
+
+### 17.5 待优化清单（用户决定遗留）
+
+1. 码率 64k → 96k/128k（只需重转码，不必重跑合成）；
+2. 音色选定后全量重跑（`--vox-ref` 换一行）；
+3. 合规音色 LoRA 微调（若素材足够，可接近 gdg 的自然度）；
+4. CDN / 回大陆节点（首屏冷启动 0.6–1.5s 的跨境下限）。

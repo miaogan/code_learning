@@ -139,13 +139,27 @@
 | 项 | 值 |
 |---|---|
 | 挂载 | `docker-compose(.prod).yml`：`./audio:/usr/share/nginx/html/audio:ro`（服务器 `~/skillcoach/audio/`） |
-| 路由 | `location /audio/ { try_files $uri =404; }`，缓存 `max-age=86400`；**绝不回落 index.html** |
-| 目录结构 | `audio/<章>/manifest.json + <节>.wav + <节>.timeline.json`（`synthesize.py` 原产物直接拷） |
-| 上线动作 | 产物放入目录 → 即时可见，前端零改动（播放器按 `manifest.json` 探测，404=素材缺失态） |
+| 路由 | `location /audio/ { try_files $uri =404; }`，**显式 MIME**（`audio/wav wav; audio/mp4 m4a;`——官方 mime.types 不含这两个扩展名，缺了会回落 octet-stream，叠加 nosniff 后浏览器直接拒绝解码） |
+| 缓存 | 媒体 1 天；`/audio/index.json` **60s**（入口真源，随上传变化）；`/audio/*/manifest.json` **no-cache**（内容随转码变，旧 manifest 会指向已删文件） |
+| 格式 | **AAC 64kbps m4a（单声道，faststart）**——wav 768kbps 是体积与流量的 12 倍；实测压缩 12.8×（578MB wav → 45MB m4a） |
+| 目录结构 | `audio/<章>/manifest.json + <节>.m4a + <节>.timeline.json` |
+| 上线动作 | `scripts/tts/transcode_audio.py`（wav→m4a，改写 manifest src）→ `scripts/tts/upload_to_server.py`（按章增量 scp，只传完整章 + 每轮同步 index） |
 | 前端态 | 探测 `manifest.json`：ready=播放器 / missing=「音频素材筹备中」+ 口播稿浏览（不渲染空播放器） |
 
 上线 checklist：①素材过本 SOP 四必要条件 → ②合成（`synthesize.py`，manifest 自动带 `aiGenerated: true`）→
-③放入 `~/skillcoach/audio/<章>/` → ④浏览器打开 `/learn/<章>?mode=listen` 验证角标与播放 → ⑤把素材 hash 补进 `assets/manifest.json`。
+③`transcode_audio.py` 转 m4a → ④`upload_to_server.py` 推到服务器（或 `make_audio.py deploy` 进仓库 `audio/`）
+→ ⑤浏览器打开 `/learn/<章>?mode=listen` 验证角标与播放 → ⑥把素材 hash 补进 `assets/manifest.json`。
+
+## 9.5 当前上线状态与待优化（2026-11-24）
+
+- **线上**：45 章 / 185 节 / 293 分钟，VoxCPM2 零样本 + **官方演示参考音**，AAC 64k，服务器 130MB。
+- **授权状态**：官方演示参考音「授权存疑」——上服务器是按用户决定先验证链路与听感，
+  **正式对外发布前必须换成合规音色**（本人录制 / CC0 / 授权录制，见 §2 三条路径）。
+- **已知音质问题**：用户反馈「电音、回声」。诊断结论：混响不是问题（衰减 190ms、噪声底 -120dB），
+  「电音」主因是 **64kbps AAC 压缩伪影**（同源 SNR 19.5dB；96k=26.1、128k=31.3）。
+  对比素材：`scripts/tts/out/bitrate_ab/index.html`；音色对比：`scripts/tts/out/ab_voices/index.html`。
+- **遗留优化**（用户决定后续处理）：①码率提到 96/128k（只需重转码，不必重合成）；
+  ②音色选定后全量重跑；③合规音色 LoRA 微调；④CDN / 回大陆节点。
 
 ## 9. 全量流水线（r151，所有文字都有音频 + 新知识同链路）
 

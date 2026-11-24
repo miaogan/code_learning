@@ -98,6 +98,11 @@ wav 隐式 RIFF LIST/INFO（ICMT「AI-generated speech」/ISFT 模型名/ICRD �
 | `<节>.timeline.json` | 同 cues + unitSpans | recue-only 重算句级切分时免重合成 |
 | `/audio/index.json` | 全部有音频章的聚合 | 「听听」入口与目录 chip 的唯一真源（新章部署零发版） |
 
+**分发前必须转码**（`transcode_audio.py`）：wav 48kHz/16bit = 768kbps，转 **AAC 64k m4a** 后
+体积压到 1/12（实测 578MB → 45MB），manifest 的 `src` 同步改写为 `.m4a`；
+`upload_to_server.py` 按章增量推到服务器并清理旧 wav。缓存三档：index 60s / manifest no-cache / 媒体 1 天
+（manifest 会随转码变化，长缓存会让浏览器去请求已删除的文件）。
+
 听侧进度契约：`heard`（听过≠读过）+ `listen_section_id/listen_position_ms`（断点），
 与 `seen` 并列不互相污染；后台同步字段服务端静默夹取、绝不 422。
 
@@ -114,3 +119,18 @@ wav 隐式 RIFF LIST/INFO（ICMT「AI-generated speech」/ISFT 模型名/ICRD �
 - 单音色：duo 逗哏/捧哏目前同声，分角色参考音待 M2；
 - 句级时间轴靠静音谷，语速极快无停顿的句群会退回等分；
 - 写稿模型 v2 的偏好型偏差（爱多抖包袱）未用负向样本压制。
+
+## 9. 音色与音质的现实边界（2026-11-24 实测）
+
+**零样本换音色 ≠ 换风格**。VoxCPM2 零样本只能模仿参考音的音色与韵律：
+- 官方演示参考音偏「平」（多半是英文演示音），中文成品听感不如 gdg LoRA 版；
+- gdg 版自然的根本原因是 **LoRA（1718 条同音色数据微调）**，这条路受名人音色红线限制不可复制；
+- 合规路径：①AISHELL-3 等开源中文音色（Apache-2.0，160 个可用）；
+  ②本人录音/授权录制后自训 LoRA（最接近 gdg 效果）。
+
+**「电音感」多半不是模型问题，是码率问题**：64kbps AAC 与源 wav 的 SNR 只有 19.5dB
+（96k=26.1、128k=31.3），齿音与句尾会出现金属感/水声。若听感不佳优先提码率，
+不必重跑合成（`transcode_audio.py --bitrate 128k` 即可）。
+
+**混响指标**：本批成品语音衰减 190ms、噪声底 -120dB——没有额外的房间回声；
+若主观仍听到「回声」，应检查播放设备/耳机的空间音效，而非模型输出。
