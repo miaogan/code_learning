@@ -52,6 +52,12 @@ def _ssh(cmd: str) -> subprocess.CompletedProcess:
                           check=False, timeout=60)
 
 
+#: scp 带宽限速（Kbit/s）。服务器 3M 出带宽实测跨境只有 ~200KB/s，
+#: 不限速的 scp 会把整条链路占满——用户在同一时间浏览站点会明显变慢
+#: （实测上传窗口内首屏 0.6s → 3.5s）。400Kbit/s ≈ 50KB/s，对 2–5MB 的章只多花几十秒。
+UPLOAD_KBIT = 400
+
+
 def upload_tick(audio_src: Path, bitrate: str) -> None:
     manifests = sorted(audio_src.glob('*/manifest.json'))
     if not manifests:
@@ -79,7 +85,7 @@ def upload_tick(audio_src: Path, bitrate: str) -> None:
         print(f'[upload] 上传 {chapter_dir.name}（{len(files)} 个文件 / {size_mb:.1f} MB）…',
               flush=True)
         _ssh(f'mkdir -p {REMOTE_DIR}/{chapter_dir.name}')
-        scp = ['scp', *SSH_BASE[1:], *[str(f) for f in files],
+        scp = ['scp', '-l', str(UPLOAD_KBIT), *SSH_BASE[1:], *[str(f) for f in files],
                f'{HOST}:{REMOTE_DIR}/{chapter_dir.name}/']
         subprocess.run(scp, check=True, timeout=600)
         # 清掉该章旧 wav（转 m4a 后不再需要，白占带宽与磁盘）
@@ -91,7 +97,8 @@ def upload_tick(audio_src: Path, bitrate: str) -> None:
     build_index(audio_src)
     index_path = audio_src / 'index.json'
     if index_path.exists():
-        scp_index = ['scp', *SSH_BASE[1:], str(index_path), f'{HOST}:{REMOTE_DIR}/index.json']
+        scp_index = ['scp', '-l', str(UPLOAD_KBIT), *SSH_BASE[1:], str(index_path),
+                     f'{HOST}:{REMOTE_DIR}/index.json']
         subprocess.run(scp_index, check=True, timeout=120)
         print(f'[upload] index.json 已同步（{len(manifests)} 章）')
 

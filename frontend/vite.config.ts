@@ -19,14 +19,14 @@ export default defineConfig({
     rollupOptions: {
       output: {
         /**
-         * 手工分块（r151 性能收尾）：教程正文 358KB 源码被 Learn/Tutorial/Search 等
-         * 多个懒加载页共享，Rollup 默认会把它提升进入口 chunk——导致登录页也要付这笔钱。
-         * 拆成独立 chunk 后入口只剩框架与壳；正文 chunk 只在进入学习类页面时拉取，
-         * 且内容不变时长期命中浏览器缓存（文件名带 content hash）。
+         * vendor 单独成块（r151 性能收尾）：框架代码几乎不随业务变化，
+         * 拆出去后每次发版用户只需重下业务代码，vendor 长期命中缓存。
+         *
+         * 教程正文**不拆**：实测它被 Learn/Tutorial/Search 多个懒加载页共享，
+         * Rollup 会把它提升为入口依赖——拆出来只是多一个请求（跨境 RTT 上更慢），
+         * 并没有延后加载（实测登录页 0.6s → 2.2s 的回退已回退）。
          */
         manualChunks(id: string) {
-          if (id.includes('/src/content/tutorials/')) return 'tutorial-content'
-          if (id.includes('/src/content/')) return 'content'
           if (id.includes('node_modules')) return 'vendor'
           return undefined
         },
