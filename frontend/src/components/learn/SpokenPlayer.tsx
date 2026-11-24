@@ -15,7 +15,7 @@
  * 契约字段为 `heard` / `listen_section_id` / `listen_position_ms`（r151 双侧同步，跨设备合并取新）。
  * 泛听三档（VERSION-PLAN §4.1）：本节循环 / 整章连播 / 跨章续播（`nextListenHref`）。
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { EMOTION_SPECS } from '../../lib/spoken'
 import {
@@ -90,6 +90,50 @@ function ScriptBrowse({ chapter }: { chapter: SpokenChapter }) {
 }
 
 /* ---------- 就绪态：播放器（纯 manifest 驱动，不依赖内嵌口播稿） ---------- */
+
+/**
+ * 句级清单单独成组件并 memo：timeupdate 每秒 4 次刷新播放位置，
+ * 若和清单同层渲染，40+ 句的 DOM diff 会跟着跑 4 次/秒——实测这是「播放卡」的主因之一
+ * （主线程被占住，句高亮跳变、拖动响应都变钝）。memo 后只有**当前句变化**时才重渲染。
+ */
+const CueList = memo(function CueList({
+  cues,
+  activeIndex,
+  highlightOn,
+  onSeek,
+}: {
+  cues: SpokenAudioCue[]
+  activeIndex: number
+  highlightOn: boolean
+  onSeek: (ms: number) => void
+}) {
+  return (
+    <div className="sc-listen-cues">
+      {cues.map((cue, index) => {
+        const isActive = index === activeIndex
+        const emotion = emotionLabel(cue)
+        return (
+          <button
+            key={`${cue.startMs}-${index}`}
+            type="button"
+            className={
+              'sc-listen-cue' +
+              (isActive && highlightOn ? ' is-active' : '') +
+              (cue.speaker === 'peng' ? ' is-peng' : '')
+            }
+            onClick={() => onSeek(cue.startMs)}
+          >
+            <span className="sc-listen-cuetag">
+              {SPEAKER_LABELS[cue.speaker]}
+              {emotion !== null ? ` · ${emotion}` : ''}
+            </span>
+            <span className="sc-listen-cuetext">{cue.text}</span>
+          </button>
+        )
+      })}
+    </div>
+  )
+})
 
 interface ReadyPlayerProps {
   chapterTitle: string
@@ -374,35 +418,13 @@ function ReadyPlayer({ chapterTitle, manifest, nextListenHref, autoplay }: Ready
         </label>
       </div>
 
-      <div className="sc-listen-cues">
-        {cues.map((cue, index) => {
-          const isActive = index === activeIndex && positionMs > 0
-          const emotion = emotionLabel(cue)
-          return (
-            <button
-              key={`${cue.startMs}-${index}`}
-              type="button"
-              className={
-                'sc-listen-cue' +
-                (isActive && highlightOn ? ' is-active' : '') +
-                (cue.speaker === 'peng' ? ' is-peng' : '')
-              }
-              onClick={() => seekTo(cue.startMs)}
-            >
-              <span className="sc-listen-cuetag">
-                {SPEAKER_LABELS[cue.speaker]}
-                {emotion !== null ? ` · ${emotion}` : ''}
-              </span>
-              <span className="sc-listen-cuetext">{cue.text}</span>
-            </button>
-          )
-        })}
-      </div>
+      <CueList cues={cues} activeIndex={activeIndex} highlightOn={highlightOn} onSeek={seekTo} />
 
       <audio
         ref={audioRef}
         src={track.src}
-        preload="metadata"
+        // 压缩后单节 3–5MB（AAC 64k）：整段预取，起播与拖动都不再等缓冲
+        preload="auto"
         onPlay={() => setPlaying(true)}
         onPause={() => {
           setPlaying(false)
