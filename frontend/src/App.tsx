@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { Suspense, lazy, useEffect, useRef } from 'react'
 import { Link, Route, Routes, useLocation } from 'react-router-dom'
 import { AiKeyModal } from './components/ui/AiKeyModal'
 import { Button } from './components/ui/Button'
@@ -7,36 +7,39 @@ import { Stepper, type StepItem, type StepState } from './components/ui/Stepper'
 import { ToolNav } from './components/ui/ToolNav'
 import { TaifuLauncher } from './components/taifu/TaifuLauncher'
 import { StreakBadge } from './components/ui/StreakBadge'
-import EvalPage from './pages/EvalPage'
-import EvidencePage from './pages/EvidencePage'
-import CoachPage from './pages/CoachPage'
-import ExamPage from './pages/ExamPage'
-import GuozijianPage from './pages/GuozijianPage'
-import HistoryPage from './pages/HistoryPage'
-import InterviewPage from './pages/InterviewPage'
-import JdPage from './pages/JdPage'
-import LearnPage from './pages/LearnPage'
-import LeapPage from './pages/LeapPage'
-import LoginPage from './pages/LoginPage'
-import MirrorPage from './pages/MirrorPage'
-import NotFoundPage from './pages/NotFoundPage'
-import PioneerPage from './pages/PioneerPage'
-import PolishPage from './pages/PolishPage'
-import PracticePage from './pages/PracticePage'
-import ProfilePage from './pages/ProfilePage'
-import ReportPage from './pages/ReportPage'
-import SearchPage from './pages/SearchPage'
-import SettingsPage from './pages/SettingsPage'
-import TutorialPage from './pages/TutorialPage'
-import UploadPage from './pages/UploadPage'
-import VersionsPage from './pages/VersionsPage'
-import ArchivePage from './pages/ArchivePage'
+
 import { GITHUB_AVATAR_URL, GITHUB_OWNER, GITHUB_REPO_URL, PRODUCT_NAME, PRODUCT_TAGLINE } from './lib/brand'
 import { TOOL_GROUPS, TOOL_ITEMS, isRouteActive } from './lib/navGroups'
 import { resetResumePrompt } from './lib/resumePrompt'
 import { logout, startAuth, useAuth } from './state/auth'
 import { dismissKeyRequired } from './state/aiGate'
 import { useFlowState } from './state/flow'
+
+// 路由级懒加载：24 个页面各成独立 chunk，首屏只加载当前路由的代码
+const EvalPage = lazy(() => import('./pages/EvalPage'))
+const EvidencePage = lazy(() => import('./pages/EvidencePage'))
+const CoachPage = lazy(() => import('./pages/CoachPage'))
+const ExamPage = lazy(() => import('./pages/ExamPage'))
+const GuozijianPage = lazy(() => import('./pages/GuozijianPage'))
+const HistoryPage = lazy(() => import('./pages/HistoryPage'))
+const InterviewPage = lazy(() => import('./pages/InterviewPage'))
+const JdPage = lazy(() => import('./pages/JdPage'))
+const LearnPage = lazy(() => import('./pages/LearnPage'))
+const LeapPage = lazy(() => import('./pages/LeapPage'))
+const LoginPage = lazy(() => import('./pages/LoginPage'))
+const MirrorPage = lazy(() => import('./pages/MirrorPage'))
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
+const PioneerPage = lazy(() => import('./pages/PioneerPage'))
+const PolishPage = lazy(() => import('./pages/PolishPage'))
+const PracticePage = lazy(() => import('./pages/PracticePage'))
+const ProfilePage = lazy(() => import('./pages/ProfilePage'))
+const ReportPage = lazy(() => import('./pages/ReportPage'))
+const SearchPage = lazy(() => import('./pages/SearchPage'))
+const SettingsPage = lazy(() => import('./pages/SettingsPage'))
+const TutorialPage = lazy(() => import('./pages/TutorialPage'))
+const UploadPage = lazy(() => import('./pages/UploadPage'))
+const VersionsPage = lazy(() => import('./pages/VersionsPage'))
+const ArchivePage = lazy(() => import('./pages/ArchivePage'))
 
 const STEP_BASE = [
   { key: 'upload', label: '投卷', to: '/' },
@@ -216,6 +219,8 @@ export default function App() {
             {/* r84 §1：路由级渲染错误边界。key=pathname —— 路由切换时重置边界，
                 否则 A 页崩过一次，边界 state 里留着 error，B 页会一直看到兜底卡。 */}
             <ErrorBoundary key={pathname} label="页面">
+              {/* 懒加载路由的等待态：只在首次进入某路由时短暂出现（chunk 通常 <100KB） */}
+              <Suspense fallback={<div className="sc-route-loading" role="status">正在载入…</div>}>
               <Routes>
                 <Route path="/" element={<UploadPage />} />
                 <Route path="/profile" element={<ProfilePage />} />
@@ -241,6 +246,7 @@ export default function App() {
                 <Route path="/settings" element={<SettingsPage />} />
                 <Route path="*" element={<NotFoundPage />} />
               </Routes>
+              </Suspense>
             </ErrorBoundary>
           </div>
         </main>

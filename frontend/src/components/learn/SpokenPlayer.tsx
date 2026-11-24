@@ -423,8 +423,9 @@ function ReadyPlayer({ chapterTitle, manifest, nextListenHref, autoplay }: Ready
       <audio
         ref={audioRef}
         src={track.src}
-        // 压缩后单节 3–5MB（AAC 64k）：整段预取，起播与拖动都不再等缓冲
-        preload="auto"
+        // 只取元数据：整段 3–5MB 若 auto 预取，会在 3M 带宽上占满链路，
+        // 把同站其它页面拖慢；实测边播边缓冲已足够顺（单节 64kbps 只占 ~8KB/s）。
+        preload="metadata"
         onPlay={() => setPlaying(true)}
         onPause={() => {
           setPlaying(false)
