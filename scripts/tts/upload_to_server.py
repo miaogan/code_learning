@@ -52,10 +52,11 @@ def _ssh(cmd: str) -> subprocess.CompletedProcess:
                           check=False, timeout=60)
 
 
-#: scp 带宽限速（Kbit/s）。服务器 3M 出带宽实测跨境只有 ~200KB/s，
-#: 不限速的 scp 会把整条链路占满——用户在同一时间浏览站点会明显变慢
-#: （实测上传窗口内首屏 0.6s → 3.5s）。400Kbit/s ≈ 50KB/s，对 2–5MB 的章只多花几十秒。
-UPLOAD_KBIT = 400
+#: scp 带宽限速（Kbit/s）。线路本身是 30M 套餐，但**中国→首尔跨境实测只有 100–950KB/s
+#: 且波动极大**：不限速的 scp 会把这个窗口全部吃掉——用户同时浏览站点会明显变慢
+#: （实测上传窗口内首屏 0.6s → 3.5s）。留 2Mbit/s ≈ 250KB/s 给上传，
+#: 2–5MB 的章多花十几秒，但浏览几乎无感。
+UPLOAD_KBIT = 2000
 
 
 def upload_tick(audio_src: Path, bitrate: str) -> None:
