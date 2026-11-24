@@ -29,6 +29,14 @@
     # 4) 部署（拷进仓库 audio/ 即 nginx 分发目录；服务器上则是 ~/skillcoach/audio/）
     python scripts/tts/make_audio.py deploy --audio-src scripts/tts/out/audio_full --deploy-dir audio
 
+    # 5) 常驻触发器（新知识 → 音频自动补齐）：
+    #    发现「有 plan 无 manifest」的章就自动合成 + 聚合；合规守卫通过才发布。
+    #    守卫 = scripts/tts/voice_compliant.marker（内容：合规音色说明 + 日期）；
+    #    标记不存在时产物只留本地（受限音色红线：绝不自动进仓库）。
+    python scripts/tts/make_audio.py watch --interval 1800 \
+        --python D:/work_space/_tts/venv_voxcpm/Scripts/python.exe \
+        --vox-ref <合规参考音> --push
+
 新知识接入路径（不新增任何环节）：登记 coverage 分层 → `draft_spoken.py` 出草稿 →
 `make_audio.py plan/synth/deploy`。口播稿质量闸与 AI 标识在各阶段强制执行。
 """
@@ -41,6 +49,8 @@ import re
 import shutil
 import subprocess
 import sys
+import time
+from datetime import datetime
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -305,6 +315,93 @@ def stage_synth(args: argparse.Namespace) -> int:
     return 0
 
 
+# ---- watch（自动触发器） ----
+
+#: 合规音色守卫标记：存在且非空才允许 deploy 进仓库（内容 = 音色说明 + 日期）。
+#: gdg 等受限音色产物只留在 out_audio 本地试听，绝不自动进入仓库/生产。
+VOICE_COMPLIANT_MARKER = HERE / 'voice_compliant.marker'
+
+
+def _voice_compliant() -> str | None:
+    if VOICE_COMPLIANT_MARKER.exists():
+        text = VOICE_COMPLIANT_MARKER.read_text(encoding='utf-8').strip()
+        return text or None
+    return None
+
+
+def _watch_tick(args: argparse.Namespace) -> None:
+    """一轮：plan → 找缺音频的章 → synth → index →（合规守卫通过才）deploy + 提交。"""
+    # 1) 重跑 plan：新登记的草稿生成新 plans（已有 plan 的章自动跳过）
+    plan_ns = argparse.Namespace(drafts=args.drafts, edits=args.edits,
+                                 title_source=args.title_source,
+                                 plans_dir=args.plans_dir, force=False)
+    stage_plan(plan_ns)
+
+    # 2) 找「有 plan 无 manifest」的章
+    todo = _chapters_todo(Path(args.plans_dir), Path(args.out_audio), None, False)
+    if todo:
+        synth_ns = argparse.Namespace(plans_dir=args.plans_dir, out_audio=args.out_audio,
+                                      backend=args.backend, python=args.python,
+                                      vox_ref=args.vox_ref, vox_lora=args.vox_lora,
+                                      only_form=args.only_form, only=None, force=False,
+                                      batch_size=args.batch_size, vox_timesteps=args.vox_timesteps,
+                                      vox_cfg=args.vox_cfg, anchor_prev=args.anchor_prev)
+        stage_synth(synth_ns)
+
+    # 3) 重建索引（含新章）
+    build_index(Path(args.out_audio))
+
+    # 4) 合规守卫：标记不存在 → 只留在本地试听目录，绝不进仓库
+    compliant = _voice_compliant()
+    if compliant is None:
+        print(f'[watch] 未检测到合规音色标记（{VOICE_COMPLIANT_MARKER.name}），'
+              '产物保留在本地目录，不 deploy / 不提交')
+        return
+
+    deploy_ns = argparse.Namespace(audio_src=args.out_audio, deploy_dir=args.deploy_dir)
+    stage_deploy(deploy_ns)
+    if args.deploy_dir != 'audio':
+        return  # 非仓库目录（试验用），不做 git 操作
+
+    status = subprocess.run(['git', 'status', '--porcelain', 'audio'],
+                            capture_output=True, text=True, check=False)
+    if not status.stdout.strip():
+        print('[watch] audio/ 无新增变化，跳过提交')
+        return
+    subprocess.run(['git', 'add', 'audio'], check=False)
+    commit = subprocess.run(['git', 'commit', '-m',
+                             f'chore(audio): 新章音频素材上线（watch 自动，音色：{compliant}）'],
+                            capture_output=True, text=True, check=False)
+    print(f'[watch] 已提交 audio/（音色：{compliant}）')
+    if args.push and commit.returncode == 0:
+        subprocess.run(['git', 'push', 'origin', 'dev'], check=False)
+        print('[watch] 已推送 dev → CI 双门禁 → nginx 分发')
+
+
+def stage_watch(args: argparse.Namespace) -> int:
+    """常驻轮询（或 --interval 0 单次）：新知识落地后音频自动补齐。
+
+    链路：新章草稿 → plan（质量闸）→ synth（GPU）→ index → deploy → 提交。
+    合规守卫：`voice_compliant.marker` 不存在时只合成不发布——受限音色产物
+    （名人声音红线）永不被自动带进仓库。换合规音色后创建标记即解锁。
+    """
+    interval = max(0, args.interval)
+    rounds = args.max_iterations if args.max_iterations > 0 else 10 ** 9
+    if args.backend == 'voxcpm' and not args.vox_ref:
+        sys.exit('watch 合成需要 --vox-ref（或 --backend mock 做链路验证）')
+    for round_no in range(1, rounds + 1):
+        print(f'\n===== watch 第 {round_no} 轮（{datetime.now().strftime("%H:%M:%S")}） =====')
+        try:
+            _watch_tick(args)
+        except (OSError, json.JSONDecodeError, subprocess.SubprocessError, ValueError) as exc:
+            # 单轮失败不退出，下一轮重试（watch 是常驻进程，不能让一次故障杀掉守护）
+            print(f'[watch] 本轮异常（{exc!r}），{interval}s 后重试', file=sys.stderr)
+        if interval == 0:
+            break
+        time.sleep(interval)
+    return 0
+
+
 def build_index(out_audio: Path) -> int:
     """聚合 out_audio 下所有章的 manifest → index.json（与 synthesize.py 收尾逻辑同口径）。"""
     chapters_index = []
@@ -410,6 +507,29 @@ def main() -> int:
     p_deploy.add_argument('--audio-src', default='scripts/tts/out/audio_full')
     p_deploy.add_argument('--deploy-dir', default='audio')
     p_deploy.set_defaults(func=stage_deploy)
+
+    p_watch = sub.add_parser('watch', help='常驻轮询：新章自动合成（合规守卫通过才发布）')
+    p_watch.add_argument('--interval', type=int, default=1800,
+                         help='轮询间隔秒（默认 30 分钟；0 = 只跑一轮）')
+    p_watch.add_argument('--max-iterations', type=int, default=0, help='最多轮数（0 = 不限）')
+    p_watch.add_argument('--drafts', default='scripts/finetune/out/drafts_final2.jsonl')
+    p_watch.add_argument('--edits', default=None, help='人工定稿覆盖表')
+    p_watch.add_argument('--title-source', default='scripts/finetune/out/spoken_drafts.jsonl')
+    p_watch.add_argument('--plans-dir', default='scripts/tts/out/plans_full')
+    p_watch.add_argument('--out-audio', default='scripts/tts/out/audio_full')
+    p_watch.add_argument('--backend', default='voxcpm', choices=['voxcpm', 'mock'])
+    p_watch.add_argument('--python', default=sys.executable, help='synthesize.py 用的解释器')
+    p_watch.add_argument('--vox-ref', default=None)
+    p_watch.add_argument('--vox-lora', default=None)
+    p_watch.add_argument('--only-form', choices=['solo', 'duo', 'all'], default='all',
+                         help='watch 场景默认 all（新知识两类形态都要覆盖）')
+    p_watch.add_argument('--batch-size', type=int, default=8)
+    p_watch.add_argument('--vox-timesteps', type=int, default=None)
+    p_watch.add_argument('--vox-cfg', type=float, default=None)
+    p_watch.add_argument('--anchor-prev', action='store_true')
+    p_watch.add_argument('--deploy-dir', default='audio', help='发布目录（仓库 audio/ 由 nginx 挂载）')
+    p_watch.add_argument('--push', action='store_true', help='提交后推送 dev（触发 CI 上线）')
+    p_watch.set_defaults(func=stage_watch)
 
     args = ap.parse_args()
     return int(args.func(args))

@@ -167,6 +167,12 @@
 2. 人工修稿后放进定稿覆盖表（`--edits`）；
 3. `make_audio.py plan → synth → index → deploy`——前端零改动：索引里多了这章，「听听」入口与目录页 chip 自动出现。
 
+**自动触发器（r151 收尾）**：`make_audio.py watch --interval 1800 --python <voxcpm venv> --vox-ref <合规参考音> --push`
+常驻轮询，发现「有 plan 无 manifest」的章就自动 plan→synth→index→deploy→提交推送。
+**合规守卫**：发布需要 `scripts/tts/voice_compliant.marker`（内容 = 音色说明 + 日期）；
+标记不存在时产物只留本地目录（受限音色红线：绝不自动进仓库/生产）。
+外部依赖（权重/venv/参考音/LoRA 的路径与重建方法）见同目录 `TTS-EXTERNAL-DEPS.md`。
+
 前端接入（r151 收尾）：`useSpokenAudioIndex()`（模块级缓存，一次会话只拉一次）+ `audioIndexHasChapter()`；
 目录页 chip 与章页「听听」入口条件 = 内嵌口播稿 **或** 索引含该章（S 类试点章与全量合成章同权）。
 
