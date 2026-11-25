@@ -242,6 +242,20 @@ class Settings(BaseSettings):
     #: 这是给「合规词表」留的运维口子：不写代码也能加，但会被 `log` 档记录命中量。
     guard_extra_terms: str = ""
 
+    # --- r152 nl2sql 只读数据问答 ----------------------------------------------
+    #: 总开关。关掉后 `query_my_data` 的 schema 不下发给模型（`taifu.tools.tool_specs()`），
+    #: 模型看不到「有这个能力」就不会去试；`TOOL_NAMES` 刻意不裁剪，万一模型仍然幻觉出
+    #: 这个名字，拿到的也是「未开启」这种可读结果而不是「没有这个工具」。
+    nl2sql_enabled: bool = True
+    #: 单条分析查询的语句超时（秒）。`db.readonly_connection` 另把上下界硬夹在 0.1–30s，
+    #: 这里配再大也不会突破 —— 同步问答本来就不该等更久。
+    nl2sql_timeout_s: float = 3.0
+    #: 结果行数上限：执行前由服务端**外层强制**包一层 `LIMIT`，模型自己写多大都不算数。
+    nl2sql_max_rows: int = 200
+    #: 回灌给模型的最多行数。超过的部分只体现在摘要里的「共 N 行」，
+    #: 避免一次查询把上下文窗吃掉一半（与 `taifu.tools.MAX_RESULT_LINES` 同量级）。
+    nl2sql_feed_lines: int = 12
+
     # --- r103 分块（按内容类型选切分器） --------------------------------------
     #: 启动时是否用种子补齐教程索引（默认开；测试与「只想要题库索引」的部署可关）。
     rag_seed_tutorials: bool = True

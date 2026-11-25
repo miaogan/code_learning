@@ -12,6 +12,7 @@ import json
 import math
 import uuid
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -3172,3 +3173,155 @@ def question_chunk_rows() -> list[dict[str, Any]]:
             "ORDER BY id"
         ).fetchall()
     return [dict(row) for row in rows]
+
+
+NL2SQL_STATUSES = frozenset({"ok", "rejected", "failed"})
+
+
+@dataclass(frozen=True)
+class Nl2SqlView:
+    """一个可被自然语言查询的逻辑视图（r152）。
+
+    **为什么定义在 repository 而不是 `services/nl2sql.py`**：工程门禁
+    `test_sql_only_through_repository` 要求 `app/` 下除 `repository.py` / `db.py` 外
+    不得出现 SQL 字面量，而这里每一条都是 SELECT。把定义留在这里，门禁不用放宽，
+    「SQL 只有一个出口」的约定也继续成立。
+
+    说明与 SQL 放在同一个对象里是刻意的：分头维护时改了一边忘另一边，模型就会
+    对着不存在的列写查询，报错很难归因。一处定义保证不漂移。
+    """
+
+    #: 逻辑名（模型在 SQL 里用这个名字，也是 `check_sql` 白名单的唯一来源）。
+    name: str
+    #: 一句话用途，进提示词。
+    summary: str
+    #: 列清单（`列名 类型：含义`），进提示词。
+    columns: str
+    #: 物理查询，**必须且只包含一个 `?`**（user_id 占位符）。
+    sql: str
+
+
+NL2SQL_VIEWS: dict[str, Nl2SqlView] = {
+    "my_attempts": Nl2SqlView(
+        name="my_attempts",
+        summary="我的每一次客观题作答（练习与笔试都在这里，source 区分）",
+        columns=(
+            "attempt_id 文本：作答记录 id；question_id 文本：题目 id；"
+            "run_id 文本：所属场次（练习是 practice:<会话>）；"
+            "correct 整数：1 答对 / 0 答错；answered_at 时间；source 文本：exam 或 practice；"
+            "direction 文本：方向；sub_direction 文本：二级方向；"
+            "question_kind 文本：single/multiple/judge；difficulty 文本：basic/intermediate/challenge；"
+            "essentiality 文本：must_know/advanced/nice_to_know；language 文本：语言；"
+            "prompt 文本：题干"
+        ),
+        sql=(
+            "SELECT qa.id AS attempt_id, qa.question_id, qa.run_id, qa.correct, "
+            "qa.answered_at, qa.source, q.direction, q.sub_direction, "
+            "q.kind AS question_kind, q.difficulty, q.essentiality, q.language, q.prompt "
+            "FROM question_attempts qa LEFT JOIN questions q ON q.id = qa.question_id "
+            "WHERE qa.user_id = ?"
+        ),
+    ),
+    "my_runs": Nl2SqlView(
+        name="my_runs",
+        summary="我的面试 / 笔试场次",
+        columns=(
+            "run_id 文本：场次 id；kind 文本：interview 或 exam；"
+            "status 文本：running 或 completed；created_at 时间：开始时间"
+        ),
+        sql="SELECT r.id AS run_id, r.kind, r.status, r.created_at FROM runs r WHERE r.user_id = ?",
+    ),
+    "my_reports": Nl2SqlView(
+        name="my_reports",
+        summary="我的诊断报告（只有生成时间，明细在报告页）",
+        columns="report_id 文本：报告 id；created_at 时间：生成时间",
+        sql="SELECT id AS report_id, created_at FROM reports WHERE user_id = ?",
+    ),
+    "my_timeline": Nl2SqlView(
+        name="my_timeline",
+        summary="我的成长时间线事件",
+        columns="type 文本：事件类型；ref_id 文本：对应对象 id；occurred_at 时间：发生时间",
+        sql="SELECT type, ref_id, occurred_at FROM timeline_events WHERE user_id = ?",
+    ),
+    "my_learn_chapters": Nl2SqlView(
+        name="my_learn_chapters",
+        summary="我的教程阅读 / 收听进度（一章一行）",
+        columns="chapter_id 文本：章节 id；updated_at 整数：最后更新毫秒时间戳",
+        sql="SELECT chapter_id, updated_at FROM learn_chapters WHERE user_id = ?",
+    ),
+    "my_mirror_cards": Nl2SqlView(
+        name="my_mirror_cards",
+        summary="我的镜试复盘卡（反向面试，独立于面试场次）",
+        columns=(
+            "card_id 文本：卡片 id；question 文本：我问的问题；"
+            "source 文本：custom 等；created_at 时间：创建时间"
+        ),
+        sql=(
+            "SELECT id AS card_id, question, source, created_at "
+            "FROM mirror_cards WHERE user_id = ?"
+        ),
+    ),
+    "my_coach_runs": Nl2SqlView(
+        name="my_coach_runs",
+        summary="我的教练问答记录",
+        columns=(
+            "coach_id 文本：记录 id；question 文本：我问的问题；"
+            "status 文本：状态；created_at 时间"
+        ),
+        sql=(
+            "SELECT id AS coach_id, question, status, created_at "
+            "FROM coach_runs WHERE user_id = ?"
+        ),
+    ),
+}
+
+#: 执行前的外层包裹：截断行数由服务端说了算，模型自己写 `LIMIT 9999` 也不算数。
+#: 子查询整体在括号内，所以 `?` 的相对顺序不变，参数可以原样传下去。
+NL2SQL_WRAP = "SELECT * FROM ({sql}) AS _nl2sql_sub LIMIT {limit}"
+
+#: 提示词里的 few-shot：给一条真实形状的示例比给一段规则更容易让模型输出可用 SQL。
+NL2SQL_FEW_SHOT = (
+    '{"sql": "SELECT direction, count(*) AS total, sum(correct) AS ok '
+    'FROM my_attempts GROUP BY direction ORDER BY total DESC", '
+    '"explain": "按方向统计题数与答对数"}'
+)
+
+
+
+def insert_nl2sql_query(
+    *,
+    question: str,
+    draft_sql: str,
+    sql_text: str,
+    status: str,
+    reject_reason: str = "",
+    row_count: int = 0,
+    elapsed_ms: int = 0,
+) -> str:
+    """记一条 nl2sql 审计（r152）。返回审计 id。
+
+    `status` 只接受闭集里的三态（`ok` / `rejected` / `failed`）：写进库的状态如果拼错，
+    后续按状态聚合的排查会静默漏数据，所以在入口就夹住而不是「先写进去再说」。
+    `question` 原样存——它是排查误拒的唯一线索，敏感度与 `coach_runs.question` 同级。
+    """
+    normalized = status if status in NL2SQL_STATUSES else "failed"
+    audit_id = str(uuid.uuid4())
+    with connection() as conn:
+        conn.execute(
+            "INSERT INTO nl2sql_queries (id, user_id, question, draft_sql, sql_text, "
+            "status, reject_reason, row_count, elapsed_ms, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                audit_id,
+                _uid(),
+                question,
+                draft_sql,
+                sql_text,
+                normalized,
+                reject_reason,
+                max(0, int(row_count)),
+                max(0, int(elapsed_ms)),
+                _now(),
+            ),
+        )
+    return audit_id

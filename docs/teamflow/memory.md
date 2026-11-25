@@ -151,3 +151,11 @@
 
 - **先校准校验器，再调提示词（2026-11-22 · r150 续）**：口播稿质量闸的两个口径 bug 会整体歪曲结论——`punch_count` 要按**包袱段**数（一个 4 行包袱算 1 次，不是 4 次），小句长度要「中文按字 + 拉丁词按 1 个」（`requestAnimationFrame` 不算 21 字）。修好后 185 节自动过闸从误报的 45.4%/77.8% 变成 **90.8% / 98.4%**；重试 +7.6pp 是真实收益，而「区间口径会被读成下限」的结论因实验被污染**未获证实**，不要引用。
 - **CosyVoice2 的 instruct 必须带 `<|endofprompt|>`（2026-11-22 · r150 续）**：`inference_instruct2` 把 instruct 当 `prompt_text` 喂给 LLM；缺结束符或写成描述性长句，模型会把指令当正文念出来（实测开头就是「就像跟朋友聊天…」）。正确写法是短祈使句 + 结束符：`用开心的语气说这句话<|endofprompt|>`。验证固定用 whisper 转写：开头出现指令文本即回归。同类问题都先查调用约定，再怀疑模型能力。
+
+## 数据问答与只读连接（r152）
+
+- **分析类查询必须走 `db.readonly_query()`，不许走 `connection()`**：`connection()` 持进程级 `_WRITER_LOCK` 且部署是单进程单 worker，一条 3 秒的查询持有它就等于全站排队。只读连接的语义是「不取写锁 + 不进镜像 + 不进离线日志」，PG 用**事务级** `SET TRANSACTION READ ONLY` + `SET LOCAL statement_timeout`（会话级 `SET` 明令禁止——连接归还池后会让下一个业务事务写失败），SQLite 用 `PRAGMA query_only` + 临时连接（WAL 读读不互斥）。
+- **不建数据库 VIEW 做行级隔离**：`current_setting('app.user_id')` 只有 PG 有，SQLite 要每连接注册自定义函数＝两套实现互相漂移。改成「逻辑视图 + 代码内联」——`services/nl2sql.py::LOGICAL_VIEWS` 一处定义同时生成提示词与执行 SQL，`FROM/JOIN` 处替换成 `(SELECT … WHERE user_id = ?)`，`user_id` 由 `core.context` 填、绝不取模型值。**新增视图只需加进 `LOGICAL_VIEWS`**，内联正则与提示词表清单都从它派生。
+- **五道闸门缺一不可**：单条 SELECT / 禁注释与 `?` 与引号标识符 / `FROM·JOIN` 表名穷举白名单（子查询内层也查，没有「其余放行」）/ 函数白名单（日期函数整体禁用，时间列是 ISO 文本走字符串比较）/ 行级隔离。执行前外层强制 `LIMIT`，模型自己写多大都不算数。
+- **工具清单是硬编码的**：`policy.TAIFU_AGENT_SYSTEM` 里逐条列了工具，加工具必须同步改这里，否则工具注册了模型也不会用。开关关闭时由 `tools.tool_specs()` 裁剪下发的 schema，`TOOL_NAMES` 不裁剪（幻觉调用拿到「未开启」而非「没这工具」）。
+- **口径**：只给可回溯的事实计数，不产匹配分 / 百分比 / 掌握度（与 JD 闭环同一条线）。审计表 `nl2sql_queries` 只写不改，`sql_text` 存实际执行语句、`draft_sql` 存模型原文。

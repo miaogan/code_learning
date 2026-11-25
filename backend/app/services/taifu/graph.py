@@ -85,8 +85,14 @@ def _input_hint(arguments: str) -> dict[str, Any]:
     return hint
 
 
-def _prepare(state: TaifuState) -> dict[str, Any]:
-    """读档案摘要、历史、摘要与记忆，拼首轮提示词；明细**不在这里读**，交给工具。"""
+def _prepare(
+    state: TaifuState, client: AIClient | None = None
+) -> dict[str, Any]:
+    """读档案摘要、历史、摘要与记忆，拼首轮提示词；明细**不在这里读**，交给工具。
+
+    `client`（r152）只为 `query_my_data` 往下传：数据问答要再调一次模型生成 SQL，
+    用同一个客户端才能保住「用户自带 Key」的口径（工具里自己 new 会静默回落服务端配置）。
+    """
     profile = repository.latest_profile()
     report = repository.latest_report()
     attempts = repository.list_attempts()
@@ -123,6 +129,7 @@ def _prepare(state: TaifuState) -> dict[str, Any]:
         report=report,
         attempts=attempts,
         memories=[item["content"] for item in memories],
+        client=client,
     )
     _emit(
         {
@@ -153,7 +160,9 @@ async def _agent(state: TaifuState, client: AIClient) -> dict[str, Any]:
     async for event in client.stream_chat(
         policy.TAIFU_AGENT_SYSTEM,
         list(state.get("dialogue") or []),
-        tools=tools.TOOL_SPECS,
+        # `tool_specs()`（r152）：`NL2SQL_ENABLED=false` 时不下发 `query_my_data`，
+        # 模型看不到这个能力就不会去试。
+        tools=tools.tool_specs(),
         timeout_s=TAIFU_TIMEOUT_S,
     ):
         if event["kind"] == "text":
@@ -382,13 +391,17 @@ def build(client: AIClient):
     async def agent_node(state: TaifuState) -> dict[str, Any]:
         return await _agent(state, client)
 
+    def prepare_node(state: TaifuState) -> dict[str, Any]:
+        # 同步节点：保持原来的执行语义（读库是同步阻塞的），只是把客户端一并带下去。
+        return _prepare(state, client)
+
     async def finalize_node(state: TaifuState) -> dict[str, Any]:
         return await _finalize(state, client)
 
     async def final_node(state: TaifuState) -> dict[str, Any]:
         return await _final_answer(state, client)
 
-    graph.add_node("prepare", _prepare)
+    graph.add_node("prepare", prepare_node)
     graph.add_node("agent", agent_node)
     graph.add_node("tools", _tools)
     graph.add_node("final", final_node)

@@ -902,6 +902,27 @@ CREATE INDEX IF NOT EXISTS idx_radar_watchlist_user ON radar_watchlist (user_id,
 """
 
 
+#: r152 nl2sql 审计：一次问答一行，**只写不改**。它是「模型到底生成了什么 SQL」的唯一
+#: 回放源，也是发现误拒 / 慢查询 / 越权尝试的事实源（没有它，事后只能靠日志猜）。
+#: 两个 SQL 列刻意分开：`sql_text` 是**实际执行**的最终语句（已内联视图、已包外层 LIMIT），
+#: `draft_sql` 是模型原文 —— 排查时要看真正跑的东西，看原文只是用来判断模型意图。
+NL2SQL_SCHEMA = """
+CREATE TABLE IF NOT EXISTS nl2sql_queries (
+    id            TEXT PRIMARY KEY,
+    user_id       TEXT NOT NULL DEFAULT 'default',
+    question      TEXT NOT NULL,
+    draft_sql     TEXT NOT NULL DEFAULT '',
+    sql_text      TEXT NOT NULL DEFAULT '',
+    status        TEXT NOT NULL,
+    reject_reason TEXT NOT NULL DEFAULT '',
+    row_count     INTEGER NOT NULL DEFAULT 0,
+    elapsed_ms    INTEGER NOT NULL DEFAULT 0,
+    created_at    TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_nl2sql_user_created ON nl2sql_queries (user_id, created_at);
+"""
+
+
 def _try_create_vector() -> bool:
     """尽力创建 pgvector 扩展（幂等），失败只记日志——与 `_try_create_trgm` 同一模式。
 
@@ -1765,6 +1786,95 @@ def ping() -> None:
         conn.execute("SELECT 1")
 
 
+#: nl2sql 只读连接的取池超时：业务侧 `db_request_timeout_s`（0.25s）是「快失败」口径，
+#: 分析查询多等一会儿是合理的，但也不能等满语句超时（那会让两个上限叠加）。
+_READONLY_POOL_WAIT_S = 2.0
+#: `statement_timeout` 只接受毫秒整数，且必须内联——`SET` 不支持参数占位符。
+#: 下界防「配成 0 变成立即取消」，上界是护栏：再长就该走后台任务而不是同步问答。
+_TIMEOUT_MIN_MS = 100
+_TIMEOUT_MAX_MS = 30_000
+
+
+@contextmanager
+def readonly_connection(*, timeout_s: float = 3.0) -> Iterator[tuple[Any, str]]:
+    """nl2sql 专用只读连接：**不取 `_WRITER_LOCK`**，不进镜像链路、不写离线日志。
+
+    为什么必须另开一条路（r152 的核心理由）：`connection()` 在取连接时持进程级
+    `_WRITER_LOCK`，而部署写死单进程单 worker（compose `--workers 1`）。nl2sql 生成的
+    查询天然带 JOIN / GROUP BY，一条 3 秒的分析查询若走 `connection()`，这 3 秒内
+    **所有业务请求都在排队**——不是变慢，是整个应用卡死。只读查询不写库，没有理由
+    参与那把锁。
+
+    三道只读约束缺一不可：
+
+    - PG：`SET TRANSACTION READ ONLY` + `SET LOCAL statement_timeout`。两者都是
+      **事务级**，事务结束自动失效。绝不能写成会话级 `SET`——连接要归还连接池，
+      会话级的只读会让下一个业务事务的写操作直接失败。
+    - SQLite：`PRAGMA query_only = ON`，写语句由驱动层拒绝，不依赖上层校验。
+    - 两边都用**临时连接**，不复用业务连接的当前事务（`_current_transaction`）。
+
+    SQLite 分支不持 `_SQLITE_LOCK`：副本是 WAL 模式，读读不互斥。库文件不存在时
+    直接报不可用——只读路径绝不允许 `mkdir` 或建出一个空库来「假装能查」。
+    """
+    backend = active_backend()
+    if backend == "sqlite":
+        path = _sqlite_path()
+        if not path.exists():
+            from app.core.errors import database_unavailable
+
+            raise database_unavailable()
+        try:
+            raw = _open_sqlite()
+        except sqlite3.Error as exc:
+            # 只读路径的失败不改全局状态：这里只把驱动异常翻成中文 503，
+            # 不调 `_note_sqlite_failure()`（那会触发整体降级判定，分析查询没这个权力）。
+            logger.warning("db.readonly_sqlite_failed error=%s", type(exc).__name__)
+            from app.core.errors import database_unavailable
+
+            raise database_unavailable() from exc
+        try:
+            raw.execute("PRAGMA query_only = ON")
+            yield raw, "sqlite"
+        finally:
+            raw.close()
+        return
+
+    ms = max(_TIMEOUT_MIN_MS, min(_TIMEOUT_MAX_MS, int(timeout_s * 1000)))
+    try:
+        with get_pool().connection(timeout=_READONLY_POOL_WAIT_S) as raw, raw.transaction():
+            raw.execute("SET TRANSACTION READ ONLY")
+            raw.execute(f"SET LOCAL statement_timeout = {ms}")
+            yield raw, "postgresql"
+    except (PoolTimeout, psycopg.OperationalError, psycopg.InterfaceError) as exc:
+        discard_failed_pool()
+        logger.warning("db.readonly_pg_unavailable error=%s", type(exc).__name__)
+        from app.core.errors import database_unavailable
+
+        raise database_unavailable() from exc
+
+
+def readonly_query(
+    sql: str, params: Sequence[Any] | None = None, *, timeout_s: float = 3.0
+) -> dict[str, Any]:
+    """在独立只读连接上跑一条 SELECT，返回 `{"columns": [...], "rows": [...]}`。
+
+    行统一成 `dict`：PG 池的 row_factory 已是 `dict_row`，SQLite 是 `sqlite3.Row`，
+    调用方不该关心这件事。列名以 `cursor.description` 为准（`SELECT *` 的展开结果
+    只有驱动知道）。
+    """
+    with readonly_connection(timeout_s=timeout_s) as (raw, backend):
+        cursor = _execute_raw(raw, backend, sql, params)
+        rows = cursor.fetchall()
+        columns = [str(item[0]) for item in (cursor.description or ())]
+    out: list[dict[str, Any]] = []
+    for row in rows:
+        if isinstance(row, dict):
+            out.append({name: row.get(name) for name in columns})
+        else:
+            out.append({name: row[name] for name in columns})
+    return {"columns": columns, "rows": out}
+
+
 SYNC_SCHEMA = """
 CREATE TABLE IF NOT EXISTS _offline_receipts (
     op_id TEXT PRIMARY KEY,
@@ -1803,7 +1913,7 @@ def initialize_sqlite() -> None:
             R51_SCHEMA, R61_SCHEMA, radar_schema, R67_INDEXES, R77_SCHEMA, R77_INDEXES,
             R80_SCHEMA, R81_SCHEMA, R81_INDEXES, R100_SCHEMA, COACH_RUNS_SCHEMA,
             RAG_FEEDBACK_SCHEMA, MIRROR_SCHEMA, WRONG_BOOK_SCHEMA, SYNC_SCHEMA,
-            r146_schema,
+            r146_schema, NL2SQL_SCHEMA,
         ):
             conn.executescript(script)
         for columns in (_ADDED_COLUMNS, _R23_ADDED_COLUMNS, _R61_ADDED_COLUMNS, _R67_ADDED_COLUMNS):
@@ -2067,6 +2177,7 @@ def _init_pg_schema() -> None:
         conn.executescript(WRONG_BOOK_SCHEMA)         # 28. 错题本移出标记（r129）
         conn.executescript(SYNC_SCHEMA)               # 29. SQLite 副本 / 离线重放回执
         conn.executescript(R146_SCHEMA)               # 30. 先锋学习清单（r146）
+        conn.executescript(NL2SQL_SCHEMA)             # 31. nl2sql 审计（r152）
         # 28. ID 游标按现有最大 id 播种。`INSERT … SELECT … ON CONFLICT` 是 PG 形态，
         #     SQLite 语法上不接受 —— 所以这里天然不能进副本镜像日志，
         #     由 `init_db()` 的 `suppress_mirror()` 保证（副本侧靠 `_sync_id_allocations()` 对齐）。

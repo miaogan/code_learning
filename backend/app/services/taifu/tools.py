@@ -16,7 +16,9 @@ import json
 from typing import Any, TypedDict
 
 from app.core import repository
+from app.core.config import get_settings
 from app.schemas import Profile, Report
+from app.services import nl2sql
 from app.services.taifu import policy
 from app.services.taifu.brief import clip
 from app.services.taifu.deep_read import (
@@ -43,6 +45,7 @@ TOOL_LABELS: dict[str, str] = {
     "read_resume_anchor": "简历原句",
     "compare_reports": "报告对比",
     "remember": "长期记忆",
+    "query_my_data": "数据查询",
 }
 
 
@@ -156,10 +159,48 @@ TOOL_SPECS: list[dict[str, Any]] = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "query_my_data",
+            "description": (
+                "用一句自然语言查询我的历史数据统计，例如「最近三场面试里 Redis 相关的题答对几个」"
+                "「这个月练了多少题」「哪一类题我错得最多」。凡是涉及数量、次数、分布、"
+                "时间趋势、分组对比的问题都该调它，而不是凭记忆估算。"
+                "它只返回事实计数，不给评分或掌握度——结论由你自己基于行数说。"
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "question": {
+                        "type": "string",
+                        "description": (
+                            "要统计的问题，写成一句口径明确的中文，如"
+                            "「按方向统计最近 30 天我的客观题正确数」"
+                        ),
+                    }
+                },
+                "required": ["question"],
+            },
+        },
+    },
 ]
 
 #: 工具名闭集：路由层与图节点据此判断「模型给了个不存在的工具」。
 TOOL_NAMES = frozenset(TOOL_LABELS)
+
+
+def tool_specs() -> list[dict[str, Any]]:
+    """按开关裁剪下发给模型的工具表（r152）。
+
+    `NL2SQL_ENABLED=false` 时不把 `query_my_data` 的 schema 发出去 —— 模型看不到
+    「有这个工具」就不会去试，比「发出去再让运行时拒绝」少一轮无效往返。
+    `TOOL_NAMES` 刻意**不裁剪**：万一模型仍然幻觉出这个名字，`run()` 会返回
+    「未开启」这种可读结果，而不是「没有这个工具」那种看起来像 bug 的话。
+    """
+    if get_settings().nl2sql_enabled:
+        return TOOL_SPECS
+    return [spec for spec in TOOL_SPECS if spec["function"]["name"] != "query_my_data"]
 
 
 class ToolContext:
@@ -176,10 +217,16 @@ class ToolContext:
         report: Report | None,
         attempts: list[dict[str, Any]],
         memories: list[str],
+        client: Any = None,
     ) -> None:
         self.profile = profile
         self.report = report
         self.attempts = attempts
+        #: r152：`query_my_data` 生成 SQL 时要再调一次模型。由 `graph.build(client)`
+        #: 注入，保证「用户自带 Key」与主对话用的是同一个客户端 —— 在工具里自己
+        #: `AIClient()` 会静默回落到服务端配置，用户填的 Key 就白填了。
+        #: 类型不标 `AIClient`：`tools` 不该为了一个注解去依赖出网模块的导入顺序。
+        self.client = client
         self._memories = list(memories)
         self._document_loaded = False
         self._document_text: str | None = None
@@ -221,6 +268,8 @@ async def run(name: str, arguments: str, context: ToolContext) -> ToolResult:
         return _compare()
     if name == "remember":
         return _remember(context, str(args.get("content") or ""))
+    if name == "query_my_data":
+        return await _query_data(context, str(args.get("question") or ""))
     return _fail(f"没有这个工具：{clip(name, 20)}")
 
 
@@ -412,4 +461,34 @@ def _remember(context: ToolContext, content: str) -> ToolResult:
         "summary": clip(written, SUMMARY_MAX),
         "href": None,
         "content": [f"已记住：{written}"],
+    }
+
+
+async def _query_data(context: ToolContext, question: str) -> ToolResult:
+    """r152：把自然语言统计问题交给 `nl2sql`，结果按统一形状回灌。
+
+    这一层只做三件事：补齐 label、裁剪回灌长度、给 `href=None`。
+    生成 / 校验 / 执行 / 审计全部在 `services/nl2sql.py`，工具层不复制任何一条规则
+    —— 否则「哪些 SQL 能跑」会出现两份口径，改一处漏一处。
+    """
+    if not question.strip():
+        return _fail("没有收到要统计的问题")
+    result = await nl2sql.query(question, client=context.client)
+    label = str(result.get("label") or TOOL_LABELS["query_my_data"])
+    if not result.get("ok"):
+        reason = str(result.get("reason") or result.get("summary") or "没有查到")
+        return {
+            "ok": False,
+            "label": label,
+            "summary": clip(reason, SUMMARY_MAX),
+            "href": None,
+            "content": [f"未读到：{clip(reason, DETAIL_LINE_MAX)}"],
+        }
+    lines = [str(line) for line in (result.get("content") or [])]
+    return {
+        "ok": True,
+        "label": label,
+        "summary": clip(str(result.get("summary") or ""), SUMMARY_MAX),
+        "href": None,
+        "content": lines[:MAX_RESULT_LINES],
     }
