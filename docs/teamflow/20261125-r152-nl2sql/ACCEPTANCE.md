@@ -62,7 +62,7 @@
 判定：**崩溃发生在 pytest 收尾阶段（临时目录清理 / `atexit` 关连接池），与用例结果无关。**
 CI 跑在 Linux 上没有这个钩子，以 CI 的 `backend` 门禁为准。
 
-## 4. 未验证 / 待 CI
+## 4. 仍未验证
 
 1. **真实模型生成的 SQL 质量**：本机全用 `FakeAI` 注入固定 SQL，没有跑真实模型。
    上线后按 `nl2sql_queries` 的 `status=rejected` 占比评估提示词是否需要调。
