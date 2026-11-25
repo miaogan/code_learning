@@ -67,7 +67,25 @@ CI 跑在 Linux 上没有这个钩子，以 CI 的 `backend` 门禁为准。
 1. **真实模型生成的 SQL 质量**：本机全用 `FakeAI` 注入固定 SQL，没有跑真实模型。
    上线后按 `nl2sql_queries` 的 `status=rejected` 占比评估提示词是否需要调。
 
-## 5. 已知遗留
+## 5. 生产验证（2026-11-25 16:34 部署后实测）
+
+`74b46a3` 推送 `dev` → CI 双门禁 success（frontend 63s / backend 504s）→ 自动部署。
+
+| 验证项 | 结果 |
+| --- | --- |
+| `logs/deploy-state` | `2026-11-25T16:34:12+08:00 74b46a3bd6f9df751aec68521210f466deb9b352`（与推送一致） |
+| 容器 | `skillcoach-backend-1` Up healthy |
+| `GET /health` | `status=ok` / `db=postgresql` `db_status=up` / `redis_status=up` / `db_replica=ready` |
+| 审计表 | `SELECT count(*) FROM nl2sql_queries` → 0 行（表已建出） |
+| **PG 只读事务** | `UPDATE questions SET updated_at = updated_at` → **`ReadOnlySqlTransaction`** |
+| 只读连接正常查询 | `SELECT count(*) FROM questions` → 1634 |
+| 工具注册 | `TOOL_NAMES` 含 `query_my_data` |
+
+> 踩坑留痕：第一次用 `INSERT INTO taifu_memories (...)` 验证写拒绝，报的是
+> `UndefinedColumn`（列名写错），那不是「只读生效」的证据 —— 换一条列名确定的
+> `UPDATE` 才拿到 `ReadOnlySqlTransaction`。验证「某个约束生效」时，先确认语句本身是合法的。
+
+## 6. 已知遗留
 
 - **没有独立前端入口**：目前只能通过太傅对话触发。`/leap` 的「问一句」入口按
   TECH.md §6 的取舍留作后续。
