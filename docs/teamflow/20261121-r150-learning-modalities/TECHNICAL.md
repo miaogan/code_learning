@@ -347,3 +347,40 @@ heard 取并集 / 断点取 `updatedAt` 较新；旧客户端缺字段按空值�
 2. 音色选定后全量重跑（`--vox-ref` 换一行）；
 3. 合规音色 LoRA 微调（若素材足够，可接近 gdg 的自然度）；
 4. CDN / 回大陆节点（首屏冷启动 0.6–1.5s 的跨境下限）。
+
+## 18. ComfyUI 探索台（2026-11-25，混合方案）
+
+**决策**：生产链路不动（`make_audio.py` 可复现/可测/CI 可断言），另建 ComfyUI 只做
+**试音色、扫 CFG/步数、试 LoRA 权重、可视化调试**；选好的参数回写到脚本。
+
+### 18.1 落地位置与结构
+
+- 根目录 `D:/work_space/comfyui/`（与产品仓库解耦）：`ComfyUI/`（官方主仓）+ `.venv/`（Py3.12）
+  + `README.md`（启停/踩坑/合规）+ `scripts/comfyui_smoke.py`（API 冒烟）+ `start_comfyui.bat`。
+- 节点：`custom_nodes/ComfyUI-VoxCPM2`（TTS / Voice Clone / TrainConfig / DatasetMaker / LoraTrainer 共 5 个）。
+- **权重零拷贝复用**：`models/tts/VoxCPM/VoxCPM2/` 与 `models/loras/gdg_v1.safetensors` 用 NTFS
+  硬链接指向 `_tts/` 里的现有文件（同盘，不额外占空间，共 4.7GB）。
+
+### 18.2 实测结果
+
+| 项 | 结果 |
+|---|---|
+| 启动 | 8188 端口，1093 个节点注册，VoxCPM 5 个全部可用 |
+| 零样本合成 | 48kHz 单声道 FLAC，7.2s 音频，冷启动 54s（含权重加载） |
+| 挂 gdg LoRA | 正常，二次合成 14s（模型常驻显存 ~7.5GB/8GB） |
+
+### 18.3 环境硬约束（重装必看）
+
+1. **torch ≥2.7**：当前 ComfyUI 依赖 `comfy_kitchen`，其算子用 `list[int]` 注解，
+   torch 2.5/2.6 的 `infer_schema` 报 `unsupported type list[int]`；本机用 **2.7.1+cu126**。
+2. requirements 里裸 `torch` 会把 CUDA 版换成 CPU 版——必须 `-c/--no-deps` 保护。
+3. pip 缓存损坏会反复抛 `IncompleteRead` → `--no-cache-dir`；大 wheel 用 `curl -C -` 续传。
+4. 节点缺 `librosa`（未写进 requirements）。
+5. **LoRA alpha 对齐**：节点默认 `alpha=16`，gdg_v1 训练时是 32 → 已本地改为 32（否则效果减半）。
+6. D 盘仅剩 ~8GB（99%），后续要装大模型需先清理。
+
+### 18.4 边界（为什么不把生产搬进去）
+
+节点图覆盖不了：写稿质量闸（185 条规则 + 重试）、Plan 构建（情绪段/合段/停顿表）、
+时间轴 DSP（真实坐标混音、抢话、裁静音、静音谷分句、−22LUFS、RIFF AI 标识）、契约与增量发布。
+这些要么是条件式数据变换、要么是自研音频算法，进 ComfyUI 就得写自定义节点（= 把 Python 包一层）。

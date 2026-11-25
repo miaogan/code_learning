@@ -64,6 +64,7 @@
 - 当前线上是 VoxCPM2 零样本 + **官方演示参考音**（授权存疑，仅验证链路）；听感不如 gdg LoRA 版，
   差距来源已拆清：**LoRA（不可复制）+ 参考音偏平**。候选择音工具已就绪：
   `scripts/tts/ab_voice.py`（AISHELL-3 中文音色 ×4 + cfg/步数变体，7 个样本已生成，对比页在 `out/ab_voices/`）。
+- **试音色工具**：ComfyUI 探索台已就绪（`D:/work_space/comfyui`，VoxCPM2 节点 + 硬链接权重，实测零样本与 LoRA 均可通过 API 合成）；另有 `scripts/tts/ab_voice.py` 批量出对比样片。
 - **码率待定**：现为 AAC 64k（与源 SNR 19.5dB，齿音有金属感）；96k/128k 分别 26.1/31.3dB。
   改码率只需 `transcode_audio.py --bitrate 128k` 重转码，**不必重跑合成**。
 - **合规 LoRA**：若拿到本人/授权音色素材（≥1000 条、干净宽带），自训 LoRA 能接近 gdg 的自然度——这是唯一正路。
